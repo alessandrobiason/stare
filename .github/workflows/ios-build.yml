@@ -181,9 +181,42 @@ jobs:
           key: pods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
           restore-keys: pods-${{ runner.os }}-
 
+      # EXPO_USE_SOURCE=1 takes the source branch of every Expo podspec's
+      # `vendored_frameworks` switch. A prebuilt XCFramework next to a podspec
+      # wins over the .swift files beside it, and patches/ only edits the .swift
+      # files — so a precompiled pod is a patch that applies, passes every
+      # check, changes the fingerprint, and changes nothing that runs.
       - name: pod install
         working-directory: ios
+        env:
+          EXPO_USE_SOURCE: '1'
+          EXPO_USE_PRECOMPILED_MODULES: '0'
         run: pod install
+
+      # And then prove it, because "in theory the sources are compiled" is what
+      # the last three builds were built on. This reports how ExpoCamera was
+      # actually integrated and fails if the patched source is not what Xcode
+      # will compile.
+      - name: Prove the patched camera source is what gets compiled
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          echo "--- Podfile.lock entry"
+          grep -n "ExpoCamera" Podfile.lock || true
+          echo "--- any XCFramework in the pod"
+          find Pods -maxdepth 3 -name "*.xcframework" -print || true
+          echo "--- how the pod resolves"
+          if [ -e Pods/ExpoCamera ]; then ls -la Pods/ExpoCamera || true; fi
+          echo "--- does the Pods project reference the patched source?"
+          if ! grep -q "CameraPhotoCapture.swift" Pods/Pods.xcodeproj/project.pbxproj; then
+            echo "::error::Pods project does not compile CameraPhotoCapture.swift, so patches/ cannot take effect"
+            exit 1
+          fi
+          if find Pods -maxdepth 3 -name "ExpoCamera.xcframework" | grep -q .; then
+            echo "::error::ExpoCamera is linked as a prebuilt XCFramework, so the patched Swift is not compiled"
+            exit 1
+          fi
+          echo "ExpoCamera compiles from the patched sources."
 
       # Simulator + CODE_SIGNING_ALLOWED=NO keeps this free of certificates and
       # provisioning profiles. Workspace and scheme are derived from the name
