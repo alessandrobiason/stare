@@ -6,6 +6,7 @@ import {
   TLE_REFRESH_INTERVAL_MS,
   TLE_RETRY_INTERVAL_MS
 } from "../constants";
+import { CameraAttitude } from "../camera/attitude";
 import { CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
@@ -13,7 +14,8 @@ import { MarkerStats } from "../hooks/useAnimatedMarkers";
 import { SkySegmentationStats } from "../hooks/useSkySegmentation";
 import { SkyTrackerStats } from "../satellite/skyTracker";
 import { ObserverLocation } from "../types";
-import { refinedCellCount, SkyMask, skyCoverage } from "../vision/skyMask";
+import { AnchoredSkyMask, maskOffsetDeg } from "../vision/anchoredMask";
+import { refinedCellCount, skyCoverage } from "../vision/skyMask";
 import { bytes, clockTime, degrees, duration, fixed, NONE, position, vector } from "./format";
 
 /**
@@ -82,22 +84,39 @@ export function statusSection({ rows, warnings }: StatusDebugInput): DebugSectio
 }
 
 export type MaskDebugInput = {
-  mask: SkyMask | null;
+  mask: AnchoredSkyMask | null;
   error: string | null;
   stats: SkySegmentationStats;
+  /** Where the camera is aimed now, against which the mask's own aim is shown. */
+  viewAttitude: CameraAttitude;
   /** `performance.now()` when the panel sampled, for the mask's age. */
   nowMs: number;
 };
 
 /** What the sky segmentation is doing, and how fresh its answer is. */
-export function maskSection({ mask, error, stats, nowMs }: MaskDebugInput): DebugSection {
+export function maskSection({
+  mask: anchored,
+  error,
+  stats,
+  viewAttitude,
+  nowMs
+}: MaskDebugInput): DebugSection {
+  const mask = anchored?.mask ?? null;
   const rows: DebugRow[] = [
     { label: "State", value: mask ? "Ready" : error ? "Failing" : "Waiting" }
   ];
   if (error) rows.push({ label: "Error", value: error });
-  if (mask) {
+  if (mask && anchored) {
     rows.push({ label: "Grid", value: `${mask.columns} x ${mask.rows} cells` });
     rows.push({ label: "Open sky", value: `${Math.round(skyCoverage(mask) * 100)}%` });
+    // How far the phone has turned since the frame this mask was cut from.
+    // The mask travels with the sky rather than with the screen, so this is not
+    // an error — it is how much of the view is sky nothing has looked at yet,
+    // and it is the figure to watch when markers stop being drawn during a pan.
+    rows.push({
+      label: "Aim offset",
+      value: `${maskOffsetDeg(anchored, viewAttitude).toFixed(1)}°`
+    });
     // How much of the frame the segmenter found an edge in, and is therefore
     // carrying at sub-cell resolution. A frame of open sky reads zero; one of
     // trees is the count to watch if a pass ever starts costing too much.
@@ -141,6 +160,9 @@ export function skySection({ tracker, markers, epoch }: SkyDebugInput): DebugSec
       { label: `Above ${MINIMUM_SATELLITE_ELEVATION_DEG}°`, value: `${markers.drawn + markers.occluded}` },
       { label: "Drawn", value: `${markers.drawn}` },
       { label: "Behind terrain", value: `${markers.occluded}` },
+      // Not behind anything as far as anyone knows: the mask has not been
+      // aimed at that sky yet, and an unlooked-at direction is not drawn.
+      { label: "Sky not yet seen", value: `${markers.unmapped}` },
       {
         label: "Sweep",
         value: `${SATELLITE_TRACKING.sweepPeriodSeconds.toFixed(0)} s · ${Math.round(

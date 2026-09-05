@@ -1,7 +1,7 @@
 import React, { MutableRefObject, useCallback, useEffect, useMemo, useState } from "react";
 import { LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { FrameLens } from "../camera/projection";
-import { readCache } from "../data/tleCache";
+import { cachedCatalog } from "../data/tleCache";
 import {
   catalogSection,
   DebugSection,
@@ -18,13 +18,14 @@ import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrie
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
+import { AnchoredSkyMask } from "../vision/anchoredMask";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
-import { SkyMask, skyCoverage } from "../vision/skyMask";
+import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
 import { DebugPanel } from "./DebugPanel";
 import { DebugToggle } from "./DebugToggle";
 import { SatelliteMarkers } from "./SatelliteMarkers";
-import { SkyMaskGrid } from "./SkyMaskGrid";
+import { SkyMaskOverlay } from "./SkyMaskOverlay";
 import { theme } from "./theme";
 
 /**
@@ -173,6 +174,9 @@ export const SkyOverlay: React.FC<Props> = ({
       mask: segmentation.mask,
       error: segmentation.error,
       stats: segmentation.statsRef.current,
+      // Where the camera is aimed now, so the panel can say how far the mask
+      // is from it: the one figure that says whether a pass is overdue.
+      viewAttitude: smoothed.filterRef.current.sample(performance.now() / 1000),
       nowMs: performance.now()
     }),
     skySection({
@@ -182,7 +186,7 @@ export const SkyOverlay: React.FC<Props> = ({
     }),
     // The cache's timestamps are wall-clock (they outlive the process), unlike
     // everything else on this page, which is measured against `performance.now()`.
-    catalogSection({ cache: readCache(), nowMs: Date.now() }),
+    catalogSection({ cache: cachedCatalog(), nowMs: Date.now() }),
     viewSection({
       source: frame.label,
       box: frameStyle,
@@ -219,7 +223,14 @@ export const SkyOverlay: React.FC<Props> = ({
       <View style={[styles.frame, frameStyle]}>
         {frame.render({ onDiscontinuity })}
 
-        {debug && segmentation.mask && <SkyMaskGrid mask={segmentation.mask} />}
+        {debug && segmentation.mask && (
+          <SkyMaskOverlay
+            mask={segmentation.mask}
+            orientationFilterRef={smoothed.filterRef}
+            lens={frame.lens}
+            frame={frameStyle}
+          />
+        )}
 
         {/* A subscription rather than a value: the loop publishes at display
             rate, and this view has nothing to redraw when it does. */}
@@ -240,8 +251,11 @@ export const SkyOverlay: React.FC<Props> = ({
 };
 
 /** One line saying what the sky mask is doing, for the scenes' status panels. */
-function describeMask(mask: SkyMask | null, error: string | null): string {
-  if (mask) return `Sky mask ${mask.columns}x${mask.rows} · ${Math.round(skyCoverage(mask) * 100)}% sky`;
+function describeMask(anchored: AnchoredSkyMask | null, error: string | null): string {
+  if (anchored) {
+    const { mask } = anchored;
+    return `Sky mask ${mask.columns}x${mask.rows} · ${Math.round(skyCoverage(mask) * 100)}% sky`;
+  }
   return error ? `Sky mask failing: ${error}` : "Waiting for the first sky mask…";
 }
 

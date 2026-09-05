@@ -2,7 +2,7 @@ import type { CameraView } from "expo-camera";
 import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { decode as decodeJpeg } from "jpeg-js";
-import { FramePixels, SkyFrameGrabber } from "./skySegmenter";
+import { FramePixels, ShutterCallback, SkyFrameGrabber } from "./skySegmenter";
 import { Size } from "./skySegmentation";
 
 /**
@@ -64,7 +64,7 @@ export function cameraFrameGrabber(
       return camera() ? frame : null;
     },
 
-    async grab(size: Size): Promise<FramePixels> {
+    async grab(size: Size, onShutter: ShutterCallback): Promise<FramePixels> {
       const view = camera();
       if (!view) throw new Error("The camera is not open");
 
@@ -80,6 +80,13 @@ export function cameraFrameGrabber(
         skipProcessing: false
       });
       if (!picture) throw new Error("The camera returned no picture");
+      // The shutter, as near as this side of the API can see it: the still is
+      // taken, and everything below — resize, encode, decode, and then the model
+      // — is work on a picture of a moment that has passed. The attitude the
+      // mask is filed under is read here rather than before the capture, which
+      // on a phone being turned is the difference between a mask aimed where it
+      // was taken and one aimed several degrees off it.
+      onShutter();
 
       // Every native image on this path is released by hand. They are shared
       // refs, so left alone they hold their bitmaps until the JavaScript garbage

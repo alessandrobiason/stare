@@ -21,6 +21,19 @@ export type FramePixels = {
   channels: 3 | 4;
 };
 
+/**
+ * Called as close to the instant the pixels were taken as the platform can
+ * report, and before any of the work that follows it.
+ *
+ * Which instant that is matters, because the mask is a map of the sky rather
+ * than of the screen (`AnchoredSkyMask`) and the aim it is filed under has to be
+ * where the camera was looking when the shutter fired. Everything after the
+ * shutter — a resize, a JPEG round trip, the better part of a second of
+ * inference — happens on a frame the camera has already left behind, and on a
+ * phone being panned the capture alone is degrees of sky.
+ */
+export type ShutterCallback = () => void;
+
 /** What the segmenter needs from whatever is showing the picture. */
 export type SkyFrameGrabber = {
   /**
@@ -29,8 +42,8 @@ export type SkyFrameGrabber = {
    * this is what the model input and the mask grid are shaped from.
    */
   size(): Size | null;
-  /** The frame resampled to exactly `size`. */
-  grab(size: Size): Promise<FramePixels>;
+  /** The frame resampled to exactly `size`, taken at `onShutter`. */
+  grab(size: Size, onShutter: ShutterCallback): Promise<FramePixels>;
 };
 
 let modelPromise: Promise<SkyModel> | null = null;
@@ -57,14 +70,23 @@ export async function preloadSkySegmenter(): Promise<void> {
   await loadModel();
 }
 
-/** Segments the sky in the frame `grabber` is showing. */
-export async function segmentSky(grabber: SkyFrameGrabber): Promise<SkyMask> {
+/**
+ * Segments the sky in the frame `grabber` is showing.
+ *
+ * `onShutter` fires when that frame is taken rather than when the mask comes
+ * back, which is the only moment the attitude behind it can be read at: see
+ * `ShutterCallback`.
+ */
+export async function segmentSky(
+  grabber: SkyFrameGrabber,
+  onShutter: ShutterCallback = () => undefined
+): Promise<SkyMask> {
   const frame = grabber.size();
   if (!frame) throw new Error("Sky segmentation has no frame to read");
 
   const model = await loadModel();
   const input = modelInputSize(frame);
-  const { pixels, channels } = await grabber.grab(input);
+  const { pixels, channels } = await grabber.grab(input, onShutter);
   const logits = await model.run(toModelTensor(pixels, input, channels), input);
 
   return poolSkyLogits(logits, input, maskGridFor(frame));

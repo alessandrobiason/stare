@@ -1,5 +1,5 @@
 import { Size } from "../../src/vision/skySegmentation";
-import { FramePixels, SkyFrameGrabber } from "../../src/vision/skySegmenter";
+import { FramePixels, ShutterCallback, SkyFrameGrabber } from "../../src/vision/skySegmenter";
 
 /**
  * The browser's half of "give me this frame at this size": a `<video>` drawn
@@ -50,10 +50,13 @@ export function videoFrameGrabber(video: () => HTMLVideoElement | null): SkyFram
       return { width: element.videoWidth, height: element.videoHeight };
     },
 
-    grab(size: Size): Promise<FramePixels> {
+    grab(size: Size, onShutter: ShutterCallback): Promise<FramePixels> {
       const element = video();
       if (!element) throw new Error("The replay video is not ready");
       const context = scratchContext(size);
+      // Nothing to wait for here — the frame on the element is the frame that
+      // gets drawn — so the shutter is now.
+      onShutter();
       // Straight to the target size: `drawImage` is the browser's own scaler,
       // and the frame keeps its shape because `size` was derived from it.
       context.drawImage(element, 0, 0, size.width, size.height);

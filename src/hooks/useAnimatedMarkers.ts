@@ -12,8 +12,8 @@ import { rangeKm } from "../components/markerGeometry";
 import { SatelliteCategory } from "../satellite/categories";
 import { OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
+import { AnchoredSkyMask, skyProbe } from "../vision/anchoredMask";
 import { MarkerVisibilityFilter } from "../vision/markerVisibility";
-import { skyConfidenceAt, SkyMask } from "../vision/skyMask";
 import { useLatestRef } from "./useLatestRef";
 
 export type SatelliteMarker = {
@@ -77,6 +77,12 @@ export type MarkerStats = {
    * or faded far enough towards it not to be worth drawing.
    */
   occluded: number;
+  /**
+   * Placed markers, drawn or not, whose direction the mask has no answer for:
+   * the phone has turned onto sky no pass has looked at yet. Zero when the mask
+   * is keeping up, and the figure to look at when a pan empties the frame.
+   */
+  unmapped: number;
 };
 
 /**
@@ -121,7 +127,8 @@ type AnimatedMarkerOptions = {
   /** Time and observer as of the newest frame. */
   epochRef: MutableRefObject<OrbitEpoch>;
   orientationFilterRef: MutableRefObject<OrientationFilter>;
-  mask: SkyMask | null;
+  /** The newest mask, with the attitude it was taken at. */
+  mask: AnchoredSkyMask | null;
   enabledCategories: Set<SatelliteCategory>;
   /**
    * Told how many markers are drawn: on a change, and no more often than
@@ -168,7 +175,7 @@ export function useAnimatedMarkers({
   const enabledCategoriesRef = useLatestRef(enabledCategories);
   const onVisibleCountChangeRef = useLatestRef(onVisibleCountChange);
   const previousFrameRef = useRef<number | null>(null);
-  const markerStatsRef = useRef<MarkerStats>({ drawn: 0, occluded: 0 });
+  const markerStatsRef = useRef<MarkerStats>({ drawn: 0, occluded: 0, unmapped: 0 });
   const visibilityRef = useRef(new MarkerVisibilityFilter());
   const frameRateRef = useRef(0);
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
@@ -201,6 +208,7 @@ export function useAnimatedMarkers({
       const visibility = visibilityRef.current;
       const visible: SatelliteMarker[] = [];
       let occluded = 0;
+      let unmapped = 0;
 
       // No mask, no markers. Drawing them anyway — which is what happens the
       // moment this is written as "hide them only if the mask says to" — claims
@@ -209,6 +217,14 @@ export function useAnimatedMarkers({
       // while the first mask is still coming, and a failing segmenter is a
       // fatal error rather than a quietly emptier sky.
       if (currentMask) {
+        // Where the mask is looking, not where the phone is: the satellite's
+        // own direction is projected into the frame the mask was taken from,
+        // so turning the phone moves the markers and leaves what the mask says
+        // about each of them alone. Read at the marker's *screen* position
+        // instead, every degree the phone turned between the shutter and this
+        // frame is a degree of building the mask has in the wrong place — which
+        // is a satellite drawn over a roof for as long as the next pass takes.
+        const skyTowards = skyProbe(currentMask, lens);
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
@@ -221,10 +237,16 @@ export function useAnimatedMarkers({
           // hidden ones are counted rather than only dropped, because how many
           // the mask is taking is the first thing to look at when it is taking
           // the wrong ones — the debug overlay shows the figure.
-          const opacity = visibility.sample(
-            fix.name,
-            skyConfidenceAt(currentMask, point.left, point.top)
-          );
+          //
+          // Sky the mask never saw — revealed by the turn that is still ahead
+          // of the segmenter — reads as no sky rather than as open sky, for the
+          // same reason no mask at all draws nothing: an unlooked-at direction
+          // is not a clear line of sight. It costs nothing on a glance, since
+          // the filter needs a run of frames to hide a drawn marker and the
+          // next pass covers the new sky within one.
+          const confidence = skyTowards(fix.position);
+          if (confidence === null) unmapped += 1;
+          const opacity = visibility.sample(fix.name, confidence ?? 0);
           if (opacity <= MARKER_VISIBILITY.minimumDrawnOpacity) {
             occluded += 1;
             continue;
@@ -252,7 +274,7 @@ export function useAnimatedMarkers({
         visibility.reset();
       }
 
-      markerStatsRef.current = { drawn: visible.length, occluded };
+      markerStatsRef.current = { drawn: visible.length, occluded, unmapped };
 
       // Farthest first, so nearer markers draw over the ones behind them and
       // the overlay reads as having depth. Landmarks go last whatever their

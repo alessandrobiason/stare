@@ -119,8 +119,12 @@ export function scaledDetail(
 
 /**
  * How confident the mask is that the frame position at (`xPercent`,
- * `yPercent`) — both 0-100, origin top-left — is open sky. This is what hides
- * satellites behind buildings and trees, through `MarkerVisibilityFilter`.
+ * `yPercent`) — both 0-100, origin top-left — is open sky.
+ *
+ * A position in the mask's *own* frame, which is not the frame on screen once
+ * the phone has moved: what hides satellites behind buildings and trees comes
+ * in through `skyProbe`, which turns a direction in the sky into a position
+ * here before asking. See `anchoredMask.ts`.
  *
  * Interpolated between cell centres rather than read from the cell the point
  * falls in. A cell is several degrees of sky across, and the nearest-cell

@@ -1,7 +1,7 @@
 import { DEVICE_CAMERA_FIELD_OF_VIEW } from "../constants";
 import { toRadians } from "../math/angles";
 import { EnuPosition } from "../types";
-import { axesFromAttitude, CameraAttitude } from "./attitude";
+import { axesFromAttitude, CameraAttitude, CameraAxes } from "./attitude";
 
 /** Position within the video frame, in percent from the top-left corner. */
 export type FramePoint = { left: number; top: number };
@@ -81,7 +81,24 @@ export function projectBeyondFrame(
   attitude: CameraAttitude,
   lens: FrameLens
 ): FramePoint | null {
-  const { forward, right, up } = axesFromAttitude(attitude);
+  return projectWithAxes(position, axesFromAttitude(attitude), lens);
+}
+
+/**
+ * The same projection again, onto axes that have already been built.
+ *
+ * `axesFromAttitude` is six trigonometric functions, and an attitude that is
+ * fixed for a whole frame — the sky mask's, which is aimed where the camera was
+ * when its frame was captured — would otherwise pay for them once per satellite
+ * per displayed frame. Callers projecting many positions against one attitude
+ * build the axes once and come in here.
+ */
+export function projectWithAxes(
+  position: EnuPosition,
+  axes: CameraAxes,
+  lens: FrameLens
+): FramePoint | null {
+  const { forward, right, up } = axes;
 
   const depth =
     position.east * forward.east + position.north * forward.north + position.up * forward.up;

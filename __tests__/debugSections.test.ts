@@ -11,7 +11,7 @@ import { CachedCatalog } from "../src/data/tleCache";
 import { SAMPLE_TLE } from "../src/data/sampleTle";
 import { replaySensorSection } from "../testing/replay/debugSections";
 import { RecordingSnapshot } from "../testing/replay/recordingDataset";
-import { SkyMask } from "../src/vision/skyMask";
+import { AnchoredSkyMask } from "../src/vision/anchoredMask";
 
 /** What a row says, keyed by its label, which is how the panel reads. */
 function values(rows: { label: string; value: string }[]): Record<string, string> {
@@ -20,10 +20,11 @@ function values(rows: { label: string; value: string }[]): Record<string, string
 
 const observer = { latitudeDeg: 60.16986, longitudeDeg: 24.93837, heightM: 21.4 };
 
-const mask: SkyMask = {
-  columns: 2,
-  rows: 2,
-  confidence: [1, 1, 0, 0]
+const level = { headingDeg: 0, pitchDeg: 0, rollDeg: 0 };
+
+const mask: AnchoredSkyMask = {
+  mask: { columns: 2, rows: 2, confidence: [1, 1, 0, 0] },
+  attitude: level
 };
 
 const noStats = { updatedAtMs: null, lastPassMs: null, passes: 0, failures: 0 };
@@ -63,7 +64,8 @@ describe("the status page", () => {
 describe("the mask page", () => {
   test("says the mask is still coming rather than showing a stale one", () => {
     const rows = values(
-      maskSection({ mask: null, error: null, stats: noStats, nowMs: 1000 }).rows
+      maskSection({ mask: null, error: null, stats: noStats, viewAttitude: level, nowMs: 1000 })
+        .rows
     );
 
     expect(rows.State).toBe("Waiting");
@@ -77,6 +79,7 @@ describe("the mask page", () => {
         mask,
         error: null,
         stats: { updatedAtMs: 4000, lastPassMs: 920, passes: 7, failures: 1 },
+        viewAttitude: { ...level, headingDeg: 12 },
         nowMs: 5500
       }).rows
     );
@@ -87,11 +90,15 @@ describe("the mask page", () => {
     expect(rows.Age).toBe("1.5 s");
     expect(rows["Last pass"]).toBe("920 ms");
     expect(rows.Passes).toBe("7 ok · 1 failed");
+    // How far the phone has turned since the frame the mask was cut from: the
+    // part of the view the mask cannot answer for yet.
+    expect(rows["Aim offset"]).toBe("12.0°");
   });
 
   test("a failing segmenter names the failure", () => {
     const rows = values(
-      maskSection({ mask: null, error: "no backend", stats: noStats, nowMs: 0 }).rows
+      maskSection({ mask: null, error: "no backend", stats: noStats, viewAttitude: level, nowMs: 0 })
+        .rows
     );
 
     expect(rows.State).toBe("Failing");
@@ -103,13 +110,14 @@ test("the sky page separates what is drawn from what the mask is hiding", () => 
   const rows = values(
     skySection({
       tracker: { entries: 16000, candidates: 240, sweepProgress: 0.5, primed: true },
-      markers: { drawn: 12, occluded: 30 },
+      markers: { drawn: 12, occluded: 30, unmapped: 4 },
       epoch: { time: new Date("2026-08-30T21:00:00.500Z"), observer }
     }).rows
   );
 
   expect(rows.Catalog).toBe("16000 objects");
   expect(rows["Near horizon"]).toBe("240 tracked");
+  expect(rows["Sky not yet seen"]).toBe("4");
   expect(rows[`Above ${MINIMUM_SATELLITE_ELEVATION_DEG}°`]).toBe("42");
   expect(rows.Drawn).toBe("12");
   expect(rows["Behind terrain"]).toBe("30");
@@ -121,7 +129,7 @@ test("the sky page says when the opening pass has not finished", () => {
   const rows = values(
     skySection({
       tracker: { entries: 10, candidates: 0, sweepProgress: 0.25, primed: false },
-      markers: { drawn: 0, occluded: 0 },
+      markers: { drawn: 0, occluded: 0, unmapped: 0 },
       epoch: { time: new Date("2026-08-30T21:00:00Z"), observer }
     }).rows
   );

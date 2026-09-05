@@ -1,11 +1,12 @@
 import { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
+import { CameraAttitude } from "../camera/attitude";
 import { FrameLens } from "../camera/projection";
 import { SKY_MASK_MAX_AGE_SECONDS, SKY_SEGMENTATION_INTERVAL_MS } from "../constants";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { AttitudeReading } from "./useSmoothedOrientation";
+import { AnchoredSkyMask } from "../vision/anchoredMask";
 import { applyHorizonPrior } from "../vision/horizonPrior";
 import { startSegmentationLoop } from "../vision/segmentationLoop";
-import { SkyMask } from "../vision/skyMask";
 import { SkyMaskTemporalFilter, SkyMaskSensorSample } from "../vision/skyMaskTemporalFilter";
 import { segmentSky, SkyFrameGrabber } from "../vision/skySegmenter";
 
@@ -20,8 +21,13 @@ export type SkySegmentationStats = {
 };
 
 export type SkySegmentation = {
-  /** The newest mask, or `null` when there is not a current one to trust. */
-  mask: SkyMask | null;
+  /**
+   * The newest mask and the attitude it was taken at, or `null` when there is
+   * not a current one to trust. Aimed rather than bare, because a mask read at
+   * the screen position a marker happens to be at now is a mask of where the
+   * buildings were when the shutter opened — see `AnchoredSkyMask`.
+   */
+  mask: AnchoredSkyMask | null;
   error: string | null;
   /**
    * Counters kept in a ref rather than state: they change on every pass and
@@ -102,7 +108,7 @@ export function useSkySegmentation(
    */
   rebuildSource?: () => boolean
 ): SkySegmentation {
-  const [mask, setMask] = useState<SkyMask | null>(null);
+  const [mask, setMask] = useState<AnchoredSkyMask | null>(null);
   const [error, setError] = useState<string | null>(null);
   const statsRef = useRef<SkySegmentationStats>({
     updatedAtMs: null,
@@ -127,30 +133,48 @@ export function useSkySegmentation(
       const grabber = grabberRef.current;
       if (!active || !grabber || !grabber.size()) return;
 
-      // Stamped for the frame going into the model, not for whenever inference
-      // comes back: the temporal filter re-aims the previous mask by the
-      // attitude change between the two, and a second of inference in the
-      // middle would otherwise make that a change the camera never made. The
-      // same clock as the orientation filter, so the two agree.
-      const capturedAtSeconds = performance.now() / 1000;
-      const attitude = orientationFilterRef.current.sample(capturedAtSeconds);
-      const capturedAt: SkyMaskSensorSample = {
-        timestampSeconds: capturedAtSeconds,
-        headingDeg: attitude.headingDeg,
-        pitchDeg: attitude.pitchDeg,
-        rollDeg: attitude.rollDeg,
-        gyroRadPerSecond: readingRef.current?.gyroRadPerSecond
+      const startedAtMs = performance.now();
+      // Where the camera was looking at the moment the frame was taken, read at
+      // that moment rather than around it. The mask is filed under this aim and
+      // everything downstream reads it through that: the temporal filter re-aims
+      // the previous mask by the change between two of them, the horizon prior
+      // caps the cells that were looking at the ground, and the markers are
+      // tested against the sky it actually covers.
+      //
+      // The orientation filter only coasts forwards, so an attitude for the
+      // shutter cannot be recovered after the fact — hence the callback rather
+      // than a timestamp handed back with the pixels. The same clock as the
+      // filter, so the two agree.
+      let capture: { attitude: CameraAttitude; sample: SkyMaskSensorSample } | null = null;
+      const onShutter = () => {
+        const capturedAtSeconds = performance.now() / 1000;
+        const attitude = orientationFilterRef.current.sample(capturedAtSeconds);
+        capture = {
+          attitude,
+          sample: {
+            timestampSeconds: capturedAtSeconds,
+            headingDeg: attitude.headingDeg,
+            pitchDeg: attitude.pitchDeg,
+            rollDeg: attitude.rollDeg,
+            gyroRadPerSecond: readingRef.current?.gyroRadPerSecond
+          }
+        };
       };
 
       try {
-        const raw = await segmentSky(grabber);
+        const raw = await segmentSky(grabber, onShutter);
         if (!active) return;
+        // A grabber that returned pixels without reporting a shutter would leave
+        // the mask with no aim to be read at, which is not something to guess at.
+        if (!capture) throw new Error("The frame was segmented without a shutter reading");
+        const { attitude, sample } = capture;
+
         failures = 0;
         const finishedAtMs = performance.now();
         maskAtSeconds = finishedAtMs / 1000;
         statsRef.current = {
           updatedAtMs: finishedAtMs,
-          lastPassMs: finishedAtMs - capturedAtSeconds * 1000,
+          lastPassMs: finishedAtMs - startedAtMs,
           passes: statsRef.current.passes + 1,
           failures: statsRef.current.failures
         };
@@ -159,7 +183,10 @@ export function useSkySegmentation(
         // afterwards would have its ground handed back by the very next blend.
         // Applied here it is carried forward with the attitude it was taken at.
         const grounded = applyHorizonPrior(raw, attitude, lens);
-        setMask(filterRef.current.update(grounded, capturedAt));
+        // Published with `attitude` and not with the attitude the phone has by
+        // now: the mask describes the frame the model was given, and the whole
+        // point of carrying the aim along is that the two are a second apart.
+        setMask({ mask: filterRef.current.update(grounded, sample), attitude });
         setError(null);
       } catch (cause) {
         if (!active) return;

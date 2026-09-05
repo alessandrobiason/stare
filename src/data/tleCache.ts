@@ -66,6 +66,18 @@ export async function readCache(): Promise<CachedCatalog | null> {
 }
 
 /**
+ * The in-memory cache as it stands, without going near the disk or a parse.
+ *
+ * For the debug panel, which samples on its own timer and must not itself be
+ * the reason a slice of parsing runs: by the time anything is on screen, boot
+ * has already resolved the catalog through `readCache` or `storeCatalog`, so
+ * this is `null` only in the boot sequence's own testing seams.
+ */
+export function cachedCatalog(): CachedCatalog | null {
+  return memory;
+}
+
+/**
  * Whether `cache` may still be served without asking CelesTrak again.
  *
  * A cache from a different URL is never fresh — pointing the app at the mock

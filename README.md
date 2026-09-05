@@ -22,8 +22,10 @@ of solar altitude inside civil twilight — worked out from the GPS fix and the
 clock, so it is right in Oslo in June as well as on the equator (`src/components/palette.ts`,
 `src/coordinates/sunAltitude.ts`).
 
-The `DEBUG` button swaps in the workings: the sky mask tinted over the picture,
-and a tabbed panel (SENSORS / STATUS / MASK / SKY / VIEW) sampled twice a second.
+The `DEBUG` button swaps in the workings: the sky mask tinted over the picture —
+travelling with the sky it was cut from, so it slides and tilts with the
+buildings as the phone moves — and a tabbed panel (SENSORS / STATUS / MASK / SKY
+/ VIEW) sampled twice a second.
 
 The app is the whole of `src/`. `testing/` holds a replay harness that runs the
 same view in a browser against a recorded iPhone stream — that is how it is
@@ -41,7 +43,7 @@ satellites → screen positions → markers, composited over the camera picture.
 | Attitude from motion + magnetometer, Kalman-fused | `src/device/`, `src/fusion/` |
 | SGP4 propagation via `satellite.js`, on a rolling sweep | `src/satellite/` |
 | Rectilinear pinhole projection onto the camera's axes | `src/camera/projection.ts` |
-| Occlusion: SegFormer sky mask, horizon-capped, IMU-stabilised | `src/vision/` |
+| Occlusion: SegFormer sky mask, horizon-capped, aimed at the sky | `src/vision/` |
 | Drawn at display rate, every marker in one canvas | `src/components/markerScene.ts`, `SatelliteMarkers` |
 | Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
 
@@ -85,8 +87,17 @@ horizon) is wider than the marker itself.
 SkyWater-Seg SegFormer about once a second, at its own aspect ratio within a
 fixed pixel budget. The model runs under ONNX Runtime — React Native on the
 phone, WASM in the browser — behind one shared module, so it is the same
-algorithm either side. Two corrections sit on top of its output:
+algorithm either side. Four things sit between its output and a marker being
+hidden:
 
+- **An aim, not a decal** (`anchoredMask.ts`). A mask is a grid over a *frame*,
+  and a frame is a piece of sky only once you know where the camera was pointing.
+  So every mask is filed under the attitude read at its own shutter, and a
+  satellite is looked up at the place it occupied in the mask's frame rather than
+  at the place it occupies on screen now. Turning the phone then moves the
+  markers and leaves what the mask says about each of them alone; what it does
+  change is how much of the view the mask still covers, and sky the turn revealed
+  is drawn as no sky rather than as clear sky.
 - **The horizon cap** (`horizonPrior.ts`). Sky reflected in water, wet asphalt
   or glass is *a picture of the sky*, and no amount of looking harder at pixels
   settles it. But gravity-referenced pitch already knows where the horizon
