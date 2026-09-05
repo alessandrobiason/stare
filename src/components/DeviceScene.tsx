@@ -51,12 +51,12 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
    * The camera's own "throw this session away and build another", filled in by
    * the view below while it is mounted.
    *
-   * A capture size a phone refuses does not leave its photo output as it found
-   * it — it stops delivering stills at any size — so a camera that has gone
-   * quiet is not a camera to reconfigure, it is one to replace. That is the
-   * whole of what the segmentation loop can do about a run of failed passes,
-   * and it is worth doing before the view gives up and says the sky cannot be
-   * segmented. See `CameraBackground`.
+   * A photo output that has stopped delivering stills is not something that can
+   * be reconfigured back into working — nothing `expo-camera` exposes reaches
+   * it — so a camera that has gone quiet is one to replace rather than to
+   * settle. That is the whole of what the segmentation loop can do about a run
+   * of failed passes, and it is worth doing before the view gives up and says
+   * the sky cannot be segmented. See `CameraBackground`.
    */
   const rebuildCameraRef = useRef<(() => void) | null>(null);
   const rebuildCamera = useCallback(() => {
@@ -73,11 +73,10 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
    * still camera returns, because the mask and the markers have to be
    * describing the same box.
    *
-   * The grabber is handed the camera only once the preview is running and has
-   * settled on a capture size the phone will deliver a still at. Before that it
-   * reports no frame at all, which the segmentation loop waits out quietly;
-   * handing it a view that cannot be captured from would instead spend the
-   * loop's failure budget on the first seconds of every launch.
+   * The grabber is handed the camera only once the preview is running. Before
+   * that it reports no frame at all, which the segmentation loop waits out
+   * quietly; handing it a view that cannot be captured from would instead spend
+   * the loop's failure budget on the first seconds of every launch.
    */
   const frame = useMemo<SceneFrame>(
     () => ({

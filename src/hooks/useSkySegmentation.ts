@@ -69,13 +69,15 @@ const MAX_CONSECUTIVE_FAILURES = 8;
  * run of failures asks for that first rather than going straight to a screen
  * that says the sky cannot be segmented.
  *
- * Twice, and not more, because a rebuild costs a second of black preview and
- * proves nothing on its own: a camera that has been handed back twice and
- * stopped capturing twice is not a camera having a moment. Past that the run of
- * failures is the honest report, and repeating the rebuild would only replace
- * it with a view that flickers and never says why.
+ * Once, and not more. A rebuild is not cheap or quick — the old session has to
+ * be given time to let go of the camera before the new one asks for it, and the
+ * new one has to be waited on — so it is the better part of ten seconds of black
+ * preview, on top of the eight it took to decide the camera was gone. A second
+ * round would double a wait nobody can act on to reach a screen that says the
+ * same thing. One is the chance a recoverable camera needs; past it the run of
+ * failures is the honest report.
  */
-const MAX_SOURCE_REBUILDS = 2;
+const MAX_SOURCE_REBUILDS = 1;
 
 /**
  * Periodically segments the sky in whatever frame is on screen, and smooths the

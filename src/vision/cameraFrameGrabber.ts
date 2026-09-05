@@ -2,6 +2,7 @@ import type { CameraView } from "expo-camera";
 import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { decode as decodeJpeg } from "jpeg-js";
+import { DEVICE_CAMERA_CAPTURE_QUALITY } from "../constants";
 import { FramePixels, ShutterCallback, SkyFrameGrabber } from "./skySegmenter";
 import { Size } from "./skySegmentation";
 
@@ -27,21 +28,19 @@ import { Size } from "./skySegmentation";
  * exist for this React Native — the resize plugin is still on Vision Camera 4
  * and worklets-core, while only Vision Camera 5 builds here.
  *
- * Two things about that capture are load-bearing on a real phone, and both are
- * set where the camera view is configured rather than here:
+ * The capture is a full-resolution still and there is no bounding it: the one
+ * prop that would is the `AVCaptureSession` preset in disguise, and writing it
+ * stops the photo output capturing at all on an iPhone 15. The note above
+ * `DEVICE_CAMERA_CAPTURE_QUALITY` in `constants.ts` has the whole of that, and
+ * why the cost is transient rather than the sort that ends a session. What can
+ * be trimmed is trimmed here: the still is asked for at a low JPEG quality, and
+ * every native image is released the moment it has been read.
  *
- *  - the session preset, which is what actually bounds the capture. `expo-camera`
- *    asks the photo output for its full `maxPhotoDimensions`, so under the
- *    default `photo` preset every pass decodes, crops and re-encodes a
- *    twelve-to-forty-eight megapixel still to produce a 320x448 input. Bounding
- *    it is worth doing, but not every phone will capture at a lowered preset,
- *    so the size is negotiated against the hardware rather than chosen here.
- *    See `DEVICE_CAMERA_PICTURE_SIZES` and `negotiatePictureSize`.
- *  - readiness. `takePictureAsync` is only legal once the preview is running,
- *    and only at a size the phone will deliver a still at; before either, the
- *    native side throws. The camera accessor passed in returns `null` until
- *    both are settled, which the segmentation loop reads as "no frame yet"
- *    rather than as a failed pass.
+ * Readiness is the other thing load-bearing on a real phone, and it is settled
+ * where the camera view is rather than here: `takePictureAsync` is only legal
+ * once the preview is running, and before that the native side throws. The
+ * camera accessor passed in returns `null` until then, which the segmentation
+ * loop reads as "no frame yet" rather than as a failed pass.
  */
 
 /** JPEG quality for the hand-off between the resizer and the decoder. */
@@ -74,6 +73,10 @@ export function cameraFrameGrabber(
       const picture = await view.takePictureAsync({
         pictureRef: true,
         shutterSound: false,
+        // The native side encodes the still to JPEG and decodes it again to
+        // make the ref. At the default quality that is a full-quality encode of
+        // a full-resolution bitmap for pixels about to be resampled to 320x448.
+        quality: DEVICE_CAMERA_CAPTURE_QUALITY,
         // Leave orientation processing on: the mask has to line up with the
         // preview the markers are drawn over, and skipping it returns the
         // sensor's own rotation instead.

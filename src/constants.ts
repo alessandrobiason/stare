@@ -31,81 +31,84 @@ export const DEVICE_CAMERA = {
   heightPx: 1440
 } as const;
 
-/**
- * Capture sizes to try on the still camera, as `expo-camera`'s `pictureSize`,
- * cheapest first. The last one that a device will actually capture at is the
- * one it runs on; see `negotiatePictureSize`.
+/*
+ * Why the still camera has no capture size set.
  *
- * A list rather than a single size because the right answer is not a property
- * of the app, and cannot be read off the phone either. `pictureSize` is not a
- * quality setting: on iOS the string picks the `AVCaptureSession` preset, and
- * the preset is what bounds a capture. `expo-camera` asks the photo output for
- * its full `maxPhotoDimensions` on every shot, so under the default `Photo`
- * preset each sky-mask pass has the phone produce a twelve- to
+ * A note rather than a constant, because what is written down here is the
+ * absence of one: the obvious optimisation is a trap that has now cost three
+ * attempts, and the next person to reach for it should read this first.
+ *
+ * `expo-camera` asks the photo output for its full `maxPhotoDimensions` on
+ * every shot, so each sky-mask pass has the phone produce a twelve- to
  * forty-eight-megapixel still — decoded to a bitmap, cropped, re-encoded and
- * decoded again — and then throws all but 320x448 of it away. Bounding that is
- * worth doing wherever it is allowed.
+ * decoded again — to feed a 320x448 model input. That is plainly worth
+ * bounding, and `pictureSize` is the only lever offered for bounding it.
  *
- * It is not allowed everywhere. `expo-camera` builds its session in the view's
- * initializer, before any prop has been seen, so the photo output is created
- * under the `Photo` preset — and on iOS 17 the output's responsive capture and
- * deferred photo delivery are configured there, once, for that preset. The
- * `pictureSize` prop arrives afterwards and lowers the preset without
- * revisiting either. On a phone whose camera supports those features — an
- * iPhone 15 does, an iPhone 12 mini does not — the output is then configured
- * for a capture it can no longer perform, and every later shot fails outright:
+ * The lever does not work. `pictureSize` is not a quality setting: on iOS the
+ * string picks the `AVCaptureSession` preset. `expo-camera` builds its session
+ * in the view's initialiser, before any prop has been seen, so the photo output
+ * is created under the `Photo` preset — and on iOS 17 its responsive capture and
+ * fast capture prioritisation are configured there, once, for that preset. The
+ * prop arrives afterwards and writes the preset without revisiting either. On a
+ * phone whose camera has those features — an iPhone 15 does, an iPhone 12 mini
+ * does not — every shot after that write fails:
  *
  *     CameraImageCaptureException: Image could not be captured
  *
- * Hence the ladder, and hence its last rung: `undefined` is not a preset at
- * all, it is "never write the prop", which leaves the session exactly as
- * `expo-camera` configured it. That is the one configuration every phone can be
- * relied on to capture in. It is the expensive rung, and the loop above it
- * spaces passes end-to-start, so a slower capture simply runs less often rather
- * than piling up.
+ * And it does not stop at the size that was asked for. The write leaves the
+ * photo output unable to capture at any size for the life of the session, so
+ * writing the prop back to `Photo` does not undo it, and neither does a ladder
+ * of sizes tried in turn. Both were shipped; both left an iPhone 15 unable to
+ * start. There is no value of this prop that is safe to write, so it is not
+ * written, and the session stays exactly as `expo-camera` built it.
  *
- * The rungs are not settings on one camera, though, and that is the part it is
- * easy to get wrong: lowering the preset does not just refuse the shot, it
- * leaves the photo output unable to capture at any size, so propping the size
- * back up does not undo it. A rung is only really tried by building a session
- * for it, and only really abandoned by throwing that session away. See
- * `PictureSizeProbe.mount`.
+ * What that costs is the full-resolution still, and the cost is transient
+ * rather than cumulative: every native image on the path is released by hand
+ * and the temporary JPEG is deleted, so a pass allocates a great deal and gives
+ * all of it back. The thirty-second termination in this app's history was the
+ * missing releases rather than the size — the jetsam report that followed it
+ * named accumulation, not a spike. The capture is asked for at a low JPEG
+ * quality for the same reason: see `DEVICE_CAMERA_CAPTURE_QUALITY`.
  *
- * Both rungs are 4:3, and that matters more than the pixels: the projection,
- * the mask grid and the fitted frame on screen are all built on the 4:3 shape
- * recorded in `DEVICE_CAMERA`, and the 16:9 presets would quietly re-crop the
- * preview out from under them. 640x480 is the largest preset below `Photo`
- * that is still 4:3; it is comfortably larger than the model input it is
- * resampled to in both directions, so the mask loses nothing, and the visible
- * cost is a softer preview behind the markers, which is the picture rather
- * than the geometry.
+ * If memory pressure does come back, it will come back as the operating system
+ * ending the app, not as this error, and the lever to reach for is the interval
+ * between passes — `SKY_SEGMENTATION_INTERVAL_MS`, bounded by
+ * `SKY_MASK_MAX_AGE_SECONDS` — rather than this prop.
  */
-export const DEVICE_CAMERA_PICTURE_SIZES = ["640x480", undefined] as const;
 
 /**
- * How long to let a freshly built capture session settle after it reports
- * itself ready, before judging whether the camera can capture at its size.
+ * JPEG quality for the still `expo-camera` hands back.
  *
- * `onCameraReady` says the session is running, not that the `pictureSize` prop
- * has been through it: the preset write is queued behind the session start on
- * `expo-camera`'s own serial queue, with nothing to wait on. So the negotiation
- * waits instead. Long enough for the reconfiguration to land, short enough to
- * be invisible against a boot sequence that has already downloaded a catalog
- * and a segmentation model.
+ * Not the quality of anything anyone sees. On the `pictureRef` path the native
+ * side encodes the captured image to JPEG and decodes it again to make the ref,
+ * and at the default — 1.0 — that is a full-quality encode of a
+ * forty-eight-megapixel bitmap, once a second, for pixels that are about to be
+ * resampled to 320x448 and thresholded into a sky mask. Twenty times more
+ * detail than survives the resize is being paid for in both directions.
+ *
+ * Low enough to make that encode cheap, high enough that the resize has real
+ * edges to work from: the mask's business is where the sky stops, and blocking
+ * artifacts along a roofline are the one thing here that would move it.
  */
-export const DEVICE_CAMERA_PICTURE_SIZE_SETTLE_MS = 400;
+export const DEVICE_CAMERA_CAPTURE_QUALITY = 0.4;
 
 /**
  * How long to leave the camera torn down between one session and the next.
  *
- * A rebuild is a teardown and a rebuild of an `AVCaptureSession`, and the two
- * halves run on separate queues: the old session stops on `expo-camera`'s
- * session queue while the new view is already being constructed on the main
- * one. Overlapping them gives the second session a device the first has not
- * finished releasing. Nothing reports when that has happened, so this is a gap
- * rather than a wait.
+ * Generous, because the two halves of a rebuild do not queue behind each other.
+ * Each `CameraView` owns a serial queue of its own, so the outgoing view's
+ * `stopRunning` — which blocks until the capture graph has actually stopped —
+ * runs alongside the incoming view's session setup rather than before it, and a
+ * replacement mounted promptly is a second `AVCaptureSession` asking for a
+ * camera the first has not finished giving up. That session does not start, and
+ * a session that does not start says nothing at all: no error, no
+ * `onCameraReady`, just a preview that stays black.
+ *
+ * Nothing reports when the old one has let go, so this is a gap rather than a
+ * wait. It is only ever spent on a camera the segmentation loop has already
+ * given up on, so a second and a half of black is cheap against the alternative.
  */
-export const DEVICE_CAMERA_REBUILD_GAP_MS = 250;
+export const DEVICE_CAMERA_REBUILD_GAP_MS = 1500;
 
 /**
  * How long to give a newly built session to report its preview running before
@@ -114,10 +117,10 @@ export const DEVICE_CAMERA_REBUILD_GAP_MS = 250;
  * `onCameraReady` is the only word there is that a session started, and it
  * never arrives at all when the session failed to configure. Waiting on it
  * unconditionally is a view that shows black forever and a segmentation loop
- * that never gets a first frame to complain about; giving up on it is a rung
- * the negotiation can step over and, on the last rung, a failure the loop can
- * report. Generous, because it is only ever spent on a camera that is already
- * going wrong.
+ * that never gets a first frame to complain about; giving up on it hands the
+ * loop a camera to fail against, which is a failure someone eventually sees.
+ * Generous, because it is only ever spent on a camera that is already going
+ * wrong.
  */
 export const DEVICE_CAMERA_PREVIEW_START_TIMEOUT_MS = 6000;
 

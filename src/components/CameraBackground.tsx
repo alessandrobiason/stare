@@ -2,13 +2,6 @@ import { CameraView } from "expo-camera";
 import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
 import {
-  describePictureSize,
-  negotiatePictureSize,
-  PictureSizeCandidate
-} from "../camera/pictureSize";
-import {
-  DEVICE_CAMERA_PICTURE_SIZES,
-  DEVICE_CAMERA_PICTURE_SIZE_SETTLE_MS,
   DEVICE_CAMERA_PREVIEW_START_TIMEOUT_MS,
   DEVICE_CAMERA_REBUILD_GAP_MS
 } from "../constants";
@@ -21,11 +14,8 @@ type Props = {
    *
    * `takePictureAsync` is only legal between `onCameraReady` and the view going
    * away; before that the native side has no photo output and the call throws.
-   * It also stays illegal after that on a capture size the phone will not
-   * deliver a still at, which is why readiness waits on the negotiation below
-   * rather than on `onCameraReady` alone. The segmenter has to know the
-   * difference between a frame it cannot have yet and a pass that failed,
-   * because it treats a run of the latter as fatal.
+   * The segmenter has to know the difference between a frame it cannot have yet
+   * and a pass that failed, because it treats a run of the latter as fatal.
    */
   onReadyChange: (ready: boolean) => void;
   /**
@@ -35,19 +25,11 @@ type Props = {
    * A ref rather than a prop the other way round because the caller is the
    * segmentation loop, several components up and running on its own timer: it
    * needs to reach the camera at the moment it gives up on it, not at a render.
-   * See `rebuild` for what recovery actually is.
    */
   recoveryRef?: MutableRefObject<(() => void) | null>;
 };
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** The rung every phone can be relied on to capture at: see the ladder. */
-const SAFE_PICTURE_SIZE =
-  DEVICE_CAMERA_PICTURE_SIZES[DEVICE_CAMERA_PICTURE_SIZES.length - 1];
-
-/** One built capture session, and the size it was built for. */
-type Session = { id: number; size: PictureSizeCandidate };
 
 /**
  * The live rear camera: the AR background on a phone, doing the job the
@@ -60,22 +42,22 @@ type Session = { id: number; size: PictureSizeCandidate };
  * view is only reached once it has been granted.
  *
  * It is configured for a camera that is read from rather than photographed with:
- * a capture bounded to something the mask actually needs, and no shutter
- * animation, which otherwise flashes over the sky once a second for captures the
- * person never asked for.
+ * no shutter animation, which otherwise flashes over the sky once a second for
+ * captures the person never asked for.
  *
- * How far the capture can be bounded is a fact about the phone, not about the
- * app, and nothing reports it — so it is measured here, once, before the
- * segmentation loop is told the camera is usable. See `negotiatePictureSize`
- * and `DEVICE_CAMERA_PICTURE_SIZES`.
+ * What it is not configured with is a capture size, and that is the point of
+ * this file rather than an omission from it. `pictureSize` is the only lever
+ * `expo-camera` offers for bounding a still, it writes the `AVCaptureSession`
+ * preset behind the photo output's back, and on a phone whose camera has the
+ * iOS 17 capture features — an iPhone 15 does — every shot after that write
+ * fails for the life of the session. The prop is therefore never written here,
+ * at any value, and the session stays exactly as `expo-camera` built it. The
+ * note above `DEVICE_CAMERA_CAPTURE_QUALITY` in `constants.ts` has the whole of
+ * it, including what the full-resolution still costs instead.
  *
- * The camera is torn down and rebuilt between rungs rather than re-propped,
- * which is the whole of why this is written as a session at a time. A capture
- * size the phone refuses does not stay contained: it leaves the photo output
- * unable to capture at any size, so a camera that has been asked for one is only
- * good for being thrown away. Stepping down the ladder in place reaches the safe
- * rung with a dead camera and reports it as a phone that cannot segment the sky,
- * which is what an iPhone 15 did on every launch.
+ * That leaves one camera, mounted once and left alone, which is also the
+ * cheapest thing to be sure of. The one time it is rebuilt is recovery, after
+ * the segmentation loop has given up on it entirely; see `rebuild`.
  *
  * `memo` because the view above it re-renders on every animation frame, and this
  * is a native camera preview: re-rendered at 60 Hz, every one of those frames
@@ -83,151 +65,111 @@ type Session = { id: number; size: PictureSizeCandidate };
  */
 export const CameraBackground: React.FC<Props> = React.memo(
   ({ cameraRef, onReadyChange, recoveryRef }) => {
+    /** Bumped to throw the camera away and build another. */
+    const [generation, setGeneration] = useState(0);
     /**
-     * The session on screen, or `null` before the first one is asked for.
+     * Whether the camera is on screen. False across a rebuild, which is the
+     * whole of how the old session is made to stop before the new one starts.
+     */
+    const [shown, setShown] = useState(false);
+
+    /** Whoever is waiting for the preview to report itself running. */
+    const startWaiter = useRef<{
+      resolve: (started: boolean) => void;
+      abandon: ReturnType<typeof setTimeout>;
+    } | null>(null);
+
+    /**
+     * Resolves when the preview reports itself running, or false when it has had
+     * long enough to.
      *
-     * Driven by the negotiation below rather than by a render: the ladder walk
-     * spans several sessions, and each one has to be built, waited on and — when
-     * its size is refused — thrown away before the next is asked for.
+     * `onCameraReady` is the only word there is that a session started, and it
+     * never comes at all when the session failed to configure — a camera that
+     * cannot be started would otherwise be a view showing black and a
+     * segmentation loop with nothing to complain about. Giving up on it hands
+     * the loop a camera to fail against instead, which is a failure someone
+     * eventually sees.
      */
-    const [session, setSession] = useState<Session | null>(null);
-    /** Bumped to start the walk over on a camera that has stopped capturing. */
-    const [recovery, setRecovery] = useState(0);
+    const awaitPreviewStart = useCallback(
+      () =>
+        new Promise<boolean>((resolve) => {
+          const abandon = setTimeout(() => {
+            startWaiter.current = null;
+            resolve(false);
+          }, DEVICE_CAMERA_PREVIEW_START_TIMEOUT_MS);
+          startWaiter.current = { resolve, abandon };
+        }),
+      []
+    );
 
-    const nextSessionId = useRef(0);
-    /** Whether there is a camera on screen to be taken off it. */
-    const mounted = useRef(false);
-    /**
-     * Whether a rebuild is still in flight — from the moment one is asked for
-     * to the moment a session has proven itself, not just to the next render.
-     * A caller that gives up again while the replacement camera is still being
-     * built would otherwise restart the very thing it is waiting on.
-     */
-    const rebuilding = useRef(false);
-    /** Whoever is waiting for the session it names to report itself running. */
-    const pending = useRef<{ id: number; started: () => void } | null>(null);
-
-    /**
-     * Builds a session for `size` and resolves once its preview is running, or
-     * once it has had long enough to say so.
-     *
-     * A preview that never starts resolves like one that did, and is left to be
-     * caught by the capture that follows: a session that cannot be captured from
-     * is a rung to step over whether the reason was the size or the start, and
-     * the alternative is a walk that waits on `onCameraReady` forever behind a
-     * view showing black.
-     */
-    const build = useCallback((size: PictureSizeCandidate): Promise<void> => {
-      return new Promise((resolve) => {
-        const id = (nextSessionId.current += 1);
-        const abandon = setTimeout(() => {
-          if (pending.current?.id !== id) return;
-          pending.current = null;
-          console.warn(`The camera preview did not start at ${describePictureSize(size)}`);
-          resolve();
-        }, DEVICE_CAMERA_PREVIEW_START_TIMEOUT_MS);
-        pending.current = {
-          id,
-          started: () => {
-            clearTimeout(abandon);
-            resolve();
-          }
-        };
-        mounted.current = true;
-        setSession({ id, size });
-      });
-    }, []);
-
-    const onCameraReady = useCallback((id: number) => {
-      if (pending.current?.id !== id) return;
-      const { started } = pending.current;
-      pending.current = null;
-      started();
+    const onCameraReady = useCallback(() => {
+      const waiter = startWaiter.current;
+      if (!waiter) return;
+      startWaiter.current = null;
+      clearTimeout(waiter.abandon);
+      waiter.resolve(true);
     }, []);
 
     // A preview that has gone away is not ready again until it says so itself.
     useEffect(() => () => onReadyChange(false), [onReadyChange]);
 
+    /** Whether a rebuild is still in flight, from asked for to captured from. */
+    const rebuilding = useRef(false);
+
     useEffect(() => {
       let cancelled = false;
-
-      // On a rebuild the camera is not to be captured from until a session has
-      // proven itself again, and the walk below starts by taking the old one
-      // off the screen.
       onReadyChange(false);
 
       void (async () => {
-        // The first walk tries the whole ladder. A later one is recovery from a
-        // camera that stopped capturing, and the cheap rungs have already had
-        // their turn — the useful thing left to try is a clean session at the
-        // size every phone captures at.
-        const ladder = recovery === 0 ? DEVICE_CAMERA_PICTURE_SIZES : [SAFE_PICTURE_SIZE];
+        if (generation > 0) {
+          // Off the screen, and then a gap. Each `CameraView` tears its session
+          // down on a queue of its own, so a replacement mounted straight away
+          // is a second `AVCaptureSession` asking for a camera the first has not
+          // finished giving up. See `DEVICE_CAMERA_REBUILD_GAP_MS`.
+          setShown(false);
+          await wait(DEVICE_CAMERA_REBUILD_GAP_MS);
+          if (cancelled) return;
+        }
 
-        const chosen = await negotiatePictureSize(ladder, {
-          mount: async (size) => {
-            if (cancelled) return;
-            if (mounted.current) {
-              // Off the screen first: the session being replaced has to stop
-              // before its successor asks the same hardware to start.
-              mounted.current = false;
-              setSession(null);
-              await wait(DEVICE_CAMERA_REBUILD_GAP_MS);
-              if (cancelled) return;
-            }
-            await build(size);
-            await wait(DEVICE_CAMERA_PICTURE_SIZE_SETTLE_MS);
-          },
-          capture: async () => {
-            if (cancelled) throw new Error("The camera view went away");
-            const view = cameraRef.current;
-            if (!view) throw new Error("The camera view went away");
-            // Thrown away immediately: the only question is whether the phone
-            // will produce it at all. Released by hand like every other native
-            // image on this path — a shared ref left alone holds its bitmap
-            // until the garbage collector notices a small wrapper.
-            const picture = await view.takePictureAsync({
-              pictureRef: true,
-              shutterSound: false,
-              skipProcessing: false
-            });
-            picture.release();
-          }
-        });
+        setShown(true);
+        const started = await awaitPreviewStart();
         if (cancelled) return;
+        if (!started) {
+          console.warn("The camera preview did not start; handing it to the mask loop anyway");
+        }
 
-        for (const { size, cause } of chosen.rejected) {
-          console.warn(`The camera would not capture at ${describePictureSize(size)}`, cause);
-        }
-        if (!chosen.proven) {
-          console.warn("No capture size worked; leaving the camera on its default and going on");
-        }
         rebuilding.current = false;
         onReadyChange(true);
       })();
 
       return () => {
         cancelled = true;
-        // Nobody is left to hear it, and a walk abandoned mid-mount would
-        // otherwise hold its resolver — and the session it names — forever.
-        pending.current?.started();
-        pending.current = null;
+        // Nobody is left to hear it, and an abandoned wait would otherwise hold
+        // its timer and its resolver for the whole six seconds.
+        const waiter = startWaiter.current;
+        if (waiter) {
+          startWaiter.current = null;
+          clearTimeout(waiter.abandon);
+          waiter.resolve(false);
+        }
       };
-    }, [recovery, build, cameraRef, onReadyChange]);
+    }, [generation, awaitPreviewStart, onReadyChange]);
 
     /**
-     * Throws the camera away and builds a fresh one at the safe size.
+     * Throws the camera away and builds another.
      *
-     * The only recovery there is. Nothing reachable from here can put a photo
-     * output that has stopped capturing back in order — not the preset, not the
-     * capture options — and the session it belongs to is the smallest thing that
-     * can be replaced whole. Ignored while one is already in flight, so a loop
-     * that gives up twice in a row does not restart the rebuild it is waiting
-     * on.
+     * A last resort, and deliberately the only one: a capture session is the
+     * smallest thing here that can be replaced whole, and replacing it is the
+     * only answer to a photo output that has stopped delivering stills. It is
+     * also not free — two sessions contending for one camera is its own failure —
+     * so it happens only after the segmentation loop has given up, never as a
+     * routine retry. Ignored while one is already in flight, so a loop that gives
+     * up twice does not restart the rebuild it is waiting on.
      */
     const rebuild = useCallback(() => {
       if (rebuilding.current) return;
       rebuilding.current = true;
-      setRecovery((count) => count + 1);
+      setGeneration((count) => count + 1);
     }, []);
 
     useEffect(() => {
@@ -238,23 +180,19 @@ export const CameraBackground: React.FC<Props> = React.memo(
       };
     }, [recoveryRef, rebuild]);
 
-    // Nothing between sessions: a rung that has been refused is not a camera to
-    // keep on screen, and the gap is a quarter of a second of the black the
-    // preview starts as anyway.
-    if (!session) return null;
+    if (!shown) return null;
 
     return (
       <CameraView
-        // The session is the unit of configuration here, so it is also the unit
-        // of identity: a new `key` is what makes React build a new native view
-        // rather than re-prop the one whose photo output is already spoiled.
-        key={session.id}
+        // A rebuild has to be a new native view rather than a re-propped one:
+        // the state being escaped lives in the session, not in the props.
+        key={generation}
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
         facing="back"
-        pictureSize={session.size}
         animateShutter={false}
-        onCameraReady={() => onCameraReady(session.id)}
+        onCameraReady={onCameraReady}
+        onMountError={({ message }) => console.warn(`The camera could not be started: ${message}`)}
       />
     );
   }
