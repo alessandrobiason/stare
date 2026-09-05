@@ -67,6 +67,18 @@ export function cameraFrameGrabber(
       const view = camera();
       if (!view) throw new Error("The camera is not open");
 
+      // The shutter, as near as this side of the API can see it — and the near
+      // side is the request, not the reply. `takePictureAsync` resolves once the
+      // still has been captured, encoded to JPEG at full resolution and decoded
+      // again to make the ref, which on a forty-eight-megapixel phone is the
+      // better part of a second; the photons landed at the start of that, with
+      // the preview already running and its exposure and focus converged. Read
+      // at the reply instead, the mask is filed under an aim that is a whole
+      // capture ahead of the frame it describes, and on a phone being panned at
+      // hand speed that is tens of degrees — a mask trailing the buildings in
+      // the direction of the turn, which is the inertia this is here to remove.
+      onShutter();
+
       // A picture reference rather than a file: it stays a native image all the
       // way into the resizer, so the capture is never encoded, written out and
       // read back just to be thrown away.
@@ -83,13 +95,6 @@ export function cameraFrameGrabber(
         skipProcessing: false
       });
       if (!picture) throw new Error("The camera returned no picture");
-      // The shutter, as near as this side of the API can see it: the still is
-      // taken, and everything below — resize, encode, decode, and then the model
-      // — is work on a picture of a moment that has passed. The attitude the
-      // mask is filed under is read here rather than before the capture, which
-      // on a phone being turned is the difference between a mask aimed where it
-      // was taken and one aimed several degrees off it.
-      onShutter();
 
       // Every native image on this path is released by hand. They are shared
       // refs, so left alone they hold their bitmaps until the JavaScript garbage

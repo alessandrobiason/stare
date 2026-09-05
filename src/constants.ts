@@ -301,6 +301,15 @@ export const SKY_CONFIDENCE_THRESHOLD = 0.5;
  *
  * The change itself is then a crossfade rather than a pop, because a marker
  * that vanishes between two frames reads as a glitch even when it is right.
+ *
+ * None of it applies to a direction the mask has no reading for — sky the phone
+ * has turned onto ahead of the segmenter (`AnchoredSkyMask`). Both mechanisms
+ * are for arbitrating between successive *answers* about one piece of sky, and
+ * there is no answer to arbitrate: the marker keeps what the last pass that
+ * could see it decided, and simply is not drawn until a pass covers it again.
+ * Fed in as a nought instead, it would cost `confidenceTimeConstantSeconds` and
+ * the width of the band before anything happened — the better part of two
+ * seconds with a satellite on screen over a building nobody has looked at.
  */
 export const MARKER_VISIBILITY = {
   /** Time constant of the per-marker confidence low pass, in seconds. */

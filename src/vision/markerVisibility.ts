@@ -69,17 +69,18 @@ export class MarkerVisibilityFilter {
 
   /**
    * How opaque the marker `key` should be drawn, given the sky confidence at
-   * the point it has been projected to. Zero means it is behind terrain, or has
-   * not faded in yet.
+   * the direction it is in — or `null` where the mask has no reading for that
+   * direction at all. Zero means it is behind terrain, in sky nothing has
+   * looked at, or has not faded in yet.
    */
-  sample(key: string, confidence: number): number {
+  sample(key: string, confidence: number | null): number {
     const track = this.tracks.get(key);
     if (!track) {
       // Nothing to smooth yet, so the mask is taken at its word — but at zero
       // opacity, so a marker rising into the frame fades in like any other.
       this.tracks.set(key, {
-        confidence,
-        visible: confidence >= SKY_CONFIDENCE_THRESHOLD,
+        confidence: confidence ?? 0,
+        visible: confidence !== null && confidence >= SKY_CONFIDENCE_THRESHOLD,
         opacity: 0,
         frame: this.frame
       });
@@ -87,16 +88,28 @@ export class MarkerVisibilityFilter {
     }
 
     track.frame = this.frame;
-    track.confidence += (confidence - track.confidence) * this.confidenceGain;
-    if (
-      track.visible
-        ? track.confidence < MARKER_VISIBILITY.hideConfidence
-        : track.confidence >= MARKER_VISIBILITY.showConfidence
-    ) {
-      track.visible = !track.visible;
+    // No reading is not a reading of nought. The low pass and the band are for
+    // arbitrating between successive *answers* about one piece of sky, and a
+    // direction the mask does not cover has not been answered — so it neither
+    // moves the smoothed confidence nor spends the band, and the marker keeps
+    // what the last pass that could see it decided. What it does not keep is
+    // being drawn: that is gated below, and the marker fades rather than
+    // waiting out a low pass tuned to the flicker of an edge it is not near.
+    // Left to average in as nought instead, a satellite the phone has just
+    // turned onto stays on screen for the better part of two seconds, over a
+    // building nobody has looked at yet.
+    if (confidence !== null) {
+      track.confidence += (confidence - track.confidence) * this.confidenceGain;
+      if (
+        track.visible
+          ? track.confidence < MARKER_VISIBILITY.hideConfidence
+          : track.confidence >= MARKER_VISIBILITY.showConfidence
+      ) {
+        track.visible = !track.visible;
+      }
     }
 
-    const target = track.visible ? 1 : 0;
+    const target = confidence !== null && track.visible ? 1 : 0;
     track.opacity = clamp(
       track.opacity + clamp(target - track.opacity, -this.fadeStep, this.fadeStep),
       0,

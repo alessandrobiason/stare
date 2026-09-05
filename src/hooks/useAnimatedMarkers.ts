@@ -239,14 +239,15 @@ export function useAnimatedMarkers({
           // the wrong ones — the debug overlay shows the figure.
           //
           // Sky the mask never saw — revealed by the turn that is still ahead
-          // of the segmenter — reads as no sky rather than as open sky, for the
-          // same reason no mask at all draws nothing: an unlooked-at direction
-          // is not a clear line of sight. It costs nothing on a glance, since
-          // the filter needs a run of frames to hide a drawn marker and the
-          // next pass covers the new sky within one.
+          // of the segmenter — is handed on as "no reading" rather than as
+          // either answer, for the same reason no mask at all draws nothing: an
+          // unlooked-at direction is not a clear line of sight, and it is not
+          // evidence of a building either. The filter fades those out and keeps
+          // what they had decided, so they come back as they were the moment a
+          // pass covers them again.
           const confidence = skyTowards(fix.position);
           if (confidence === null) unmapped += 1;
-          const opacity = visibility.sample(fix.name, confidence ?? 0);
+          const opacity = visibility.sample(fix.name, confidence);
           if (opacity <= MARKER_VISIBILITY.minimumDrawnOpacity) {
             occluded += 1;
             continue;

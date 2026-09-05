@@ -92,12 +92,15 @@ hidden:
 
 - **An aim, not a decal** (`anchoredMask.ts`). A mask is a grid over a *frame*,
   and a frame is a piece of sky only once you know where the camera was pointing.
-  So every mask is filed under the attitude read at its own shutter, and a
-  satellite is looked up at the place it occupied in the mask's frame rather than
-  at the place it occupies on screen now. Turning the phone then moves the
-  markers and leaves what the mask says about each of them alone; what it does
-  change is how much of the view the mask still covers, and sky the turn revealed
-  is drawn as no sky rather than as clear sky.
+  So every mask is filed under the attitude read at its own shutter — the near
+  end of the capture, since the far end is a full-resolution encode and decode
+  later and reading it there files the mask under an aim a whole capture ahead of
+  its own frame. A satellite is then looked up at the place it occupied in the
+  mask's frame rather than at the place it occupies on screen now. Turning the
+  phone moves the markers and leaves what the mask says about each of them alone;
+  what it does change is how much of the view the mask still covers, and a
+  direction outside that is no reading rather than either answer — not drawn,
+  and not argued with by the hysteresis below either.
 - **The horizon cap** (`horizonPrior.ts`). Sky reflected in water, wet asphalt
   or glass is *a picture of the sky*, and no amount of looking harder at pixels
   settles it. But gravity-referenced pitch already knows where the horizon

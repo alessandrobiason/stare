@@ -23,7 +23,7 @@ function clock(startSeconds = 0) {
 function play(
   filter: MarkerVisibilityFilter,
   key: string,
-  passes: number[],
+  passes: (number | null)[],
   time = clock()
 ): number[] {
   return passes.map((confidence) => {
@@ -95,6 +95,44 @@ test("hides a marker two passes agree about", () => {
   expect(opacities[1]).toBeLessThan(1);
   expect(opacities[2]).toBe(0);
   expect(opacities[3]).toBe(0);
+});
+
+test("drops a marker the mask has no reading for without spending the band on it", () => {
+  // The phone has turned onto sky no pass has covered yet.
+  const missing = settled("MISSING");
+  const gone = play(missing.filter, "MISSING", [null], missing.time);
+
+  // A genuine "not sky" is an answer, and answers are arbitrated: one pass of
+  // it moves nothing, because a mask flickering at an edge must not blink a
+  // marker. No answer at all is not in that argument — nothing is drawn on it,
+  // now, rather than after the better part of two seconds over a building
+  // nobody has looked at.
+  const blocked = settled("BLOCKED");
+  const held = play(blocked.filter, "BLOCKED", [0.05], blocked.time);
+
+  expect(gone[0]).toBe(0);
+  expect(held[0]).toBe(1);
+});
+
+test("a marker out of the mask's reach comes back as it was, not from scratch", () => {
+  const { filter, time } = settled();
+  play(filter, "SAT", [null, null], time);
+
+  // The pass that covers it again finds it where the last pass that could see
+  // it left it — open sky, already decided — so it fades straight back in
+  // rather than spending the band again to earn it.
+  const returning = play(filter, "SAT", [0.95], time);
+  expect(returning[0]).toBe(1);
+});
+
+test("no reading neither hides a marker for good nor spends the band", () => {
+  const { filter, time } = settled();
+  // A marker sitting in sky the mask cannot answer for is not evidence that it
+  // is behind anything: a run of them must not decide it is.
+  play(filter, "SAT", [null, null, null, null], time);
+
+  const covered = play(filter, "SAT", [0.6], time);
+  expect(covered[0]).toBe(1);
 });
 
 test("brings a hidden marker back when the sky reopens", () => {

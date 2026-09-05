@@ -31,6 +31,14 @@ export type FramePixels = {
  * shutter — a resize, a JPEG round trip, the better part of a second of
  * inference — happens on a frame the camera has already left behind, and on a
  * phone being panned the capture alone is degrees of sky.
+ *
+ * A grabber calls it on the near side of its capture rather than the far side.
+ * The two are not the same instant and not close together: on the phone the
+ * still is captured, encoded and decoded before `takePictureAsync` resolves, so
+ * the reply is a whole capture later than the photons, while the request is
+ * ahead of them only by the camera's own latency on a preview that is already
+ * running. Late by a capture is what a trailing mask looks like; early by the
+ * shutter delay is not visible.
  */
 export type ShutterCallback = () => void;
 
