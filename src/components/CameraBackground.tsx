@@ -1,6 +1,7 @@
 import { CameraView } from "expo-camera";
 import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
+import { runCaptureProbe } from "../debug/captureProbe";
 import {
   DEVICE_CAMERA_PREVIEW_START_TIMEOUT_MS,
   DEVICE_CAMERA_REBUILD_GAP_MS
@@ -30,6 +31,15 @@ type Props = {
 };
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Whether to run the still-camera experiment before handing the camera over.
+ *
+ * A dev-client switch, and off in every build that ships. `runCaptureProbe`
+ * holds the camera for the better part of a minute and reports itself through
+ * `console.warn`, which only means anything with Metro attached to read it.
+ */
+const RUN_CAPTURE_PROBE = false;
 
 /**
  * The live rear camera: the AR background on a phone, doing the job the
@@ -142,6 +152,14 @@ export const CameraBackground: React.FC<Props> = React.memo(
           console.warn("The camera preview did not start; handing it to the mask loop anyway");
         }
 
+        // Off in anything that ships. See `runCaptureProbe`: it takes over the
+        // camera for half a minute, and it is only useful with a Metro log to
+        // read it in.
+        if (RUN_CAPTURE_PROBE && cameraRef.current) {
+          await runCaptureProbe(cameraRef.current);
+          if (cancelled) return;
+        }
+
         rebuilding.current = false;
         onReadyChange(true);
       })();
@@ -157,7 +175,7 @@ export const CameraBackground: React.FC<Props> = React.memo(
           waiter.resolve(false);
         }
       };
-    }, [generation, awaitPreviewStart, onReadyChange]);
+    }, [generation, awaitPreviewStart, cameraRef, onReadyChange]);
 
     /**
      * Throws the camera away and builds another.
