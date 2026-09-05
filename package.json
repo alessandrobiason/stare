@@ -4,7 +4,7 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "postinstall": "patch-package",
+    "postinstall": "patch-package --error-on-fail",
     "prebuild": "expo prebuild --platform ios --clean",
     "ota-update": "npx eas-cli update --branch production",
     "runtime-version": "expo-updates runtimeversion:resolve --platform ios",

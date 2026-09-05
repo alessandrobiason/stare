@@ -16,7 +16,7 @@ index 424294b..d3873be 100644
    override var reason: String {
      "Failed to save image: \(param)"
 diff --git a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
-index fc9a9bb..8fe912b 100644
+index fc9a9bb..30e4d23 100644
 --- a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
 +++ b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
 @@ -126,8 +126,14 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
@@ -31,19 +31,43 @@ index fc9a9bb..8fe912b 100644
 +      // the same string for every possible cause, which is not enough to act on
 +      // when the failure only reproduces on someone else's phone.
 +      continuation.resume(throwing: CameraImageCaptureDetailedException(
-+        CameraPhotoCapture.describeCaptureFailure(error: error, output: output)
++        describeCaptureFailure(error: error, output: output)
 +      ))
        return
      }
  
-@@ -156,6 +162,24 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+@@ -156,6 +162,49 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
      }
    }
  
 +  /// The capture failure, in enough detail to tell the causes apart.
-+  private static func describeCaptureFailure(error: Error, output: AVCapturePhotoOutput) -> String {
++  ///
++  /// Everything reachable from the delegate callback without adding state:
++  /// what AVFoundation said, whether the session was running or interrupted at
++  /// the time, whether the video connection was live, and how the output and
++  /// the device were configured. A capture that fails on someone else's phone
++  /// is otherwise a single fixed string shared by every possible cause.
++  private func describeCaptureFailure(error: Error, output: AVCapturePhotoOutput) -> String {
 +    let nsError = error as NSError
 +    var parts = ["\(nsError.domain) \(nsError.code) \(nsError.localizedDescription)"]
++
++    if let session = captureDelegate?.previewLayer.session {
++      parts.append("running=\(session.isRunning ? 1 : 0)")
++      parts.append("interrupted=\(session.isInterrupted ? 1 : 0)")
++      parts.append("preset=\(session.sessionPreset.rawValue)")
++    }
++    if let previewSize = captureDelegate?.previewLayer.frame.size {
++      parts.append("preview=\(Int(previewSize.width))x\(Int(previewSize.height))")
++    }
++
++    if let connection = output.connection(with: .video) {
++      parts.append("connection=\(connection.isEnabled ? "on" : "off")/\(connection.isActive ? "active" : "inactive")")
++      if let input = connection.inputPorts.first?.input as? AVCaptureDeviceInput {
++        let format = CMVideoFormatDescriptionGetDimensions(input.device.activeFormat.formatDescription)
++        parts.append("device=\(input.device.localizedName)")
++        parts.append("activeFormat=\(format.width)x\(format.height)")
++      }
++    }
 +
 +    if #available(iOS 16.0, *) {
 +      let dimensions = output.maxPhotoDimensions
@@ -53,6 +77,7 @@ index fc9a9bb..8fe912b 100644
 +      parts.append("deferred=\(output.isAutoDeferredPhotoDeliveryEnabled ? 1 : 0)")
 +      parts.append("responsive=\(output.isResponsiveCaptureEnabled ? 1 : 0)")
 +      parts.append("fastPriority=\(output.isFastCapturePrioritizationEnabled ? 1 : 0)")
++      parts.append("zeroShutterLag=\(output.isZeroShutterLagEnabled ? 1 : 0)")
 +    }
 +
 +    return parts.joined(separator: ", ")

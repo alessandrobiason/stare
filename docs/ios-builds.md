@@ -197,8 +197,20 @@ error screen now reads
 
 ```
 Image could not be captured: <domain> <code> <description>,
-maxPhotoDimensions=WxH, deferred=0, responsive=1, fastPriority=1
+running=1, interrupted=0, preset=AVCaptureSessionPresetPhoto, preview=390x520,
+connection=on/active, device=Back Camera, activeFormat=4032x3024,
+maxPhotoDimensions=WxH, deferred=0, responsive=1, fastPriority=1,
+zeroShutterLag=1
 ```
+
+Every term there separates causes that the bare string does not:
+`interrupted=1` or `connection=on/inactive` is a session that has lost the
+camera; `preview=0x0` is a preview layer that was never laid out; a mismatch
+between `activeFormat` and `maxPhotoDimensions` is the settings combination
+AVFoundation refuses; and the domain and code name the rest outright.
+
+`postinstall` runs `patch-package --error-on-fail`, so an install whose patch no
+longer applies fails the job rather than quietly producing an unpatched binary.
 
 That string doubles as a check on which binary is running: if a phone reports
 the bare "Image could not be captured" with nothing after the colon, it is
