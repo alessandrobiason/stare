@@ -189,10 +189,27 @@ output. If the same error is ever reported again, check first whether the phone
 is running a build made after the patch landed rather than an update layered
 onto an older one.
 
+The same patch also makes a capture failure say what went wrong.
+`CameraImageCaptureException` has one fixed reason string — "Image could not be
+captured" — for every possible cause, and `expo-camera` discards the `NSError`
+AVFoundation handed it. The patch keeps it, so the message that reaches the
+error screen now reads
+
+```
+Image could not be captured: <domain> <code> <description>,
+maxPhotoDimensions=WxH, deferred=0, responsive=1, fastPriority=1
+```
+
+That string doubles as a check on which binary is running: if a phone reports
+the bare "Image could not be captured" with nothing after the colon, it is
+running a build from before this patch, and whatever was shipped since reached
+it as a JavaScript update over an older binary.
+
 Drop the patch when `expo-camera` ships a version that disables deferred
-delivery unconditionally: delete the file, and `npm ci` will stop applying it.
-`patch-package` fails loudly if the package version moves and the patch no
-longer applies, so an upgrade cannot silently drop it.
+delivery unconditionally and reports the underlying error: delete the file, and
+`npm ci` will stop applying it. `patch-package` fails loudly if the package
+version moves and the patch no longer applies, so an upgrade cannot silently
+drop it.
 
 ## Shipping a fix without a rebuild
 
