@@ -16,27 +16,76 @@ index 424294b..d3873be 100644
    override var reason: String {
      "Failed to save image: \(param)"
 diff --git a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
-index fc9a9bb..30e4d23 100644
+index fc9a9bb..5366986 100644
 --- a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
 +++ b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
-@@ -126,8 +126,14 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
-     photoCapturedContinuation = nil
-     photoCaptureOptions = nil
+@@ -27,6 +27,11 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+   private var photoCaptureOptions: TakePictureOptions?
+   private var photoCapturedContinuation: CheckedContinuation<Any, Error>?
+ 
++  /// Whether this capture has already been retried with the plainest settings.
++  private var retriedWithPlainSettings = false
++  /// How the first attempt failed, kept so both attempts can be reported.
++  private var firstFailure: String?
++
+   init(delegate: CameraPhotoCaptureDelegate) {
+     self.captureDelegate = delegate
+     super.init()
+@@ -69,6 +74,8 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+     return try await withCheckedThrowingContinuation { continuation in
+       photoCapturedContinuation = continuation
+       photoCaptureOptions = options
++      retriedWithPlainSettings = false
++      firstFailure = nil
+ 
+       let connection = photoOutput.connection(with: .video)
+       let orientation = captureDelegate?.responsiveWhenOrientationLocked == true ?
+@@ -123,14 +130,40 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+       return
+     }
+ 
+-    photoCapturedContinuation = nil
+-    photoCaptureOptions = nil
++    if let error {
++      // One retry with the plainest settings AVFoundation accepts — no codec,
++      // no maxPhotoDimensions, no preview format, no quality prioritisation.
++      //
++      // Every one of those is set unconditionally above, and any of them can
++      // make a request invalid for the session's current configuration, which
++      // is refused in milliseconds and looks exactly like a camera that cannot
++      // capture. If the plain request succeeds, the fault was the request and
++      // the picture is returned as though nothing happened. If it fails too,
++      // both failures are reported and the fault is below this library.
++      if !retriedWithPlainSettings {
++        retriedWithPlainSettings = true
++        firstFailure = describeCaptureFailure(error: error, output: output)
++        DispatchQueue.main.async {
++          output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
++        }
++        return
++      }
  
 -    if error != nil {
 -      continuation.resume(throwing: CameraImageCaptureException())
-+    if let error {
-+      // Carry what AVFoundation actually said, and the photo output's state at
-+      // the moment it said it. The unadorned "Image could not be captured" is
-+      // the same string for every possible cause, which is not enough to act on
-+      // when the failure only reproduces on someone else's phone.
++      photoCapturedContinuation = nil
++      photoCaptureOptions = nil
++      let plainFailure = describeCaptureFailure(error: error, output: output)
 +      continuation.resume(throwing: CameraImageCaptureDetailedException(
-+        describeCaptureFailure(error: error, output: output)
++        "configured[\(firstFailure ?? "?")] plain[\(plainFailure)]"
 +      ))
        return
      }
  
-@@ -156,6 +162,49 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
++    photoCapturedContinuation = nil
++    photoCaptureOptions = nil
++    if retriedWithPlainSettings {
++      NSLog("expo-camera: configured photo settings refused, plain retry captured. First failure: %@", firstFailure ?? "?")
++    }
++
+     // Processing a full-res still takes seconds and this callback can arrive on the main queue —
+     // extract what we need from the photo, then do the heavy work off the delivery queue
+     let imageData = photo.fileDataRepresentation()
+@@ -156,6 +189,63 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
      }
    }
  
@@ -51,10 +100,14 @@ index fc9a9bb..30e4d23 100644
 +    let nsError = error as NSError
 +    var parts = ["\(nsError.domain) \(nsError.code) \(nsError.localizedDescription)"]
 +
++    parts.append("iOS=\(UIDevice.current.systemVersion)")
++
 +    if let session = captureDelegate?.previewLayer.session {
 +      parts.append("running=\(session.isRunning ? 1 : 0)")
 +      parts.append("interrupted=\(session.isInterrupted ? 1 : 0)")
 +      parts.append("preset=\(session.sessionPreset.rawValue)")
++      parts.append("inputs=\(session.inputs.count)")
++      parts.append("outputs=\(session.outputs.count)")
 +    }
 +    if let previewSize = captureDelegate?.previewLayer.frame.size {
 +      parts.append("preview=\(Int(previewSize.width))x\(Int(previewSize.height))")
@@ -66,6 +119,16 @@ index fc9a9bb..30e4d23 100644
 +        let format = CMVideoFormatDescriptionGetDimensions(input.device.activeFormat.formatDescription)
 +        parts.append("device=\(input.device.localizedName)")
 +        parts.append("activeFormat=\(format.width)x\(format.height)")
++
++        // The list the requested dimensions have to be a member of. If the
++        // requested value is not in here, AVFoundation refuses the request —
++        // which is the shape of a failure that costs no time at all.
++        if #available(iOS 16.0, *) {
++          let supported = input.device.activeFormat.supportedMaxPhotoDimensions
++            .map { "\($0.width)x\($0.height)" }
++            .joined(separator: "/")
++          parts.append("supportedMaxPhotoDimensions=[\(supported)]")
++        }
 +      }
 +    }
 +
