@@ -1,0 +1,76 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run replay harness (choose test dataset)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run web",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "TEST_DATA_DIR": "${input:testDataDir}"
+      }
+    },
+    {
+      // Serves testing/fixtures/active.tle on :8787 in place of the real,
+      // rate-limited CelesTrak endpoint. See testing/tools/mock-celestrak-server.mjs
+      // and the "Local CelesTrak mock" section of the README. Meant to be run
+      // via the "Run web + mock CelesTrak" compound below, not by itself.
+      "name": "Mock CelesTrak server",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run mock-celestrak",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Run web (mock CelesTrak)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run web",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "TEST_DATA_DIR": "${input:testDataDir}",
+        "EXPO_PUBLIC_TLE_URL": "http://localhost:8787/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
+      }
+    },
+    {
+      // Metro for a dev-client build on a phone, reached over Expo's ngrok
+      // tunnel. No test dataset here: this serves the app itself, not the
+      // replay harness, so it needs the phone rather than a browser.
+      //
+      // `npm run tunnel` rather than `expo start --dev-client --tunnel`
+      // directly, and that is the whole point of the entry: the script carries
+      // ELECTRON_DISABLE_SANDBOX=1, without which preparing the React Native
+      // DevTools shell is fatal under root and the CLI reports it as a failed
+      // install. See the "Developing" section of the README, which also covers
+      // what to check when the tunnel itself will not come up.
+      "name": "Run dev client (tunnel)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run tunnel",
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      // Starts the mock server and the replay harness together so it never
+      // touches the real CelesTrak endpoint. Stopping the compound stops both
+      // terminals.
+      //
+      // This is the entry to use. The replay runs in a browser on this machine;
+      // the only other way to run the app is a TestFlight build on a real
+      // iPhone, which is a GitHub Actions workflow - see docs/ios-builds.md.
+      "name": "Run web + mock CelesTrak",
+      "configurations": ["Mock CelesTrak server", "Run web (mock CelesTrak)"],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "testDataDir",
+      "type": "promptString",
+      "description": "Path to a folder holding frames.mov and the sensor CSVs (see testing/tools/prepare-test-data.mjs)",
+      "default": "test-data/advio-21/advio-21/iphone"
+    }
+  ]
+}

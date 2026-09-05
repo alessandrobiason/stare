@@ -1,0 +1,9 @@
+# The build context is deliberately empty: docker/Dockerfile copies no source in
+# (both ways of running the image mount /app instead), so nothing needs to be
+# sent to the daemon.
+#
+# Denying everything is also what keeps the private keys in .secrets/ and the
+# ~600 MB under test-data/ and public/ out of the build entirely, rather than
+# relying on this file listing each new one as it appears. If a COPY is ever
+# added to the Dockerfile, un-ignore exactly what it needs with `!` lines here.
+*

@@ -1,0 +1,78 @@
+{
+  "name": "stare",
+  "version": "0.1.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "prebuild": "expo prebuild --platform ios --clean",
+    "ota-update": "npx eas-cli update --branch production",
+    "runtime-version": "expo-updates runtimeversion:resolve --platform ios",
+    "start": "ELECTRON_DISABLE_SANDBOX=1 expo start --dev-client",
+    "tunnel": "ELECTRON_DISABLE_SANDBOX=1 expo start --dev-client --tunnel",
+    "web": "node testing/tools/prepare-test-data.mjs && ELECTRON_DISABLE_SANDBOX=1 expo start --web",
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "mock-celestrak": "node testing/tools/mock-celestrak-server.mjs",
+    "prepare-test-data": "node testing/tools/prepare-test-data.mjs",
+    "e2e": "playwright test",
+    "measure-jitter": "node testing/tools/measure-jitter.mjs"
+  },
+  "dependencies": {
+    "@shopify/react-native-skia": "2.6.2",
+    "expo": "^57.0.0",
+    "expo-asset": "~57.0.13",
+    "expo-camera": "~57.0.4",
+    "expo-dev-client": "~57.0.18",
+    "expo-file-system": "~57.0.5",
+    "expo-image-manipulator": "^57.0.14",
+    "expo-location": "~57.0.14",
+    "expo-sensors": "~57.0.2",
+    "expo-updates": "~57.0.21",
+    "jpeg-js": "^0.4.4",
+    "onnxruntime-react-native": "^1.24.3",
+    "onnxruntime-web": "^1.16.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-web": "^0.21.2",
+    "satellite.js": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.2.4",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^57.0.2",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
+    "typescript": "~6.0.3"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/__tests__/**/*.test.ts",
+      "<rootDir>/__tests__/**/*.test.tsx"
+    ],
+    "moduleNameMapper": {
+      "^react-native$": "react-native-web"
+    },
+    "moduleFileExtensions": [
+      "web.tsx",
+      "web.ts",
+      "tsx",
+      "ts",
+      "js",
+      "json"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/testing/e2e/"
+    ]
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

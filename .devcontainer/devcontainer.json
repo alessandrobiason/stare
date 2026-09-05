@@ -1,0 +1,66 @@
+{
+  "name": "Stare",
+
+  // docker/Dockerfile is the whole image definition. Nothing that belongs in a
+  // Dockerfile is repeated here -- CHROMIUM_PATH and ELECTRON_DISABLE_SANDBOX
+  // are set there and inherited, not restated below.
+  "build": {
+    "dockerfile": "../docker/Dockerfile",
+    "context": ".."
+  },
+
+  "workspaceFolder": "/app",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
+
+  "mounts": [
+    "source=/mnt/,target=/mnt,type=bind,consistency=cached",
+    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
+
+    // node_modules stays off the bind mount: it is large, platform-specific,
+    // and produced by npm ci rather than edited.
+    "source=stare-node-modules,target=/app/node_modules,type=volume",
+
+    // Everything a rebuild used to throw away lives in the container's home
+    // directory, so home is a volume. That covers the Playwright browser cache
+    // under ~/.cache/ms-playwright, the npm cache, the VS Code server,
+    // ~/.gitconfig and ~/.ssh/known_hosts.
+    //
+    // Docker seeds a named volume from the image the first time it is mounted
+    // and never again, so nothing below this line should expect a later image
+    // build to refresh a file under /root. The Dockerfile deliberately writes
+    // none.
+    "source=stare-home,target=/root,type=volume"
+  ],
+
+  "runArgs": [
+    "--network=host"
+  ],
+
+  "containerEnv": {
+    "SSH_AUTH_SOCK": "/ssh-agent"
+  },
+
+  "forwardPorts": [8081],
+
+  "portsAttributes": {
+    "8081": {
+      "label": "Expo web",
+      "onAutoForward": "openBrowser"
+    }
+  },
+
+  // known_hosts now persists across rebuilds, so the keyscan is guarded rather
+  // than appending a duplicate GitHub entry on every container create.
+  "postCreateCommand": "mkdir -p ~/.ssh && chmod 700 ~/.ssh && { ssh-keygen -F github.com >/dev/null 2>&1 || ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null; }; npm ci --legacy-peer-deps --no-audit --no-fund",
+
+  "overrideCommand": true,
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "eamodio.gitlens",
+        "github.vscode-github-actions"
+      ]
+    }
+  }
+}

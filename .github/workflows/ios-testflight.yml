@@ -1,0 +1,460 @@
+# Builds a signed device .ipa and uploads it to TestFlight.
+#
+# This is the sibling of ios-build.yml. That one answers "does this still
+# compile for iOS" against the simulator with signing off, costs nothing in
+# Apple credentials, and runs on native-input pushes. This one produces an
+# installable build, needs a paid Apple Developer account, and is manual only:
+# a Release archive plus the export and upload runs 20-30 minutes on a macOS
+# runner, which bills at 10x, so roughly 250 of the free 2,000 monthly minutes
+# per release. Do not put it on a push trigger.
+#
+# The Linux gate from ios-build.yml is repeated here rather than shared, so a
+# broken app.json or a transparent icon fails at the 1x rate before any of that
+# is spent. The two workflows stay independently editable, which matters more
+# than the twenty duplicated lines.
+#
+# Required repository secrets -- see docs/ios-builds.md for how to produce
+# each one without a Mac:
+#
+#   APPLE_TEAM_ID                 10-character team ID from developer.apple.com
+#   APPLE_DIST_CERT_P12_BASE64    Apple Distribution certificate + private key,
+#                                 as a base64 .p12
+#   APPLE_DIST_CERT_PASSWORD      the password that .p12 was exported with
+#   APPSTORE_KEY_ID               App Store Connect API key ID
+#   APPSTORE_ISSUER_ID            App Store Connect API issuer ID
+#   APPSTORE_API_KEY_P8_BASE64    that key's .p8, base64
+#
+# The API key does double duty: xcodebuild uses it with -allowProvisioningUpdates
+# to create and download the provisioning profile, so no .mobileprovision has to
+# be stored or rotated here, and altool uses it to authenticate the upload.
+#
+# Two things about when to run this at all:
+#
+# Most fixes should not. Since expo-updates went in, anything that lives in
+# src/ reaches an installed build through ota-update.yml, which runs on Linux
+# in two minutes instead of thirty macOS ones. This workflow is for the native
+# half: a new dependency, a config plugin, a permission string, the icon,
+# anything in app.json that prebuild writes into the Xcode project. Compare
+# `npm run runtime-version` before and after a change -- if the fingerprint is
+# unchanged, an OTA update carries it and this workflow has nothing to add.
+#
+# The Debug configuration produces a development build instead of the shipping
+# app. Its only difference is that expo-dev-client's launcher is compiled in --
+# the podspecs are marked debugOnly, so a Release archive carries none of it --
+# which gives a menu on the phone for loading any published update branch, and
+# real error overlays instead of a silent failure. It installs over the release
+# build through TestFlight under the same bundle identifier, so the phone holds
+# one or the other, not both.
+
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Release: the app as testers get it. Debug: a development build carrying the dev client, which loads update branches from a menu instead of running an embedded bundle.'
+        type: choice
+        options: [Release, Debug]
+        default: Release
+
+permissions:
+  contents: read
+
+# Deliberately not cancel-in-progress: interrupting a run partway through an
+# upload leaves a half-delivered build on Apple's side. Releases queue instead.
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+
+jobs:
+  prebuild-check:
+    name: Generate native project (Linux, 1x)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      # Every credential below is first used deep inside the 10x job, where a
+      # bad one surfaces as something unreadable: a .p8 that is not valid PEM
+      # fails the archive with "Invalid authentication key credential specified
+      # (CryptoKit.CryptoKitASN1Error.invalidPEMDocument)" and nothing about
+      # which secret to look at. Checking them here costs seconds at the 1x
+      # rate, before npm even runs.
+      - name: Check the release secrets
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CERT_P12_BASE64: ${{ secrets.APPLE_DIST_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_DIST_CERT_PASSWORD }}
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          API_KEY_P8_BASE64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+          PROFILE_BASE64: ${{ secrets.APPLE_DIST_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$1 See the secrets table in docs/ios-builds.md."
+            exit 1
+          }
+
+          for pair in "APPLE_TEAM_ID:${TEAM_ID:-}" \
+                      "APPLE_DIST_CERT_P12_BASE64:${CERT_P12_BASE64:-}" \
+                      "APPLE_DIST_CERT_PASSWORD:${CERT_PASSWORD:-}" \
+                      "APPSTORE_KEY_ID:${KEY_ID:-}" \
+                      "APPSTORE_ISSUER_ID:${ISSUER_ID:-}" \
+                      "APPSTORE_API_KEY_P8_BASE64:${API_KEY_P8_BASE64:-}" \
+                      "APPLE_DIST_PROFILE_BASE64:${PROFILE_BASE64:-}"; do
+            [ -n "${pair#*:}" ] || fail "Repository secret ${pair%%:*} is empty or not set."
+          done
+
+          # Both IDs are plain alphanumeric, so anything else in them is stray
+          # whitespace or a smart quote picked up on the way through a paste.
+          case "$TEAM_ID" in *[![:alnum:]]*)
+            fail "APPLE_TEAM_ID holds a character that is not a letter or digit." ;; esac
+          case "$KEY_ID" in *[![:alnum:]]*)
+            fail "APPSTORE_KEY_ID holds a character that is not a letter or digit." ;; esac
+
+          # The same normalising the 10x job does, so what passes here is what
+          # it will get: whitespace out of the base64, then CRs out of the PEM.
+          key="$RUNNER_TEMP/authkey.p8"
+          printf '%s' "$API_KEY_P8_BASE64" | tr -d '[:space:]' | base64 -d 2>/dev/null \
+            | tr -d '\r' > "$key" || true
+          # The message stays one line: only the first reaches the annotation.
+          openssl pkey -in "$key" -noout 2>/dev/null \
+            || fail "APPSTORE_API_KEY_P8_BASE64 does not decode to a PEM private key -- it is 'base64 -w0 < AuthKey_XXXXXXXXXX.p8', not the .p8 text."
+          rm -f "$key"
+
+          # The profile is not negotiable at build time -- manual signing uses
+          # this one or fails -- so it is checked against what the app actually
+          # builds. A .mobileprovision is a CMS blob wrapped around a plist.
+          bundle="$(python3 -c 'import json; print(json.load(open("app.json"))["expo"]["ios"]["bundleIdentifier"])')"
+          profile="$RUNNER_TEMP/dist.mobileprovision"
+          plist="$RUNNER_TEMP/profile.plist"
+          printf '%s' "$PROFILE_BASE64" | tr -d '[:space:]' | base64 -d 2>/dev/null > "$profile" || true
+          openssl smime -verify -inform DER -noverify -in "$profile" -out "$plist" 2>/dev/null \
+            || fail "APPLE_DIST_PROFILE_BASE64 does not decode to a provisioning profile -- it is 'base64 -w0 < Stare.mobileprovision' as downloaded from developer.apple.com."
+          python3 tools/check-ios-profile.py "$plist" "$bundle" "$TEAM_ID"
+          rm -f "$profile" "$plist"
+
+          echo "All seven release secrets are present and usable."
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: expo prebuild
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      # An icon with an alpha channel is rejected by App Store Connect at the
+      # very last step (ITMS-90717). Catching it here saves the whole 10x job.
+      - name: Check app icon has no alpha channel
+        run: node tools/check-icon-opaque.mjs
+
+      # A binary that cannot find its updates is the one failure this pipeline
+      # cannot correct after the fact: the fix would be another release. Nothing
+      # about it is visible at runtime either -- the app simply never updates.
+      - name: Check the update configuration
+        run: node tools/check-eas-updates.mjs
+
+      # The number that decides, later, whether a published update is allowed
+      # to reach the build this run is about to produce. ota-update.yml prints
+      # the same line; if the two differ, the update is for a different binary
+      # and the phone will ignore it. Computed here rather than in the 10x job
+      # because it is the same value either side of the build-number stamp --
+      # fingerprint.config.js keeps versions out of the hash for exactly that
+      # reason -- and a minute of Linux is the right place to learn it.
+      - name: Report the runtime version
+        run: |
+          set -euo pipefail
+          runtime="$(npx expo-updates runtimeversion:resolve --platform ios \
+            | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).runtimeVersion')"
+          {
+            echo "### iOS ${{ inputs.configuration || 'Release' }} build"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Runtime version | \`$runtime\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo
+            echo "An OTA update reaches this build only while \`npm run runtime-version\`"
+            echo "still prints \`$runtime\`. When it stops, the change is a native one and"
+            echo "needs another run of this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Runtime version: $runtime"
+
+  release:
+    name: Archive and upload (macOS, 10x)
+    needs: prebuild-check
+    runs-on: macos-26
+    # Longer than ios-build.yml's cap: a Release archive optimises every pod,
+    # and the export and upload follow it.
+    timeout-minutes: 60
+    env:
+      # CFBundleVersion has to be unique per CFBundleShortVersionString and
+      # rising. run_number never repeats across runs, and run_attempt
+      # distinguishes a re-run of a failed release, which reuses run_number.
+      BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same pin, and the same reasoning, as ios-build.yml: ExpoModulesJSI
+      # resolves through SwiftPM against a swift-tools-version 6.2 dependency,
+      # so anything older than Xcode 26 dies at package resolution. Holding the
+      # 26 line makes a move to 27 a deliberate edit in both workflows.
+      - name: Select Xcode 26 (Swift 6.2)
+        run: |
+          set -euo pipefail
+          xcode="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)" || true
+          if [ -z "${xcode:-}" ]; then
+            echo "::error::No Xcode 26 on this runner image. ExpoModulesJSI needs Swift 6.2; if the image has moved on to Xcode 27, widen the glob above after checking Expo supports it."
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
+          "$xcode/Contents/Developer/usr/bin/xcodebuild" -version
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      # app.json stays the source of truth for the native project, so the build
+      # number goes in there and prebuild writes it into Info.plist. Editing the
+      # generated Info.plist afterwards would work too, but the next --clean
+      # prebuild would silently drop it.
+      - name: Stamp the build number into app.json
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs");
+            const config = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            config.expo.ios.buildNumber = process.env.BUILD_NUMBER;
+            fs.writeFileSync("app.json", JSON.stringify(config, null, 2) + "\n");
+          '
+          echo "Build $BUILD_NUMBER of version $(node -p 'require("./app.json").expo.version')"
+
+      - name: expo prebuild
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      # Only the download cache, not ios/Pods: saving a multi-gigabyte Pods
+      # directory costs upload time billed at 10x. The tarballs are the slow part.
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: pod install
+        working-directory: ios
+        run: pod install
+
+      # A dedicated keychain rather than the login one: it gets its own random
+      # password, an explicit unlock, and is deleted at the end of the job. The
+      # runner is ephemeral anyway, but nothing here needs to outlive the build.
+      - name: Import signing certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.APPLE_DIST_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_DIST_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(openssl rand -base64 24)"
+          cert="$RUNNER_TEMP/dist.p12"
+
+          echo "$CERT_P12_BASE64" | base64 --decode > "$cert"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          # Stop the keychain relocking mid-build on the default 5-minute idle.
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$cert" -k "$keychain" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          # Without this, codesign prompts for keychain access and hangs the job.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain" > /dev/null
+          # Prepend rather than replace, so the system roots stay searchable.
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$keychain"
+          rm -f "$cert"
+
+          echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "Identities available to codesign:"
+          security find-identity -v -p codesigning "$keychain"
+
+      # Only the upload uses this key now that signing is manual. altool looks
+      # for it in a handful of fixed directories and insists on the
+      # AuthKey_<id>.p8 filename, so it goes where altool will find it.
+      - name: Install App Store Connect API key
+        env:
+          API_KEY_P8_BASE64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+        run: |
+          set -euo pipefail
+          dir="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$dir"
+          key="$dir/AuthKey_${KEY_ID}.p8"
+          # First tr: a base64 paste that arrived wrapped, or with a stray
+          # newline, is still the right key. Second: CryptoKit matches the PEM
+          # header line exactly, so one \r left by a Windows round-trip of the
+          # .p8 is enough to make the whole document unparseable.
+          printf '%s' "$API_KEY_P8_BASE64" | tr -d '[:space:]' | base64 --decode \
+            | tr -d '\r' > "$key"
+          chmod 600 "$key"
+          # The Linux gate checked this already; repeated here because the gate
+          # is skippable by re-running only this job.
+          openssl pkey -in "$key" -noout 2>/dev/null || {
+            echo "::error::APPSTORE_API_KEY_P8_BASE64 did not decode to a PEM private key."
+            exit 1
+          }
+
+      # Manual signing needs the profile on disk before xcodebuild resolves it
+      # by name. Xcode 16 moved the directory it reads; the runner is on 26, so
+      # the new path is the one that matters and the old one is a cheap hedge
+      # against a rolled-back image.
+      - name: Install the distribution profile
+        env:
+          PROFILE_BASE64: ${{ secrets.APPLE_DIST_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          profile="$RUNNER_TEMP/dist.mobileprovision"
+          plist="$RUNNER_TEMP/profile.plist"
+          printf '%s' "$PROFILE_BASE64" | tr -d '[:space:]' | base64 --decode > "$profile"
+          security cms -D -i "$profile" > "$plist"
+
+          name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$plist")"
+          uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$plist")"
+          expires="$(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$plist")"
+
+          # The name is pasted into the export options plist further down, so a
+          # markup character in it would produce invalid XML rather than an
+          # obvious complaint. Apple allows them in profile names; nothing here
+          # needs to.
+          case "$name" in *[\<\>\&\"\']*)
+            echo "::error::Provisioning profile name \"$name\" contains a character that cannot go into the export options plist. Rename the profile at developer.apple.com to plain text."
+            exit 1 ;; esac
+
+          for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" \
+                     "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            mkdir -p "$dir"
+            cp "$profile" "$dir/$uuid.mobileprovision"
+          done
+          rm -f "$plist"
+
+          # The name, not the UUID: PROVISIONING_PROFILE_SPECIFIER takes either,
+          # and the name is what the export options below have to repeat.
+          echo "PROFILE_NAME=$name" >> "$GITHUB_ENV"
+          echo "Installed \"$name\" ($uuid), expires $expires"
+
+      # Why manual signing at all: xcodebuild archive under automatic signing
+      # signs for *development* first and leaves distribution to the export,
+      # and a development profile is minted from a registered device list plus
+      # an Apple Development certificate. An account that only ships to
+      # TestFlight has neither, so Apple refuses with "Your team has no devices
+      # from which to generate a provisioning profile". Forcing the identity
+      # instead only earns "automatically signed for development, but a
+      # conflicting code signing identity has been manually specified".
+      #
+      # The settings go on the app target rather than the xcodebuild command
+      # line, because a command-line setting reaches every target in the build,
+      # CocoaPods' included, and a pod that cannot carry a profile fails the
+      # build. After pod install, which rewrites parts of the same project.
+      - name: Point the app target at the profile
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: node tools/set-ios-signing.mjs
+
+      # No -allowProvisioningUpdates and no authentication key: signing is
+      # settled in the project by the step above, and nothing here needs to ask
+      # Apple for anything. The API key is still installed, because altool uses
+      # it for the upload. Nothing signing-related is passed on the command
+      # line either -- see the step above for why.
+      - name: Archive
+        env:
+          CONFIGURATION: ${{ inputs.configuration || 'Release' }}
+        run: |
+          set -euo pipefail
+          workspace="$(ls -d ios/*.xcworkspace | head -1)"
+          scheme="$(basename "$workspace" .xcworkspace)"
+          echo "Archiving $scheme ($CONFIGURATION) with \"$PROFILE_NAME\""
+          xcodebuild archive \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -derivedDataPath ios/build \
+            OTHER_CODE_SIGN_FLAGS="--keychain=$SIGNING_KEYCHAIN" \
+            -quiet
+
+      - name: Export .ipa
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          bundle="$(node -p 'require("./app.json").expo.ios.bundleIdentifier')"
+
+          # "app-store-connect" is the current spelling; Xcode 15.3 renamed it
+          # from "app-store", which still works but warns. signingStyle has to
+          # match the archive: automatic here would send the export back to
+          # Apple for a profile it cannot mint, which is the whole reason this
+          # release signs manually.
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${bundle}</key><string>${PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key><true/>
+            <key>destination</key><string>export</string>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+
+          ls -lh "$RUNNER_TEMP/export"
+
+      - name: Upload to TestFlight
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          ipa="$(ls "$RUNNER_TEMP/export"/*.ipa | head -1)"
+          echo "Uploading $(basename "$ipa") as build $BUILD_NUMBER"
+          xcrun altool --upload-app -f "$ipa" -t ios \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+          echo "Uploaded. App Store Connect processes the build before it shows"
+          echo "up in TestFlight, which usually takes 5-15 minutes."
+
+      - name: Remove credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
+          rm -rf "$HOME/.appstoreconnect/private_keys"
+          rm -f "$RUNNER_TEMP/dist.mobileprovision"
+          rm -rf "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" \
+                 "$HOME/Library/MobileDevice/Provisioning Profiles"
