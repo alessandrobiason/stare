@@ -73,3 +73,9 @@ test("a long failure reason is shown in full, not clipped or elided", () => {
   expect(text).toContain("plain[AVFoundationErrorDomain -11800");
   expect(text).not.toContain("…");
 });
+
+test("the loading screen still says nothing once the build line exists", () => {
+  // The build identity belongs to a failure report, not to a launch. A line
+  // that leaked onto the loading screen would undo the whole point of it.
+  expect(textOf(screen())).toBe("");
+});

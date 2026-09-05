@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { describeBuild } from "../debug/buildIdentity";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
@@ -31,6 +32,8 @@ type Props = {
  */
 export const BootScreen: React.FC<Props> = ({ failed, error, retryable = true, onRetry }) => {
   const [frame, setFrame] = useState<FrameSize | null>(null);
+  // Read once: it cannot change while the app is running.
+  const [build] = useState(describeBuild);
 
   const measure = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -70,6 +73,16 @@ export const BootScreen: React.FC<Props> = ({ failed, error, retryable = true, o
           ) : (
             <Text style={styles.footnote}>This device cannot run the sky view.</Text>
           )}
+
+          {/* Which binary is reporting this. See `describeBuild`: a fix that
+              never reached the phone reads exactly like a fix that did not
+              work, and the difference has to be legible from the screen
+              someone photographs. */}
+          {build ? (
+            <Text style={styles.build} selectable>
+              {build}
+            </Text>
+          ) : null}
         </View>
       )}
     </View>
@@ -128,6 +141,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5
+  },
+  build: {
+    marginTop: 14,
+    color: theme.color.textFaint,
+    fontSize: 9,
+    lineHeight: 13
   },
   footnote: {
     marginTop: 14,
