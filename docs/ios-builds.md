@@ -211,6 +211,18 @@ AVFoundation refuses; and the domain and code name the rest outright.
 
 `postinstall` runs `patch-package --error-on-fail`, so an install whose patch no
 longer applies fails the job rather than quietly producing an unpatched binary.
+Both iOS workflows then grep the patched sources in `node_modules` before
+anything expensive runs, which catches the other half: a `postinstall` that
+never ran at all. A build that reaches `pod install` has the patch in the
+sources CocoaPods compiles.
+
+**Which build is on the phone.** The release workflow stamps
+`ios.buildNumber` as `<run_number>.<run_attempt>`, so the build number
+TestFlight shows is the GitHub Actions run number. When a fix appears not to
+have worked, check that first: the number in TestFlight against the number of
+the run that was supposed to carry it. A native fix reaching a phone that is
+still on the previous binary looks exactly like a native fix that does not
+work, and telling those apart by reasoning is not possible.
 
 That string doubles as a check on which binary is running: if a phone reports
 the bare "Image could not be captured" with nothing after the colon, it is

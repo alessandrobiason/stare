@@ -58,6 +58,34 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps --no-audit --no-fund
 
+      # A patch that never reached node_modules produces a binary
+      # indistinguishable from one where the fix did not work — which has
+      # already cost a release cycle and a day of guessing. `--error-on-fail`
+      # in postinstall catches a patch that fails to apply; this catches the
+      # case where postinstall never ran at all, and it runs before anything
+      # expensive so it fails at the 1x rate.
+      - name: Verify native patches reached node_modules
+        run: |
+          set -euo pipefail
+          missing=0
+          while IFS='|' read -r file needle; do
+            [ -n "$file" ] || continue
+            if ! grep -q "$needle" "$file"; then
+              echo "::error::$file has no '$needle' — patches/ did not reach node_modules"
+              missing=1
+            fi
+          done <<'MARKERS'
+node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|describeCaptureFailure
+node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|retriedWithPlainSettings
+node_modules/expo-camera/ios/Current/CameraSessionManager.swift|disableDeferredPhotoDelivery
+node_modules/expo-camera/ios/Common/CameraExceptions.swift|CameraImageCaptureDetailedException
+MARKERS
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Refusing to build: the camera fix is not in the sources CocoaPods will compile."
+            exit 1
+          fi
+          echo "Native patches present in node_modules."
+
       # ios/ is generated, never committed. This resolves every config plugin
       # in app.json and writes the Xcode project; --no-install skips the
       # CocoaPods step, which needs macOS.
@@ -104,6 +132,34 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      # A patch that never reached node_modules produces a binary
+      # indistinguishable from one where the fix did not work — which has
+      # already cost a release cycle and a day of guessing. `--error-on-fail`
+      # in postinstall catches a patch that fails to apply; this catches the
+      # case where postinstall never ran at all, and it runs before anything
+      # expensive so it fails at the 1x rate.
+      - name: Verify native patches reached node_modules
+        run: |
+          set -euo pipefail
+          missing=0
+          while IFS='|' read -r file needle; do
+            [ -n "$file" ] || continue
+            if ! grep -q "$needle" "$file"; then
+              echo "::error::$file has no '$needle' — patches/ did not reach node_modules"
+              missing=1
+            fi
+          done <<'MARKERS'
+node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|describeCaptureFailure
+node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|retriedWithPlainSettings
+node_modules/expo-camera/ios/Current/CameraSessionManager.swift|disableDeferredPhotoDelivery
+node_modules/expo-camera/ios/Common/CameraExceptions.swift|CameraImageCaptureDetailedException
+MARKERS
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Refusing to build: the camera fix is not in the sources CocoaPods will compile."
+            exit 1
+          fi
+          echo "Native patches present in node_modules."
 
       - name: expo prebuild
         run: npx expo prebuild --platform ios --clean --no-install
