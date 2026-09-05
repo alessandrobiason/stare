@@ -60,28 +60,31 @@ jobs:
 
       # A patch that never reached node_modules produces a binary
       # indistinguishable from one where the fix did not work — which has
-      # already cost a release cycle and a day of guessing. `--error-on-fail`
-      # in postinstall catches a patch that fails to apply; this catches the
-      # case where postinstall never ran at all, and it runs before anything
-      # expensive so it fails at the 1x rate.
+      # already cost a release cycle. `--error-on-fail` in postinstall catches
+      # a patch that fails to apply; this catches the case where postinstall
+      # never ran at all, and it runs before anything expensive so it fails at
+      # the 1x rate.
+      #
+      # Every line here stays indented under the block scalar. A heredoc body
+      # at column zero ends the scalar and makes the whole workflow file
+      # invalid YAML, which GitHub reports as a failed run against the push
+      # rather than as a syntax error.
       - name: Verify native patches reached node_modules
         run: |
           set -euo pipefail
           missing=0
-          while IFS='|' read -r file needle; do
-            [ -n "$file" ] || continue
-            if ! grep -q "$needle" "$file"; then
-              echo "::error::$file has no '$needle' — patches/ did not reach node_modules"
+          require() {
+            if ! grep -q "$2" "$1"; then
+              echo "::error::$1 has no '$2', so patches/ did not reach node_modules"
               missing=1
             fi
-          done <<'MARKERS'
-node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|describeCaptureFailure
-node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|retriedWithPlainSettings
-node_modules/expo-camera/ios/Current/CameraSessionManager.swift|disableDeferredPhotoDelivery
-node_modules/expo-camera/ios/Common/CameraExceptions.swift|CameraImageCaptureDetailedException
-MARKERS
+          }
+          require node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift describeCaptureFailure
+          require node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift retriedWithPlainSettings
+          require node_modules/expo-camera/ios/Current/CameraSessionManager.swift disableDeferredPhotoDelivery
+          require node_modules/expo-camera/ios/Common/CameraExceptions.swift CameraImageCaptureDetailedException
           if [ "$missing" -ne 0 ]; then
-            echo "::error::Refusing to build: the camera fix is not in the sources CocoaPods will compile."
+            echo "::error::Refusing to build, the camera fix is not in the sources CocoaPods compiles"
             exit 1
           fi
           echo "Native patches present in node_modules."
@@ -135,28 +138,31 @@ MARKERS
 
       # A patch that never reached node_modules produces a binary
       # indistinguishable from one where the fix did not work — which has
-      # already cost a release cycle and a day of guessing. `--error-on-fail`
-      # in postinstall catches a patch that fails to apply; this catches the
-      # case where postinstall never ran at all, and it runs before anything
-      # expensive so it fails at the 1x rate.
+      # already cost a release cycle. `--error-on-fail` in postinstall catches
+      # a patch that fails to apply; this catches the case where postinstall
+      # never ran at all, and it runs before anything expensive so it fails at
+      # the 1x rate.
+      #
+      # Every line here stays indented under the block scalar. A heredoc body
+      # at column zero ends the scalar and makes the whole workflow file
+      # invalid YAML, which GitHub reports as a failed run against the push
+      # rather than as a syntax error.
       - name: Verify native patches reached node_modules
         run: |
           set -euo pipefail
           missing=0
-          while IFS='|' read -r file needle; do
-            [ -n "$file" ] || continue
-            if ! grep -q "$needle" "$file"; then
-              echo "::error::$file has no '$needle' — patches/ did not reach node_modules"
+          require() {
+            if ! grep -q "$2" "$1"; then
+              echo "::error::$1 has no '$2', so patches/ did not reach node_modules"
               missing=1
             fi
-          done <<'MARKERS'
-node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|describeCaptureFailure
-node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift|retriedWithPlainSettings
-node_modules/expo-camera/ios/Current/CameraSessionManager.swift|disableDeferredPhotoDelivery
-node_modules/expo-camera/ios/Common/CameraExceptions.swift|CameraImageCaptureDetailedException
-MARKERS
+          }
+          require node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift describeCaptureFailure
+          require node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift retriedWithPlainSettings
+          require node_modules/expo-camera/ios/Current/CameraSessionManager.swift disableDeferredPhotoDelivery
+          require node_modules/expo-camera/ios/Common/CameraExceptions.swift CameraImageCaptureDetailedException
           if [ "$missing" -ne 0 ]; then
-            echo "::error::Refusing to build: the camera fix is not in the sources CocoaPods will compile."
+            echo "::error::Refusing to build, the camera fix is not in the sources CocoaPods compiles"
             exit 1
           fi
           echo "Native patches present in node_modules."
