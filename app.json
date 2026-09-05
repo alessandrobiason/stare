@@ -1,0 +1,72 @@
+{
+  "expo": {
+    "name": "Stare",
+    "slug": "stare",
+    "version": "0.1.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6a2d1b3b-c6d7-4981-8cf9-ad1402b4ef87",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
+    "icon": "./assets/icon.png",
+    "platforms": [
+      "ios",
+      "web"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.alessandrobiason.stare",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIRequiredDeviceCapabilities": [
+          "arm64",
+          "gyroscope",
+          "magnetometer",
+          "location-services"
+        ],
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ]
+      }
+    },
+    "plugins": [
+      "expo-asset",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Stare shows satellites over the sky in front of you.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Stare needs your position to work out which satellites are overhead.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      "onnxruntime-react-native"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6a2d1b3b-c6d7-4981-8cf9-ad1402b4ef87"
+      }
+    },
+    "owner": "alesbiasons-team",
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    }
+  }
+}

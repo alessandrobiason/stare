@@ -1,0 +1,21 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "rootDir": ".",
+    "paths": {
+      "@shopify/react-native-skia/src/*": [
+        "./node_modules/@shopify/react-native-skia/lib/typescript/src/*"
+      ]
+    },
+    "types": ["jest", "node"]
+  },
+  "include": ["src", "__tests__", "testing", "tools", "App.tsx", "App.web.tsx"],
+  "exclude": ["node_modules", "dist", ".expo"]
+}

@@ -1,0 +1,122 @@
+# Publishes a JavaScript-only fix to phones that already have the app.
+#
+# The third workflow, and the cheap one. ios-build.yml asks whether the project
+# still compiles; ios-testflight.yml produces an installable binary and costs
+# roughly 250 of the 2,000 free monthly minutes because macOS bills at 10x.
+# This one runs entirely on Linux at 1x, takes about two minutes, and reaches
+# an installed build without going near Apple.
+#
+# What it cannot do is change native code. Everything under ios/ is compiled
+# into the binary on the phone: a new dependency, a config plugin, a permission
+# string, an icon, anything in app.json that prebuild writes into the Xcode
+# project. Those need ios-testflight.yml. What it can do is every line of
+# src/, which on this project is the app.
+#
+# Nothing here has to be trusted to get that distinction right. The runtime
+# version is a fingerprint of the native inputs (app.json, the config plugins,
+# every autolinked package), computed the same way at build time and at publish
+# time. An update whose fingerprint does not match a binary's is never offered
+# to it. So the failure mode of publishing a native change is that the phone
+# quietly ignores the update -- not that it installs one it cannot run. The
+# fingerprint is printed below so it can be compared with the release that
+# built the installed app, which prints the same line.
+#
+# Required repository secret:
+#
+#   EXPO_TOKEN    an Expo access token, from expo.dev -> account settings ->
+#                 access tokens. Nothing Apple-related is involved.
+
+name: OTA update
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Update branch to publish to (the installed build listens on the channel of the same name)
+        type: string
+        default: production
+      message:
+        description: What this update changes, shown in the EAS dashboard
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# One publish at a time per branch. Two runs racing would leave whichever
+# finished last as the update phones fetch, which is not necessarily the one
+# whose commit is newer.
+concurrency:
+  group: ota-update-${{ inputs.branch }}
+  cancel-in-progress: false
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+
+jobs:
+  publish:
+    name: Publish update (Linux, 1x)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Full history: the fingerprint reads the repository through git, and a
+      # shallow clone can give a different answer from the release that built
+      # the binary this update is aimed at.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      # An update goes straight onto a phone with no review, no Apple
+      # processing and no chance to catch it in between, so the whole suite
+      # runs first. It is seconds on this project.
+      - name: Typecheck, lint and test
+        run: npm run check
+
+      - name: Check the update configuration
+        run: node tools/check-eas-updates.mjs
+
+      # Printed before publishing rather than after, so a mismatch with the
+      # installed build is visible in the log next to what caused it.
+      - name: Report the runtime version
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          runtime="$(npx expo-updates runtimeversion:resolve --platform ios \
+            | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).runtimeVersion')"
+          echo "RUNTIME_VERSION=$runtime" >> "$GITHUB_ENV"
+          {
+            echo "### OTA update"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Branch | \`${{ inputs.branch }}\` |"
+            echo "| Runtime version | \`$runtime\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo
+            echo "Only builds whose runtime version is \`$runtime\` will take this update."
+            echo "The iOS TestFlight run that produced the installed build prints the same value."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx eas-cli@latest update \
+            --branch "${{ inputs.branch }}" \
+            --message "${{ inputs.message }}" \
+            --platform ios \
+            --non-interactive
+          echo
+          echo "Published to branch ${{ inputs.branch }} at runtime version $RUNTIME_VERSION."
+          echo "The app checks on launch and applies what it downloaded on the next"
+          echo "one, so a phone takes the update at the second launch after this."

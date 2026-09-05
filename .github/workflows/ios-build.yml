@@ -1,0 +1,144 @@
+# Compiles the app the way an iPhone build does, on GitHub's runners.
+#
+# Budget notes — this repo is private, so Actions minutes come out of the free
+# 2,000/month allowance, and macOS runners bill at a 10x multiplier. One full
+# build of this project costs roughly 15 minutes of wall clock, i.e. ~150
+# billed minutes, so the month holds about a dozen of them. Everything below
+# is arranged to keep that count down:
+#
+#   * the workflow only ever runs when someone presses "Run workflow"; there
+#     is no push or schedule trigger, so no commit can start a macOS run;
+#   * a Linux job at the 1x rate regenerates the native project first, so a
+#     broken app.json or config plugin fails in ~1 minute instead of ~150;
+#   * concurrency cancels superseded runs, and timeouts cap a hung build.
+#
+# The build targets the simulator with signing off, so it needs no Apple
+# Developer account and no secrets. It answers "does this still compile for
+# iOS", not "here is an installable .ipa" — device builds need a paid account
+# and certificates in secrets.
+
+name: iOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: Xcode build configuration
+        type: choice
+        options: [Debug, Release]
+        default: Debug
+
+permissions:
+  contents: read
+
+# A newer manual run on the same ref makes the running build irrelevant; stop
+# paying for it.
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+
+jobs:
+  prebuild-check:
+    name: Generate native project (Linux, 1x)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      # --legacy-peer-deps matches .devcontainer/devcontainer.json; the
+      # onnxruntime and react 19 peer ranges do not resolve without it.
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      # ios/ is generated, never committed. This resolves every config plugin
+      # in app.json and writes the Xcode project; --no-install skips the
+      # CocoaPods step, which needs macOS.
+      - name: expo prebuild
+        run: npx expo prebuild --platform ios --clean --no-install
+
+  build:
+    name: xcodebuild (macOS, 10x)
+    needs: prebuild-check
+    # macos-26 is the current GA arm64 image and bills at the same 10x standard
+    # rate as macos-15 (macos-26-xlarge is the pricier SKU; this is not it). Not
+    # macos-latest: that alias migrates between images over a 1-2 month window,
+    # and an unannounced toolchain change is the last thing a 10x job needs.
+    runs-on: macos-26
+    # Hard stop: a wedged build must not quietly eat the monthly allowance.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      # expo-modules-core builds ExpoModulesJSI through SwiftPM, and one of that
+      # package's dependencies declares swift-tools-version 6.2, so the build
+      # dies at package resolution on anything older than Xcode 26. This image
+      # already defaults to a 26.x, so the step is a pin rather than a fix: it
+      # holds the build on the 26 line, so that when the image's default moves
+      # to Xcode 27 that becomes a deliberate edit here instead of a surprise
+      # in a 10x job. Set before CocoaPods runs so pod install and xcodebuild
+      # agree on a single toolchain.
+      - name: Select Xcode 26 (Swift 6.2)
+        run: |
+          set -euo pipefail
+          xcode="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)" || true
+          if [ -z "${xcode:-}" ]; then
+            echo "::error::No Xcode 26 on this runner image. ExpoModulesJSI needs Swift 6.2; if the image has moved on to Xcode 27, widen the glob above after checking Expo supports it."
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
+          "$xcode/Contents/Developer/usr/bin/xcodebuild" -version
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: expo prebuild
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      # Only the download cache, not ios/Pods: saving a multi-gigabyte Pods
+      # directory happens on this runner, and that upload time is billed at
+      # 10x too. The tarballs (hermes-engine, the prebuilt React Native
+      # frameworks) are the slow part and they live here.
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: pod install
+        working-directory: ios
+        run: pod install
+
+      # Simulator + CODE_SIGNING_ALLOWED=NO keeps this free of certificates and
+      # provisioning profiles. Workspace and scheme are derived from the name
+      # in app.json, so renaming the app does not break this step.
+      - name: Build
+        run: |
+          set -euo pipefail
+          workspace="$(ls -d ios/*.xcworkspace | head -1)"
+          scheme="$(basename "$workspace" .xcworkspace)"
+          echo "Building $scheme (${{ inputs.configuration || 'Debug' }})"
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration "${{ inputs.configuration || 'Debug' }}" \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet \
+            build
