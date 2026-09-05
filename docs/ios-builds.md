@@ -150,6 +150,50 @@ Once a build made after the updates setup below is installed, most later fixes
 do not come this way at all — see
 [Shipping a fix without a rebuild](#shipping-a-fix-without-a-rebuild).
 
+## Native patches to dependencies
+
+`patches/` holds patches applied to `node_modules` by `patch-package`, from the
+`postinstall` script, on every install — locally and in every workflow, all of
+which run a plain `npm ci` with dev dependencies.
+
+There is currently one, and it is worth knowing why it exists rather than only
+that it does.
+
+`patches/expo-camera+57.0.4.patch` disables automatic deferred photo delivery
+on the camera's photo output. On hardware that supports deferred delivery — an
+iPhone 15 does, an iPhone 12 mini does not — AVFoundation calls
+`didFinishCapturingDeferredPhotoProxy` instead of `didFinishProcessingPhoto`,
+and `expo-camera` implements only the latter, so every `takePictureAsync` comes
+back as
+
+```
+CameraImageCaptureException: Image could not be captured
+(at ExpoCamera/CameraPhotoCapture.swift:130)
+```
+
+which on this app is the sky mask failing every pass and the view going back to
+the boot screen. Expo hit the same thing in 57.0.1 ([expo/expo#47728]) and
+fixed it in 57.0.3, but inside the responsive-capture guard — which is read
+mid-`beginConfiguration`, before the session runs, and can still be false on
+hardware that supports the feature once the configuration settles. The patch
+moves the disable out of that guard and repeats it after `startRunning`, where
+the flags describe the configuration that will actually be captured under.
+
+[expo/expo#47728]: https://github.com/expo/expo/issues/47728
+
+**A patch is native code, so it ships in a binary and not in an update.** This
+is the distinction the next section is about: three attempts were made at that
+capture failure in JavaScript alone, each shipped over the air, and none of them
+could have worked, because nothing the bundle can reach configures the photo
+output. If the same error is ever reported again, check first whether the phone
+is running a build made after the patch landed rather than an update layered
+onto an older one.
+
+Drop the patch when `expo-camera` ships a version that disables deferred
+delivery unconditionally: delete the file, and `npm ci` will stop applying it.
+`patch-package` fails loudly if the package version moves and the patch no
+longer applies, so an upgrade cannot silently drop it.
+
 ## Shipping a fix without a rebuild
 
 A release costs 20-30 minutes of macOS runner, roughly an eighth of the free

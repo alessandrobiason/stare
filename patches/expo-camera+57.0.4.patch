@@ -1,0 +1,66 @@
+diff --git a/node_modules/expo-camera/ios/Current/CameraSessionManager.swift b/node_modules/expo-camera/ios/Current/CameraSessionManager.swift
+index 7a6568c..46709a7 100644
+--- a/node_modules/expo-camera/ios/Current/CameraSessionManager.swift
++++ b/node_modules/expo-camera/ios/Current/CameraSessionManager.swift
+@@ -112,6 +112,11 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+       if hasAvailableCameraDevice && !self.session.isRunning {
+         self.session.startRunning()
+       }
++      // The session is committed and running here, which is the first point at
++      // which the deferred-delivery flags describe the configuration that will
++      // actually be captured under. This fires just before onCameraReady, so it
++      // lands before the first takePictureAsync can.
++      disableDeferredPhotoDelivery()
+     } else {
+       self.session.stopRunning()
+     }
+@@ -373,14 +378,48 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+   }
+ 
+   private func configureResponsiveCapture(_ photoOutput: AVCapturePhotoOutput) {
+-    guard #available(iOS 17.0, *), photoOutput.isResponsiveCaptureSupported else {
++    guard #available(iOS 17.0, *) else {
++      return
++    }
++
++    // Unconditionally, and before the responsive-capture check rather than
++    // after it. This class implements didFinishProcessingPhoto and not
++    // didFinishCapturingDeferredPhotoProxy, so a capture AVFoundation decides
++    // to defer has nothing to handle it and comes back as an error. Automatic
++    // deferred delivery is available on capable hardware whether or not
++    // responsive capture is on, and isResponsiveCaptureSupported is read here
++    // mid beginConfiguration, before the session runs, where it can still be
++    // false on hardware that supports it once the configuration settles.
++    if photoOutput.isAutoDeferredPhotoDeliveryEnabled {
++      photoOutput.isAutoDeferredPhotoDeliveryEnabled = false
++    }
++
++    guard photoOutput.isResponsiveCaptureSupported else {
+       return
+     }
+     photoOutput.isResponsiveCaptureEnabled = true
+     if photoOutput.isFastCapturePrioritizationSupported {
+       photoOutput.isFastCapturePrioritizationEnabled = true
+     }
++  }
++
++  /// Turns automatic deferred photo delivery off once the session is really
++  /// running.
++  ///
++  /// Both flags follow the committed configuration, so the pass made while the
++  /// session was still being configured can miss it. This runs after
++  /// startRunning, on the session queue, and is one property read on every call
++  /// after the first.
++  func disableDeferredPhotoDelivery() {
++    guard #available(iOS 17.0, *), let photoOutput else {
++      return
++    }
++    guard photoOutput.isAutoDeferredPhotoDeliveryEnabled else {
++      return
++    }
++    session.beginConfiguration()
+     photoOutput.isAutoDeferredPhotoDeliveryEnabled = false
++    session.commitConfiguration()
+   }
+ 
+   private func startSession() {

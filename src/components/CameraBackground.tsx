@@ -46,14 +46,18 @@ const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(
  * captures the person never asked for.
  *
  * What it is not configured with is a capture size, and that is the point of
- * this file rather than an omission from it. `pictureSize` is the only lever
- * `expo-camera` offers for bounding a still, it writes the `AVCaptureSession`
- * preset behind the photo output's back, and on a phone whose camera has the
- * iOS 17 capture features — an iPhone 15 does — every shot after that write
- * fails for the life of the session. The prop is therefore never written here,
- * at any value, and the session stays exactly as `expo-camera` built it. The
- * note above `DEVICE_CAMERA_CAPTURE_QUALITY` in `constants.ts` has the whole of
- * it, including what the full-resolution still costs instead.
+ * this file rather than an omission from it. `pictureSize` writes the
+ * `AVCaptureSession` preset behind the photo output's back, which changes the
+ * active format the output is still handing its own `maxPhotoDimensions`
+ * against. The prop is never written here, at any value, and the session stays
+ * exactly as `expo-camera` built it.
+ *
+ * Nothing in this file fixes the capture failure that kept an iPhone 15 from
+ * starting, and three earlier versions of it that claimed to were wrong. That
+ * fault is automatic deferred photo delivery in `expo-camera`'s own Swift, and
+ * it is fixed in `patches/expo-camera+57.0.4.patch` — in the binary rather than
+ * the bundle. The note above `DEVICE_CAMERA_CAPTURE_QUALITY` in `constants.ts`
+ * has the whole of it.
  *
  * That leaves one camera, mounted once and left alone, which is also the
  * cheapest thing to be sure of. The one time it is rebuilt is recovery, after

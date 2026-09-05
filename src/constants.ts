@@ -32,48 +32,56 @@ export const DEVICE_CAMERA = {
 } as const;
 
 /*
- * Why the still camera has no capture size set.
+ * Why the still camera has no capture size set, and where the real fix lives.
  *
  * A note rather than a constant, because what is written down here is the
- * absence of one: the obvious optimisation is a trap that has now cost three
- * attempts, and the next person to reach for it should read this first.
- *
- * `expo-camera` asks the photo output for its full `maxPhotoDimensions` on
- * every shot, so each sky-mask pass has the phone produce a twelve- to
- * forty-eight-megapixel still — decoded to a bitmap, cropped, re-encoded and
- * decoded again — to feed a 320x448 model input. That is plainly worth
- * bounding, and `pictureSize` is the only lever offered for bounding it.
- *
- * The lever does not work. `pictureSize` is not a quality setting: on iOS the
- * string picks the `AVCaptureSession` preset. `expo-camera` builds its session
- * in the view's initialiser, before any prop has been seen, so the photo output
- * is created under the `Photo` preset — and on iOS 17 its responsive capture and
- * fast capture prioritisation are configured there, once, for that preset. The
- * prop arrives afterwards and writes the preset without revisiting either. On a
- * phone whose camera has those features — an iPhone 15 does, an iPhone 12 mini
- * does not — every shot after that write fails:
+ * absence of one. Three JavaScript-only attempts were made at the capture
+ * failure that kept an iPhone 15 from starting, and all three were wrong in the
+ * same way: the fault was never reachable from here.
  *
  *     CameraImageCaptureException: Image could not be captured
+ *     (at ExpoCamera/CameraPhotoCapture.swift:130)
  *
- * And it does not stop at the size that was asked for. The write leaves the
- * photo output unable to capture at any size for the life of the session, so
- * writing the prop back to `Photo` does not undo it, and neither does a ladder
- * of sizes tried in turn. Both were shipped; both left an iPhone 15 unable to
- * start. There is no value of this prop that is safe to write, so it is not
- * written, and the session stays exactly as `expo-camera` built it.
+ * That line is `didFinishProcessingPhoto` being handed an error by AVFoundation.
+ * The cause is automatic deferred photo delivery: on hardware that supports it
+ * — an iPhone 15 does, an iPhone 12 mini does not — AVFoundation calls
+ * `didFinishCapturingDeferredPhotoProxy` instead, and `expo-camera` implements
+ * only the former, so the capture has nothing to resolve it and fails. Expo hit
+ * this themselves in 57.0.1 (expo/expo#47728) and fixed it in 57.0.3 by turning
+ * deferred delivery off — but inside the responsive-capture guard, which is read
+ * mid `beginConfiguration`, before the session runs, where it can still be false
+ * on hardware that supports it once the configuration settles. When that guard
+ * returns early, deferred delivery is never disabled and every capture fails.
  *
- * What that costs is the full-resolution still, and the cost is transient
- * rather than cumulative: every native image on the path is released by hand
- * and the temporary JPEG is deleted, so a pass allocates a great deal and gives
- * all of it back. The thirty-second termination in this app's history was the
- * missing releases rather than the size — the jetsam report that followed it
- * named accumulation, not a spike. The capture is asked for at a low JPEG
- * quality for the same reason: see `DEVICE_CAMERA_CAPTURE_QUALITY`.
+ * There is no prop for any of that. The fix is a native patch, in
+ * `patches/expo-camera+57.0.4.patch`, applied by `patch-package` on install.
+ * It is therefore in the binary, not the bundle: an OTA update cannot carry it,
+ * and shipping it needs a new build.
  *
- * If memory pressure does come back, it will come back as the operating system
- * ending the app, not as this error, and the lever to reach for is the interval
- * between passes — `SKY_SEGMENTATION_INTERVAL_MS`, bounded by
- * `SKY_MASK_MAX_AGE_SECONDS` — rather than this prop.
+ * `pictureSize` stays unwritten regardless, and that part of the earlier work
+ * stands. On iOS the string picks the `AVCaptureSession` preset, and the preset
+ * changes the device's active format — while `expo-camera` goes on handing the
+ * photo output's own `maxPhotoDimensions` to every shot. Those dimensions have
+ * to match the *current* active format, so writing the prop after the output was
+ * configured is a mismatch waiting to happen, and it is a second way to reach
+ * the same exception. Nothing here writes it, at any value, and the session
+ * stays exactly as `expo-camera` built it.
+ *
+ * What that gives up is a bounded still, and the cost is transient rather than
+ * cumulative: every native image on the path is released by hand and the
+ * temporary JPEG deleted, so a pass allocates a great deal and gives all of it
+ * back. The thirty-second termination in this app's history was the missing
+ * releases rather than the size — the jetsam report that followed it named
+ * accumulation, not a spike.
+ *
+ * How large the still actually is, this note does not claim to know. An earlier
+ * version of it asserted twelve to forty-eight megapixels; the AVFoundation
+ * header says only that the per-shot default is the smallest supported size and
+ * leaves the output's own default unstated, so the figure was a guess dressed as
+ * a fact. If memory pressure ever does come back it will come back as the
+ * operating system ending the app rather than as this error, and the lever is
+ * the interval between passes — `SKY_SEGMENTATION_INTERVAL_MS`, bounded by
+ * `SKY_MASK_MAX_AGE_SECONDS` — not this prop.
  */
 
 /**
@@ -82,9 +90,9 @@ export const DEVICE_CAMERA = {
  * Not the quality of anything anyone sees. On the `pictureRef` path the native
  * side encodes the captured image to JPEG and decodes it again to make the ref,
  * and at the default — 1.0 — that is a full-quality encode of a
- * forty-eight-megapixel bitmap, once a second, for pixels that are about to be
- * resampled to 320x448 and thresholded into a sky mask. Twenty times more
- * detail than survives the resize is being paid for in both directions.
+ * full-resolution bitmap, once a second, for pixels that are about to be
+ * resampled to 320x448 and thresholded into a sky mask. Far more detail than
+ * survives the resize is being paid for in both directions.
  *
  * Low enough to make that encode cheap, high enough that the resize has real
  * edges to work from: the mask's business is where the sky stops, and blocking

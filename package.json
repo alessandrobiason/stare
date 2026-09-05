@@ -4,6 +4,7 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
+    "postinstall": "patch-package",
     "prebuild": "expo prebuild --platform ios --clean",
     "ota-update": "npx eas-cli update --branch production",
     "runtime-version": "expo-updates runtimeversion:resolve --platform ios",
@@ -46,6 +47,7 @@
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.2",
     "jest": "^30.4.2",
+    "patch-package": "^8.0.1",
     "ts-jest": "^29.4.12",
     "typescript": "~6.0.3"
   },
