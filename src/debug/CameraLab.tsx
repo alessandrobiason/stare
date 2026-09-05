@@ -116,7 +116,7 @@ export const CameraLab: React.FC = () => {
 
       for (let index = 0; index < STAGES.length; index += 1) {
         if (cancelled) return;
-        const { label, facing, selectedLens, pictureSize } = STAGES[index];
+        const { label, selectedLens, pictureSize } = STAGES[index];
 
         setShown(false);
         await wait(STAGE_GAP_MS);

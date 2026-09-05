@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
@@ -48,7 +48,20 @@ export const BootScreen: React.FC<Props> = ({ failed, error, retryable = true, o
       {failed && (
         <View style={styles.card}>
           <Text style={styles.title}>Could not start</Text>
-          {error ? <Text style={styles.reason}>{error}</Text> : null}
+          {error ? (
+            // Scrolled and selectable, because a reason can be long. The
+            // camera's capture failures now carry the AVFoundation error and
+            // the session's state with them, which is a paragraph rather than a
+            // sentence — and the screen it lands on is centred inside an
+            // `overflow: "hidden"` root, so without this the end of the message
+            // is clipped off the bottom with no way to reach it. Selectable so
+            // it can be copied out rather than photographed.
+            <ScrollView style={styles.reasonScroll} contentContainerStyle={styles.reasonContent}>
+              <Text style={styles.reason} selectable>
+                {error}
+              </Text>
+            </ScrollView>
+          ) : null}
 
           {retryable ? (
             <Pressable style={styles.retry} onPress={onRetry}>
@@ -89,8 +102,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1
   },
-  reason: {
+  reasonScroll: {
     marginTop: 10,
+    // Tall enough for a real diagnostic, short enough that the title and the
+    // retry button stay on screen with it.
+    maxHeight: 260
+  },
+  reasonContent: {
+    paddingRight: 4
+  },
+  reason: {
     color: theme.color.text,
     fontSize: 12,
     lineHeight: 18

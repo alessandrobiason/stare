@@ -48,3 +48,28 @@ test("a failure retrying cannot fix offers no retry, and does not blame the netw
   expect(text).not.toContain("TRY AGAIN");
   expect(text).not.toContain("network");
 });
+
+test("a long failure reason is shown in full, not clipped or elided", () => {
+  // The camera's capture failures carry the AVFoundation error and the
+  // session's state with them, which is a paragraph. The card sits centred
+  // inside an `overflow: "hidden"` root, so a reason that outgrows the screen
+  // used to lose its tail with no way to reach it — and the tail is where the
+  // second half of a two-attempt failure lives.
+  const reason =
+    "The sky could not be segmented, so nothing can be hidden behind terrain: " +
+    "CameraImageCaptureDetailedException: Image could not be captured: " +
+    "configured[AVFoundationErrorDomain -11800 The operation could not be completed, " +
+    "iOS=17.5, running=1, interrupted=0, preset=AVCaptureSessionPresetPhoto, inputs=1, " +
+    "outputs=1, preview=393x524, connection=on/active, device=Back Camera, " +
+    "activeFormat=4032x3024, supportedMaxPhotoDimensions=[4032x3024/8064x6048], " +
+    "maxPhotoDimensions=8064x6048, deferred=0, responsive=1] " +
+    "plain[AVFoundationErrorDomain -11800 The operation could not be completed]";
+
+  const text = textOf(screen({ failed: true, error: reason }));
+
+  expect(text).toContain(reason);
+  // The end of the message specifically: that is the half that says whether the
+  // plain retry failed too, and it is the half a clipped card would drop.
+  expect(text).toContain("plain[AVFoundationErrorDomain -11800");
+  expect(text).not.toContain("…");
+});
