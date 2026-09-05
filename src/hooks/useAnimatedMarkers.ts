@@ -14,6 +14,7 @@ import { OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
 import { AnchoredSkyMask, skyProbe } from "../vision/anchoredMask";
 import { MarkerVisibilityFilter } from "../vision/markerVisibility";
+import { SkyMemory } from "../vision/skyMemory";
 import { useLatestRef } from "./useLatestRef";
 
 export type SatelliteMarker = {
@@ -78,11 +79,18 @@ export type MarkerStats = {
    */
   occluded: number;
   /**
-   * Placed markers, drawn or not, whose direction the mask has no answer for:
-   * the phone has turned onto sky no pass has looked at yet. Zero when the mask
-   * is keeping up, and the figure to look at when a pan empties the frame.
+   * Placed markers, drawn or not, whose direction nothing has any answer for:
+   * neither the live mask nor the sky already looked at has been aimed there.
+   * Zero when the mask is keeping up, and the figure to look at when a pan
+   * empties the frame.
    */
   unmapped: number;
+  /**
+   * Placed markers answered for by `SkyMemory` rather than by the live mask —
+   * sky the phone has turned back onto, or panned past a moment ago. What this
+   * counts is markers that would have been undrawable until the next pass.
+   */
+  remembered: number;
 };
 
 /**
@@ -97,12 +105,15 @@ export type AnimatedMarkers = {
   markers: MarkerSource;
   /** The tracker driving it, for the debug overlay's propagation readout. */
   tracker: SkyTracker;
+  /** The sky already looked at, for the debug overlay's coverage readout. */
+  skyMemory: SkyMemory;
   markerStatsRef: MutableRefObject<MarkerStats>;
   /** Smoothed display rate, in frames per second. */
   frameRateRef: MutableRefObject<number>;
   /**
    * Call on a seek: the sky jumps, so what each marker had settled on about
-   * the piece of frame it was crossing no longer describes anything.
+   * the piece of frame it was crossing no longer describes anything, and
+   * neither does the sky the passes before the jump had mapped.
    */
   reset: () => void;
 };
@@ -170,12 +181,19 @@ export function useAnimatedMarkers({
     () => new SkyTracker(catalog, MINIMUM_SATELLITE_ELEVATION_DEG),
     [catalog]
   );
+  // Outlives every mask that feeds it, which is the point: see `SkyMemory`.
+  const skyMemory = useMemo(() => new SkyMemory(), []);
 
   const maskRef = useLatestRef(mask);
   const enabledCategoriesRef = useLatestRef(enabledCategories);
   const onVisibleCountChangeRef = useLatestRef(onVisibleCountChange);
   const previousFrameRef = useRef<number | null>(null);
-  const markerStatsRef = useRef<MarkerStats>({ drawn: 0, occluded: 0, unmapped: 0 });
+  const markerStatsRef = useRef<MarkerStats>({
+    drawn: 0,
+    occluded: 0,
+    unmapped: 0,
+    remembered: 0
+  });
   const visibilityRef = useRef(new MarkerVisibilityFilter());
   const frameRateRef = useRef(0);
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
@@ -184,6 +202,15 @@ export function useAnimatedMarkers({
   /** The last count handed to `onVisibleCountChange`, and when. */
   const publishedCountRef = useRef(-1);
   const publishedCountAtRef = useRef(0);
+
+  // Each pass, once, off the frame loop: a mask is a second of sky the app
+  // would otherwise throw away when the next one lands. Cheap next to the
+  // inference that produced it — a projection per grid cell in view — and it is
+  // what lets a turn back onto mapped sky draw markers on the frame it happens.
+  useEffect(() => {
+    if (!mask) return;
+    skyMemory.absorb(mask, lens, epochRef.current.observer, performance.now() / 1000);
+  }, [epochRef, lens, mask, skyMemory]);
 
   useEffect(() => {
     let handle = requestAnimationFrame(function animate(now: number) {
@@ -209,6 +236,7 @@ export function useAnimatedMarkers({
       const visible: SatelliteMarker[] = [];
       let occluded = 0;
       let unmapped = 0;
+      let remembered = 0;
 
       // No mask, no markers. Drawing them anyway — which is what happens the
       // moment this is written as "hide them only if the mask says to" — claims
@@ -225,6 +253,10 @@ export function useAnimatedMarkers({
         // frame is a degree of building the mask has in the wrong place — which
         // is a satellite drawn over a roof for as long as the next pass takes.
         const skyTowards = skyProbe(currentMask, lens);
+        // What the passes before this one found, for the sky this one is not
+        // aimed at. Resolved once per frame rather than per satellite, like the
+        // probe above it.
+        const skyRemembered = skyMemory.probe(now / 1000);
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
@@ -238,15 +270,25 @@ export function useAnimatedMarkers({
           // the mask is taking is the first thing to look at when it is taking
           // the wrong ones — the debug overlay shows the figure.
           //
-          // Sky the mask never saw — revealed by the turn that is still ahead
-          // of the segmenter — is handed on as "no reading" rather than as
-          // either answer, for the same reason no mask at all draws nothing: an
-          // unlooked-at direction is not a clear line of sight, and it is not
-          // evidence of a building either. The filter fades those out and keeps
-          // what they had decided, so they come back as they were the moment a
-          // pass covers them again.
-          const confidence = skyTowards(fix.position);
+          // The live mask answers first and the memory only where it cannot:
+          // the two are the same sky, and the more recent look is the better
+          // one. What the memory covers is the sky this pass is not aimed at
+          // but an earlier one was — the view either side of a pan, and
+          // everything behind a phone that has turned back the way it came.
+          // Without it every one of those directions waits on the segmenter
+          // reaching it again, which is a second or two of empty frame for sky
+          // that was mapped moments ago and has not changed since.
+          //
+          // Sky *nothing* has looked at is still handed on as "no reading"
+          // rather than as either answer, for the same reason no mask at all
+          // draws nothing: an unlooked-at direction is not a clear line of
+          // sight, and it is not evidence of a building either. The filter
+          // fades those out and keeps what they had decided, so they come back
+          // as they were the moment a pass covers them again.
+          const live = skyTowards(fix.position);
+          const confidence = live ?? skyRemembered(fix.position);
           if (confidence === null) unmapped += 1;
+          else if (live === null) remembered += 1;
           const opacity = visibility.sample(fix.name, confidence);
           if (opacity <= MARKER_VISIBILITY.minimumDrawnOpacity) {
             occluded += 1;
@@ -275,7 +317,7 @@ export function useAnimatedMarkers({
         visibility.reset();
       }
 
-      markerStatsRef.current = { drawn: visible.length, occluded, unmapped };
+      markerStatsRef.current = { drawn: visible.length, occluded, unmapped, remembered };
 
       // Farthest first, so nearer markers draw over the ones behind them and
       // the overlay reads as having depth. Landmarks go last whatever their
@@ -305,10 +347,14 @@ export function useAnimatedMarkers({
     maskRef,
     onVisibleCountChangeRef,
     orientationFilterRef,
+    skyMemory,
     tracker
   ]);
 
-  const reset = useCallback(() => visibilityRef.current.reset(), []);
+  const reset = useCallback(() => {
+    visibilityRef.current.reset();
+    skyMemory.reset();
+  }, [skyMemory]);
 
   const markers = useCallback<MarkerSource>((listener) => {
     const listeners = listenersRef.current;
@@ -321,7 +367,7 @@ export function useAnimatedMarkers({
     };
   }, []);
 
-  return { markers, tracker, markerStatsRef, frameRateRef, reset };
+  return { markers, tracker, skyMemory, markerStatsRef, frameRateRef, reset };
 }
 
 /**

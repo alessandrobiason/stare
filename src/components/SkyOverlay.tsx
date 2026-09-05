@@ -153,6 +153,7 @@ export const SkyOverlay: React.FC<Props> = ({
   const {
     markers,
     tracker,
+    skyMemory,
     markerStatsRef,
     frameRateRef,
     reset: resetMarkers
@@ -182,6 +183,9 @@ export const SkyOverlay: React.FC<Props> = ({
     skySection({
       tracker: tracker.stats(),
       markers: markerStatsRef.current,
+      // Walks the grid, which is why it is asked for here — on the panel's own
+      // slow timer — rather than kept up to date by the frame loop.
+      memory: skyMemory.stats(performance.now() / 1000),
       epoch: epochRef.current
     }),
     // The cache's timestamps are wall-clock (they outlive the process), unlike

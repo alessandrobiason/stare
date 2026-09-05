@@ -266,6 +266,78 @@ export const SKY_MASK_MAX_AGE_SECONDS = 8;
 export const SKY_CONFIDENCE_THRESHOLD = 0.5;
 
 /**
+ * The sky the phone has already looked at, kept after the mask that saw it has
+ * been replaced (`src/vision/skyMemory.ts`).
+ *
+ * A mask covers the frame it was cut from and nothing else, so every pass
+ * throws away what the last one learned about the sky either side of it. What
+ * that costs is the whole of the delay in panning: turn the phone and the new
+ * sky has no reading until a pass lands on it — a second or two — and turn back
+ * and the sky that was mapped a moment ago has to be looked at again, because
+ * the only mask in existence is now aimed somewhere else.
+ *
+ * Nothing about that second wait is honest. The buildings did not move while
+ * the phone was pointed away from them, and a reading taken twenty seconds ago
+ * from the same spot is the same reading. So each pass is also written into a
+ * grid fixed to the sky rather than to the frame, and a direction the live mask
+ * cannot answer for is asked of that instead — which makes turning back
+ * immediate and leaves only genuinely unlooked-at sky waiting on the segmenter.
+ *
+ * The two things that can invalidate it are time and the observer moving, and
+ * both are bounded here rather than trusted.
+ */
+export const SKY_MEMORY = {
+  /**
+   * Cell size of the remembered grid, in degrees of azimuth and elevation.
+   *
+   * The mask's own resolution: 3,600 cells over this camera's 54 x 69 degree
+   * frame is almost exactly a degree either way, so a finer grid would store
+   * detail no pass ever put there and a coarser one would throw away edges the
+   * model did resolve.
+   */
+  cellDeg: 1,
+  /**
+   * Lowest elevation the grid covers, in degrees. Below the horizon there is
+   * nothing to remember, and `MINIMUM_SATELLITE_ELEVATION_DEG` keeps every
+   * marker well above this — the margin is only so that a marker at the floor
+   * still has cells beneath it to interpolate between.
+   */
+  floorElevationDeg: 0,
+  /**
+   * How long a remembered reading is trusted, in seconds.
+   *
+   * Not how long a roof stays where it is — that is indefinite — but how long
+   * this app is willing to answer for a hand-held phone without having looked
+   * again. A minute and a half covers panning around the sky and coming back,
+   * which is what this is for, and expires anything left over from a walk that
+   * did not trip `observerDriftMetres`.
+   */
+  maxAgeSeconds: 90,
+  /**
+   * Share of a direction's four surrounding cells that must carry a live
+   * reading before the memory answers for it at all.
+   *
+   * The reading is interpolated between cell centres, as the mask's own is, so
+   * the edge of the remembered region has directions with one or two of their
+   * four neighbours filled. Answering from those means extrapolating the sky
+   * beyond where anything looked; a half is the point at which the direction is
+   * more inside the mapped region than outside it.
+   */
+  minimumCoverage: 0.5,
+  /**
+   * How far the observer may move before everything remembered is dropped, in
+   * metres.
+   *
+   * The grid is a map of directions, and directions to nearby buildings are
+   * only fixed while the observer is. Measured from where the memory was
+   * started rather than from the last fix, so a slow walk accumulates instead
+   * of being absorbed a metre at a time. Horizontal only: a phone's GPS
+   * altitude wanders by more than this on its own while sitting still.
+   */
+  observerDriftMetres: 25
+} as const;
+
+/**
  * How long a marker holds its answer to "am I behind something"
  * (`src/vision/markerVisibility.ts`).
  *

@@ -110,7 +110,8 @@ test("the sky page separates what is drawn from what the mask is hiding", () => 
   const rows = values(
     skySection({
       tracker: { entries: 16000, candidates: 240, sweepProgress: 0.5, primed: true },
-      markers: { drawn: 12, occluded: 30, unmapped: 4 },
+      markers: { drawn: 12, occluded: 30, unmapped: 4, remembered: 5 },
+      memory: { cells: 4500, capacity: 32400, coverage: 0.125 },
       epoch: { time: new Date("2026-08-30T21:00:00.500Z"), observer }
     }).rows
   );
@@ -118,6 +119,11 @@ test("the sky page separates what is drawn from what the mask is hiding", () => 
   expect(rows.Catalog).toBe("16000 objects");
   expect(rows["Near horizon"]).toBe("240 tracked");
   expect(rows["Sky not yet seen"]).toBe("4");
+  // Markers the live mask cannot answer for and an earlier pass can: without
+  // the memory these are the ones a pan leaves off the frame for a second or
+  // two, and they are counted apart from the ones it draws outright.
+  expect(rows["From remembered sky"]).toBe("5");
+  expect(rows["Sky mapped"]).toBe("13% · 4500 cells");
   expect(rows[`Above ${MINIMUM_SATELLITE_ELEVATION_DEG}°`]).toBe("42");
   expect(rows.Drawn).toBe("12");
   expect(rows["Behind terrain"]).toBe("30");
@@ -129,7 +135,8 @@ test("the sky page says when the opening pass has not finished", () => {
   const rows = values(
     skySection({
       tracker: { entries: 10, candidates: 0, sweepProgress: 0.25, primed: false },
-      markers: { drawn: 0, occluded: 0, unmapped: 0 },
+      markers: { drawn: 0, occluded: 0, unmapped: 0, remembered: 0 },
+      memory: { cells: 0, capacity: 32400, coverage: 0 },
       epoch: { time: new Date("2026-08-30T21:00:00Z"), observer }
     }).rows
   );

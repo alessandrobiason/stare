@@ -87,7 +87,7 @@ horizon) is wider than the marker itself.
 SkyWater-Seg SegFormer about once a second, at its own aspect ratio within a
 fixed pixel budget. The model runs under ONNX Runtime — React Native on the
 phone, WASM in the browser — behind one shared module, so it is the same
-algorithm either side. Four things sit between its output and a marker being
+algorithm either side. Five things sit between its output and a marker being
 hidden:
 
 - **An aim, not a decal** (`anchoredMask.ts`). A mask is a grid over a *frame*,
@@ -101,6 +101,17 @@ hidden:
   what it does change is how much of the view the mask still covers, and a
   direction outside that is no reading rather than either answer — not drawn,
   and not argued with by the hysteresis below either.
+- **The sky already looked at** (`skyMemory.ts`). One mask covers one frame, so
+  each pass used to throw away what the last one learned about the sky either
+  side of it: turn the phone and the new view waits on the segmenter, turn back
+  and the sky mapped a moment ago waits all over again. Every pass is therefore
+  also written into an azimuth/elevation grid fixed to the sky, and a direction
+  the live mask cannot answer for is asked of that. Turning back is then
+  immediate, and only genuinely unlooked-at sky waits. It is a fallback and not
+  a licence: the live mask wins wherever it reaches, a reading expires after
+  ninety seconds, moving twenty-five metres drops the lot — directions to
+  nearby buildings are only fixed while the observer is — and a direction whose
+  neighbouring cells are mostly empty still gets no answer at all.
 - **The horizon cap** (`horizonPrior.ts`). Sky reflected in water, wet asphalt
   or glass is *a picture of the sky*, and no amount of looking harder at pixels
   settles it. But gravity-referenced pitch already knows where the horizon

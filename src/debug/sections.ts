@@ -16,6 +16,7 @@ import { SkyTrackerStats } from "../satellite/skyTracker";
 import { ObserverLocation } from "../types";
 import { AnchoredSkyMask, maskOffsetDeg } from "../vision/anchoredMask";
 import { refinedCellCount, skyCoverage } from "../vision/skyMask";
+import { SkyMemoryStats } from "../vision/skyMemory";
 import { bytes, clockTime, degrees, duration, fixed, NONE, position, vector } from "./format";
 
 /**
@@ -145,12 +146,14 @@ export function maskSection({
 export type SkyDebugInput = {
   tracker: SkyTrackerStats;
   markers: MarkerStats;
+  /** How much of the sky the passes so far have between them mapped. */
+  memory: SkyMemoryStats;
   /** Time and observer the last drawn frame propagated against. */
   epoch: { time: Date; observer: ObserverLocation };
 };
 
 /** Where the catalog is: how much of it is being carried, and how much is drawn. */
-export function skySection({ tracker, markers, epoch }: SkyDebugInput): DebugSection {
+export function skySection({ tracker, markers, memory, epoch }: SkyDebugInput): DebugSection {
   return {
     id: "sky",
     title: "SKY",
@@ -160,9 +163,16 @@ export function skySection({ tracker, markers, epoch }: SkyDebugInput): DebugSec
       { label: `Above ${MINIMUM_SATELLITE_ELEVATION_DEG}°`, value: `${markers.drawn + markers.occluded}` },
       { label: "Drawn", value: `${markers.drawn}` },
       { label: "Behind terrain", value: `${markers.occluded}` },
-      // Not behind anything as far as anyone knows: the mask has not been
-      // aimed at that sky yet, and an unlooked-at direction is not drawn.
+      // Not behind anything as far as anyone knows: nothing has been aimed at
+      // that sky yet, and an unlooked-at direction is not drawn.
       { label: "Sky not yet seen", value: `${markers.unmapped}` },
+      // Drawn on an earlier pass's word because the live mask is aimed
+      // elsewhere — the markers a pan would otherwise have had to wait for.
+      { label: "From remembered sky", value: `${markers.remembered}` },
+      {
+        label: "Sky mapped",
+        value: `${Math.round(memory.coverage * 100)}% · ${memory.cells} cells`
+      },
       {
         label: "Sweep",
         value: `${SATELLITE_TRACKING.sweepPeriodSeconds.toFixed(0)} s · ${Math.round(
