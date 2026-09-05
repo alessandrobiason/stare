@@ -112,6 +112,22 @@ async function attempt(
 export async function runCaptureProbe(view: CameraView): Promise<void> {
   console.warn(`${TAG} starting — ${VARIANTS.length} variants, then ${BURST} in a row`);
 
+  // What the session thinks it has. A capture rejected in two milliseconds is a
+  // photo output with nothing to capture from, and the lens list is the closest
+  // thing this API has to "is there a camera attached to this session at all".
+  try {
+    const lenses = await view.getAvailableLensesAsync();
+    console.warn(`${TAG} lenses (${lenses.length}): ${JSON.stringify(lenses)}`);
+  } catch (cause) {
+    console.warn(`${TAG} lenses unavailable — ${String(cause)}`);
+  }
+  try {
+    const sizes = await view.getAvailablePictureSizesAsync();
+    console.warn(`${TAG} pictureSizes (${sizes.length}): ${JSON.stringify(sizes)}`);
+  } catch (cause) {
+    console.warn(`${TAG} pictureSizes unavailable — ${String(cause)}`);
+  }
+
   for (const { label, options } of VARIANTS) {
     await attempt(view, label, options);
     await wait(GAP_MS);

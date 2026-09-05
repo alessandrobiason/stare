@@ -3,6 +3,7 @@ import { SafeAreaView, StyleSheet } from "react-native";
 import { runBootSequence } from "./boot/bootSequence";
 import { bootTasks } from "./boot/bootTasks";
 import { BootScreen } from "./components/BootScreen";
+import { CameraLab } from "./debug/CameraLab";
 import { DeviceScene } from "./components/DeviceScene";
 import { FatalErrorBoundary } from "./components/FatalErrorBoundary";
 import { useAppBoot } from "./hooks/useAppBoot";
@@ -20,10 +21,27 @@ import { useAppBoot } from "./hooks/useAppBoot";
  * fed by a recording instead of a camera, which is how it is developed and
  * tested without a phone in hand; nothing in here knows that exists.
  */
+/**
+ * Temporary: replaces the whole app with a bare camera, for a dev client.
+ *
+ * Off in anything that ships. See `CameraLab` — it exists to say whether the
+ * capture failure is the library on this phone or this app around it, and it
+ * can only answer that by being the only thing on screen.
+ */
+const CAMERA_LAB = false;
+
 export default function App() {
   const boot = useAppBoot((onProgress, { force }) =>
     runBootSequence(bootTasks({ force }), onProgress)
   );
+
+  if (CAMERA_LAB) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <CameraLab />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.root}>
