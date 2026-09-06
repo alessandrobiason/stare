@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CategoryLegend } from "../src/components/CategoryLegend";
+import { CompassNotice } from "../src/components/CompassNotice";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SceneStatus } from "../src/components/SceneStatus";
@@ -71,6 +72,47 @@ describe("the marker count", () => {
 
     expect(textOf(<SceneStatus markerCount={0} warned />)).toBe("0");
     expect(warned).not.toBe(renderToStaticMarkup(<SceneStatus markerCount={0} />));
+  });
+});
+
+describe("the compass notice", () => {
+  /** What the notice says for a compass at `accuracy`, with a declination in hand. */
+  const at = (accuracy: number | undefined) =>
+    textOf(<CompassNotice accuracy={accuracy} declinationKnown />);
+
+  test("says nothing before the compass has reported", () => {
+    // Silence here is the seconds before the first heading, not a verdict.
+    expect(at(undefined)).toBe("");
+  });
+
+  test("says nothing about a compass the platform vouches for", () => {
+    expect(at(3)).toBe("");
+  });
+
+  test("asks for the one fix the person holding the phone can make", () => {
+    // A magnetometer captured by a magnet reports a field like any other and
+    // the sky is simply drawn somewhere else — so the notice has to name the
+    // action, not the fault.
+    expect(at(0)).toContain("figure eight");
+    expect(at(0)).toContain("Compass needs calibrating");
+  });
+
+  test("warns at medium too, since 35° is most of the frame", () => {
+    // The platform's own band for level 2 is wider than half the camera's field
+    // of view: a satellite drawn under it can be off the picture entirely,
+    // which is a wrong view rather than a degraded one.
+    expect(at(2)).toContain("Compass needs calibrating");
+  });
+
+  test("a missing declination is said instead, and only when nothing worse is", () => {
+    const magnetic = textOf(<CompassNotice accuracy={3} declinationKnown={false} />);
+    expect(magnetic).toContain("magnetic north");
+
+    // A compass that may be forty degrees out makes the true-versus-magnetic
+    // question moot, so the graver of the two is the one shown.
+    const uncalibrated = textOf(<CompassNotice accuracy={0} declinationKnown={false} />);
+    expect(uncalibrated).toContain("Compass needs calibrating");
+    expect(uncalibrated).not.toContain("magnetic north");
   });
 });
 

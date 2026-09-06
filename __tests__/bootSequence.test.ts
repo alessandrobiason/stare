@@ -252,13 +252,17 @@ describe("the fix", () => {
     expect(stepOf(last, "location").detail).toContain("60.170");
   });
 
-  test("a declination the platform cannot supply leaves true north as magnetic", async () => {
+  test("a declination the platform cannot supply is nothing, not zero", async () => {
+    // Zero is a declination — magnetic north — and a real reading of it is
+    // indistinguishable from one that never came. The view keeps the compass
+    // open and fills this in from the first heading that settles, so which of
+    // the two boot is handing over has to survive the handover.
     const result = await runBootSequence(
       tasks({ readDeclination: () => Promise.resolve(null) }),
       () => undefined
     );
 
-    expect(result).toMatchObject({ declinationDeg: 0 });
+    expect(result).toMatchObject({ declinationDeg: null });
   });
 
   test("a declination that throws does not stop a boot that has its fix", async () => {
@@ -267,7 +271,7 @@ describe("the fix", () => {
       () => undefined
     );
 
-    expect(result).toMatchObject({ declinationDeg: 0 });
+    expect(result).toMatchObject({ declinationDeg: null });
   });
 
   test("no fix is fatal, because there is nowhere to place a satellite", async () => {

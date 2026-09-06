@@ -1,4 +1,5 @@
 import {
+  COMPASS_ACCURACY,
   MINIMUM_SATELLITE_ELEVATION_DEG,
   SATELLITE_TRACKING,
   SKY_CONFIDENCE_THRESHOLD,
@@ -11,8 +12,10 @@ import { CameraAttitude } from "../camera/attitude";
 import { CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
+import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
 import { MarkerStats } from "../hooks/useAnimatedMarkers";
 import { SkySegmentationStats } from "../hooks/useSkySegmentation";
+import { wrapDegrees360 } from "../math/angles";
 import { SkyTrackerStats } from "../satellite/skyTracker";
 import { ObserverLocation } from "../types";
 import { AnchoredSkyMask, maskOffsetDeg } from "../vision/anchoredMask";
@@ -343,6 +346,44 @@ export type DeviceSensorDebugInput = {
   capabilities: DeviceCapabilities;
 };
 
+/**
+ * Where the phone is aimed, for the status page.
+ *
+ * The heading, which is the yaw *and* the offset to north — not the yaw, which
+ * this used to print under that label. Yaw is counted from the attitude
+ * source's own origin, and on a phone that origin is wherever the platform
+ * started counting: it is not north, and it is not the origin the phone next to
+ * this one is using. Printed as a heading it is a bearing two working devices
+ * will disagree about by any amount at all, which is a bug hunt for something
+ * that is not happening — and it hides the one divergence that is real, since
+ * the offset moves the other way and the two are only meaningful added.
+ *
+ * Where there is no offset there is no bearing to print, and it says so rather
+ * than showing the yaw: a heading that was never referenced to north is a
+ * different thing from one that is wrong, and only one of them is fixable.
+ */
+export function aimReadout(orientation: DeviceOrientation | null): string {
+  if (!orientation) return "Waiting for the first attitude…";
+  const pitch = `pitch ${degrees(orientation.pitch)}`;
+  if (orientation.northOffset === undefined) return `Heading not referenced · ${pitch}`;
+  const heading = degrees(wrapDegrees360(orientation.yaw + orientation.northOffset));
+  // Named as magnetic where no declination was ever had, because that is a
+  // heading a few degrees out in most places and twenty in some.
+  const north = orientation.declination === undefined ? " magnetic" : "";
+  return `Heading ${heading}${north} · ${pitch}`;
+}
+
+/** What the platform makes of its own compass, and what the filter does with it. */
+function compassReadout(accuracy: number | undefined): string {
+  if (accuracy === undefined) return NONE;
+  const level = Math.round(accuracy);
+  const named = level >= 0 && level < COMPASS_ACCURACY.names.length;
+  // The noise the north reference is being corrected with, which is the whole
+  // consequence of the grade: this is the figure that changes when it does.
+  const trust = `±${degrees(northOffsetNoiseDeg(accuracy))}`;
+  return named ? `${COMPASS_ACCURACY.names[level]} (${level}) · ${trust}` : `? (${level}) · ${trust}`;
+}
+
 /** The phone's own sensors, as they arrive — before the filter smooths them. */
 export function deviceSensorSection({
   orientation,
@@ -363,6 +404,18 @@ export function deviceSensorSection({
         value:
           orientation?.northOffset === undefined ? NONE : degrees(orientation.northOffset)
       },
+      // What was folded into that offset, and what the phone thinks of the
+      // compass it came from. Both are here because neither is visible in the
+      // offset itself: a declination that never arrived and a compass captured
+      // by a magnet both read as a perfectly ordinary bearing.
+      {
+        label: "Declination",
+        value:
+          orientation?.declination === undefined
+            ? `${NONE} · magnetic north`
+            : degrees(orientation.declination)
+      },
+      { label: "Compass", value: compassReadout(orientation?.compassAccuracy) },
       {
         label: "Gyro",
         value: orientation?.gyro ? vector(orientation.gyro, 2, "rad/s") : NONE

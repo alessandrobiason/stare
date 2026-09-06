@@ -19,6 +19,15 @@ export type AttitudeMeasurement = {
   rollDeg: number;
   /** Bearing of the attitude source's yaw origin, clockwise from true north. */
   northOffsetDeg?: number;
+  /**
+   * How far that bearing may be out, in degrees, when the source can say.
+   *
+   * A phone can: the platform grades its own compass, and the grades are wide
+   * apart enough to matter (`COMPASS_ACCURACY`). A recording cannot — it is one
+   * device on one evening — so it leaves this out and the filter falls back to
+   * the fitted constant.
+   */
+  northOffsetNoiseDeg?: number;
   /** Body-frame turn rate. Only the magnitude is used, so axes need no convention. */
   gyroRadPerSecond?: { x: number; y: number; z: number };
 };
@@ -35,6 +44,25 @@ const LEVEL: SmoothedOrientation = {
   rollDeg: 0,
   rotationRateDegPerSecond: 0
 };
+
+/**
+ * How far to trust a bearing to north from a compass the platform grades
+ * `accuracy`, in degrees, for `AttitudeMeasurement.northOffsetNoiseDeg`.
+ *
+ * A source with no grade to give — a recording, or a phone before its first
+ * heading — gets the fitted constant, which is what a good compass earns.
+ */
+export function northOffsetNoiseDeg(accuracy: number | undefined): number {
+  if (accuracy === undefined) return ORIENTATION_FILTER.magneticNoiseDeg;
+  const byLevel = ORIENTATION_FILTER.magneticNoiseByCompassAccuracy;
+  const level = Math.round(accuracy);
+  // A level outside the four the platform documents is not a good compass that
+  // happens to sit off the end of the table — it is one this cannot grade, so
+  // it is given the grade of one that cannot be trusted rather than the best
+  // row, which is what clamping to the end would have handed it.
+  if (level < 0 || level >= byLevel.length) return byLevel[0];
+  return byLevel[level];
+}
 
 function gyroMagnitudeDegPerSecond(measurement: AttitudeMeasurement): number {
   const gyro = measurement.gyroRadPerSecond;
@@ -94,7 +122,13 @@ export class OrientationFilter {
 
     this.northReference.predict(elapsed, ORIENTATION_FILTER.magneticDriftDegPerRootSecond);
     if (measurement.northOffsetDeg !== undefined) {
-      this.northReference.correct(measurement.northOffsetDeg, ORIENTATION_FILTER.magneticNoiseDeg);
+      // Per reading rather than per filter: on a phone this rises and falls
+      // with the platform's own calibration, and a bearing it has graded
+      // unusable has to be taken as one rather than fused as if it were good.
+      this.northReference.correct(
+        measurement.northOffsetDeg,
+        measurement.northOffsetNoiseDeg ?? ORIENTATION_FILTER.magneticNoiseDeg
+      );
     }
 
     this.heading.predict(elapsed, this.angularAcceleration(this.heading.rate, gyroRate));

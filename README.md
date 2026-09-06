@@ -393,3 +393,16 @@ running harness.
   decodes the JPEG. At one pass a second that should be affordable, but the cost
   and any preview hitch are unmeasured.
 - The device lens is assumed, not calibrated.
+- **North comes from the phone's compass, and a compass is a soft-failing
+  sensor.** A hard-iron bias — a magnetic case, a car door, a second phone on
+  the table — reads exactly like the field it corrupts: no dropout, no
+  shimmer, just a sky drawn steadily somewhere else. At mid latitudes the
+  horizontal component is about half the total, so 13 µT of bias is thirty
+  degrees of heading, which is most of the frame. The view reports what the
+  platform says about its own calibration and trusts the bearing accordingly
+  (`COMPASS_ACCURACY`), and asks for a figure-eight when it will not vouch for
+  it, but nothing here corrects a bias it cannot see. Comparing two phones is
+  the fastest way to be misled by this: yaw alone is measured from each
+  platform's own origin and the two will differ by any amount at all while both
+  are working — only `yaw + northOffset`, the "Aim" row on the STATUS page, is
+  a bearing.

@@ -30,14 +30,15 @@ export type DeviceOrientationFeed = {
  * the render loop samples itself. See `useSmoothedOrientation`.
  *
  * `declinationDeg` is how far magnetic north sits from true north here, which
- * only the caller knows — the platform's figure on a phone, the recording's
- * constant under the replay. `capabilities` is what boot found: with no motion
- * sensor there is nothing to subscribe to, so nothing is ever published rather
- * than waiting on a listener that never fires.
+ * only the caller knows — boot's reading on a phone, and `null` where it had
+ * none by the time the view opened, which the subscription then corrects from
+ * the compass itself. `capabilities` is what boot found: with no motion sensor
+ * there is nothing to subscribe to, so nothing is ever published rather than
+ * waiting on a listener that never fires.
  */
 export function useDeviceOrientation(
   capabilities: DeviceCapabilities,
-  declinationDeg: number
+  declinationDeg: number | null
 ): DeviceOrientationFeed {
   const latestRef = useRef<DeviceOrientation | null>(null);
   const listenersRef = useRef(new Set<(orientation: DeviceOrientation) => void>());

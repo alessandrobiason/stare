@@ -1,6 +1,7 @@
 import { DeviceMotion, DeviceMotionMeasurement, Magnetometer } from "expo-sensors";
 import { attitudeFromAxes } from "../camera/attitude";
 import { DeviceCapabilities } from "./capabilities";
+import { subscribeToCompass } from "./location";
 import { toDegrees, wrapDegrees180 } from "../math/angles";
 import { Quaternion, rotateVector, Vector3 } from "../math/quaternion";
 import { EnuPosition } from "../types";
@@ -20,6 +21,21 @@ export type DeviceOrientation = {
   roll: number;
   northOffset?: number;
   gyro?: { x: number; y: number; z: number };
+  /**
+   * The declination folded into `northOffset`, in degrees east, or `undefined`
+   * where the platform has never supplied one — in which case the offset is to
+   * *magnetic* north and headings are out by the local declination.
+   *
+   * Reported alongside rather than left implicit because it is now a live
+   * figure: boot's is a single reading behind a timeout, and the compass watch
+   * corrects it as it settles and as the phone travels (`subscribeToCompass`).
+   */
+  declination?: number;
+  /**
+   * The platform's grade of its own compass, 0 to 3, or `undefined` before the
+   * first heading. What `northOffset` is worth — see `CompassReading`.
+   */
+  compassAccuracy?: number;
 };
 
 const LEVEL: DeviceOrientation = { yaw: 0, pitch: 0, roll: 0 };
@@ -107,11 +123,15 @@ export async function readDeviceCapabilities(): Promise<DeviceCapabilities> {
  * The magnetometer is taken separately, since losing it still leaves a usable
  * pitch and roll — only the bearing to north goes, which `northOffset` already
  * reports as absent.
+ *
+ * `declinationDeg` is boot's reading, or `null` where it had none by the time
+ * the view opened. Either way it is only a starting point: the compass watch
+ * below corrects it as the platform settles and as the phone travels.
  */
 export async function subscribeToDeviceOrientation(
   onChange: (orientation: DeviceOrientation) => void,
   capabilities: DeviceCapabilities,
-  declinationDeg: number
+  declinationDeg: number | null
 ): Promise<() => void> {
   const gated = readingsNeedPermission();
 
@@ -130,6 +150,8 @@ export async function subscribeToDeviceOrientation(
   let rotation: Quaternion | null = null;
   let field: Vector3 | null = null;
   let orientation = LEVEL;
+  let declination = declinationDeg;
+  let compassAccuracy: number | undefined;
 
   DeviceMotion.setUpdateInterval(UPDATE_INTERVAL_MS);
   if (useMagnetometer) Magnetometer.setUpdateInterval(UPDATE_INTERVAL_MS);
@@ -145,7 +167,13 @@ export async function subscribeToDeviceOrientation(
       yaw: wrapDegrees180(attitude.headingDeg),
       pitch: attitude.pitchDeg,
       roll: attitude.rollDeg,
-      northOffset: field ? northOffsetDeg(rotation, field, declinationDeg) : undefined
+      // Magnetic north where there is no declination to be had, which is a
+      // heading out by the local figure rather than a heading out by anything.
+      // Reported as such below, so a view that is quietly a few degrees off
+      // says so instead of looking like a view that is not.
+      northOffset: field ? northOffsetDeg(rotation, field, declination ?? 0) : undefined,
+      declination: declination ?? undefined,
+      compassAccuracy
     };
     onChange(orientation);
   };
@@ -174,9 +202,44 @@ export async function subscribeToDeviceOrientation(
       })
     : null;
 
+  /**
+   * The platform's compass, for the two things the raw magnetometer cannot say
+   * for itself: where true north is relative to magnetic, and whether any of
+   * this is calibrated (`subscribeToCompass`).
+   *
+   * Not awaited. The attitude is what the view is aimed with and it must not
+   * wait on a heading watch that may never register — on a device that refused
+   * the fix, it never will. So it starts alongside, and until it reports the
+   * readings carry boot's declination and no accuracy at all.
+   *
+   * Nothing is published from here either: the motion listener fires twenty
+   * times a second and picks these up on its next reading, which is 50 ms and
+   * saves a publish per heading.
+   */
+  let stopCompass: (() => void) | null = null;
+  let stopped = false;
+  if (useMagnetometer) {
+    subscribeToCompass(({ declinationDeg: fromCompass, accuracy }) => {
+      // A heading with no true north in it still grades the compass, and the
+      // grade is the half that says whether to trust the bearing.
+      if (fromCompass !== null) declination = fromCompass;
+      compassAccuracy = accuracy;
+    })
+      .then((cleanup) => {
+        // The watch can register after this subscription has been torn down.
+        if (stopped) cleanup();
+        else stopCompass = cleanup;
+      })
+      // Boot already read a declination, or decided there was none; losing the
+      // watch only means it stops being corrected.
+      .catch((error) => console.warn("Compass updates unavailable", error));
+  }
+
   return () => {
+    stopped = true;
     motionSubscription.remove();
     magnetometerSubscription?.remove();
+    stopCompass?.();
   };
 }
 
@@ -190,8 +253,13 @@ export async function subscribeToDeviceOrientation(
  * this reduces to the declination.
  *
  * No hard-iron term, unlike the recording: the platform calibrates its own
- * magnetometer. `declinationDeg` is the caller's — the platform's figure on a
- * phone, the recording's constant under the harness.
+ * magnetometer. It does not always calibrate it *well*, and there is nothing in
+ * a field reading that says which — a bias reads exactly like a field — so what
+ * the platform thinks of its own compass is carried alongside as
+ * `compassAccuracy` rather than assumed away here.
+ *
+ * `declinationDeg` is the caller's: boot's figure corrected by the compass
+ * watch on a phone, the recording's constant under the harness.
  */
 function northOffsetDeg(
   rotation: Quaternion,
