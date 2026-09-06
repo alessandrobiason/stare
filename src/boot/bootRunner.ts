@@ -184,7 +184,9 @@ export function settleCatalog(
   if (result.source === "bundled") {
     throw boot.fail(
       id,
-      "No satellite catalogue could be downloaded, and none is cached on this device."
+      "No satellite catalogue could be downloaded, and none is cached on this device. " +
+        "STARE gets orbital data from CelesTrak, a public satellite-tracking service — " +
+        "check your connection and try again in a few minutes."
     );
   }
 
