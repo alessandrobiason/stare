@@ -1,3 +1,5 @@
+import { PersistentStore, persistentStore } from "./persistentStore";
+
 /**
  * Where the downloaded TLE catalog lives between runs of the app.
  *
@@ -6,6 +8,10 @@
  * refresh interval that the app forgets when it closes is not an interval at
  * all — every cold start would be a fresh download, which is exactly what gets
  * a client blocked.
+ *
+ * Where a phone and a browser each put it is `persistentStore.ts`, which is
+ * shared with the intro flag; what is written and how a bad entry is handled is
+ * here.
  */
 
 export type StoredCatalog = {
@@ -19,98 +25,16 @@ export type StoredCatalog = {
   catalog: string;
 };
 
-/** The handful of operations the cache needs from whatever storage exists. */
-export type PersistentStore = {
-  read(): string | null;
-  write(contents: string): void;
-  remove(): void;
-};
+export type { PersistentStore };
 
-const FILE_DIRECTORY = "stare";
-const FILE_NAME = "active-tles.json";
-/** Also the `localStorage` key on web. */
-const STORAGE_KEY = "stare.active-tles";
-
-/**
- * Web storage. Tried first because its presence is a reliable signal that we
- * are in a browser, which keeps this module from having to ask React Native
- * what platform it is on.
- */
-function browserStore(): PersistentStore | null {
-  let storage: Storage;
-  try {
-    if (typeof localStorage === "undefined") return null;
-    storage = localStorage;
-  } catch {
-    // Access itself throws when site data is blocked.
-    return null;
-  }
-
-  return {
-    read: () => storage.getItem(STORAGE_KEY),
-    write: (contents) => storage.setItem(STORAGE_KEY, contents),
-    remove: () => storage.removeItem(STORAGE_KEY)
-  };
-}
-
-/**
- * A file in the app's document directory, on the device.
- *
- * The document directory rather than the cache directory: iOS evicts the latter
- * whenever it is short of space, which would silently reset the refresh
- * interval and put the app straight back to downloading on every launch. And a
- * file rather than a key-value store, because the active catalog runs to a
- * couple of megabytes.
- */
-function deviceFileStore(): PersistentStore | null {
-  try {
-    // Required lazily: on web this branch is never reached, and the module is
-    // a native one that a browser bundle should not have to resolve.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Directory, File, Paths } = require("expo-file-system") as typeof import("expo-file-system");
-
-    const openFile = () => {
-      const directory = new Directory(Paths.document, FILE_DIRECTORY);
-      directory.create({ intermediates: true, idempotent: true });
-      return new File(directory, FILE_NAME);
-    };
-
-    // Resolve the directory once up front so a broken or unavailable module
-    // fails here, where we can fall through, rather than on first use.
-    openFile();
-
-    return {
-      read: () => {
-        const file = openFile();
-        return file.exists ? file.textSync() : null;
-      },
-      write: (contents) => {
-        const file = openFile();
-        if (!file.exists) file.create({ intermediates: true });
-        file.write(contents);
-      },
-      remove: () => {
-        const file = openFile();
-        if (file.exists) file.delete();
-      }
-    };
-  } catch {
-    return null;
-  }
-}
-
-let detected: PersistentStore | null | undefined;
-let override: PersistentStore | null | undefined;
-
-function store(): PersistentStore | null {
-  if (override !== undefined) return override;
-  if (detected === undefined) detected = browserStore() ?? deviceFileStore();
-  return detected;
-}
+const store = persistentStore({
+  fileName: "active-tles.json",
+  storageKey: "stare.active-tles"
+});
 
 /** Test seam: swaps the backing store. Pass `undefined` to restore detection. */
 export function setPersistentStoreForTesting(next: PersistentStore | null | undefined): void {
-  override = next;
+  store.setForTesting(next);
 }
 
 function isStoredCatalog(value: unknown): value is StoredCatalog {
@@ -134,7 +58,7 @@ function isStoredCatalog(value: unknown): value is StoredCatalog {
  */
 export function readStoredCatalog(): StoredCatalog | null {
   try {
-    const raw = store()?.read();
+    const raw = store.get()?.read();
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     return isStoredCatalog(parsed) ? parsed : null;
@@ -150,7 +74,7 @@ export function readStoredCatalog(): StoredCatalog | null {
  */
 export function writeStoredCatalog(stored: StoredCatalog): void {
   try {
-    store()?.write(JSON.stringify(stored));
+    store.get()?.write(JSON.stringify(stored));
   } catch (error) {
     console.warn("Could not cache the TLE catalog", error);
   }
@@ -169,7 +93,7 @@ export function touchStoredAttempt(attemptedAtMs: number): void {
 /** Test seam, and the way to force a refresh. */
 export function clearStoredCatalog(): void {
   try {
-    store()?.remove();
+    store.get()?.remove();
   } catch {
     // Nothing to do; the entry is unreachable either way.
   }

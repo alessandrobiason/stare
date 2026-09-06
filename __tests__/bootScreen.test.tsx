@@ -14,11 +14,24 @@ function screen(overrides: Partial<React.ComponentProps<typeof BootScreen>> = {}
   return <BootScreen failed={false} error={null} onRetry={() => undefined} {...overrides} />;
 }
 
-test("the loading screen says nothing at all: the sky is the whole of it", () => {
-  // Not "says little" — nothing. Every word this screen used to carry named a
-  // step of a start-up nobody can act on, and the satellites turning are what
-  // report that it is still going.
-  expect(textOf(screen())).toBe("");
+test("the loading screen says the app's name, and nothing else at all", () => {
+  // One word. Every other word this screen has ever carried named a step of a
+  // start-up nobody can act on, and the satellites turning are what report that
+  // it is still going; the name is the one thing a launch is entitled to say.
+  expect(textOf(screen())).toBe("STARE");
+});
+
+test("the launch out of the intro leaves the name off", () => {
+  // The intro has just spent a page on it. See `useIntro`: the second launch
+  // onwards is the one that opens on the name.
+  expect(textOf(screen({ wordmark: false }))).toBe("");
+});
+
+test("a failure takes the screen from the name rather than sharing it", () => {
+  const text = textOf(screen({ failed: true, error: "Your location could not be found." }));
+
+  expect(text).not.toContain("STARE");
+  expect(text).toContain("Your location could not be found.");
 });
 
 test("a failure shows the reason and a way to try again", () => {
@@ -74,8 +87,8 @@ test("a long failure reason is shown in full, not clipped or elided", () => {
   expect(text).not.toContain("…");
 });
 
-test("the loading screen still says nothing once the build line exists", () => {
+test("the loading screen carries no build line, only the name", () => {
   // The build identity belongs to a failure report, not to a launch. A line
   // that leaked onto the loading screen would undo the whole point of it.
-  expect(textOf(screen())).toBe("");
+  expect(textOf(screen())).toBe("STARE");
 });

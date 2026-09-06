@@ -1,0 +1,67 @@
+/**
+ * What the app says to someone opening it for the first time, and nothing more.
+ *
+ * Three pages: what it does, how to hold it, and what it is about to ask the
+ * operating system for. That last one is the reason this exists at all. Boot
+ * asks for the camera and a fix within a second of the app opening
+ * (`bootTasks`), and the phone asks for motion as soon as the view subscribes
+ * to it (`subscribeToDeviceOrientation`) — three system prompts, back to back,
+ * over a screen that has never explained what any of them are for. A prompt
+ * answered without knowing why it was asked is usually answered "no", and every
+ * one of the three is fatal to a view that places objects in the sky by
+ * knowing where you are and where you are pointing.
+ *
+ * The copy is here rather than in the component for the same reason the boot
+ * sky's geometry is not in its canvas: what is said is worth reading and
+ * testing on its own, and the pager below it only has to lay out text.
+ */
+
+/** One thing the operating system will ask about, and why the app needs it. */
+export type IntroAccess = {
+  /** As the iOS prompt names it, so the two read as the same request. */
+  name: string;
+  reason: string;
+};
+
+export type IntroPage = {
+  title: string;
+  body: string;
+  /** The permissions page, and only it, lists what will be asked for. */
+  access?: readonly IntroAccess[];
+  /** A quieter line under the page, where one is worth the space. */
+  footnote?: string;
+};
+
+export const INTRO_PAGES: readonly IntroPage[] = [
+  {
+    title: "Stare",
+    body:
+      "Point the phone at the sky. The satellites passing over you are drawn onto " +
+      "the picture where they actually are — placed by your position, aimed by the " +
+      "phone's own motion sensors."
+  },
+  {
+    title: "Hold it up, turn slowly",
+    body:
+      "Every mark is one object: its colour says what the satellite is for, its size " +
+      "how far away it is, and its trail where it has just been. Anything behind a " +
+      "building or a tree is left out rather than drawn over it."
+  },
+  {
+    title: "What it needs",
+    body: "Three things, and the phone will ask you about each of them in a moment.",
+    access: [
+      { name: "Camera", reason: "The sky in front of you, and what is standing in the way of it." },
+      { name: "Location", reason: "Which satellites are above you, and where in the sky they sit." },
+      { name: "Motion & Fitness", reason: "Which way the phone is pointed, and how it is tilted." }
+    ],
+    footnote:
+      "All three are used on the phone alone. The only thing Stare sends or fetches " +
+      "is the public satellite catalogue; where you are never leaves the device."
+  }
+];
+
+/** The button under the pager: the last page is the one that starts the app. */
+export function introButtonLabel(page: number): string {
+  return page === INTRO_PAGES.length - 1 ? "ALLOW ACCESS" : "NEXT";
+}

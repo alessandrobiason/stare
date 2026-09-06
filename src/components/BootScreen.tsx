@@ -13,24 +13,37 @@ type Props = {
   /** Whether trying again could help; a missing sensor is not going to appear. */
   retryable?: boolean;
   onRetry: () => void;
+  /**
+   * Whether to name the app in the middle of the sky while it loads.
+   *
+   * Off for the launch that has just come out of the intro, which said the name
+   * on its own first page a moment ago (`src/App.tsx`, `useIntro`).
+   */
+  wordmark?: boolean;
 };
 
 /**
  * The screen the app opens on, and the one it comes back to when something
  * fatal happens.
  *
- * While it is loading it is only the sky — five satellites turning, and not a
- * word (see `bootSky`). It used to carry a wordmark, a tagline, a progress bar
- * and the list of start-up steps as they settled, which was a lot of screen
- * spent telling someone that a catalogue they have never heard of is being
- * downloaded. None of it was actionable: the app either opens, or it comes
- * back here with a reason.
+ * While it is loading it is the sky and the app's name — five satellites
+ * turning, and the one word they turn around (see `bootSky`). It used to carry
+ * a tagline, a progress bar and the list of start-up steps as they settled,
+ * which was a lot of screen spent telling someone that a catalogue they have
+ * never heard of is being downloaded. None of it was actionable: the app either
+ * opens, or it comes back here with a reason.
  *
- * A failure is that reason, and is the only thing this screen ever writes. The
- * sky stops turning under it, because the turning is what was saying that
- * something is still happening.
+ * A failure is that reason, and is the only other thing this screen ever
+ * writes. The name gives way to it, and the sky stops turning underneath,
+ * because the turning is what was saying that something is still happening.
  */
-export const BootScreen: React.FC<Props> = ({ failed, error, retryable = true, onRetry }) => {
+export const BootScreen: React.FC<Props> = ({
+  failed,
+  error,
+  retryable = true,
+  onRetry,
+  wordmark = true
+}) => {
   const [frame, setFrame] = useState<FrameSize | null>(null);
   // Read once: it cannot change while the app is running.
   const [build] = useState(describeBuild);
@@ -47,6 +60,8 @@ export const BootScreen: React.FC<Props> = ({ failed, error, retryable = true, o
   return (
     <View style={styles.root} onLayout={measure}>
       <BootSky frame={frame} turning={!failed} />
+
+      {!failed && wordmark && <Text style={styles.wordmark}>STARE</Text>}
 
       {failed && (
         <View style={styles.card}>
@@ -99,6 +114,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
     overflow: "hidden"
+  },
+  /**
+   * The name, in the eye of the orbits.
+   *
+   * It has to fit inside them. The innermost satellite in `BOOT_ORBITS` runs at
+   * 175 design units with a body of 28, so the clear circle around the centre is
+   * 147 of the design frame's 1820 tall — 54 layout points on the smallest
+   * screen this ships to, a 375 x 667 phone, and 69 on a current one. Five
+   * letters at this size and spacing measure 91 points across, so the word ends
+   * some eight points short of the closest satellite even there. Grow either
+   * figure and they meet.
+   *
+   * `letterSpacing` is applied after the last letter as well as between them, so
+   * the box is a space wider than the word in it and the letters sit half a
+   * space left of the middle. A margin shifts a centred box by half of itself,
+   * which is why the correction is the whole space rather than half of it.
+   */
+  wordmark: {
+    color: theme.color.textBright,
+    fontSize: 19,
+    fontWeight: "600",
+    letterSpacing: 7,
+    marginLeft: 7,
+    opacity: 0.92
   },
   card: {
     width: "100%",

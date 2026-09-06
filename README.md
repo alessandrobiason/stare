@@ -52,11 +52,23 @@ satellites → screen positions → markers, composited over the camera picture.
 catalog, the sensors, a GPS fix, magnetic declination, camera permission and the
 segmentation model. Any of them failing fails boot — there is no degraded mode
 that looks like it is working, and markers are drawn only against a mask that is
-less than 8 seconds old. While it runs, the screen is the logo and
-nothing else — five satellites turning around the middle of it
-(`src/components/bootSky.ts`, drawn still into `assets/logo-extended.svg`).
-Their turning is the only progress report, because the steps behind it are not
-ones anyone can act on; a failure stops the sky and says what went wrong.
+less than 8 seconds old. While it runs, the screen is the logo and the app's
+name — five satellites turning around the one word, which sits in the clear
+circle their innermost orbit leaves (`src/components/bootSky.ts`, drawn still
+into `assets/logo-extended.svg`). Their turning is the only progress report,
+because the steps behind it are not ones anyone can act on; a failure stops the
+sky, takes the name off it and says what went wrong.
+
+**The first launch is not that** (`src/onboarding/`, `src/components/IntroScreen.tsx`).
+Boot asks for the camera and a GPS fix within a second of the app opening, and
+the view asks for motion as soon as it subscribes to it — three system prompts,
+back to back, over a screen that has explained nothing, each of them fatal to the
+view if refused. So a device that has not seen the app before opens on three
+pages instead: what it does, how to hold it, and what it is about to ask for and
+why. Nothing boots until the last page is accepted, which is why `src/App.tsx`
+mounts the app proper only then. A flag in the document directory keeps it to
+that one launch, alongside the catalog cache and through the same storage
+(`src/data/persistentStore.ts`); the launch after it opens straight on the name.
 
 **Where you are pointing** (`src/fusion/`). The device's Euler angles and the
 magnetic bearing to north are fused in a per-axis Kalman filter whose process
