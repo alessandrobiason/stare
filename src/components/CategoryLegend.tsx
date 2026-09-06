@@ -63,6 +63,7 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
         accessibilityLabel="Category filter"
         aria-expanded={expanded}
         style={[styles.header, expanded ? styles.headerOpen : styles.headerClosed]}
+        hitSlop={expanded ? { top: 10, bottom: 5, left: 12, right: 12 } : undefined}
         onPress={() => setExpanded((open) => !open)}
       >
         <Text style={[panelStyles.title, styles.headerTitle]}>FILTER</Text>
