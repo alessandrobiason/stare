@@ -29,27 +29,33 @@ export type IntroAccess = {
 };
 
 export type IntroPage = {
-  title: string;
+  /** Shown as the card's title. The first page has none — see `wordmark`. */
+  title?: string;
   body: string;
   /** The permissions page, and only it, lists what will be asked for. */
   access?: readonly IntroAccess[];
   /** A quieter line under the page, where one is worth the space. */
   footnote?: string;
+  /**
+   * Name the app in the middle of the sky instead of titling the card, exactly
+   * as the boot screen does once the intro is behind it (`BootScreen`'s own
+   * `wordmark`). Only the first page says the app's name at all.
+   */
+  wordmark?: boolean;
 };
 
 export const INTRO_PAGES: readonly IntroPage[] = [
   {
-    title: "Stare",
+    wordmark: true,
     body:
       "Point the phone at the sky. The satellites passing over you are drawn onto " +
-      "the picture where they actually are — placed by your position, aimed by the " +
-      "phone's own motion sensors."
+      "the picture where they actually are."
   },
   {
     title: "Hold it up, turn slowly",
     body:
       "Every mark is one object: its colour says what the satellite is for, its size " +
-      "how far away it is, and its trail where it has just been. Anything behind a " +
+      "how far away it is. Anything behind a " +
       "building or a tree is left out rather than drawn over it."
   },
   {
