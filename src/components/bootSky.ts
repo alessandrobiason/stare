@@ -228,6 +228,12 @@ function pointAt(cx: number, cy: number, radius: number, degrees: number): [numb
  * `clearance` is how far behind the body's *centre* that head sits, measured
  * along the orbit; anything less than the body's own radius is swallowed by
  * it. See `TRAIL_GAP` for why the gap is there at all.
+ *
+ * `direction` is the orbit's, and it is what puts the trail on the right side
+ * of the body: "behind" is against the way the satellite is travelling, so on
+ * an anticlockwise orbit the trail lies at *increasing* angles from the body,
+ * not decreasing ones. Laying every trail the same way round left the two
+ * anticlockwise satellites leading with their tails.
  */
 function trailPolygon(
   cx: number,
@@ -236,21 +242,22 @@ function trailPolygon(
   headDeg: number,
   sweepDeg: number,
   width: number,
-  clearance: number
+  clearance: number,
+  direction: 1 | -1
 ): number[] {
   // About two and a half degrees a segment: past that the outer edge of the
   // widest trail visibly flattens, and below it costs points for nothing.
   const steps = Math.max(12, Math.round(sweepDeg / 2.5));
   // The gap is an arc length, so what it costs in angle depends on the orbit:
   // the same clear space is a wider turn on an inner one.
-  const trailHeadDeg = headDeg - (clearance / radius) * (180 / Math.PI);
-  const tailDeg = trailHeadDeg - sweepDeg;
+  const trailHeadDeg = headDeg - direction * (clearance / radius) * (180 / Math.PI);
+  const tailDeg = trailHeadDeg - direction * sweepDeg;
   const outer: number[] = [];
   const inner: number[] = [];
 
   for (let step = 0; step <= steps; step += 1) {
     const along = step / steps;
-    const degrees = tailDeg + sweepDeg * along;
+    const degrees = tailDeg + direction * sweepDeg * along;
     const half = (width * along) / 2;
     outer.push(...pointAt(cx, cy, radius + half, degrees));
     inner.push(...pointAt(cx, cy, radius - half, degrees));
@@ -331,7 +338,8 @@ export function bootSkyScene(frame: FrameSize): BootSkyScene {
         orbit.phaseDeg,
         orbit.sweepDeg,
         orbit.trailWidth * scale,
-        orbit.bodyRadius * (1 + TRAIL_GAP) * scale
+        orbit.bodyRadius * (1 + TRAIL_GAP) * scale,
+        orbit.direction
       ),
       bodyX,
       bodyY,

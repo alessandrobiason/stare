@@ -40,12 +40,13 @@ const GLOW = {
     { offset: 1, color: BACKGROUND }
   ]
 };
+/** `direction` is the orbit's, and it is which side of the body the trail lies on. */
 const ORBITS = [
-  { radius: 175, phaseDeg: -30, sweepDeg: 120, trailWidth: 14, bodyRadius: 28, color: "#48515c" },
-  { radius: 300, phaseDeg: 150, sweepDeg: 104, trailWidth: 17, bodyRadius: 36, color: "#fdfdfd" },
-  { radius: 420, phaseDeg: -110, sweepDeg: 92, trailWidth: 24, bodyRadius: 50, color: "#5fd0d4" },
-  { radius: 500, phaseDeg: 60, sweepDeg: 84, trailWidth: 19, bodyRadius: 42, color: "#7a71cc" },
-  { radius: 620, phaseDeg: -100, sweepDeg: 76, trailWidth: 34, bodyRadius: 72, color: "#ffcf5c" }
+  { radius: 175, phaseDeg: -30, sweepDeg: 120, trailWidth: 14, bodyRadius: 28, color: "#48515c", direction: 1 },
+  { radius: 300, phaseDeg: 150, sweepDeg: 104, trailWidth: 17, bodyRadius: 36, color: "#fdfdfd", direction: -1 },
+  { radius: 420, phaseDeg: -110, sweepDeg: 92, trailWidth: 24, bodyRadius: 50, color: "#5fd0d4", direction: 1 },
+  { radius: 500, phaseDeg: 60, sweepDeg: 84, trailWidth: 19, bodyRadius: 42, color: "#7a71cc", direction: -1 },
+  { radius: 620, phaseDeg: -100, sweepDeg: 76, trailWidth: 34, bodyRadius: 72, color: "#ffcf5c", direction: 1 }
 ];
 const TRAIL_GAP = 0.35;
 const STARS = {
@@ -79,6 +80,8 @@ const ICON = {
   sweepDeg: 104,
   trailWidth: 46,
   bodyRadius: 100,
+  /** Clockwise, like the gold orbit it takes its colour from: trail below, body ahead. */
+  direction: 1,
   /** How much of the square the drawing spans, the rest being margin. */
   coverage: 0.74
 };
@@ -100,17 +103,20 @@ function pointAt(cx, cy, radius, degrees) {
 /**
  * The icon's shape: an arc that begins at a point, thickens along the orbit,
  * and stops `clearance` short of the body's centre — see TRAIL_GAP.
+ *
+ * `direction` is the orbit's: the trail lies behind the body, which is against
+ * the way it travels, so an anticlockwise orbit's runs the other way round.
  */
-function trailPolygon(cx, cy, radius, headDeg, sweepDeg, width, clearance) {
+function trailPolygon(cx, cy, radius, headDeg, sweepDeg, width, clearance, direction) {
   const steps = Math.max(12, Math.round(sweepDeg / 2.5));
-  const trailHeadDeg = headDeg - (clearance / radius) * (180 / Math.PI);
-  const tailDeg = trailHeadDeg - sweepDeg;
+  const trailHeadDeg = headDeg - direction * (clearance / radius) * (180 / Math.PI);
+  const tailDeg = trailHeadDeg - direction * sweepDeg;
   const outer = [];
   const inner = [];
 
   for (let step = 0; step <= steps; step += 1) {
     const along = step / steps;
-    const degrees = tailDeg + sweepDeg * along;
+    const degrees = tailDeg + direction * sweepDeg * along;
     const half = (width * along) / 2;
     outer.push(pointAt(cx, cy, radius + half, degrees));
     inner.push(pointAt(cx, cy, radius - half, degrees));
@@ -129,7 +135,8 @@ function satellite(cx, cy, orbit, scale) {
     orbit.phaseDeg,
     orbit.sweepDeg,
     orbit.trailWidth * scale,
-    orbit.bodyRadius * (1 + TRAIL_GAP) * scale
+    orbit.bodyRadius * (1 + TRAIL_GAP) * scale,
+    orbit.direction
   );
   const [bodyX, bodyY] = pointAt(cx, cy, radius, orbit.phaseDeg);
   return { points, bodyX, bodyY, bodyRadius: orbit.bodyRadius * scale };

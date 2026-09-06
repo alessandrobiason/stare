@@ -77,6 +77,23 @@ test("a trail stops short of its own body, rather than growing out of it", () =>
   }
 });
 
+test("a trail follows its body rather than leading it, whichever way the orbit runs", () => {
+  // Two of the five orbits run anticlockwise, and "behind" for them is the
+  // other way round the circle. Laid out the same way as the clockwise ones,
+  // they went round tail first.
+  for (const satellite of bootSkyScene(PHONE).satellites) {
+    const angleOf = (x: number, y: number) =>
+      Math.atan2(y - satellite.cy, x - satellite.cx) * (180 / Math.PI);
+    const bodyDeg = angleOf(satellite.bodyX, satellite.bodyY);
+    const tipDeg = angleOf(satellite.trail[0], satellite.trail[1]);
+    // Signed turn from the tail's tip to the body, brought into (-180, 180].
+    const ahead = ((bodyDeg - tipDeg + 540) % 360) - 180;
+
+    // The body is ahead of its own tail, in the direction it is travelling.
+    expect(Math.sign(ahead)).toBe(Math.sign(satellite.degreesPerSecond));
+  }
+});
+
 test("the satellites turn, at their own rates and both ways round", () => {
   const { satellites } = bootSkyScene(PHONE);
   const after = satellites.map((satellite) => skyAngleDeg(satellite, 10));
