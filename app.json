@@ -50,7 +50,14 @@
           "locationWhenInUsePermission": "Stare needs your position to work out which satellites are overhead.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
+          "motionUsagePermission": false,
           "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": false
         }
       ],
       "onnxruntime-react-native"

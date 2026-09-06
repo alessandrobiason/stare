@@ -65,11 +65,10 @@ async function isAvailable(sensor: { isAvailableAsync(): Promise<boolean> }): Pr
  * Detected by the API that does the gating rather than by asking React Native
  * which platform this is, as with the persistent store.
  *
- * One loose end this leaves: `expo-sensors`' config plugin still writes an
- * `NSMotionUsageDescription` into the Info.plist, and nothing now reaches the
- * prompt it is there for. Dropping it means a plugin entry in `app.json`, which
- * moves the fingerprint and so needs a native build — worth doing at the next
- * one, not worth one of its own.
+ * The Info.plist follows: `app.json` turns off the `NSMotionUsageDescription`
+ * both `expo-sensors` and `expo-location` would otherwise write, since the app
+ * no longer reaches the prompt it is there for. A purpose string for a
+ * permission nothing asks for is a promise about data the app does not take.
  */
 function readingsNeedPermission(): boolean {
   const events = globalThis as {
