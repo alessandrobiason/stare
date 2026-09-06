@@ -51,12 +51,16 @@ export type BootResult = {
   /** Where the phone is, as of the fix boot waited for. */
   observer: ObserverLocation;
   /**
-   * How far magnetic north sits from true north here, in degrees east.
+   * How far magnetic north sits from true north here, in degrees east, or
+   * `null` where the compass had not settled on one by the time boot gave up
+   * waiting (`readMagneticDeclinationDeg`).
    *
-   * Zero when the platform cannot say, which leaves headings out by the local
-   * declination rather than out by somewhere else's.
+   * `null` rather than zero, which is a declination — magnetic north — and
+   * indistinguishable from a real reading of it. The view keeps the compass
+   * watch open and fills this in from the first heading that does settle
+   * (`subscribeToCompass`), and says which of the two it is holding meanwhile.
    */
-  declinationDeg: number;
+  declinationDeg: number | null;
 };
 
 /**
@@ -195,6 +199,6 @@ export async function runBootSequence(
     capabilities: sensors.capabilities,
     warnings: [],
     observer,
-    declinationDeg: access.declinationDeg ?? 0
+    declinationDeg: access.declinationDeg
   };
 }

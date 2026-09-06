@@ -1,6 +1,10 @@
 import { existsSync, readFileSync } from "fs";
 import { ORIENTATION_FILTER } from "../src/constants";
-import { AttitudeMeasurement, OrientationFilter } from "../src/fusion/orientationFilter";
+import {
+  AttitudeMeasurement,
+  northOffsetNoiseDeg,
+  OrientationFilter
+} from "../src/fusion/orientationFilter";
 import { toDegrees, wrapDegrees180 } from "../src/math/angles";
 import {
   RecordingData,
@@ -33,6 +37,60 @@ test("the heading is the yaw plus the bearing to north", () => {
   const filter = new OrientationFilter();
   const orientation = filter.update(level({ yawDeg: 100, northOffsetDeg: 30 }));
   expect(orientation.headingDeg).toBeCloseTo(130);
+});
+
+describe("how far a bearing to north is trusted", () => {
+  test("a compass the platform will not vouch for moves the reference far less", () => {
+    // The failure this is for: a magnetometer captured by a magnet reports a
+    // field like any other, thirty degrees out, and used to be fused as though
+    // it were a good one.
+    //
+    // Measured after the reference has settled, not from the first reading.
+    // The first correction seeds the estimate outright and the next few behave
+    // like a running average whatever the noise is — what the grade buys is the
+    // *steady-state* gain, which is where the ratio between the two lives.
+    const headingAfterJump = (noiseDeg: number): number => {
+      const filter = new OrientationFilter();
+      let timestampSeconds = 0;
+      const feed = (northOffsetDeg: number) => {
+        filter.update(
+          level({ timestampSeconds, northOffsetDeg, northOffsetNoiseDeg: noiseDeg })
+        );
+        timestampSeconds += RATE;
+      };
+      for (let step = 0; step < 600; step += 1) feed(0);
+      for (let step = 0; step < 30; step += 1) feed(40);
+      return filter.sample(timestampSeconds).headingDeg;
+    };
+
+    const trusted = headingAfterJump(northOffsetNoiseDeg(3));
+    const doubted = headingAfterJump(northOffsetNoiseDeg(0));
+
+    expect(doubted).toBeLessThan(trusted / 4);
+    // Not zero, though: a compass that has genuinely moved has to be able to
+    // win eventually, so what this buys is time — for the platform to
+    // recalibrate, and for the view to have said so on screen.
+    expect(doubted).toBeGreaterThan(0);
+  });
+
+  test("a source with no grade to give gets the fitted constant", () => {
+    // A recording is one device on one evening and has no opinion of its own,
+    // so it must fuse exactly as it did before any of this existed.
+    expect(northOffsetNoiseDeg(undefined)).toBe(ORIENTATION_FILTER.magneticNoiseDeg);
+    expect(northOffsetNoiseDeg(3)).toBe(ORIENTATION_FILTER.magneticNoiseDeg);
+  });
+
+  test("the worse the grade the less the bearing counts", () => {
+    const noise = [0, 1, 2, 3].map(northOffsetNoiseDeg);
+    expect(noise).toEqual([...noise].sort((a, b) => b - a));
+  });
+
+  test("a level off the end of the table is untrusted, not trusted best", () => {
+    // Clamping to the end would have handed an ungradable compass the row a
+    // well-calibrated one earns, which is the wrong direction to fail in.
+    expect(northOffsetNoiseDeg(9)).toBe(northOffsetNoiseDeg(0));
+    expect(northOffsetNoiseDeg(-1)).toBe(northOffsetNoiseDeg(0));
+  });
 });
 
 test("the heading is reported in [0, 360)", () => {

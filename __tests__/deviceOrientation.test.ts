@@ -6,6 +6,11 @@
  * the readings — `cameraAttitude.test.ts` and `angles.test.ts` do that — but
  * the one decision above them: whether a permission stands between the app and
  * the sensor, and what happens when the answer is no.
+ *
+ * The platform's compass is stood in for too. What it contributes is not a
+ * bearing — the magnetometer gives that — but the two things a raw field cannot
+ * say for itself: where true north is relative to magnetic, and whether any of
+ * it is calibrated.
  */
 
 import { DeviceCapabilities } from "../src/device/capabilities";
@@ -13,6 +18,10 @@ import {
   DeviceOrientation,
   subscribeToDeviceOrientation
 } from "../src/device/deviceOrientation";
+
+jest.mock("expo-location", () => ({
+  watchHeadingAsync: jest.fn()
+}));
 
 jest.mock("expo-sensors", () => ({
   DeviceMotion: {
@@ -33,6 +42,17 @@ const { DeviceMotion: deviceMotion, Magnetometer: magnetometer } = jest.requireM
   "expo-sensors"
 ) as { DeviceMotion: Sensor; Magnetometer: Sensor };
 
+const location = jest.requireMock("expo-location") as Record<string, jest.Mock>;
+
+/** One heading, as the platform's compass reports one. */
+type Heading = { trueHeading: number; magHeading: number; accuracy: number };
+
+/** The compass listener the module registered, so a heading can be pushed through it. */
+let report: (heading: Heading) => void;
+
+/** The magnetometer listener, since a bearing needs a field to be taken from. */
+let field: (reading: { x: number; y: number; z: number }) => void;
+
 const bothSensors: DeviceCapabilities = { motion: true, magnetometer: true };
 
 /** A reading of the phone held level, as `DeviceMotion` reports one. */
@@ -50,7 +70,16 @@ beforeEach(() => {
     emit = listener;
     return { remove: jest.fn() };
   });
-  magnetometer.addListener.mockImplementation(() => ({ remove: jest.fn() }));
+  magnetometer.addListener.mockImplementation((listener: typeof field) => {
+    field = listener;
+    return { remove: jest.fn() };
+  });
+  report = () => undefined;
+  field = () => undefined;
+  location.watchHeadingAsync.mockImplementation(async (listener: typeof report) => {
+    report = listener;
+    return { remove: jest.fn() };
+  });
   deviceMotion.requestPermissionsAsync.mockResolvedValue({ status: "granted" });
   magnetometer.requestPermissionsAsync.mockResolvedValue({ status: "granted" });
   delete (globalThis as { DeviceMotionEvent?: unknown }).DeviceMotionEvent;
@@ -132,6 +161,106 @@ describe("in a browser, where it is", () => {
     expect(readings).toEqual([{ yaw: 0, pitch: 0, roll: 0 }]);
     expect(deviceMotion.addListener).not.toHaveBeenCalled();
     expect(() => unsubscribe()).not.toThrow();
+  });
+});
+
+/** Lets the compass watch's own promise settle, since nothing awaits it. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/**
+ * A field pointing along the device's +y with the dip on -z. Held level this is
+ * magnetic north dead ahead, so the offset that comes out is the declination
+ * and nothing else — which is what these tests are reading.
+ */
+const northward = { x: 0, y: 20, z: -40 };
+
+describe("the platform's compass", () => {
+  test("fills in a declination boot never got, rather than leaving the session on magnetic north", async () => {
+    // Boot waits three seconds and then goes without one. That used to cost the
+    // whole session the local declination on the one launch where the compass
+    // was slow — and left two phones side by side disagreeing by exactly it.
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, null);
+
+    field(northward);
+    emit(levelMeasurement);
+    expect(readings.at(-1)).toMatchObject({ northOffset: 0, declination: undefined });
+
+    report({ trueHeading: 97, magHeading: 90, accuracy: 3 });
+    emit(levelMeasurement);
+    expect(readings.at(-1)).toMatchObject({ northOffset: 7, declination: 7 });
+  });
+
+  test("goes on correcting it, since the declination belongs to the place not the phone", async () => {
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 3);
+
+    field(northward);
+    report({ trueHeading: 108, magHeading: 90, accuracy: 3 });
+    emit(levelMeasurement);
+
+    expect(readings.at(-1)).toMatchObject({ declination: 18 });
+  });
+
+  test("grades itself even on a heading with no true north in it", async () => {
+    // The grade is the half that says whether to trust the bearing at all, and
+    // it arrives whether or not the platform has a declination to go with it.
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 4);
+
+    field(northward);
+    report({ trueHeading: -1, magHeading: 90, accuracy: 0 });
+    emit(levelMeasurement);
+
+    expect(readings.at(-1)).toMatchObject({ declination: 4, compassAccuracy: 0 });
+  });
+
+  test("the attitude does not wait on it", async () => {
+    // A watch that never registers — a device that refused the fix — must not
+    // hold up the view: this resolving at all is the assertion.
+    location.watchHeadingAsync.mockReturnValue(new Promise(() => undefined));
+
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 0);
+
+    emit(levelMeasurement);
+    expect(readings).toHaveLength(1);
+  });
+
+  test("is not opened at all without the magnetometer it would be correcting", async () => {
+    await subscribeToDeviceOrientation(() => undefined, { motion: true, magnetometer: false }, 0);
+
+    expect(location.watchHeadingAsync).not.toHaveBeenCalled();
+  });
+
+  test("is torn down with the sensors", async () => {
+    const remove = jest.fn();
+    location.watchHeadingAsync.mockResolvedValue({ remove });
+
+    const unsubscribe = await subscribeToDeviceOrientation(() => undefined, bothSensors, 0);
+    await flush();
+    unsubscribe();
+
+    expect(remove).toHaveBeenCalled();
+  });
+
+  test("a watch that registers after the teardown is torn down anyway", async () => {
+    // Nothing awaits it, so this is the ordering that actually happens when a
+    // scene unmounts in the seconds before the compass answers.
+    const remove = jest.fn();
+    let settle: (subscription: { remove: () => void }) => void = () => undefined;
+    location.watchHeadingAsync.mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve;
+      })
+    );
+
+    const unsubscribe = await subscribeToDeviceOrientation(() => undefined, bothSensors, 0);
+    unsubscribe();
+    settle({ remove });
+    await flush();
+
+    expect(remove).toHaveBeenCalled();
   });
 });
 

@@ -1,4 +1,5 @@
 import {
+  aimReadout,
   catalogSection,
   deviceSensorSection,
   maskSection,
@@ -8,6 +9,7 @@ import {
 } from "../src/debug/sections";
 import { MINIMUM_SATELLITE_ELEVATION_DEG } from "../src/constants";
 import { CachedCatalog } from "../src/data/tleCache";
+import { DeviceOrientation } from "../src/device/deviceOrientation";
 import { SAMPLE_TLE } from "../src/data/sampleTle";
 import { replaySensorSection } from "../testing/replay/debugSections";
 import { RecordingSnapshot } from "../testing/replay/recordingDataset";
@@ -296,6 +298,76 @@ test("the device sensors page shows what is missing rather than a plausible zero
   expect(rows.Gyro).toBe("—");
   expect(rows.Magnetometer).toBe("missing");
   expect(rows.GPS).toBe("60.16986, 24.93837");
+  expect(rows.Compass).toBe("—");
+});
+
+describe("what the phone thinks of its own compass", () => {
+  const sensors = (orientation: DeviceOrientation) =>
+    values(
+      deviceSensorSection({
+        orientation,
+        observer,
+        capabilities: { motion: true, magnetometer: true }
+      }).rows
+    );
+
+  const aimed: DeviceOrientation = { yaw: 20, pitch: 30, roll: 0 };
+
+  test("names the grade and says what the filter does with it", () => {
+    // The grade alone is a number nobody can act on; the noise beside it is the
+    // whole consequence — the figure that changes when the grade does.
+    expect(sensors({ ...aimed, compassAccuracy: 1 }).Compass).toBe("low (1) · ±20.0°");
+    expect(sensors({ ...aimed, compassAccuracy: 3 }).Compass).toBe("high (3) · ±3.0°");
+  });
+
+  test("a grade off the end of the four is shown as one, not guessed at", () => {
+    expect(sensors({ ...aimed, compassAccuracy: 9 }).Compass).toBe("? (9) · ±40.0°");
+  });
+
+  test("no declination reads as magnetic north rather than as a zero", () => {
+    // Zero is a declination, and a real reading of it is indistinguishable from
+    // one that never came — which is a heading a few degrees out in most places
+    // and twenty in some, with nothing on the page saying so.
+    expect(sensors(aimed).Declination).toBe("— · magnetic north");
+    expect(sensors({ ...aimed, declination: 0 }).Declination).toBe("0.0°");
+    expect(sensors({ ...aimed, declination: 11.5 }).Declination).toBe("11.5°");
+  });
+});
+
+describe("the aim readout", () => {
+  test("is the heading, which is the yaw plus the bearing to north", () => {
+    // It used to print the yaw under the label "Heading". Yaw is counted from
+    // the platform's own origin, so two working phones side by side disagree
+    // about it by any amount at all — and the offset moves the other way, so
+    // the divergence that is real only shows in the sum.
+    expect(aimReadout({ yaw: 20, pitch: 30, roll: 0, northOffset: 110, declination: 4 })).toBe(
+      "Heading 130.0° · pitch 30.0°"
+    );
+  });
+
+  test("wraps into a bearing rather than reporting one past the circle", () => {
+    expect(aimReadout({ yaw: 300, pitch: 0, roll: 0, northOffset: 100, declination: 0 })).toBe(
+      "Heading 40.0° · pitch 0.0°"
+    );
+  });
+
+  test("says the bearing is magnetic where no declination was ever had", () => {
+    expect(aimReadout({ yaw: 20, pitch: 30, roll: 0, northOffset: 110 })).toBe(
+      "Heading 130.0° magnetic · pitch 30.0°"
+    );
+  });
+
+  test("prints no bearing at all without an offset, rather than the bare yaw", () => {
+    // A heading that was never referenced to north is a different thing from
+    // one that is wrong, and only one of the two is worth chasing.
+    expect(aimReadout({ yaw: 20, pitch: 30, roll: 0 })).toBe(
+      "Heading not referenced · pitch 30.0°"
+    );
+  });
+
+  test("says it is still waiting before the first attitude", () => {
+    expect(aimReadout(null)).toContain("Waiting");
+  });
 });
 
 const snapshot: RecordingSnapshot = {

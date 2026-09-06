@@ -4,14 +4,16 @@ import { StyleSheet, View } from "react-native";
 import { BootResult } from "../boot/bootSequence";
 import { DEVICE_LENS } from "../camera/projection";
 import { DEVICE_CAMERA, DEVICE_CAMERA_FIELD_OF_VIEW } from "../constants";
-import { deviceSensorSection, statusSection } from "../debug/sections";
-import { DeviceOrientation } from "../device/deviceOrientation";
+import { aimReadout, deviceSensorSection, statusSection } from "../debug/sections";
+import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
+import { useCompassAccuracy } from "../hooks/useCompassAccuracy";
 import { useDeviceOrientation } from "../hooks/useDeviceOrientation";
 import { useLiveSky } from "../hooks/useLiveSky";
 import { useSceneControls } from "../hooks/useSceneControls";
 import { AttitudeSource } from "../hooks/useSmoothedOrientation";
 import { cameraFrameGrabber } from "../vision/cameraFrameGrabber";
 import { CameraBackground } from "./CameraBackground";
+import { CompassNotice } from "./CompassNotice";
 import { SceneStatus } from "./SceneStatus";
 import { SceneFrame, SkyOverlay } from "./SkyOverlay";
 
@@ -32,6 +34,10 @@ type Props = {
 export const DeviceScene: React.FC<Props> = ({ boot }) => {
   const { observer, epochRef } = useLiveSky(boot.observer);
   const orientation = useDeviceOrientation(boot.capabilities, boot.declinationDeg);
+  // The one thing about the sensors this view renders from, and it renders only
+  // when the platform regrades its compass — a handful of times a session
+  // rather than twenty times a second. See `useCompassAccuracy`.
+  const compass = useCompassAccuracy(orientation);
   const controls = useSceneControls();
   const [maskStatus, setMaskStatus] = useState("Waiting for the first sky mask…");
   const cameraRef = useRef<CameraView | null>(null);
@@ -115,6 +121,12 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
           pitchDeg: next.pitch,
           rollDeg: next.roll,
           northOffsetDeg: next.northOffset,
+          // What that bearing is worth, which only a phone can say. A compass
+          // the platform has graded unusable is one that 13 µT of magnet can
+          // have pointed thirty degrees off at these latitudes, and fusing it
+          // as though it were a good one is how the sky ends up drawn
+          // somewhere else with nothing on screen looking amiss.
+          northOffsetNoiseDeg: northOffsetNoiseDeg(next.compassAccuracy),
           gyroRadPerSecond: next.gyro
         })
       ),
@@ -150,7 +162,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
                 label: "Position",
                 value: `${observer.latitudeDeg.toFixed(4)}, ${observer.longitudeDeg.toFixed(4)} · ${observer.heightM.toFixed(0)} m`
               },
-              { label: "Aim", value: aimOf(orientation.latestRef.current) },
+              { label: "Aim", value: aimReadout(orientation.latestRef.current) },
               { label: "Sky mask", value: maskStatus }
             ],
             warnings: boot.warnings
@@ -159,15 +171,10 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
       />
 
       <SceneStatus markerCount={controls.markerCount} warned={boot.warnings.length > 0} />
+      <CompassNotice accuracy={compass.accuracy} declinationKnown={compass.declinationKnown} />
     </View>
   );
 };
-
-/** Where the phone is pointed, for the status panel. */
-function aimOf(orientation: DeviceOrientation | null): string {
-  if (!orientation) return "Waiting for the first attitude…";
-  return `Heading ${orientation.yaw.toFixed(1)}° · pitch ${orientation.pitch.toFixed(1)}°`;
-}
 
 const styles = StyleSheet.create({
   root: {

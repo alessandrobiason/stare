@@ -7,6 +7,11 @@ import { ObserverLocation } from "../types";
  * replay takes it from the recording's GPS stream instead. Boot cannot carry on
  * without it: a fix a hundred kilometres out puts a low pass several degrees
  * from where it is drawn.
+ *
+ * The platform's compass is here too, rather than with the sensors it corrects.
+ * It comes through the same module and the same foreground permission as the
+ * fix, and the declination it answers for is a property of where the phone is
+ * rather than of the phone.
  */
 
 /** Thrown when the fix cannot be had, with a reason worth showing someone. */
@@ -84,6 +89,72 @@ export async function readMagneticDeclinationDeg(): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * What the platform's own compass says, beyond the bearing itself.
+ *
+ * Published together because they arrive together, on one heading, and because
+ * neither is worth much without the other: a declination differenced out of a
+ * compass the platform does not trust is a correction of a few degrees taken
+ * off a reading that may be forty out.
+ */
+export type CompassReading = {
+  /**
+   * Local declination in degrees east, or `null` while the platform has no true
+   * north to offer — the same figure and the same absence as
+   * `readMagneticDeclinationDeg`, arriving as the compass settles rather than
+   * once.
+   */
+  declinationDeg: number | null;
+  /**
+   * How well calibrated the platform reckons its compass is: 3 high, 2 medium,
+   * 1 low, 0 unusable. `expo-location` reports the same four levels on both
+   * platforms, mapping iOS's uncertainty in degrees onto them — 3 is better
+   * than 20°, 2 better than 35°, 1 better than 50°, and 0 is worse than that.
+   *
+   * The reason to carry it at all: those bands are wide. A level-2 compass is
+   * allowed to be 35° out, which is most of the frame, and nothing else in the
+   * app can tell that reading apart from a good one. See `COMPASS_ACCURACY`.
+   */
+  accuracy: number;
+};
+
+/**
+ * Follows the platform's compass, resolving to an unsubscribe function.
+ *
+ * Two things the app has no other source for. The **declination** stops being a
+ * single reading taken at boot: `readMagneticDeclinationDeg` waits three
+ * seconds and then goes without one, which costs the whole session the local
+ * declination on the one launch where the compass was slow to settle — and
+ * leaves two phones side by side disagreeing by exactly that. It is also a
+ * property of where the phone is rather than of the phone, so it has to follow
+ * an observer that travels. Kept open, the first heading that does settle
+ * corrects it, and it goes on correcting.
+ *
+ * The **accuracy** is the platform's own word on whether any of that is worth
+ * trusting, which is the one thing a magnetometer cannot say for itself: a
+ * hard-iron bias reads exactly like a field, and 13 µT of it — a magnetic case,
+ * a car door, a second phone on the table — is thirty degrees of heading at
+ * these latitudes.
+ *
+ * Behind the same foreground permission as the fix, so call it after one has
+ * been granted; without it the watch never reports and the caller keeps
+ * whatever boot managed to read.
+ */
+export async function subscribeToCompass(
+  onChange: (reading: CompassReading) => void
+): Promise<() => void> {
+  const subscription = await Location.watchHeadingAsync(({ trueHeading, magHeading, accuracy }) => {
+    onChange({
+      // iOS reports a negative true heading when it has no declination to
+      // apply, exactly as in the one-shot read above.
+      declinationDeg:
+        trueHeading < 0 || magHeading < 0 ? null : wrapDegrees180(trueHeading - magHeading),
+      accuracy
+    });
+  });
+  return () => subscription.remove();
 }
 
 /** How long boot will wait for the compass to settle before going without it. */

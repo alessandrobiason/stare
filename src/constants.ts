@@ -508,8 +508,31 @@ export const ORIENTATION_FILTER = {
   pitchNoiseDeg: 0.18,
   /** Measurement noise of the roll channel, in degrees. */
   rollNoiseDeg: 0.18,
-  /** Measurement noise of the magnetic bearing to north, in degrees. */
+  /**
+   * Measurement noise of the magnetic bearing to north, in degrees, for a
+   * compass the platform has said nothing about — a recording, or the seconds
+   * before the first heading arrives. Fitted against a recording made with a
+   * well-calibrated phone, so it is the figure a *good* compass earns; see
+   * `magneticNoiseByCompassAccuracy` for the rest of them.
+   */
   magneticNoiseDeg: 3,
+  /**
+   * The same noise by what the platform says about its own calibration, indexed
+   * by accuracy level: 0 unusable, 3 high (`CompassReading`).
+   *
+   * Roughly half of each level's documented uncertainty band — 3 is better than
+   * 20°, 2 than 35°, 1 than 50° — read as a bound of about two sigma. The point
+   * is not the exact figures but the ratio: at level 0 the north reference
+   * moves about a hundredth as fast per reading as at level 3, so a phone whose
+   * magnetometer has been captured by a magnet drifts slowly on the gyro
+   * instead of being yanked forty degrees off by a bearing that is not one.
+   *
+   * It still converges — the reference is a random walk, and a steady wrong
+   * bearing eventually wins — because the alternative is a compass that has
+   * genuinely moved never being believed. What it buys is time for the platform
+   * to recalibrate, and for `COMPASS_ACCURACY` to have said so on screen.
+   */
+  magneticNoiseByCompassAccuracy: [40, 20, 10, 3],
   /**
    * How fast the magnetic reference may wander, in deg/sqrt(s). Rejecting the
    * bearing's noise is nearly free even at this looseness, so the figure is set
@@ -532,6 +555,32 @@ export const ORIENTATION_FILTER = {
   maxExtrapolationSeconds: 0.1,
   /** Gap beyond which the filter restarts instead of fusing across it. */
   maxSampleGapSeconds: 0.5
+} as const;
+
+/**
+ * What the app makes of the platform's own verdict on its compass
+ * (`CompassReading.accuracy`).
+ *
+ * The levels are worth saying out loud because a compass is the one sensor here
+ * that fails silently and plausibly. A hard-iron bias — a magnetic case, a car
+ * door, a phone lying next to this one — is indistinguishable from the field it
+ * corrupts, and it does not shimmer or drop out: the sky is simply drawn
+ * somewhere else, steadily, and looks fine. At these latitudes the horizontal
+ * field is only about half the total (the rest is the dip), so 13 µT of bias is
+ * already thirty degrees of heading.
+ *
+ * `warnAtOrBelow` is 2 rather than 1 because of what level 2 licenses: 35° of
+ * uncertainty against a frame `DEVICE_CAMERA_FIELD_OF_VIEW` wide is most of the
+ * screen, so a satellite drawn under it can be off the picture entirely. That
+ * is not a degraded view, it is a wrong one, and it is worth a line over the
+ * sky — one the phone can act on, and which goes away when it does, unlike
+ * boot's warnings (see `SceneStatus`).
+ */
+export const COMPASS_ACCURACY = {
+  /** At or below this level the view says the compass needs calibrating. */
+  warnAtOrBelow: 2,
+  /** What each level is called, indexed by it, for the readouts. */
+  names: ["unusable", "low", "medium", "high"]
 } as const;
 
 /**
