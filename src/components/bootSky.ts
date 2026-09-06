@@ -6,10 +6,10 @@ import { FrameSize } from "./markerGeometry";
  * screen, and nothing else.
  *
  * It is the logo rather than a decoration of it. `assets/icon.svg` is one
- * tapered trail with a body at its head; this is that shape five times over,
- * on five orbits, in the five colours the overlay itself uses — one satellite
- * per category, so the palette a person will read against the real sky is
- * already in front of them while it loads.
+ * tapered trail with a body just ahead of it; this is that shape five times
+ * over, on five orbits, in the five colours the overlay itself uses — one
+ * satellite per category, so the palette a person will read against the real
+ * sky is already in front of them while it loads.
  *
  * The turning is the whole of the loading indicator. There is no spinner, no
  * progress bar and no step list, because none of them told anyone anything
@@ -54,10 +54,10 @@ const GLOW = {
 /**
  * One orbit, in design pixels.
  *
- * `sweep` is how much of the circle the trail shows behind the body, and
- * `phaseDeg` where the body starts — measured from the orbit's centre, with
- * zero to the right and angles increasing downwards, as the frame's own
- * coordinates do.
+ * `sweep` is how much of the circle the trail itself covers — laid behind the
+ * body, and clear of it by `TRAIL_GAP` — and `phaseDeg` is where the body
+ * starts, measured from the orbit's centre, with zero to the right and angles
+ * increasing downwards, as the frame's own coordinates do.
  *
  * The periods are not physical. They are spread so the five never come back
  * into the same arrangement within the time a boot takes, which is what keeps
@@ -67,7 +67,7 @@ type Orbit = {
   radius: number;
   phaseDeg: number;
   sweepDeg: number;
-  /** Width of the trail where it meets the body; it tapers to nothing. */
+  /** Width of the trail at its head; it tapers to nothing going back. */
   trailWidth: number;
   bodyRadius: number;
   color: string;
@@ -137,6 +137,23 @@ export const BOOT_ORBITS: readonly Orbit[] = [
 ];
 
 /**
+ * The clear sky between a body and the head of its own trail, as a fraction of
+ * the body's radius.
+ *
+ * The trail used to run all the way to the body's centre, so what emerged from
+ * behind the body was fused to it: at a glance, a round head with a tail
+ * growing straight out of it, which is a tadpole rather than a satellite.
+ * Ending the trail short leaves two marks instead of one silhouette — the
+ * object, and the ground it has just covered — and the eye reads the second as
+ * something the first left behind rather than as part of its body.
+ *
+ * A fraction of the body rather than a fixed distance, because the five bodies
+ * differ by two and a half times across the composition and a gap that does
+ * not follow them closes on the largest.
+ */
+const TRAIL_GAP = 0.35;
+
+/**
  * The star field, as the parameters that generate it.
  *
  * Generated rather than listed, and from a fixed seed, so the same sky comes
@@ -172,7 +189,7 @@ export type SkySatellite = {
    * is not a stroke of constant width that either backend could describe.
    */
   trail: number[];
-  /** The body at the trail's head, at zero rotation. */
+  /** The body, a little ahead of the trail's head, at zero rotation. */
   bodyX: number;
   bodyY: number;
   bodyRadius: number;
@@ -201,11 +218,16 @@ function pointAt(cx: number, cy: number, radius: number, degrees: number): [numb
 }
 
 /**
- * The icon's shape: an arc that begins at a point and thickens to its head.
+ * The icon's shape: an arc that begins at a point, thickens along the orbit,
+ * and stops short of the body it belongs to.
  *
  * Walked out along the far edge and back along the near one, which is what
  * makes the taper — the two edges start on the same point and separate to the
- * full trail width by the time they reach the body.
+ * full trail width by the time they reach the head.
+ *
+ * `clearance` is how far behind the body's *centre* that head sits, measured
+ * along the orbit; anything less than the body's own radius is swallowed by
+ * it. See `TRAIL_GAP` for why the gap is there at all.
  */
 function trailPolygon(
   cx: number,
@@ -213,12 +235,16 @@ function trailPolygon(
   radius: number,
   headDeg: number,
   sweepDeg: number,
-  width: number
+  width: number,
+  clearance: number
 ): number[] {
   // About two and a half degrees a segment: past that the outer edge of the
   // widest trail visibly flattens, and below it costs points for nothing.
   const steps = Math.max(12, Math.round(sweepDeg / 2.5));
-  const tailDeg = headDeg - sweepDeg;
+  // The gap is an arc length, so what it costs in angle depends on the orbit:
+  // the same clear space is a wider turn on an inner one.
+  const trailHeadDeg = headDeg - (clearance / radius) * (180 / Math.PI);
+  const tailDeg = trailHeadDeg - sweepDeg;
   const outer: number[] = [];
   const inner: number[] = [];
 
@@ -304,7 +330,8 @@ export function bootSkyScene(frame: FrameSize): BootSkyScene {
         radius,
         orbit.phaseDeg,
         orbit.sweepDeg,
-        orbit.trailWidth * scale
+        orbit.trailWidth * scale,
+        orbit.bodyRadius * (1 + TRAIL_GAP) * scale
       ),
       bodyX,
       bodyY,

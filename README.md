@@ -8,7 +8,8 @@ motion sensors, and hidden behind whatever buildings and trees are in the way.
 The view opens in **normal** mode: the camera picture, the markers, a marker
 count and a collapsed category filter. **A marker is the app's own logo**: the
 body and tapered trail of `assets/icon.svg`, a couple of dozen pixels across,
-the same shape the boot screen turns five of. It carries four channels at once —
+the same shape the boot screen turns five of — both drawn by `tools/make-logo.mjs`
+from the geometry in `src/components/bootSky.ts`. It carries four channels at once —
 colour for purpose (five categories), shape for whether the object holds station
 (a geostationary ring, or a body trailing the 12 seconds of ground track it has
 just covered), size for range on a log scale from 400 km to 40,000 km, and a

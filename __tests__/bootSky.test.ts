@@ -41,7 +41,7 @@ test("the composition keeps its proportions on a screen of any shape", () => {
   }
 });
 
-test("a trail starts at a point and thickens to its body", () => {
+test("a trail starts at a point and thickens to its head", () => {
   const [satellite] = bootSkyScene(PHONE).satellites;
   const points = satellite.trail;
   const at = (index: number): [number, number] => [points[index * 2], points[index * 2 + 1]];
@@ -60,6 +60,21 @@ test("a trail starts at a point and thickens to its body", () => {
   const [headBackX, headBackY] = at(head + 1);
   const width = BOOT_ORBITS[0].trailWidth * (PHONE.height / BOOT_SKY_DESIGN.height);
   expect(Math.hypot(headX - headBackX, headY - headBackY)).toBeCloseTo(width);
+});
+
+test("a trail stops short of its own body, rather than growing out of it", () => {
+  // A trail that runs under the body is one silhouette with the body: a round
+  // head with a tail on it, which is a tadpole. Every one of them keeps clear.
+  for (const satellite of bootSkyScene(PHONE).satellites) {
+    let nearest = Infinity;
+    for (let index = 0; index < satellite.trail.length; index += 2) {
+      nearest = Math.min(
+        nearest,
+        Math.hypot(satellite.trail[index] - satellite.bodyX, satellite.trail[index + 1] - satellite.bodyY)
+      );
+    }
+    expect(nearest).toBeGreaterThan(satellite.bodyRadius);
+  }
 });
 
 test("the satellites turn, at their own rates and both ways round", () => {
@@ -98,10 +113,10 @@ test("the same sky comes out of every run", () => {
 });
 
 /**
- * `tools/make-extended-logo.mjs` cannot import this module — it is a build
- * script and the composition is TypeScript — so it restates the geometry. This
- * is what stops the two drifting: change one, and the other has to be
- * regenerated before this passes.
+ * `tools/make-logo.mjs` cannot import this module — it is a build script and
+ * the composition is TypeScript — so it restates the geometry. This is what
+ * stops the two drifting: change one, and the other has to be regenerated
+ * before this passes.
  */
 test("the committed logo is this sky, held still", () => {
   const svg = readFileSync(join(__dirname, "..", "assets", "logo-extended.svg"), "utf8");
@@ -114,6 +129,11 @@ test("the committed logo is this sky, held still", () => {
       `r="${round(satellite.bodyRadius)}"/>`;
     expect(svg).toContain(`<g fill="${satellite.color}">`);
     expect(svg).toContain(body);
+
+    // The trail too, or the shape itself can drift while the bodies agree:
+    // its tip is where the gap the trail leaves shows up in the file.
+    const [tipX, tipY] = [satellite.trail[0], satellite.trail[1]];
+    expect(svg).toContain(`d="M ${round(tipX)} ${round(tipY)} L `);
   }
 
   // Stars too, or a change to the field goes unnoticed: the bodies alone do
