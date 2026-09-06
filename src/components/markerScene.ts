@@ -7,7 +7,7 @@ import {
   trailReach,
   TrailReach
 } from "./markerGeometry";
-import { MarkerPalette } from "./palette";
+import { Ink, MarkerPalette } from "./palette";
 
 /**
  * What the overlay draws, as shapes in layout pixels.
@@ -69,6 +69,8 @@ import { MarkerPalette } from "./palette";
 export type MarkerScene = {
   /** Far to near, so the nearer marker is the one on top. */
   glyphs: GlyphShape[];
+  /** The ring around the marker being read about, or `null` when none is. */
+  selection: SelectionRing | null;
   /** Drawn last, and by the one part of the overlay that is still views. */
   labels: LabelPlacement[];
   /** Camera roll, so the labels stay level with the horizon. */
@@ -136,6 +138,38 @@ export type GlyphShape = {
   alpha: number;
 };
 
+/**
+ * The ring drawn around a tapped satellite, and the whole of what says which
+ * mark the info card is talking about.
+ *
+ * It matters most in exactly the case that made a card necessary: a tap over a
+ * cluster offers several names, and without this, switching between them
+ * changes some text at the bottom of the screen and nothing else — the sky
+ * never says which of the four marks under the finger is the one now being
+ * described.
+ *
+ * Two circles, like the marks themselves: a dark rim under a bright ring, so it
+ * reads against a photograph of the sky whichever way round the day has the
+ * palette. Drawn clear of the mark rather than over it — the mark's own colour,
+ * size and shape are three of the four channels the overlay has, and a
+ * selection must not paint over any of them.
+ */
+export type SelectionRing = {
+  /** Centre: the marker's own. */
+  x: number;
+  y: number;
+  /** Radius of the ring, outside everything the marker draws. */
+  radius: number;
+  /** Thickness of the bright ring, and of the dark rim carrying it. */
+  width: number;
+  rimWidth: number;
+  /** The ring's colour: the palette's own, so it flips with the day. */
+  color: string;
+  rim: Ink;
+  /** The fade the marker is in, so the ring goes with it rather than alone. */
+  alpha: number;
+};
+
 /** A landmark's name, and the mark it belongs under. */
 export type LabelPlacement = {
   name: string;
@@ -158,7 +192,8 @@ export type LabelPlacement = {
 export function buildMarkerScene(
   frame: MarkerFrame,
   box: FrameSize,
-  palette: MarkerPalette
+  palette: MarkerPalette,
+  selectedName: string | null = null
 ): MarkerScene {
   const scale = box.width / DESIGN_FRAME_WIDTH_PX;
   const glyphs: GlyphShape[] = [];
@@ -173,6 +208,7 @@ export function buildMarkerScene(
   );
   const named = new Set(landmarks.filter((_, index) => allowed[index]).map((one) => one.name));
   const labels: LabelPlacement[] = [];
+  let selection: SelectionRing | null = null;
 
   for (const marker of frame.markers) {
     const x = (marker.point.left / 100) * box.width;
@@ -206,6 +242,22 @@ export function buildMarkerScene(
       alpha: marker.opacity
     });
 
+    if (marker.name === selectedName) {
+      // Outside the halo where there is one, so a selected landmark is not a
+      // ring drawn through its own glow.
+      const clear = landmark ? size / 2 + HALO_MARGIN_PX * scale : size / 2 + outline;
+      selection = {
+        x,
+        y,
+        radius: clear + SELECTION_GAP_PX * scale + (SELECTION_WIDTH_PX * scale) / 2,
+        width: SELECTION_WIDTH_PX * scale,
+        rimWidth: (SELECTION_WIDTH_PX + 2 * MIN_OUTLINE_PX) * scale,
+        color: palette.label,
+        rim: palette.outline,
+        alpha: marker.opacity
+      };
+    }
+
     if (landmark && named.has(marker.name)) {
       labels.push({
         name: marker.name,
@@ -217,7 +269,7 @@ export function buildMarkerScene(
     }
   }
 
-  return { glyphs, labels, rollDeg: frame.rollDeg, palette };
+  return { glyphs, selection, labels, rollDeg: frame.rollDeg, palette };
 }
 
 /**
@@ -270,6 +322,18 @@ const MIN_OUTLINE_PX = 1;
 const RING_RATIO = 0.17;
 const MIN_RING_PX = 1;
 const HALO_MARGIN_PX = 6;
+/** Clear sky left between a mark and the ring saying it is selected. */
+const SELECTION_GAP_PX = 4;
+/**
+ * Thickness of that ring, quoted at the design width like every size here.
+ *
+ * A shade heavier than the rim under a marker (`OUTLINE_RATIO` of a 17-pixel
+ * body is 2.7), because at the scale a phone actually draws this frame at —
+ * about 0.55, so a hair over a point and a half — a thinner ring around the
+ * eight pixels the geostationary belt gets is a smudge rather than a mark of
+ * selection.
+ */
+const SELECTION_WIDTH_PX = 3;
 /**
  * The box a label is drawn in, centred on its marker.
  *

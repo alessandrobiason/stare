@@ -1,8 +1,5 @@
 import { FramePoint } from "../camera/projection";
 import { SATELLITE_MARKERS } from "../constants";
-import { EnuPosition } from "../types";
-
-const METERS_PER_KM = 1000;
 
 /** The frame the markers are drawn over, in layout pixels. */
 export type FrameSize = { width: number; height: number };
@@ -15,11 +12,6 @@ export type TrailReach = {
   /** Its length: the distance the object covers in the trail window. */
   length: number;
 };
-
-/** How far away the satellite is, in kilometres. */
-export function rangeKm(position: EnuPosition): number {
-  return Math.hypot(position.east, position.north, position.up) / METERS_PER_KM;
-}
 
 /**
  * Marker diameter for an object at `rangeKm`, in frame pixels.

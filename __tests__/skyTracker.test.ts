@@ -5,7 +5,8 @@ import {
   createObserverFrame,
   eciToEnuInFrame,
   elevationDeg,
-  gmstAt
+  gmstAt,
+  rangeKm
 } from "../src/coordinates/transform";
 import { parseTleCatalog } from "../src/data/tleCatalog";
 import { SatelliteCatalog } from "../src/satellite/catalog";
@@ -232,4 +233,86 @@ test("the sweep's progress walks through the catalog between passes", () => {
 
   expect(sweepProgress).toBeGreaterThan(0);
   expect(sweepProgress).toBeLessThan(1);
+});
+
+describe("describing one tapped satellite", () => {
+  /** A satellite the fixture can be relied on to place above the mask. */
+  function anyVisibleName(): string {
+    const [fix] = primedTracker().fixesAt(WHEN, observer);
+    expect(fix).toBeDefined();
+    return fix.name;
+  }
+
+  test("answers with figures the frame loop never computes", () => {
+    const tracker = primedTracker();
+    const name = anyVisibleName();
+    const detail = tracker.describe(name, WHEN, observer)!;
+    const fix = tracker.fixesAt(WHEN, observer).find((one) => one.name === name)!;
+
+    expect(detail.name).toBe(name);
+    expect(detail.category).toBe(fix.category);
+    expect(detail.parked).toBe(fix.parked);
+    // The same place the marker is drawn at, said in words: range, bearing and
+    // height, all resolved from one propagation of that one object.
+    expect(detail.rangeKm).toBeCloseTo(rangeKm(fix.position), 3);
+    expect(detail.elevationDeg).toBeCloseTo(elevationDeg(fix.position), 3);
+    expect(detail.elevationDeg).toBeGreaterThan(MASK_DEG);
+    expect(detail.altitudeKm).toBeGreaterThan(150);
+    expect(detail.altitudeKm).toBeLessThanOrEqual(detail.rangeKm);
+    // Anything still in orbit is moving at a few kilometres a second.
+    expect(detail.speedKmPerSecond).toBeGreaterThan(1);
+    expect(detail.speedKmPerSecond).toBeLessThan(12);
+    expect(detail.orbitPeriodMinutes).toBeGreaterThan(80);
+  });
+
+  test("reads a bearing off a compass rather than as a signed angle", () => {
+    // Due west is 270 degrees. Handed on as atan2 gives it, the card would read
+    // "-90°", which is not a direction anyone turns towards.
+    const tracker = primedTracker();
+    for (const fix of tracker.fixesAt(WHEN, observer)) {
+      const { azimuthDeg: bearing } = tracker.describe(fix.name, WHEN, observer)!;
+      expect(bearing).toBeGreaterThanOrEqual(0);
+      expect(bearing).toBeLessThan(360);
+    }
+  });
+
+  test("a parked object's orbit takes a day, which is why it holds station", () => {
+    const tracker = primedTracker();
+    const parked = tracker.fixesAt(WHEN, observer).find((fix) => fix.parked)!;
+    const detail = tracker.describe(parked.name, WHEN, observer)!;
+
+    expect(detail.parked).toBe(true);
+    // A sidereal day, within the spread of the geosynchronous belt itself.
+    expect(detail.orbitPeriodMinutes).toBeGreaterThan(1300);
+    expect(detail.orbitPeriodMinutes).toBeLessThan(1600);
+    expect(detail.altitudeKm).toBeGreaterThan(30000);
+  });
+
+  test("costs one propagation, and only when something is selected", () => {
+    // The figures here are for the one object someone tapped, so they are
+    // resolved on a card's own slow timer rather than carried by every marker
+    // of every frame.
+    const tracker = primedTracker();
+    const name = anyVisibleName();
+
+    expect(countPropagations(() => tracker.describe(name, WHEN, observer))).toBe(1);
+  });
+
+  test("says nothing about a name the catalog does not carry", () => {
+    // A selection outlives the frame it was made on, and the catalog is
+    // reloaded underneath it every couple of hours.
+    expect(primedTracker().describe("NOT A SATELLITE", WHEN, observer)).toBeNull();
+  });
+
+  test("describes a satellite that has since set, rather than losing it", () => {
+    // Nothing about the lookup depends on the object being on the frame: turn
+    // the phone away, or wait for the pass to end, and the card still answers.
+    const tracker = primedTracker();
+    const below = catalog.entries.find(
+      (entry) => trueElevationDeg(entry.name, WHEN) < -20
+    )!;
+    const detail = tracker.describe(below.name, WHEN, observer)!;
+
+    expect(detail.elevationDeg).toBeLessThan(0);
+  });
 });

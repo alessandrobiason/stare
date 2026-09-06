@@ -8,6 +8,7 @@ import {
   Circle,
   GlyphShape,
   MarkerScene,
+  SelectionRing,
   TailShape
 } from "./markerScene";
 import { Ink, MarkerPalette } from "./palette";
@@ -28,6 +29,8 @@ type Props = {
   frame: FrameSize | null;
   /** Night or daylight, and the crossfade between them. See `palette.ts`. */
   palette: MarkerPalette;
+  /** The satellite being read about, ringed on the frame. See `SelectionRing`. */
+  selectedName?: string | null;
 };
 
 /**
@@ -56,11 +59,16 @@ type Props = {
  *
  * The names are the exception, and stay views — see `MarkerLabels`.
  */
-export const SatelliteMarkers: React.FC<Props> = ({ markers, frame, palette }) => {
+export const SatelliteMarkers: React.FC<Props> = ({
+  markers,
+  frame,
+  palette,
+  selectedName = null
+}) => {
   const drawn = useMarkerFrames(markers);
   if (!frame) return null;
 
-  const scene = buildMarkerScene(drawn, frame, palette);
+  const scene = buildMarkerScene(drawn, frame, palette, selectedName);
   return (
     <>
       <SkiaPictureView
@@ -89,6 +97,9 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
       // cost this whole arrangement exists to avoid.
       const tail = Skia.Path.Make();
       for (const glyph of scene.glyphs) drawGlyph(canvas, paint, tail, glyph, scene.palette);
+      // Over every mark, including the ones in front of the selected satellite:
+      // a ring half hidden behind a passing dot says nothing.
+      if (scene.selection) drawSelection(canvas, paint, scene.selection);
     },
     { x: 0, y: 0, width: frame.width, height: frame.height }
   );
@@ -132,6 +143,14 @@ function drawGlyph(
     canvas.drawPath(tail, paint);
   }
   circle(canvas, paint, glyph, glyph.core, glyph.color, glyph.alpha);
+}
+
+/** The ring that says which satellite the info card is describing. */
+function drawSelection(canvas: SkCanvas, paint: SkPaint, ring: SelectionRing): void {
+  stroke(paint, ring.rim.color, ring.rim.alpha * ring.alpha, ring.rimWidth);
+  canvas.drawCircle(ring.x, ring.y, ring.radius, paint);
+  stroke(paint, ring.color, ring.alpha, ring.width);
+  canvas.drawCircle(ring.x, ring.y, ring.radius, paint);
 }
 
 /** The tail's polygon, into the path this frame is reusing. */

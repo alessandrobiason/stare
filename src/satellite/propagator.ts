@@ -71,3 +71,15 @@ export function propagate(satrec: SatRec, when: Date): EciPosition {
   if (!position) throw new Error("Propagation failed: no position returned");
   return position;
 }
+
+/**
+ * How long one orbit takes, in minutes, from the elements themselves.
+ *
+ * `no` is the mean motion SGP4 works in — radians per minute — so the period is
+ * a division rather than anything propagated: it is a property of the orbit
+ * rather than of where the object is now. A geostationary satellite comes out
+ * at a sidereal day, which is what makes it hold station.
+ */
+export function orbitPeriodMinutes(satrec: SatRec): number {
+  return (2 * Math.PI) / satrec.no;
+}
