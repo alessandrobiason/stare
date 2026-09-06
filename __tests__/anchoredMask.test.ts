@@ -7,6 +7,7 @@ import {
 } from "../src/camera/projection";
 import { EnuPosition } from "../src/types";
 import {
+  aimToleranceDeg,
   AnchoredSkyMask,
   maskAlignment,
   maskOffsetDeg,
@@ -116,4 +117,37 @@ test("the aim offset is the angle between the two, whatever the roll", () => {
   expect(maskOffsetDeg(mask, { ...LEVEL, pitchDeg: -12 })).toBeCloseTo(12, 6);
   // Rolling turns the frame about where it is looking, so the aim is unchanged.
   expect(maskOffsetDeg(mask, { ...LEVEL, rollDeg: 45 })).toBeCloseTo(0, 6);
+});
+
+describe("when a mask has been left behind", () => {
+  test("the tolerance is a share of the frame's narrower side, not its wider", () => {
+    // This camera is portrait: wider down the frame than across it. A tolerance
+    // taken off the wide side would let a pan across the narrow one uncover
+    // half as much again before the loop noticed.
+    const eighth = aimToleranceDeg(DEVICE_LENS, 1 / 8);
+    const acrossDeg = 2 * Math.atan(DEVICE_LENS.horizontalScale) * (180 / Math.PI);
+    const downDeg = 2 * Math.atan(DEVICE_LENS.verticalScale) * (180 / Math.PI);
+
+    expect(acrossDeg).toBeLessThan(downDeg);
+    expect(eighth).toBeCloseTo(acrossDeg / 8, 6);
+  });
+
+  test("a turn of the tolerance sweeps that share of the view off the mask", () => {
+    const fraction = 1 / 8;
+    const turned = aimToleranceDeg(DEVICE_LENS, fraction);
+    const mask = aimed(uniform(48, 32, 1));
+
+    // What the figure is for: at exactly the tolerance, the mask's own edge has
+    // travelled this far across the frame, and everything past it is sky no pass
+    // has looked at. A little over the eighth the fraction names, because frame
+    // position goes as the tangent of the angle and the edge is where that bites
+    // — the direction that uncovers more at the threshold rather than less.
+    const edge = towards({ left: 0, top: 50 });
+    const point = projectToFrame(edge, { ...LEVEL, headingDeg: -turned }, DEVICE_LENS);
+    expect(point!.left).toBeGreaterThan(fraction * 100);
+    expect(point!.left).toBeLessThan(fraction * 100 * 1.25);
+
+    // And the offset a chase is triggered on is that same angle.
+    expect(maskOffsetDeg(mask, { ...LEVEL, headingDeg: turned })).toBeCloseTo(turned, 6);
+  });
 });

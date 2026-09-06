@@ -64,7 +64,7 @@ describe("the status page", () => {
 describe("the mask page", () => {
   test("says the mask is still coming rather than showing a stale one", () => {
     const rows = values(
-      maskSection({ mask: null, error: null, stats: noStats, viewAttitude: level, nowMs: 1000 })
+      maskSection({ mask: null, error: null, stats: noStats, viewAttitude: level, chaseAtDeg: 6.7, nowMs: 1000 })
         .rows
     );
 
@@ -80,6 +80,7 @@ describe("the mask page", () => {
         error: null,
         stats: { updatedAtMs: 4000, lastPassMs: 920, passes: 7, failures: 1 },
         viewAttitude: { ...level, headingDeg: 12 },
+        chaseAtDeg: 6.7,
         nowMs: 5500
       }).rows
     );
@@ -92,12 +93,14 @@ describe("the mask page", () => {
     expect(rows.Passes).toBe("7 ok · 1 failed");
     // How far the phone has turned since the frame the mask was cut from: the
     // part of the view the mask cannot answer for yet.
-    expect(rows["Aim offset"]).toBe("12.0°");
+    // Against the drift that makes the next pass overdue: this one is past it,
+    // so the loop is chasing the view rather than waiting out its gap.
+    expect(rows["Aim offset"]).toBe("12.0° of 6.7°");
   });
 
   test("a failing segmenter names the failure", () => {
     const rows = values(
-      maskSection({ mask: null, error: "no backend", stats: noStats, viewAttitude: level, nowMs: 0 })
+      maskSection({ mask: null, error: "no backend", stats: noStats, viewAttitude: level, chaseAtDeg: 6.7, nowMs: 0 })
         .rows
     );
 

@@ -3,6 +3,7 @@ import {
   SATELLITE_TRACKING,
   SKY_CONFIDENCE_THRESHOLD,
   SKY_SEGMENTATION_INTERVAL_MS,
+  SKY_SEGMENTATION_MINIMUM_INTERVAL_MS,
   TLE_REFRESH_INTERVAL_MS,
   TLE_RETRY_INTERVAL_MS
 } from "../constants";
@@ -90,6 +91,8 @@ export type MaskDebugInput = {
   stats: SkySegmentationStats;
   /** Where the camera is aimed now, against which the mask's own aim is shown. */
   viewAttitude: CameraAttitude;
+  /** How far that may drift before the loop stops waiting and takes a new pass. */
+  chaseAtDeg: number;
   /** `performance.now()` when the panel sampled, for the mask's age. */
   nowMs: number;
 };
@@ -100,6 +103,7 @@ export function maskSection({
   error,
   stats,
   viewAttitude,
+  chaseAtDeg,
   nowMs
 }: MaskDebugInput): DebugSection {
   const mask = anchored?.mask ?? null;
@@ -114,9 +118,11 @@ export function maskSection({
     // The mask travels with the sky rather than with the screen, so this is not
     // an error — it is how much of the view is sky nothing has looked at yet,
     // and it is the figure to watch when markers stop being drawn during a pan.
+    // Shown against the drift that makes the next pass overdue, so the reading
+    // says whether the loop is waiting out its gap or chasing the view.
     rows.push({
       label: "Aim offset",
-      value: `${maskOffsetDeg(anchored, viewAttitude).toFixed(1)}°`
+      value: `${maskOffsetDeg(anchored, viewAttitude).toFixed(1)}° of ${chaseAtDeg.toFixed(1)}°`
     });
     // How much of the frame the segmenter found an edge in, and is therefore
     // carrying at sub-cell resolution. A frame of open sky reads zero; one of
@@ -137,7 +143,12 @@ export function maskSection({
     value: stats.lastPassMs === null ? NONE : `${Math.round(stats.lastPassMs)} ms`
   });
   rows.push({ label: "Passes", value: `${stats.passes} ok · ${stats.failures} failed` });
-  rows.push({ label: "Gap between", value: `${SKY_SEGMENTATION_INTERVAL_MS} ms` });
+  // A range rather than a figure: the gap is what a still camera waits, and the
+  // floor is what a camera being turned off the mask's aim gets instead.
+  rows.push({
+    label: "Gap between",
+    value: `${SKY_SEGMENTATION_MINIMUM_INTERVAL_MS}–${SKY_SEGMENTATION_INTERVAL_MS} ms`
+  });
   rows.push({ label: "Sky at or above", value: SKY_CONFIDENCE_THRESHOLD.toFixed(2) });
 
   return { id: "mask", title: "MASK", rows };

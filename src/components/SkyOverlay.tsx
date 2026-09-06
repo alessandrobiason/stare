@@ -7,6 +7,7 @@ import {
   View
 } from "react-native";
 import { FrameLens } from "../camera/projection";
+import { SKY_MASK_CHASE_FRACTION } from "../constants";
 import { cachedCatalog } from "../data/tleCache";
 import {
   catalogSection,
@@ -24,7 +25,7 @@ import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrie
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
-import { AnchoredSkyMask } from "../vision/anchoredMask";
+import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
@@ -223,6 +224,7 @@ export const SkyOverlay: React.FC<Props> = ({
       // Where the camera is aimed now, so the panel can say how far the mask
       // is from it: the one figure that says whether a pass is overdue.
       viewAttitude: smoothed.filterRef.current.sample(performance.now() / 1000),
+      chaseAtDeg: aimToleranceDeg(frame.lens, SKY_MASK_CHASE_FRACTION),
       nowMs: performance.now()
     }),
     skySection({

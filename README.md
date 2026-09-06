@@ -112,9 +112,11 @@ horizon) is wider than the marker itself.
 
 **What is in the way** (`src/vision/`). A frame goes to the MIT-licensed
 SkyWater-Seg SegFormer about once a second, at its own aspect ratio within a
-fixed pixel budget. The model runs under ONNX Runtime — React Native on the
-phone, WASM in the browser — behind one shared module, so it is the same
-algorithm either side. Five things sit between its output and a marker being
+fixed pixel budget — and sooner than that when the phone has been turned off
+what the last pass covered, since a gap is only quiet worth having while the
+camera is still (`segmentationLoop.ts`). The model runs under ONNX Runtime —
+React Native on the phone, WASM in the browser — behind one shared module, so it
+is the same algorithm either side. Five things sit between its output and a marker being
 hidden:
 
 - **An aim, not a decal** (`anchoredMask.ts`). A mask is a grid over a *frame*,

@@ -66,13 +66,37 @@ export function skyProbe(
   };
 }
 
+/** Angle between two aims: how far the camera has turned from one to the other. */
+export function aimOffsetDeg(from: CameraAttitude, to: CameraAttitude): number {
+  const a = axesFromAttitude(from).forward;
+  const b = axesFromAttitude(to).forward;
+  return toDegrees(Math.acos(clamp(a.east * b.east + a.north * b.north + a.up * b.up, -1, 1)));
+}
+
 /** Angle between where the mask was aimed and where the camera is aimed now. */
 export function maskOffsetDeg(anchored: AnchoredSkyMask, attitude: CameraAttitude): number {
-  const mask = axesFromAttitude(anchored.attitude).forward;
-  const view = axesFromAttitude(attitude).forward;
-  return toDegrees(
-    Math.acos(clamp(mask.east * view.east + mask.north * view.north + mask.up * view.up, -1, 1))
-  );
+  return aimOffsetDeg(anchored.attitude, attitude);
+}
+
+/**
+ * How far the camera may turn off a mask's aim before that mask is answering
+ * for materially less than the view: `fraction` of the narrower of the two
+ * fields of view the frame covers.
+ *
+ * Off the narrower one, so the figure means the same thing whichever way the
+ * phone is turned — a frame is wider one way than the other, and a tolerance
+ * taken off the wide side would let half as much again of a portrait frame go
+ * unmapped across the narrow one before it noticed.
+ *
+ * A fraction of the field of view rather than of the frame, and the two are not
+ * quite the same thing: frame position goes as the tangent of the angle, so a
+ * turn of an eighth of the field of view sweeps a little over an eighth of the
+ * frame's width past the edge. That is the conservative direction — slightly
+ * more sky uncovered at the threshold than the fraction suggests, never less.
+ */
+export function aimToleranceDeg(lens: FrameLens, fraction: number): number {
+  const halfNarrowSide = Math.min(lens.horizontalScale, lens.verticalScale);
+  return fraction * 2 * toDegrees(Math.atan(halfNarrowSide));
 }
 
 /**

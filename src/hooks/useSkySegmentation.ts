@@ -1,10 +1,15 @@
 import { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 import { CameraAttitude } from "../camera/attitude";
 import { FrameLens } from "../camera/projection";
-import { SKY_MASK_MAX_AGE_SECONDS, SKY_SEGMENTATION_INTERVAL_MS } from "../constants";
+import {
+  SKY_MASK_CHASE_FRACTION,
+  SKY_MASK_MAX_AGE_SECONDS,
+  SKY_SEGMENTATION_INTERVAL_MS,
+  SKY_SEGMENTATION_MINIMUM_INTERVAL_MS
+} from "../constants";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { AttitudeReading } from "./useSmoothedOrientation";
-import { AnchoredSkyMask } from "../vision/anchoredMask";
+import { aimOffsetDeg, aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { applyHorizonPrior } from "../vision/horizonPrior";
 import { startSegmentationLoop } from "../vision/segmentationLoop";
 import { SkyMaskTemporalFilter, SkyMaskSensorSample } from "../vision/skyMaskTemporalFilter";
@@ -130,6 +135,14 @@ export function useSkySegmentation(
     let rebuilds = 0;
     /** When the newest accepted mask was produced, on the same clock as below. */
     let maskAtSeconds = -Infinity;
+    /**
+     * The aim the newest mask was taken at, and whether the pass that produced
+     * it landed. Together they are what says the segmenter is being outrun
+     * rather than simply failing.
+     */
+    let anchor: CameraAttitude | null = null;
+    let landed = false;
+    const toleranceDeg = aimToleranceDeg(lens, SKY_MASK_CHASE_FRACTION);
 
     const segmentCurrentFrame = async () => {
       const grabber = grabberRef.current;
@@ -172,6 +185,8 @@ export function useSkySegmentation(
         const { attitude, sample } = capture;
 
         failures = 0;
+        anchor = attitude;
+        landed = true;
         const finishedAtMs = performance.now();
         maskAtSeconds = finishedAtMs / 1000;
         statsRef.current = {
@@ -192,6 +207,7 @@ export function useSkySegmentation(
         setError(null);
       } catch (cause) {
         if (!active) return;
+        landed = false;
         failures += 1;
         statsRef.current = { ...statsRef.current, failures: statsRef.current.failures + 1 };
         console.warn(`Sky segmentation failed (${failures} in a row)`, cause);
@@ -218,7 +234,28 @@ export function useSkySegmentation(
       }
     };
 
-    const stop = startSegmentationLoop(segmentCurrentFrame, SKY_SEGMENTATION_INTERVAL_MS);
+    /**
+     * Whether the next pass is wanted before the full gap is up: the camera has
+     * turned far enough off the newest mask's aim that a good part of what is on
+     * screen is sky nothing has looked at.
+     *
+     * Only after a pass that landed. A failing pass keeps the full gap, because
+     * the run of failures that gives up on the camera is counted in passes and
+     * its budget is only eight *seconds* for as long as each one waits a second
+     * — chasing through a failure would spend all eight inside three, and turn a
+     * camera hiccup that passes on its own into a trip back to the boot screen.
+     */
+    const overdue = () => {
+      if (!landed || !anchor) return false;
+      const attitude = orientationFilterRef.current.sample(performance.now() / 1000);
+      return aimOffsetDeg(anchor, attitude) >= toleranceDeg;
+    };
+
+    const stop = startSegmentationLoop(segmentCurrentFrame, {
+      gapMs: SKY_SEGMENTATION_INTERVAL_MS,
+      minimumGapMs: SKY_SEGMENTATION_MINIMUM_INTERVAL_MS,
+      overdue
+    });
 
     // A pass that never returns leaves the newest mask in place indefinitely,
     // and a mask of where the buildings were a minute ago is worse than none.

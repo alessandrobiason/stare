@@ -292,8 +292,53 @@ export const MARKER_SELECTION = {
  * Quiet left between sky segmentation runs, measured end-to-start rather than
  * as a rate: a pass takes roughly this long itself, so as a period it would
  * leave no gap at all. See `startSegmentationLoop`.
+ *
+ * This is the gap for a camera that is still, which is the case the gap was
+ * chosen for: nothing in front of a phone lying on a table changes, and a pass
+ * spent on it buys nothing. A camera that has been turned is the opposite case
+ * — see `SKY_SEGMENTATION_MINIMUM_INTERVAL_MS`.
  */
 export const SKY_SEGMENTATION_INTERVAL_MS = 1000;
+
+/**
+ * The shortest that gap may be cut to when the mask has been left behind.
+ *
+ * The mask maps the sky rather than the screen, so turning the phone does not
+ * make it wrong — it makes it *smaller*, until the part of the view it can
+ * answer for is not the part being looked at. Waiting out a full second of
+ * quiet in that state is the one case where the gap is pure lag: the sky on
+ * screen is unmapped, the markers over it are not drawn, and the segmenter is
+ * deliberately idle. So the loop polls during the gap and starts the next pass
+ * as soon as the view has turned off the mask's aim by
+ * `SKY_MASK_CHASE_FRACTION` of the frame.
+ *
+ * A floor rather than no gap at all, and the floor is the memory bound. Every
+ * pass is a full-resolution still — see the note above on why the capture size
+ * is left unwritten — which is a large transient, and that note names the
+ * interval between passes as the lever to reach for if memory pressure ever
+ * returns. Chasing shortens it and so pulls that lever the wrong way, which is
+ * affordable only because it is bounded: a pass's own cost is most of the cycle
+ * either way, so the floor buys back perhaps a third of the period rather than a
+ * multiple of the rate, and only while the phone is actually being moved. If the
+ * app does start being killed, raise this before raising anything else.
+ *
+ * Not applied after a failed pass, which keeps its own budget — see
+ * `MAX_CONSECUTIVE_FAILURES`, whose eight strikes are eight seconds only for as
+ * long as a failure waits the full gap.
+ */
+export const SKY_SEGMENTATION_MINIMUM_INTERVAL_MS = 300;
+
+/**
+ * How far the view may turn off the mask's aim before the next pass is due, as
+ * a fraction of the narrower of the frame's two fields of view.
+ *
+ * An eighth is about seven degrees on this camera, which is well past what a
+ * hand holding a phone still produces and is reached within a fraction of a
+ * second of a deliberate pan. Larger, and a turn is left showing a band of
+ * undrawn sky down one side; smaller, and the sensor's own noise would be
+ * enough to keep the camera capturing while nobody is moving.
+ */
+export const SKY_MASK_CHASE_FRACTION = 1 / 8;
 
 /**
  * How old the newest sky mask may be before it stops being trusted.
