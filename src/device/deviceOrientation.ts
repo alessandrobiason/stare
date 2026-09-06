@@ -47,9 +47,46 @@ async function isAvailable(sensor: { isAvailableAsync(): Promise<boolean> }): Pr
 }
 
 /**
+ * Whether the platform makes the *readings* conditional on a permission.
+ *
+ * A browser does: iOS Safari hands out `DeviceMotionEvent.requestPermission`,
+ * and until that is granted no motion event fires at all. A phone does not.
+ * `CMMotionManager` — the attitude, the rotation rate and the magnetic field,
+ * which is everything this module reads — is unauthenticated on iOS. The
+ * "Motion & Fitness" prompt that `requestPermissionsAsync` raises there belongs
+ * to `CMPedometer`: step counts and activity, none of which this app touches.
+ *
+ * So the phone is not asked. Asking put a system prompt in front of someone for
+ * data the app never reads, and then took the answer — or a phone with Motion &
+ * Fitness turned off in Settings, which is a common enough thing to have done
+ * once — as a reason to stop aiming the view altogether: a live camera under a
+ * sky frozen at level, with nothing on screen to say why.
+ *
+ * Detected by the API that does the gating rather than by asking React Native
+ * which platform this is, as with the persistent store.
+ *
+ * One loose end this leaves: `expo-sensors`' config plugin still writes an
+ * `NSMotionUsageDescription` into the Info.plist, and nothing now reaches the
+ * prompt it is there for. Dropping it means a plugin entry in `app.json`, which
+ * moves the fingerprint and so needs a native build — worth doing at the next
+ * one, not worth one of its own.
+ */
+function readingsNeedPermission(): boolean {
+  const events = globalThis as {
+    DeviceMotionEvent?: { requestPermission?: unknown };
+    DeviceOrientationEvent?: { requestPermission?: unknown };
+  };
+  return (
+    typeof events.DeviceMotionEvent?.requestPermission === "function" ||
+    typeof events.DeviceOrientationEvent?.requestPermission === "function"
+  );
+}
+
+/**
  * Probes the two sensors this module reads. Availability only — asking for
  * permission here would put a system prompt in front of someone before the view
- * they asked for; `subscribeToDeviceOrientation` asks when it subscribes.
+ * they asked for; `subscribeToDeviceOrientation` asks when it subscribes, and
+ * only where the reading needs it.
  */
 export async function readDeviceCapabilities(): Promise<DeviceCapabilities> {
   const [motion, magnetometer] = await Promise.all([
@@ -63,25 +100,33 @@ export async function readDeviceCapabilities(): Promise<DeviceCapabilities> {
  * Subscribes to whatever `capabilities` says this device has, resolving to an
  * unsubscribe function.
  *
- * Without motion, or with it refused, there is no attitude at all: it reports
- * level once and returns a no-op. The magnetometer is taken separately, since
- * refusing it still leaves a usable pitch and roll — only the bearing to north
- * goes, which `northOffset` already reports as absent. Boot stops a device that
- * lacks the sensor outright, so the case handled here is a refused permission.
+ * Without motion there is no attitude at all: it reports level once and returns
+ * a no-op. Boot stops a device that lacks the sensor outright, so what is
+ * handled here is a browser refusing the reading — the one platform where a
+ * permission stands between this and the sensor (`readingsNeedPermission`).
+ *
+ * The magnetometer is taken separately, since losing it still leaves a usable
+ * pitch and roll — only the bearing to north goes, which `northOffset` already
+ * reports as absent.
  */
 export async function subscribeToDeviceOrientation(
   onChange: (orientation: DeviceOrientation) => void,
   capabilities: DeviceCapabilities,
   declinationDeg: number
 ): Promise<() => void> {
-  if (!capabilities.motion || (await DeviceMotion.requestPermissionsAsync()).status !== "granted") {
+  const gated = readingsNeedPermission();
+
+  if (
+    !capabilities.motion ||
+    (gated && (await DeviceMotion.requestPermissionsAsync()).status !== "granted")
+  ) {
     onChange(LEVEL);
     return () => undefined;
   }
 
   const useMagnetometer =
     capabilities.magnetometer &&
-    (await Magnetometer.requestPermissionsAsync()).status === "granted";
+    (!gated || (await Magnetometer.requestPermissionsAsync()).status === "granted");
 
   let rotation: Quaternion | null = null;
   let field: Vector3 | null = null;

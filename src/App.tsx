@@ -16,7 +16,7 @@ import { useIntro } from "./hooks/useIntro";
  * placed by GPS and aimed by the phone's own motion sensors.
  *
  * The first launch on a device opens on the intro (`IntroScreen`): what the app
- * does, how to hold it, and the three things the phone is about to ask
+ * does, how to hold it, and the two things the phone is about to ask
  * permission for. Every launch after it opens straight on the boot screen and
  * stays there until everything the view needs is in hand, so nothing below has
  * a loading state of its own. Anything fatal — during start-up or after it —

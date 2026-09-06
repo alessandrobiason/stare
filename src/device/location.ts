@@ -64,15 +64,43 @@ export async function requestObserverFix(): Promise<ObserverLocation> {
  * staged recording never leaves the place it was made. An app that travels
  * cannot: the two norths are twenty degrees apart in places, a third of the
  * frame.
+ *
+ * **Call this after `requestObserverFix`, not alongside it.** The compass is
+ * behind the same foreground permission as the fix, and asked before that
+ * permission is granted this returns `null` every time — which on a first
+ * launch is the whole of the first session aimed at magnetic north.
  */
 export async function readMagneticDeclinationDeg(): Promise<number | null> {
   try {
-    const heading = await Location.getHeadingAsync();
+    // Bounded, because the platform's own call is not: it resolves on the first
+    // heading good enough to use and has no answer of its own for a compass
+    // that never reports one. Boot waits on this, and a boot screen that never
+    // finishes is a worse failure than a heading referenced to magnetic north.
+    const heading = await within(Location.getHeadingAsync(), HEADING_TIMEOUT_MS);
+    if (!heading) return null;
     // iOS reports a negative true heading when it has no declination to apply.
     if (heading.trueHeading < 0 || heading.magHeading < 0) return null;
     return wrapDegrees180(heading.trueHeading - heading.magHeading);
   } catch {
     return null;
+  }
+}
+
+/** How long boot will wait for the compass to settle before going without it. */
+const HEADING_TIMEOUT_MS = 3000;
+
+/** What `promise` resolves to, or `null` if it has not by `ms`. */
+async function within<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

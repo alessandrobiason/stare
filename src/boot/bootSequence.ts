@@ -5,6 +5,7 @@ import { ObserverLocation } from "../types";
 import {
   BootError,
   BootProgress,
+  BootRun,
   BootStep,
   BootStepDefinition,
   describeError,
@@ -75,6 +76,51 @@ export type BootTasks = {
   loadSkyModel(): Promise<void>;
 };
 
+/** What the operating system was asked for, and what came back. */
+type Access = {
+  camera: void | Error;
+  /** `null` when the camera was refused and the fix was never asked for. */
+  observer: ObserverLocation | Error | null;
+  /** `null` when there was no fix to read it against, or none to be had. */
+  declinationDeg: number | null;
+};
+
+/**
+ * Everything boot needs the operating system's permission for, asked for one
+ * prompt at a time and in the order the intro names them.
+ *
+ * One at a time because two prompts are two system alerts: asked together, the
+ * order they arrive in is the operating system's to decide, and one raised
+ * while the other is up may never be presented at all — which is a boot that
+ * waits forever on an answer to a question nobody was asked. It costs nothing
+ * to boot: the prompts are answered one after another whatever we do, and the
+ * catalogue, the sensors and the sky model are still loading behind them.
+ *
+ * Nothing is asked for after a refusal that has already lost boot. A phone that
+ * has just refused the camera is not then asked where it is for a view that
+ * will not open either way.
+ *
+ * The declination comes last for a harder reason: the platform answers for the
+ * heading through the same authorisation as the fix, so asked alongside the
+ * request rather than after it, it is asked before there is any permission to
+ * answer it with. It failed exactly once per device — on the first launch,
+ * the only one where the permission is not already granted — and left the first
+ * session's headings out by the local declination, which is a marker out by
+ * twenty degrees in the places where that matters most.
+ */
+async function requestAccess(boot: BootRun, tasks: BootTasks): Promise<Access> {
+  const camera = await boot.run("camera", tasks.requestCamera);
+  if (camera instanceof Error) return { camera, observer: null, declinationDeg: null };
+
+  const observer = await boot.run("location", tasks.locateObserver);
+  if (observer instanceof Error) return { camera, observer, declinationDeg: null };
+
+  // Folded into the location step: same subsystem, same permission, and not
+  // worth a line of its own on screen.
+  const declinationDeg = await tasks.readDeclination().catch(() => null);
+  return { camera, observer, declinationDeg };
+}
+
 /**
  * Prepares everything the AR view needs, reporting progress as it goes.
  *
@@ -84,6 +130,10 @@ export type BootTasks = {
  * includes the catalogue's own expensive half: building its SGP4 records is
  * part of the step (`runCatalogStep`), so it runs against the other steps'
  * waiting rather than after all of them.
+ *
+ * The one thing not run against the rest is the asking: everything the phone
+ * has to grant is requested in a single chain, one prompt at a time, for the
+ * reasons in `requestAccess`.
  *
  * Nothing here is optional. Without a catalogue there is nothing to draw;
  * without the sensors there is no attitude to aim with; without a fix there is
@@ -99,16 +149,10 @@ export async function runBootSequence(
 ): Promise<BootResult> {
   const boot = startBootRun(STEPS, onProgress);
 
-  const [catalogResult, sensorsResult, locationResults, skyModelResult] = await Promise.all([
+  const [catalogResult, sensorsResult, access, skyModelResult] = await Promise.all([
     runCatalogStep(boot, "catalog", tasks.loadCatalog),
     boot.run("sensors", tasks.checkSensors),
-    Promise.all([
-      boot.run("location", tasks.locateObserver),
-      // Folded into the location step: same subsystem, and not worth a line of
-      // its own on screen.
-      tasks.readDeclination().catch(() => null),
-      boot.run("camera", tasks.requestCamera)
-    ]),
+    requestAccess(boot, tasks),
     boot.run("skyModel", tasks.loadSkyModel)
   ]);
 
@@ -122,23 +166,27 @@ export async function runBootSequence(
 
   const catalog = settleCatalog(boot, "catalog", catalogResult);
 
-  const [observerResult, declination, cameraResult] = locationResults;
-  if (observerResult instanceof Error) {
-    throw boot.fail("location", describeError(observerResult, "Your location could not be found"));
+  // Settled in the order they were asked for, so the reason boot stopped is the
+  // first prompt that went against it rather than the last.
+  //
+  // The camera is no longer only the picture behind the markers: it is what the
+  // sky mask is computed from, so refusing it leaves nothing to check a line of
+  // sight against.
+  if (access.camera instanceof Error) {
+    throw boot.fail("camera", describeError(access.camera, "The camera could not be opened"));
+  }
+  boot.update("camera", "done");
+
+  // `null` only where the camera failed above, which has already thrown.
+  const observer = access.observer;
+  if (observer === null || observer instanceof Error) {
+    throw boot.fail("location", describeError(observer, "Your location could not be found"));
   }
   boot.update(
     "location",
     "done",
-    `${observerResult.latitudeDeg.toFixed(3)}, ${observerResult.longitudeDeg.toFixed(3)}`
+    `${observer.latitudeDeg.toFixed(3)}, ${observer.longitudeDeg.toFixed(3)}`
   );
-
-  // The camera is no longer only the picture behind the markers: it is what the
-  // sky mask is computed from, so refusing it leaves nothing to check a line of
-  // sight against.
-  if (cameraResult instanceof Error) {
-    throw boot.fail("camera", describeError(cameraResult, "The camera could not be opened"));
-  }
-  boot.update("camera", "done");
 
   throwIfSkyModelFailed();
 
@@ -146,7 +194,7 @@ export async function runBootSequence(
     catalog,
     capabilities: sensors.capabilities,
     warnings: [],
-    observer: observerResult,
-    declinationDeg: declination ?? 0
+    observer,
+    declinationDeg: access.declinationDeg ?? 0
   };
 }

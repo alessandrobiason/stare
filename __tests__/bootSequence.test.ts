@@ -126,6 +126,122 @@ test("steps run together rather than one after another", async () => {
   expect(peak).toBeGreaterThan(1);
 });
 
+/**
+ * When each of the operating system's prompts is raised, which is a question
+ * about the first launch and only the first launch: on every launch after it
+ * the answers are already given, and nothing below is visible at all.
+ */
+describe("what the phone is asked for, and when", () => {
+  const delay = <T>(value?: T): Promise<T> =>
+    new Promise((resolve) => setTimeout(() => resolve(value as T), 5));
+
+  /** The task set, with a note taken of every request and how it was answered. */
+  function asking(log: string[], overrides: Partial<BootTasks> = {}): BootTasks {
+    const base = tasks(overrides);
+    const watched =
+      <T>(name: string, task: () => Promise<T>) =>
+      async (): Promise<T> => {
+        log.push(`${name} asked`);
+        try {
+          const value = await task();
+          log.push(`${name} answered`);
+          return value;
+        } catch (error) {
+          log.push(`${name} refused`);
+          throw error;
+        }
+      };
+
+    return {
+      ...base,
+      requestCamera: watched("camera", base.requestCamera),
+      locateObserver: watched("location", base.locateObserver),
+      readDeclination: watched("declination", base.readDeclination)
+    };
+  }
+
+  test("one prompt at a time, in the order the intro names them", async () => {
+    // Two system alerts raised together are two alerts the operating system
+    // orders as it likes, and one raised while another is up may never be
+    // presented — which is a boot waiting forever on an answer to a question
+    // nobody was asked. The intro says camera, then location; so does this.
+    const log: string[] = [];
+    await runBootSequence(
+      asking(log, {
+        requestCamera: () => delay(),
+        locateObserver: () => delay(observer)
+      }),
+      () => undefined
+    );
+
+    expect(log).toEqual([
+      "camera asked",
+      "camera answered",
+      "location asked",
+      "location answered",
+      "declination asked",
+      "declination answered"
+    ]);
+  });
+
+  test("the declination is read only once the fix is in hand", async () => {
+    const log: string[] = [];
+    await runBootSequence(asking(log, { locateObserver: () => delay(observer) }), () => undefined);
+
+    expect(log.indexOf("declination asked")).toBeGreaterThan(log.indexOf("location answered"));
+  });
+
+  test("the first launch gets the local declination, not magnetic north", async () => {
+    // The regression this ordering exists for. The platform reads the compass
+    // through the same foreground permission as the fix and refuses until it is
+    // granted, so a heading asked for alongside the fix rather than after it
+    // failed on every first launch — and only on a first launch, which is why
+    // it survived a phone it had already been run on. The cost was a whole
+    // first session aimed at magnetic north: twenty degrees out in the places
+    // where the two norths are furthest apart.
+    let granted = false;
+    const result = await runBootSequence(
+      tasks({
+        locateObserver: async () => {
+          await delay();
+          granted = true;
+          return observer;
+        },
+        readDeclination: async () =>
+          granted ? 10 : Promise.reject(new Error("DeniedForegroundLocationPermission"))
+      }),
+      () => undefined
+    );
+
+    expect(result.declinationDeg).toBe(10);
+  });
+
+  test("a refused camera is not followed by asking where the phone is", async () => {
+    // Boot is already lost; asking for a fix it will not use is one more prompt
+    // for nothing, and one more thing refused for the next launch to live with.
+    const log: string[] = [];
+    const failure = runBootSequence(
+      asking(log, { requestCamera: () => Promise.reject(new Error("Camera access is off")) }),
+      () => undefined
+    );
+
+    await expect(failure).rejects.toMatchObject({ step: "camera" });
+    expect(log).toEqual(["camera asked", "camera refused"]);
+  });
+
+  test("a refused fix does not go on to read the compass behind it", async () => {
+    const log: string[] = [];
+    const failure = runBootSequence(
+      asking(log, { locateObserver: () => Promise.reject(new Error("permission refused")) }),
+      () => undefined
+    );
+
+    await expect(failure).rejects.toMatchObject({ step: "location" });
+    expect(log).toEqual(["camera asked", "camera answered", "location asked", "location refused"]);
+  });
+
+});
+
 describe("the fix", () => {
   test("is shown against its step", async () => {
     let last: BootStep[] = [];

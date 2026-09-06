@@ -3,13 +3,18 @@
  *
  * Three pages: what it does, how to hold it, and what it is about to ask the
  * operating system for. That last one is the reason this exists at all. Boot
- * asks for the camera and a fix within a second of the app opening
- * (`bootTasks`), and the phone asks for motion as soon as the view subscribes
- * to it (`subscribeToDeviceOrientation`) — three system prompts, back to back,
- * over a screen that has never explained what any of them are for. A prompt
- * answered without knowing why it was asked is usually answered "no", and every
- * one of the three is fatal to a view that places objects in the sky by
- * knowing where you are and where you are pointing.
+ * asks for the camera and then for a fix within a second of the app opening
+ * (`bootTasks`, in that order) — two system prompts, back to back, over a
+ * screen that has never explained what either of them is for. A prompt answered
+ * without knowing why it was asked is usually answered "no", and both are fatal
+ * to a view that places objects in the sky by knowing where you are and where
+ * you are pointing.
+ *
+ * Two, not three. The phone's motion sensors are read without a prompt of their
+ * own — see `readingsNeedPermission` — so they are described rather than listed:
+ * naming an access that never appears teaches someone to expect a prompt that
+ * is not coming, and the page is only worth having if it matches what happens
+ * next.
  *
  * The copy is here rather than in the component for the same reason the boot
  * sky's geometry is not in its canvas: what is said is worth reading and
@@ -49,15 +54,16 @@ export const INTRO_PAGES: readonly IntroPage[] = [
   },
   {
     title: "What it needs",
-    body: "Three things, and the phone will ask you about each of them in a moment.",
+    body: "Two things, and the phone will ask you about each of them in a moment.",
     access: [
       { name: "Camera", reason: "The sky in front of you, and what is standing in the way of it." },
-      { name: "Location", reason: "Which satellites are above you, and where in the sky they sit." },
-      { name: "Motion & Fitness", reason: "Which way the phone is pointed, and how it is tilted." }
+      { name: "Location", reason: "Which satellites are above you, and where in the sky they sit." }
     ],
     footnote:
-      "All three are used on the phone alone. The only thing Stare sends or fetches " +
-      "is the public satellite catalogue; where you are never leaves the device."
+      "Which way the phone is pointed comes from its own motion sensors, which it " +
+      "reads without asking. Everything here is used on the phone alone: the only " +
+      "thing Stare sends or fetches is the public satellite catalogue, and where you " +
+      "are never leaves the device."
   }
 ];
 

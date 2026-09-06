@@ -30,18 +30,28 @@ afterEach(() => {
 test("the intro names every access the phone is about to ask for, and why", () => {
   const asked = INTRO_PAGES.flatMap((page) => page.access ?? []);
 
-  // The three prompts a first launch actually produces: the camera and the fix
-  // from boot (`bootTasks`), and motion when the view subscribes to it
-  // (`subscribeToDeviceOrientation`). A prompt not explained here arrives with
-  // no reason attached, which is how a permission gets refused.
-  expect(asked.map((access) => access.name)).toEqual([
-    "Camera",
-    "Location",
-    "Motion & Fitness"
-  ]);
+  // The two prompts a first launch actually produces, in the order boot raises
+  // them (`requestAccess`). A prompt not explained here arrives with no reason
+  // attached, which is how a permission gets refused.
+  expect(asked.map((access) => access.name)).toEqual(["Camera", "Location"]);
   for (const access of asked) {
     expect(access.reason.length).toBeGreaterThan(20);
   }
+});
+
+test("nothing is listed that the phone never asks about", () => {
+  // Motion is read without a prompt on the phone — the sensors this app reads
+  // are not behind one, and the "Motion & Fitness" permission that looks like
+  // theirs belongs to the pedometer (`readingsNeedPermission`). Listing it here
+  // promised a prompt that never arrives, which is a page teaching someone to
+  // distrust the next one.
+  const asked = INTRO_PAGES.flatMap((page) => page.access ?? []);
+  expect(asked.map((access) => access.name)).not.toContain("Motion & Fitness");
+
+  // Still said, though: the sensors are read, and the page that says what the
+  // app needs should not go quiet about the one thing it takes without asking.
+  const said = INTRO_PAGES.map((page) => `${page.body} ${page.footnote ?? ""}`).join(" ");
+  expect(said).toMatch(/motion sensors/i);
 });
 
 test("nothing is asked for before the app has said what it is", () => {
