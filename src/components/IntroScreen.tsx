@@ -76,6 +76,12 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
     <View style={styles.root} onLayout={measure}>
       <BootSky frame={frame} turning />
 
+      {INTRO_PAGES[page]?.wordmark && (
+        <View style={styles.wordmarkLayer} pointerEvents="none">
+          <Text style={styles.wordmark}>STARE</Text>
+        </View>
+      )}
+
       {frame ? (
         <>
           <ScrollView
@@ -86,10 +92,10 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
             onMomentumScrollEnd={settled}
             style={styles.pager}
           >
-            {INTRO_PAGES.map((content) => (
-              <View key={content.title} style={[styles.page, { width: frame.width }]}>
+            {INTRO_PAGES.map((content, index) => (
+              <View key={index} style={[styles.page, { width: frame.width }]}>
                 <View style={styles.card}>
-                  <Text style={styles.title}>{content.title}</Text>
+                  {content.title ? <Text style={styles.title}>{content.title}</Text> : null}
                   <Text style={styles.body}>{content.body}</Text>
 
                   {content.access?.map((access) => (
@@ -109,9 +115,9 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
 
           <View style={styles.footer}>
             <View style={styles.dots}>
-              {INTRO_PAGES.map((content, index) => (
+              {INTRO_PAGES.map((_, index) => (
                 <View
-                  key={content.title}
+                  key={index}
                   style={[styles.dot, index === page && styles.dotHere]}
                 />
               ))}
@@ -141,6 +147,24 @@ const styles = StyleSheet.create({
   },
   pager: {
     flex: 1
+  },
+  // Centred over the whole frame rather than inside the pager, so the name
+  // lands exactly where the boot screen puts it — the eye of the orbits —
+  // rather than the smaller area the pager leaves above the footer.
+  wordmarkLayer: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  // Identical to `BootScreen`'s own `wordmark` style: same word, same screen,
+  // same font.
+  wordmark: {
+    color: theme.color.textBright,
+    fontSize: 19,
+    fontWeight: "600",
+    letterSpacing: 7,
+    marginLeft: 7,
+    opacity: 0.92
   },
   page: {
     flex: 1,

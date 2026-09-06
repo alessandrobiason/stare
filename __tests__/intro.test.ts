@@ -59,7 +59,10 @@ test("nothing is asked for before the app has said what it is", () => {
   // the app does with them.
   const asking = INTRO_PAGES.map((page) => Boolean(page.access));
   expect(asking).toEqual([false, false, true]);
-  expect(INTRO_PAGES[0].title).toBe("Stare");
+  // The first page names the app in the middle of the sky rather than in the
+  // card's title — see `wordmark`.
+  expect(INTRO_PAGES[0].wordmark).toBe(true);
+  expect(INTRO_PAGES[0].title).toBeUndefined();
 });
 
 test("the button says what it does: the last page is the one that starts the app", () => {
