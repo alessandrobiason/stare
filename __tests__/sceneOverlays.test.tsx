@@ -78,6 +78,7 @@ describe("the tapped satellite's card", () => {
   function detail(overrides: Partial<SatelliteDetail> = {}): SatelliteDetail {
     return {
       name: "STARLINK-1234",
+      noradId: 44714,
       category: "COMMS",
       parked: false,
       rangeKm: 1240.4,
@@ -126,6 +127,45 @@ describe("the tapped satellite's card", () => {
     expect(text).toContain("96 min");
   });
 
+  test("says what the satellite is before it says how far away it is", () => {
+    // Someone who has just tapped a light in the sky is asking what it is; the
+    // figures only mean something once the object has a name and a job.
+    const text = textOf(card({ "STARLINK-1234": detail() }));
+
+    expect(text).toContain("SpaceX");
+    // And where to read more, labelled with the site it opens rather than with
+    // the words "official site".
+    expect(text).toContain("starlink.com");
+  });
+
+  test("a landmark is described in its own right, not as one of a fleet", () => {
+    const text = textOf(
+      card({
+        ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" })
+      })
+    );
+
+    expect(text).toContain("International Space Station");
+    expect(text).toContain("nasa.gov");
+  });
+
+  test("the link is a link, and opens the operator's own page", () => {
+    const markup = renderToStaticMarkup(card({ "STARLINK-1234": detail() }));
+
+    expect(markup).toContain('role="link"');
+    expect(markup).toContain('aria-label="Open starlink.com"');
+  });
+
+  test("an object with no page to open says its piece without a dead link", () => {
+    // A link is worth a tap only if it lands on the people who fly the thing.
+    const text = textOf(
+      card({ "GJZ 01": detail({ name: "GJZ 01", noradId: 57489, category: "EARTH" }) })
+    );
+
+    expect(text).toContain("remote-sensing");
+    expect(text).not.toContain("↗");
+  });
+
   test("a satellite that has set is below the horizon, not at a negative angle", () => {
     // The card outlives the pass it was opened on, and keeps answering.
     const text = textOf(
@@ -140,6 +180,7 @@ describe("the tapped satellite's card", () => {
       card({
         ASTRA: detail({
           name: "ASTRA",
+          noradId: 28526,
           parked: true,
           rangeKm: 38200,
           altitudeKm: 35786,
@@ -168,9 +209,13 @@ describe("the tapped satellite's card", () => {
     // to drill into would charge every tap for the case where two overlapped.
     const markup = renderToStaticMarkup(
       card({
-        ISS: detail({ name: "ISS", category: "LANDMARK" }),
-        "PROGRESS-MS 27": detail({ name: "PROGRESS-MS 27", category: "LANDMARK" }),
-        "SOYUZ-MS 26": detail({ name: "SOYUZ-MS 26", category: "LANDMARK" })
+        ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" }),
+        "PROGRESS-MS 27": detail({
+          name: "PROGRESS-MS 27",
+          noradId: 61454,
+          category: "LANDMARK"
+        }),
+        "SOYUZ-MS 26": detail({ name: "SOYUZ-MS 26", noradId: 61443, category: "LANDMARK" })
       })
     );
 
@@ -185,8 +230,13 @@ describe("the tapped satellite's card", () => {
   test("describes whichever of the cluster is selected", () => {
     const names = ["ISS", "SOYUZ-MS 26"];
     const details = {
-      ISS: detail({ name: "ISS", category: "LANDMARK", rangeKm: 431 }),
-      "SOYUZ-MS 26": detail({ name: "SOYUZ-MS 26", category: "LANDMARK", rangeKm: 433 })
+      ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK", rangeKm: 431 }),
+      "SOYUZ-MS 26": detail({
+        name: "SOYUZ-MS 26",
+        noradId: 61443,
+        category: "LANDMARK",
+        rangeKm: 433
+      })
     };
 
     expect(textOf(card(details, names, "SOYUZ-MS 26"))).toContain("433 km");

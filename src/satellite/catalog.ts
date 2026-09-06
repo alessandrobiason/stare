@@ -1,11 +1,13 @@
 import { startSlicing } from "../timeSlice";
 import { Tle } from "../types";
 import { isUsableSatrec, parseTle, SatRec } from "./propagator";
-import { SatelliteCategory } from "./categories";
+import { noradId, SatelliteCategory } from "./categories";
 
 /** One catalog entry, ready to propagate. */
 export type CatalogEntry = {
   name: string;
+  /** The catalogue number, read off the elements. See `SatelliteDetail`. */
+  noradId: number;
   category: SatelliteCategory;
   parked: boolean;
   satrec: SatRec;
@@ -18,7 +20,13 @@ function toEntry(tle: Tle): CatalogEntry | null {
     // twoline2satrec signals malformed elements through its return value
     // rather than throwing; dropping them here keeps the hot loop simple.
     if (!isUsableSatrec(satrec)) return null;
-    return { name: tle.name, category: tle.category, parked: tle.parked, satrec };
+    return {
+      name: tle.name,
+      noradId: noradId(tle.line1),
+      category: tle.category,
+      parked: tle.parked,
+      satrec
+    };
   } catch {
     // Unparseable entry: drop it rather than failing the whole catalog.
     return null;
