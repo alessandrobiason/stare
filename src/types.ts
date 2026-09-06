@@ -87,6 +87,15 @@ export type SatelliteFix = {
 export type SatelliteDetail = {
   /** The catalog's name for it, which is what the marker is keyed by. */
   name: string;
+  /**
+   * Its catalogue number, which is the key its description is written against.
+   *
+   * Names are the wrong key for that for the reason `categories.ts` gives —
+   * the catalogue calls Hubble `HST` and renames a crew ferry every mission —
+   * so the objects worth describing individually are recognised by the one
+   * identifier that outlives them. See `briefingFor`.
+   */
+  noradId: number;
   category: SatelliteCategory;
   /** Holds station over the equator, which is why its orbit takes a day. */
   parked: boolean;

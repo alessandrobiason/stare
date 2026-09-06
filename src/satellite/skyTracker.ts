@@ -206,6 +206,7 @@ export class SkyTracker {
 
     return {
       name: tracked.entry.name,
+      noradId: tracked.entry.noradId,
       category: tracked.entry.category,
       parked: tracked.entry.parked,
       rangeKm: rangeKm(enu),

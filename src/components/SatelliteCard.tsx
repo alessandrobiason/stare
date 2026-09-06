@@ -1,5 +1,6 @@
 import React, { MutableRefObject, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { briefingFor } from "../satellite/briefing";
 import { CATEGORY_LABELS } from "../satellite/categories";
 import { SatelliteDetail } from "../types";
 import { cssColor, MarkerPalette } from "./palette";
@@ -41,9 +42,17 @@ const SAMPLE_INTERVAL_MS = 500;
  *
  * The overlay's four channels answer "what is it for" and "how far away", and
  * for a couple of dozen landmarks "what is it called". This is the rest of the
- * answer for the one object someone asked about: its name, its purpose, how far
- * away and how high it is, how fast it is going, where to look for it, and how
- * long it takes to come round again.
+ * answer for the one object someone asked about: what it is and who flies it,
+ * where to read more about it, its purpose, how far away and how high it is,
+ * how fast it is going, where to look for it, and how long it takes to come
+ * round again.
+ *
+ * **The description comes first, above the figures.** Someone who has just
+ * tapped a light in the sky is asking what it is, not how many kilometres away
+ * it is; the numbers only mean something once the object has a name and a job.
+ * The text is written per object for the landmarks and per fleet for everything
+ * else, and it carries the operator's own page where there is one — see
+ * `briefingFor`.
  *
  * **A tap over a cluster.** The sky puts markers on top of each other, so a tap
  * frequently means several satellites at once. The alternatives were a pair of
@@ -72,6 +81,10 @@ export const SatelliteCard: React.FC<Props> = ({
   const [detail, setDetail] = useState<SatelliteDetail | null>(() =>
     describeRef.current(selected)
   );
+
+  // Resolved on each render rather than memoised: it is a walk down a list of
+  // name patterns, against a card that re-renders twice a second.
+  const briefing = detail ? briefingFor(detail) : null;
 
   useEffect(() => {
     setDetail(describeRef.current(selected));
@@ -149,6 +162,13 @@ export const SatelliteCard: React.FC<Props> = ({
         </Pressable>
       </View>
 
+      {briefing && (
+        <View style={styles.briefing}>
+          <Text style={styles.briefingText}>{briefing.text}</Text>
+          {briefing.url && <OfficialSite url={briefing.url} />}
+        </View>
+      )}
+
       {detail ? (
         <View style={styles.facts}>
           <Fact label="Distance" value={kilometres(detail.rangeKm)} />
@@ -165,6 +185,38 @@ export const SatelliteCard: React.FC<Props> = ({
     </View>
   );
 };
+
+/**
+ * The operator's own page for this object, as a link out of the app.
+ *
+ * Labelled with the site it opens rather than with the words "official site",
+ * because the domain is the useful half: `nasa.gov` and `starlink.com` say who
+ * is being asked, which is the whole reason a link is worth a tap. Failures are
+ * swallowed — a device with nothing able to open a URL is not a reason to
+ * unhandle a rejection over a camera view.
+ */
+const OfficialSite: React.FC<{ url: string }> = ({ url }) => (
+  <Pressable
+    accessibilityRole="link"
+    accessibilityLabel={`Open ${siteOf(url)}`}
+    style={styles.site}
+    onPress={() => {
+      void Linking.openURL(url).catch(() => undefined);
+    }}
+  >
+    <Text numberOfLines={1} style={styles.siteLabel}>
+      {siteOf(url)} ↗
+    </Text>
+  </Pressable>
+);
+
+/**
+ * The host a link goes to, without the scheme or a leading `www.` — what a
+ * person would say the site is called.
+ */
+function siteOf(url: string): string {
+  return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+}
 
 /** One figure and what it is. */
 const Fact: React.FC<{ label: string; value: string }> = ({ label, value }) => (
@@ -316,6 +368,28 @@ const styles = StyleSheet.create({
     color: theme.color.textDim,
     fontSize: 13,
     fontWeight: "700"
+  },
+  briefing: {
+    paddingHorizontal: 10,
+    paddingTop: 7
+  },
+  briefingText: {
+    color: theme.color.text,
+    fontSize: 11.5,
+    // Prose rather than a figure, so it is set to be read: looser lines than
+    // the label-and-number rows under it.
+    lineHeight: 16
+  },
+  site: {
+    // A thumb-sized target, like every other control on the sky.
+    minHeight: 30,
+    justifyContent: "center"
+  },
+  siteLabel: {
+    color: theme.color.textBright,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3
   },
   facts: {
     paddingHorizontal: 10,
