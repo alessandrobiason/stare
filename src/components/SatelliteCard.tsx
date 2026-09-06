@@ -1,0 +1,353 @@
+import React, { MutableRefObject, useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { CATEGORY_LABELS } from "../satellite/categories";
+import { SatelliteDetail } from "../types";
+import { cssColor, MarkerPalette } from "./palette";
+import { theme } from "./theme";
+
+type Props = {
+  /**
+   * Every satellite the tap covered, nearest to it first. One name is the
+   * ordinary case; a cluster is why this is a list. See `markersUnder`.
+   */
+  names: string[];
+  /** Which of them is being described, and ringed on the frame. */
+  selected: string;
+  onSelect: (name: string) => void;
+  onClose: () => void;
+  /**
+   * Reads the newest figures for a name, on this card's own slow timer.
+   *
+   * A ref, so the card keeps sampling across a re-render without resubscribing,
+   * and so the lookup can close over the current epoch without the card knowing
+   * what an epoch is. Returns `null` for a name the catalog no longer carries.
+   */
+  describeRef: MutableRefObject<(name: string) => SatelliteDetail | null>;
+  /** The colours the sky is drawn in, so the swatch is the mark on the frame. */
+  palette: MarkerPalette;
+};
+
+/**
+ * How often the figures are re-read.
+ *
+ * The same reasoning as the debug panel's, and the same answer: everything here
+ * moves continuously, and nobody reads a card sixty times a second. Twice a
+ * second is faster than the eye and costs one propagation of one satellite.
+ */
+const SAMPLE_INTERVAL_MS = 500;
+
+/**
+ * What a tapped satellite is, at the bottom of the screen.
+ *
+ * The overlay's four channels answer "what is it for" and "how far away", and
+ * for a couple of dozen landmarks "what is it called". This is the rest of the
+ * answer for the one object someone asked about: its name, its purpose, how far
+ * away and how high it is, how fast it is going, where to look for it, and how
+ * long it takes to come round again.
+ *
+ * **A tap over a cluster.** The sky puts markers on top of each other, so a tap
+ * frequently means several satellites at once. The alternatives were a pair of
+ * arrows through them or a list to drill into, and both hide the thing being
+ * chosen between: an arrow says "next" without saying next *what*, and a list
+ * costs a tap on every satellite to answer for the one case where two
+ * overlapped. So the names are laid out as a strip of chips — every candidate
+ * visible at once, one tap to switch, the selected one lit — and the sky rings
+ * whichever is selected (`SelectionRing`), which is what ties a name back to
+ * the mark it belongs to. With a single satellite under the finger there is
+ * nothing to choose between and the strip is not drawn at all.
+ *
+ * The figures keep updating while the card is open, because they are all
+ * moving: a low pass halves its range and crosses forty degrees of sky in the
+ * time it takes to read about it. They are read on a slow timer rather than
+ * from the frame loop — see `SkyTracker.describe`.
+ */
+export const SatelliteCard: React.FC<Props> = ({
+  names,
+  selected,
+  onSelect,
+  onClose,
+  describeRef,
+  palette
+}) => {
+  const [detail, setDetail] = useState<SatelliteDetail | null>(() =>
+    describeRef.current(selected)
+  );
+
+  useEffect(() => {
+    setDetail(describeRef.current(selected));
+    const handle = setInterval(
+      () => setDetail(describeRef.current(selected)),
+      SAMPLE_INTERVAL_MS
+    );
+    return () => clearInterval(handle);
+  }, [describeRef, selected]);
+
+  return (
+    <View style={styles.sheet} accessibilityLabel="Satellite details">
+      {names.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.strip}
+          contentContainerStyle={styles.stripContent}
+        >
+          {names.map((name) => {
+            const on = name === selected;
+            return (
+              <Pressable
+                key={name}
+                // A tab, which is what this is: one panel of figures, and a
+                // strip of names deciding whose. The debug pages are built the
+                // same way, and it is the role that carries "selected".
+                accessibilityRole="tab"
+                // The `aria-` form rather than `accessibilityState`, which is
+                // what actually reaches the DOM under react-native-web — the
+                // category filter's `aria-expanded` is the same story.
+                aria-selected={on}
+                style={[styles.chip, on && styles.chipOn]}
+                onPress={() => onSelect(name)}
+              >
+                <Text numberOfLines={1} style={[styles.chipLabel, on && styles.chipLabelOn]}>
+                  {name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      <View style={styles.header}>
+        <View style={styles.heading}>
+          <Text numberOfLines={1} style={styles.name}>
+            {selected}
+          </Text>
+          {detail && (
+            <View style={styles.purpose}>
+              <View
+                style={[
+                  styles.swatch,
+                  {
+                    backgroundColor: palette.categories[detail.category],
+                    borderColor: cssColor(palette.outline)
+                  }
+                ]}
+              />
+              <Text numberOfLines={1} style={styles.purposeLabel}>
+                {CATEGORY_LABELS[detail.category]}
+                {detail.parked ? " · HOLDS STATION" : ""}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close satellite details"
+          style={styles.close}
+          onPress={onClose}
+        >
+          <Text style={styles.closeLabel}>✕</Text>
+        </Pressable>
+      </View>
+
+      {detail ? (
+        <View style={styles.facts}>
+          <Fact label="Distance" value={kilometres(detail.rangeKm)} />
+          <Fact label="Altitude" value={kilometres(detail.altitudeKm)} />
+          <Fact label="Speed" value={`${detail.speedKmPerSecond.toFixed(1)} km/s`} />
+          <Fact label="Look" value={lookDirection(detail)} />
+          <Fact label="Orbit" value={orbitPeriod(detail.orbitPeriodMinutes)} />
+        </View>
+      ) : (
+        // The catalog is reloaded every couple of hours and objects leave it —
+        // an honest gap, rather than a card of dashes that looks like a fault.
+        <Text style={styles.missing}>This satellite has left the catalog.</Text>
+      )}
+    </View>
+  );
+};
+
+/** One figure and what it is. */
+const Fact: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <View style={styles.fact}>
+    <Text style={styles.factLabel}>{label}</Text>
+    <Text numberOfLines={1} style={styles.factValue}>
+      {value}
+    </Text>
+  </View>
+);
+
+/**
+ * A distance in kilometres, grouped for reading.
+ *
+ * Whole kilometres throughout: the figures run from a few hundred to the
+ * thirty-six thousand of the geostationary belt, and a satellite's own position
+ * moves by kilometres between two frames of this card anyway.
+ */
+function kilometres(value: number): string {
+  return `${Math.round(value).toString().replace(GROUPS, ",")} km`;
+}
+
+/** Thousands, from the right: 35786 -> 35,786. */
+const GROUPS = /\B(?=(\d{3})+(?!\d))/g;
+
+/**
+ * Where to point yourself: the compass bearing, and how far up from there.
+ *
+ * The bearing is given as a compass point as well as a number, because a number
+ * on its own is only useful to someone already holding a compass — and the
+ * elevation is worded rather than signed, since a satellite that has set is
+ * below the horizon rather than at a negative angle.
+ */
+function lookDirection({ azimuthDeg, elevationDeg }: SatelliteDetail): string {
+  const bearing = `${compassPoint(azimuthDeg)} ${Math.round(azimuthDeg)}°`;
+  return elevationDeg >= 0
+    ? `${bearing} · ${Math.round(elevationDeg)}° up`
+    : `${bearing} · ${Math.round(-elevationDeg)}° below`;
+}
+
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+/** The eight-point compass direction a bearing falls in. */
+function compassPoint(azimuthDeg: number): string {
+  const sector = Math.round(azimuthDeg / 45) % COMPASS.length;
+  return COMPASS[(sector + COMPASS.length) % COMPASS.length];
+}
+
+/**
+ * How long one orbit takes, in the units that make it readable: minutes for
+ * anything in low orbit, hours and minutes once a period runs past a couple of
+ * hours — a geostationary object comes out at a day, which is the whole reason
+ * it appears to hold still.
+ */
+function orbitPeriod(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return "—";
+  if (minutes < 120) return `${Math.round(minutes)} min`;
+  const whole = Math.round(minutes);
+  return `${Math.floor(whole / 60)}h ${whole % 60}m`;
+}
+
+const SWATCH_SIZE = 10;
+
+const styles = StyleSheet.create({
+  sheet: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    // Clear of the debug toggle, which keeps its corner whatever else is open.
+    bottom: 58,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.color.divider,
+    backgroundColor: theme.color.panel,
+    overflow: "hidden"
+  },
+  strip: {
+    flexGrow: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.divider
+  },
+  stripContent: {
+    padding: 6,
+    gap: 6
+  },
+  chip: {
+    // A thumb-sized target, like every other control on the sky.
+    minHeight: 30,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    backgroundColor: theme.color.control
+  },
+  chipOn: {
+    backgroundColor: theme.color.controlActive
+  },
+  chipLabel: {
+    color: theme.color.textDim,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.4
+  },
+  chipLabelOn: {
+    color: theme.color.textBright
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingLeft: 10,
+    paddingTop: 8,
+    gap: 8
+  },
+  heading: {
+    flex: 1
+  },
+  name: {
+    color: theme.color.textBright,
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.4
+  },
+  purpose: {
+    marginTop: 3,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  swatch: {
+    width: SWATCH_SIZE,
+    height: SWATCH_SIZE,
+    borderRadius: SWATCH_SIZE / 2,
+    marginRight: 7,
+    // Rimmed like the marks on the sky are; the colour comes from the palette.
+    borderWidth: 1.5
+  },
+  purposeLabel: {
+    flex: 1,
+    color: theme.color.textFaint,
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.6
+  },
+  close: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  closeLabel: {
+    color: theme.color.textDim,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  facts: {
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 9
+  },
+  fact: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 2
+  },
+  factLabel: {
+    color: theme.color.textFaint,
+    fontSize: 10,
+    letterSpacing: 0.3
+  },
+  factValue: {
+    flexShrink: 1,
+    color: theme.color.text,
+    fontSize: 12,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
+  },
+  missing: {
+    paddingHorizontal: 10,
+    paddingTop: 4,
+    paddingBottom: 10,
+    color: theme.color.textDim,
+    fontSize: 11
+  }
+});
+
+export default SatelliteCard;

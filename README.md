@@ -15,6 +15,19 @@ colour for purpose (five categories), shape for whether the object holds station
 just covered), size for range on a log scale from 400 km to 40,000 km, and a
 label, spent only on a couple of dozen landmarks.
 
+**Tap a marker and it says what it is.** The overlay's channels answer "what is
+it for" and "how far away", and for a couple of dozen landmarks "what is it
+called"; a tap fills in the rest for the one object asked about — name, purpose,
+distance, altitude, speed, where to look for it, and how long its orbit takes.
+A fingertip covers a good deal more sky than an eight-pixel marker, so the
+target is the finger's size rather than the mark's, and a tap that covers
+several satellites — the geostationary belt is a line of markers a few pixels
+apart, and crew vehicles sit on the station they are docked to — offers all of
+them as a strip of names, with the sky ringing whichever one is being read about
+(`src/components/markerHitTest.ts`, `SatelliteCard`). The figures keep up while
+the card is open, because they are all moving: a low pass halves its range in
+the time it takes to read them.
+
 Every mark is a coloured core inside a contrasting rim, because a photograph of
 the sky is either far brighter or far darker than any fill. Which way round that
 runs follows the sun: with it down the marks are light in a dark rim, with it up
@@ -47,6 +60,7 @@ satellites → screen positions → markers, composited over the camera picture.
 | Occlusion: SegFormer sky mask, horizon-capped, aimed at the sky | `src/vision/` |
 | Drawn at display rate, every marker in one canvas | `src/components/markerScene.ts`, `SatelliteMarkers` |
 | Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
+| A tap back into the sky: which markers, and what they are | `src/components/markerHitTest.ts`, `SkyTracker.describe` |
 
 **Boot is all-or-nothing** (`src/boot/`). Before the view opens it must have the
 catalog, the sensors, a GPS fix, magnetic declination, camera permission and the
@@ -157,7 +171,10 @@ subscription (`useSmoothedOrientation`); drawn frames reach the overlay the same
 way (`MarkerSource`), so the component that draws is the only thing that renders
 at display rate — the camera picture, the legend and the debug panel above it do
 not. The epoch, the frame rate and the debug figures live in refs, and the
-marker count is published four times a second rather than per frame.
+marker count is published four times a second rather than per frame. A tap is
+the same idea from the other end: it reads the newest drawn frame out of a ref
+to work out what is under the finger, and the card it opens re-reads its figures
+twice a second, so neither costs the view a render per frame.
 
 ### Layout
 

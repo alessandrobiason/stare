@@ -4,8 +4,10 @@ import {
   eciToEnu,
   eciToEnuInFrame,
   elevationDeg,
+  geodeticAltitudeKm,
   gmstAt,
-  isAboveHorizon
+  isAboveHorizon,
+  rangeKm
 } from "../src/coordinates/transform";
 import { ObserverLocation } from "../src/types";
 
@@ -28,6 +30,39 @@ test("azimuth is measured clockwise from north", () => {
   expect(azimuthDeg({ east: 0, north: 1, up: 0 })).toBeCloseTo(0);
   expect(azimuthDeg({ east: 1, north: 0, up: 0 })).toBeCloseTo(90);
   expect(azimuthDeg({ east: -1, north: 0, up: 0 })).toBeCloseTo(-90);
+});
+
+test("measures range from the observer's local frame, in kilometres", () => {
+  // ENU is metres; a satellite 550 km straight up is 550 km away.
+  expect(rangeKm({ east: 0, north: 0, up: 550_000 })).toBeCloseTo(550, 6);
+  expect(rangeKm({ east: 3_000, north: 4_000, up: 0 })).toBeCloseTo(5, 6);
+});
+
+test("altitude is height above the ellipsoid, not distance from the observer", () => {
+  // A point straight up from the observer: the two agree there, and nowhere
+  // else. 500 km up, so `rangeKm` and the altitude are both about 500.
+  const gmst = gmstAt(when);
+  const frame = createObserverFrame(observer);
+  const scale = 1 + 500 / 6371;
+  const overheadEcef = {
+    x: frame.ecef.x * scale,
+    y: frame.ecef.y * scale,
+    z: frame.ecef.z * scale
+  };
+  const cos = Math.cos(gmst);
+  const sin = Math.sin(gmst);
+  const overheadEci = {
+    x: overheadEcef.x * cos - overheadEcef.y * sin,
+    y: overheadEcef.x * sin + overheadEcef.y * cos,
+    z: overheadEcef.z
+  };
+
+  expect(geodeticAltitudeKm(overheadEci, gmst)).toBeCloseTo(500, 0);
+
+  // Away from the zenith they part company: the same orbit seen near the
+  // horizon is far further away than it is high.
+  const range = rangeKm(eciToEnuInFrame(eci, gmst, frame));
+  expect(geodeticAltitudeKm(eci, gmst)).toBeLessThan(range);
 });
 
 test("elevation is measured up from the local horizontal", () => {

@@ -2,7 +2,14 @@ import React, { useLayoutEffect, useRef } from "react";
 import { MarkerSource, useMarkerFrames } from "../hooks/useAnimatedMarkers";
 import { MarkerLabels } from "./MarkerLabels";
 import { FrameSize } from "./markerGeometry";
-import { buildMarkerScene, Circle, GlyphShape, MarkerScene, TailShape } from "./markerScene";
+import {
+  buildMarkerScene,
+  Circle,
+  GlyphShape,
+  MarkerScene,
+  SelectionRing,
+  TailShape
+} from "./markerScene";
 import { Ink, MarkerPalette } from "./palette";
 
 type Props = {
@@ -12,6 +19,8 @@ type Props = {
   frame: FrameSize | null;
   /** Night or daylight, and the crossfade between them. See `palette.ts`. */
   palette: MarkerPalette;
+  /** The satellite being read about, ringed on the frame. See `SelectionRing`. */
+  selectedName?: string | null;
 };
 
 /**
@@ -26,10 +35,15 @@ type Props = {
  * of a marker is defined and where the tests read it from. This file, like its
  * native sibling, only knows how to fill a circle and a polygon.
  */
-export const SatelliteMarkers: React.FC<Props> = ({ markers, frame, palette }) => {
+export const SatelliteMarkers: React.FC<Props> = ({
+  markers,
+  frame,
+  palette,
+  selectedName = null
+}) => {
   const drawn = useMarkerFrames(markers);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const scene = frame ? buildMarkerScene(drawn, frame, palette) : null;
+  const scene = frame ? buildMarkerScene(drawn, frame, palette, selectedName) : null;
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -68,6 +82,24 @@ function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
   context.lineJoin = "round";
   context.lineCap = "round";
   for (const glyph of scene.glyphs) drawGlyph(context, glyph, scene.palette);
+  // Over every mark, including the ones in front of the selected satellite: a
+  // ring half hidden behind a passing dot says nothing.
+  if (scene.selection) drawSelection(context, scene.selection);
+}
+
+/** The ring that says which satellite the info card is describing. */
+function drawSelection(context: CanvasRenderingContext2D, ring: SelectionRing): void {
+  const band = (color: string, alpha: number, width: number) => {
+    context.globalAlpha = alpha;
+    context.strokeStyle = color;
+    context.lineWidth = width;
+    context.beginPath();
+    context.arc(ring.x, ring.y, Math.max(0, ring.radius), 0, TWO_PI);
+    context.stroke();
+  };
+
+  band(ring.rim.color, ring.rim.alpha * ring.alpha, ring.rimWidth);
+  band(ring.color, ring.alpha, ring.width);
 }
 
 /**

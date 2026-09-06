@@ -76,6 +76,35 @@ export type SatelliteFix = {
 };
 
 /**
+ * Everything the overlay says about one satellite when it is tapped.
+ *
+ * Resolved on demand rather than carried on every marker of every frame
+ * (`SkyTracker.describe`). The frame loop places a couple of hundred fixes
+ * sixty times a second and needs a direction and a range to do it; these are
+ * the figures a person reads at their own pace, for the one object they asked
+ * about, and none of them would have earned a place in that loop.
+ */
+export type SatelliteDetail = {
+  /** The catalog's name for it, which is what the marker is keyed by. */
+  name: string;
+  category: SatelliteCategory;
+  /** Holds station over the equator, which is why its orbit takes a day. */
+  parked: boolean;
+  /** Distance from the observer to the satellite, in kilometres. */
+  rangeKm: number;
+  /** Height above the WGS-84 ellipsoid, in kilometres: how high it orbits. */
+  altitudeKm: number;
+  /** Inertial speed, in kilometres per second. */
+  speedKmPerSecond: number;
+  /** Where to look for it: compass bearing, in degrees clockwise from north. */
+  azimuthDeg: number;
+  /** And how far up, in degrees above the horizon. Negative once it has set. */
+  elevationDeg: number;
+  /** How long one orbit takes, in minutes. */
+  orbitPeriodMinutes: number;
+};
+
+/**
  * Where and when to place satellites: the clock and the fix the markers are
  * projected against.
  *

@@ -2,18 +2,11 @@ import { SATELLITE_MARKERS } from "../src/constants";
 import {
   labellablePoints,
   markerDiameterPx,
-  rangeKm,
   trailReach
 } from "../src/components/markerGeometry";
 
 /** The recording's own frame, so pixel figures read at their design size. */
 const FRAME = { width: 720, height: 1280 };
-
-test("measures range from the observer's local frame, in kilometres", () => {
-  // ENU is metres; a satellite 550 km straight up is 550 km away.
-  expect(rangeKm({ east: 0, north: 0, up: 550_000 })).toBeCloseTo(550, 6);
-  expect(rangeKm({ east: 3_000, north: 4_000, up: 0 })).toBeCloseTo(5, 6);
-});
 
 test("shrinks the marker with the logarithm of distance", () => {
   const { nearDiameterPx, farDiameterPx, nearRangeKm, farRangeKm } = SATELLITE_MARKERS;

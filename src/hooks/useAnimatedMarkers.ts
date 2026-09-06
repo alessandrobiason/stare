@@ -6,9 +6,9 @@ import {
   projectToFrame
 } from "../camera/projection";
 import { MARKER_VISIBILITY, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
+import { rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { SatelliteCatalog } from "../satellite/catalog";
-import { rangeKm } from "../components/markerGeometry";
 import { SatelliteCategory } from "../satellite/categories";
 import { OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
@@ -110,6 +110,16 @@ export type AnimatedMarkers = {
   markerStatsRef: MutableRefObject<MarkerStats>;
   /** Smoothed display rate, in frames per second. */
   frameRateRef: MutableRefObject<number>;
+  /**
+   * The newest drawn frame, for asking where the markers are without being
+   * told sixty times a second.
+   *
+   * What a tap needs (`markersUnder`): a question asked once, about the frame
+   * that was on screen when the finger landed. Subscribed to instead, the view
+   * holding the tap handler would render at display rate — which is the whole
+   * of what `MarkerSource` exists to avoid.
+   */
+  latestFrameRef: MutableRefObject<MarkerFrame>;
   /**
    * Call on a seek: the sky jumps, so what each marker had settled on about
    * the piece of frame it was crossing no longer describes anything, and
@@ -367,7 +377,7 @@ export function useAnimatedMarkers({
     };
   }, []);
 
-  return { markers, tracker, skyMemory, markerStatsRef, frameRateRef, reset };
+  return { markers, tracker, skyMemory, markerStatsRef, frameRateRef, latestFrameRef, reset };
 }
 
 /**

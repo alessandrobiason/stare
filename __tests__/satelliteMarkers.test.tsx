@@ -28,6 +28,11 @@ function scene(markers: SatelliteMarker[], rollDeg = 0, box = FRAME) {
   return buildMarkerScene(frame, box, NIGHT_PALETTE);
 }
 
+/** The same, with one satellite selected: what a tap leaves on the frame. */
+function selectedScene(markers: SatelliteMarker[], name: string, box = FRAME) {
+  return buildMarkerScene({ markers, rollDeg: 0 }, box, NIGHT_PALETTE, name);
+}
+
 /** A tail's three corners, as points: the tip it tapers to and its head. */
 function corners(glyph: GlyphShape): { x: number; y: number }[] {
   const points = glyph.tail?.points ?? [];
@@ -214,4 +219,70 @@ test("keeps a name level with the horizon as the camera rolls", () => {
   expect(
     renderToStaticMarkup(<MarkerLabels labels={labels} rollDeg={12} palette={palette} />)
   ).toContain("rotate(-12deg)");
+});
+
+describe("the ring around a tapped satellite", () => {
+  test("is drawn on the selected marker, and on no other", () => {
+    const { selection, glyphs } = selectedScene(
+      [
+        marker({ name: "ISS", category: "LANDMARK", point: { left: 50, top: 50 } }),
+        marker({ name: "STARLINK-1234", point: { left: 20, top: 20 } })
+      ],
+      "STARLINK-1234"
+    );
+
+    expect(selection).not.toBeNull();
+    expect(selection!.x).toBeCloseTo(glyphs[1].x);
+    expect(selection!.y).toBeCloseTo(glyphs[1].y);
+  });
+
+  test("nothing is ringed until something is tapped", () => {
+    expect(scene([marker({ name: "ISS" })]).selection).toBeNull();
+    // Nor for a selection that has left the frame: the card outlives the pass,
+    // and the ring is only ever a thing on a marker that is there to ring.
+    expect(selectedScene([marker({ name: "ISS" })], "GONE").selection).toBeNull();
+  });
+
+  test("clears the mark rather than painting over it", () => {
+    // Colour, size and shape are three of the four channels a marker carries,
+    // and a selection is not allowed to cost any of them.
+    const [{ selection, glyphs }] = [selectedScene([marker({ name: "SAT" })], "SAT")];
+    const outerEdge = glyphs[0].rim.radius;
+
+    expect(selection!.radius - selection!.width / 2).toBeGreaterThan(outerEdge);
+  });
+
+  test("clears a landmark's halo too", () => {
+    const { selection, glyphs } = selectedScene(
+      [marker({ name: "ISS", category: "LANDMARK" })],
+      "ISS"
+    );
+
+    expect(selection!.radius - selection!.width / 2).toBeGreaterThan(glyphs[0].halo!);
+  });
+
+  test("is a bright band on a dark rim, like every other mark on the sky", () => {
+    // A photograph is not a background a single colour reads against, so the
+    // ring is rimmed exactly as the marks are, and flips with the day.
+    const { selection } = selectedScene([marker({ name: "SAT" })], "SAT");
+
+    expect(selection!.color).toBe(NIGHT_PALETTE.label);
+    expect(selection!.rim).toBe(NIGHT_PALETTE.outline);
+    expect(selection!.rimWidth).toBeGreaterThan(selection!.width);
+  });
+
+  test("fades with the marker it belongs to", () => {
+    // A marker crossing a roof line fades out; a ring left at full strength
+    // over it would be the one thing on the frame the mask does not reach.
+    const { selection } = selectedScene([marker({ name: "SAT", opacity: 0.4 })], "SAT");
+
+    expect(selection!.alpha).toBeCloseTo(0.4);
+  });
+
+  test("scales with the frame, as every other size does", () => {
+    const small = selectedScene([marker({ name: "SAT" })], "SAT", { width: 360, height: 640 });
+    const large = selectedScene([marker({ name: "SAT" })], "SAT", { width: 1440, height: 2560 });
+
+    expect(large.selection!.radius).toBeCloseTo(small.selection!.radius * 4);
+  });
 });

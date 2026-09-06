@@ -1,5 +1,11 @@
 import React, { MutableRefObject, useCallback, useEffect, useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, View } from "react-native";
+import {
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { FrameLens } from "../camera/projection";
 import { cachedCatalog } from "../data/tleCache";
 import {
@@ -24,6 +30,8 @@ import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
 import { DebugPanel } from "./DebugPanel";
 import { DebugToggle } from "./DebugToggle";
+import { markersUnder } from "./markerHitTest";
+import { SatelliteCard } from "./SatelliteCard";
 import { SatelliteMarkers } from "./SatelliteMarkers";
 import { SkyMaskOverlay } from "./SkyMaskOverlay";
 import { theme } from "./theme";
@@ -107,6 +115,11 @@ type Props = {
  * this holds no branches for one source or another. Two view modes: normal
  * draws the markers, debug adds the sky mask over the picture and a panel of
  * the figures behind it.
+ *
+ * The picture is also the one control the normal view has: a tap on it asks
+ * what is under the finger (`markersUnder`) and opens a card about it
+ * (`SatelliteCard`), and a tap that lands on empty sky puts the card away
+ * again.
  */
 export const SkyOverlay: React.FC<Props> = ({
   frame,
@@ -124,6 +137,7 @@ export const SkyOverlay: React.FC<Props> = ({
 }) => {
   const [fatal, setFatal] = useState<Error | null>(null);
   const [available, setAvailable] = useState<Size | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
   const onLayout = useCallback(
     ({ nativeEvent }: LayoutChangeEvent) => setAvailable(nativeEvent.layout),
     []
@@ -156,6 +170,7 @@ export const SkyOverlay: React.FC<Props> = ({
     skyMemory,
     markerStatsRef,
     frameRateRef,
+    latestFrameRef,
     reset: resetMarkers
   } = useAnimatedMarkers({
     catalog,
@@ -166,6 +181,36 @@ export const SkyOverlay: React.FC<Props> = ({
     enabledCategories,
     onVisibleCountChange: onVisibleSatelliteCountChange
   });
+
+  // What the tapped satellite is, resolved on the card's own slow timer against
+  // the epoch of whatever frame is on screen when it asks.
+  const describeRef = useLatestRef((name: string) => {
+    const { time, observer } = epochRef.current;
+    return tracker.describe(name, time, observer);
+  });
+
+  /**
+   * What a tap on the picture means: the satellites under the finger, or
+   * nothing at all.
+   *
+   * The frame is read from a ref rather than subscribed to, so this view still
+   * renders only when something it draws changes rather than sixty times a
+   * second (`latestFrameRef`). An empty answer is a real one — tapping the sky
+   * between the markers is how a card is dismissed, which is the gesture
+   * anything drawn over a photograph has to honour.
+   */
+  const onTapSky = ({ nativeEvent }: GestureResponderEvent) => {
+    const { locationX, locationY } = nativeEvent;
+    // A press raised by a keyboard rather than by a finger carries no point.
+    if (!frameStyle || !Number.isFinite(locationX) || !Number.isFinite(locationY)) return;
+
+    const hits = markersUnder(latestFrameRef.current, frameStyle, {
+      x: locationX,
+      y: locationY
+    });
+    const names = hits.map((hit) => hit.name);
+    setSelection(names.length === 0 ? null : { names, selected: names[0] });
+  };
 
   // Rebuilt on every render and read only through the ref, because the panel
   // samples it on its own slow timer rather than drawing from this render.
@@ -238,7 +283,27 @@ export const SkyOverlay: React.FC<Props> = ({
 
         {/* A subscription rather than a value: the loop publishes at display
             rate, and this view has nothing to redraw when it does. */}
-        <SatelliteMarkers markers={markers} frame={frameStyle} palette={palette} />
+        <SatelliteMarkers
+          markers={markers}
+          frame={frameStyle}
+          palette={palette}
+          selectedName={selection?.selected ?? null}
+        />
+
+        {/* The picture itself is the control: over the markers, which are drawn
+            into a canvas that takes no touches, and under every panel, which
+            are laid over this box rather than inside it. Not while the debug
+            overlays are up — there the picture is the mask's, and a card would
+            be reading out satellites over a page of figures about them. */}
+        {!debug && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Satellite markers"
+            accessibilityHint="Tap a marker to see what it is"
+            style={StyleSheet.absoluteFill}
+            onPress={onTapSky}
+          />
+        )}
       </View>
 
       <CategoryLegend
@@ -247,6 +312,17 @@ export const SkyOverlay: React.FC<Props> = ({
         onEnableAll={onEnableAll}
         palette={palette}
       />
+
+      {!debug && selection && (
+        <SatelliteCard
+          names={selection.names}
+          selected={selection.selected}
+          onSelect={(name) => setSelection({ names: selection.names, selected: name })}
+          onClose={() => setSelection(null)}
+          describeRef={describeRef}
+          palette={palette}
+        />
+      )}
 
       {debug && <DebugPanel sourceRef={debugSourceRef} onClose={onToggleDebug} />}
       <DebugToggle on={debug} onToggle={onToggleDebug} />
@@ -264,6 +340,17 @@ function describeMask(anchored: AnchoredSkyMask | null, error: string | null): s
 }
 
 type Size = { width: number; height: number };
+
+/**
+ * What a tap picked out: the satellites under the finger, and which of them is
+ * being read about.
+ *
+ * The names rather than the markers themselves, because the markers are a frame
+ * of an animation and this outlives it — the satellite goes on moving, and the
+ * card asks the tracker where it is now (`SkyTracker.describe`) rather than
+ * holding on to where it was when it was tapped.
+ */
+type Selection = { names: string[]; selected: string };
 
 /**
  * The largest box of the camera's shape that fits in `available`.

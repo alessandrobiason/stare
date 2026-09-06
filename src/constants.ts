@@ -254,6 +254,41 @@ export const SATELLITE_MARKERS = {
 } as const;
 
 /**
+ * Tapping a marker to read what it is (`src/components/markerHitTest.ts`).
+ *
+ * The overlay says what a satellite is *for* with colour and how far away it is
+ * with size, and there it stops: a couple of dozen objects carry a name and the
+ * other sixteen thousand carry none. A tap is how the rest of it is asked for,
+ * and the two figures here are what a finger makes of a sky drawn at these
+ * sizes.
+ *
+ * In layout pixels, and deliberately not scaled to the frame — unlike every
+ * size in `SATELLITE_MARKERS`, which is quoted against `DESIGN_FRAME_WIDTH_PX`.
+ * A marker is drawn smaller on a smaller frame; a fingertip is not.
+ */
+export const MARKER_SELECTION = {
+  /**
+   * How far from a marker's centre a tap still counts as hitting it.
+   *
+   * Half of the 44-point target Apple's guidelines put a floor at, which is
+   * about what a fingertip actually covers. The markers themselves are 8 to 17
+   * pixels across, so without this the far half of the catalogue would be a
+   * four-pixel radius target, and a tap would mostly be a miss.
+   */
+  tapRadiusPx: 22,
+  /**
+   * How many satellites one tap may offer to choose between.
+   *
+   * A finger over the geostationary belt covers a dozen markers, and a list
+   * that long is not a choice anyone makes — it is a scroll through names that
+   * all look alike. The nearest few to where the tap landed are the ones that
+   * were plausibly aimed at; past that, aiming more precisely is the better
+   * answer, and zooming is not a thing this view does.
+   */
+  maxCandidates: 5
+} as const;
+
+/**
  * Quiet left between sky segmentation runs, measured end-to-start rather than
  * as a rate: a pass takes roughly this long itself, so as a period it would
  * leave no gap at all. See `startSegmentationLoop`.

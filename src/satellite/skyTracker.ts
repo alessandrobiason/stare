@@ -1,13 +1,23 @@
 import { SATELLITE_MARKERS, SATELLITE_TRACKING } from "../constants";
 import {
+  azimuthDeg,
   createObserverFrame,
   eciToEnuInFrame,
   elevationDeg,
-  gmstAt
+  geodeticAltitudeKm,
+  gmstAt,
+  rangeKm
 } from "../coordinates/transform";
-import { EciPosition, EciState, ObserverLocation, SatelliteFix } from "../types";
+import { wrapDegrees360 } from "../math/angles";
+import {
+  EciPosition,
+  EciState,
+  ObserverLocation,
+  SatelliteDetail,
+  SatelliteFix
+} from "../types";
 import { CatalogEntry, SatelliteCatalog } from "./catalog";
-import { propagateStateAt } from "./propagator";
+import { orbitPeriodMinutes, propagateStateAt } from "./propagator";
 
 /** What the tracker remembers about one catalog entry between propagations. */
 type TrackedEntry = {
@@ -64,6 +74,8 @@ export class SkyTracker {
   private candidateCount = 0;
   /** Replay time of the last sweep, in epoch milliseconds. */
   private sweptAtMs = 0;
+  /** Name index for `describe`, built on first use. See `byName`. */
+  private named: Map<string, TrackedEntry> | null = null;
 
   constructor(catalog: SatelliteCatalog, minimumElevationDeg: number) {
     this.minimumElevationDeg = minimumElevationDeg;
@@ -159,6 +171,54 @@ export class SkyTracker {
     return fixes;
   }
 
+  /**
+   * Everything the overlay says about one satellite, by name.
+   *
+   * The other way into the tracker, and the slow one: `fixesAt` answers "where
+   * is everything, right now" sixty times a second, and this answers "what is
+   * that one" a couple of times a second for the single object someone has
+   * tapped. So it may do what the frame path cannot afford — propagate that
+   * object exactly rather than carrying it forward, and convert its position to
+   * a geodetic height — and the figures it returns cost nothing on any frame
+   * where nobody has asked for them.
+   *
+   * Keyed by name because that is what a placed marker carries, and what the
+   * visibility filter already treats as an object's identity. `null` for a name
+   * that is not in the catalog, or one SGP4 cannot place: a selection outlives
+   * the frame it was made on, and the catalog can be reloaded underneath it.
+   *
+   * Not a pure read, in the same way `fixesAt` is not: the propagation it runs
+   * is stored, so the next sweep starts from a state that is fresher rather
+   * than one it has to redo.
+   */
+  describe(name: string, when: Date, observer: ObserverLocation): SatelliteDetail | null {
+    const tracked = this.byName().get(name);
+    if (!tracked) return null;
+
+    const whenMs = when.getTime();
+    this.refresh(tracked, whenMs);
+    const state = tracked.state;
+    if (!state) return null;
+
+    const gmst = gmstAt(when);
+    const enu = eciToEnuInFrame(state.position, gmst, createObserverFrame(observer));
+    const { velocity } = state;
+
+    return {
+      name: tracked.entry.name,
+      category: tracked.entry.category,
+      parked: tracked.entry.parked,
+      rangeKm: rangeKm(enu),
+      altitudeKm: geodeticAltitudeKm(state.position, gmst),
+      speedKmPerSecond: Math.hypot(velocity.x, velocity.y, velocity.z),
+      // Wrapped, because a bearing is read off a compass rather than signed:
+      // due west is 270 degrees, not minus ninety.
+      azimuthDeg: wrapDegrees360(azimuthDeg(enu)),
+      elevationDeg: elevationDeg(enu),
+      orbitPeriodMinutes: orbitPeriodMinutes(tracked.entry.satrec)
+    };
+  }
+
   /** A summary of the tracker's state. Cheap: nothing here is recounted. */
   stats(): SkyTrackerStats {
     return {
@@ -167,6 +227,25 @@ export class SkyTracker {
       sweepProgress: this.tracked.length === 0 ? 1 : this.cursor / this.tracked.length,
       primed: this.primed
     };
+  }
+
+  /**
+   * The catalog by name, built the first time a satellite is tapped.
+   *
+   * Nothing on the frame path looks an object up by name, so this index is
+   * built on the first `describe` rather than in the constructor, where it
+   * would cost every launch 16,000 insertions for a screen most sessions never
+   * open. Where a name is carried by more than one entry — the catalog does not
+   * promise otherwise — the first wins, which is the entry `fixesAt` reaches
+   * first as well.
+   */
+  private byName(): Map<string, TrackedEntry> {
+    if (this.named) return this.named;
+    this.named = new Map();
+    for (const tracked of this.tracked) {
+      if (!this.named.has(tracked.entry.name)) this.named.set(tracked.entry.name, tracked);
+    }
+    return this.named;
   }
 
   /**
