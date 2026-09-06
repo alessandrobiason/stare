@@ -39,10 +39,28 @@ import { bytes, clockTime, degrees, duration, fixed, NONE, position, vector } fr
 export type DebugRow = { label: string; value: string; wrap?: boolean };
 
 /**
+ * One switch on a page: something the overlay can turn off, rather than another
+ * figure about it.
+ *
+ * The panel samples its sections on a timer, so `on` is read the same way as a
+ * row's value — the switch shows what the view is actually doing rather than
+ * what it was last told to do.
+ */
+export type DebugSwitch = { label: string; on: boolean; onToggle: () => void };
+
+/**
  * One page of the debug overlay: a tab and what it shows. Sections are what the
  * panel's menu is built from, so a scene adds a page by returning another one.
+ *
+ * `switches` are drawn above the figures, because a page's controls are what
+ * the rest of it is then reporting on.
  */
-export type DebugSection = { id: string; title: string; rows: DebugRow[] };
+export type DebugSection = {
+  id: string;
+  title: string;
+  rows: DebugRow[];
+  switches?: DebugSwitch[];
+};
 
 /**
  * Everything the overlay would show, as of now.
@@ -89,6 +107,16 @@ export type MaskDebugInput = {
   mask: AnchoredSkyMask | null;
   error: string | null;
   stats: SkySegmentationStats;
+  /**
+   * Whether the mask is being applied to the markers, and how to change that.
+   *
+   * Switching it off draws every satellite the catalogue puts above the
+   * elevation mask, over trees and walls and all — which is how a mask that is
+   * hiding the wrong ones is told apart from a sky that is genuinely that
+   * empty. The segmenter keeps running either way, so the figures below still
+   * say what it would have hidden.
+   */
+  filtering: { on: boolean; onToggle: () => void };
   /** Where the camera is aimed now, against which the mask's own aim is shown. */
   viewAttitude: CameraAttitude;
   /** How far that may drift before the loop stops waiting and takes a new pass. */
@@ -102,13 +130,22 @@ export function maskSection({
   mask: anchored,
   error,
   stats,
+  filtering,
   viewAttitude,
   chaseAtDeg,
   nowMs
 }: MaskDebugInput): DebugSection {
   const mask = anchored?.mask ?? null;
   const rows: DebugRow[] = [
-    { label: "State", value: mask ? "Ready" : error ? "Failing" : "Waiting" }
+    // What the segmenter is doing, and — when the switch above is off — that
+    // nothing is being done with the answer, so a sky full of markers over
+    // rooftops reads as the setting it is rather than as a broken mask.
+    {
+      label: "State",
+      value: `${mask ? "Ready" : error ? "Failing" : "Waiting"}${
+        filtering.on ? "" : " · not filtering"
+      }`
+    }
   ];
   if (error) rows.push({ label: "Error", value: error });
   if (mask && anchored) {
@@ -151,7 +188,14 @@ export function maskSection({
   });
   rows.push({ label: "Sky at or above", value: SKY_CONFIDENCE_THRESHOLD.toFixed(2) });
 
-  return { id: "mask", title: "MASK", rows };
+  return {
+    id: "mask",
+    title: "MASK",
+    rows,
+    switches: [
+      { label: "Hide behind terrain", on: filtering.on, onToggle: filtering.onToggle }
+    ]
+  };
 }
 
 export type SkyDebugInput = {

@@ -1,7 +1,8 @@
-import React, { MutableRefObject, useEffect, useState } from "react";
+import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { DebugSection, DebugSource } from "../debug/sections";
+import { DebugSection, DebugSource, DebugSwitch } from "../debug/sections";
 import { theme } from "./theme";
+import { Toggle } from "./Toggle";
 
 type Props = {
   /**
@@ -43,6 +44,33 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose }) =
     return () => clearInterval(handle);
   }, [sourceRef]);
 
+  /** A re-read owed to a switch that was just pressed; see `flip` below. */
+  const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (settleRef.current !== null) clearTimeout(settleRef.current);
+    },
+    []
+  );
+
+  /**
+   * Flips a switch, then re-reads the pages once the view around the panel has
+   * caught up.
+   *
+   * A switch's position belongs to the scene rather than to this panel, and the
+   * scene's state has not moved yet when the press handler returns — so left to
+   * the sampling timer, a switch would sit in its old position for up to half a
+   * second after being pressed, which reads as a control that does nothing.
+   */
+  const flip = useCallback(
+    (control: DebugSwitch) => {
+      control.onToggle();
+      if (settleRef.current !== null) clearTimeout(settleRef.current);
+      settleRef.current = setTimeout(() => setSections(sourceRef.current()), 0);
+    },
+    [sourceRef]
+  );
+
   // Falling back to the first section rather than remembering an index keeps a
   // scene that adds or drops a page from landing on an empty one.
   const active = sections.find((section) => section.id === selected) ?? sections[0];
@@ -75,6 +103,20 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose }) =
       </View>
 
       <ScrollView style={styles.rows} contentContainerStyle={styles.rowsContent}>
+        {active?.switches?.map((control) => (
+          <Pressable
+            key={control.label}
+            accessibilityRole="switch"
+            accessibilityLabel={control.label}
+            accessibilityState={{ checked: control.on }}
+            style={styles.row}
+            onPress={() => flip(control)}
+          >
+            <Text style={styles.switchLabel}>{control.label}</Text>
+            <Toggle on={control.on} />
+          </Pressable>
+        ))}
+
         {active?.rows.map((row) => (
           <View key={row.label} style={styles.row}>
             <Text style={styles.rowLabel}>{row.label}</Text>
@@ -161,6 +203,13 @@ const styles = StyleSheet.create({
   rowLabel: {
     color: theme.color.textFaint,
     fontSize: 10,
+    letterSpacing: 0.3
+  },
+  // Brighter than a figure's label: this one is a control, not a caption.
+  switchLabel: {
+    color: theme.color.text,
+    fontSize: 10,
+    fontWeight: "600",
     letterSpacing: 0.3
   },
   rowValue: {

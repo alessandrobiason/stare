@@ -29,6 +29,9 @@ const mask: AnchoredSkyMask = {
 
 const noStats = { updatedAtMs: null, lastPassMs: null, passes: 0, failures: 0 };
 
+/** The mask doing its job, which is what every page below assumes. */
+const filtering = { on: true, onToggle: () => undefined };
+
 describe("the status page", () => {
   test("carries the readouts the corner panel used to show, in order", () => {
     const section = statusSection({
@@ -64,7 +67,15 @@ describe("the status page", () => {
 describe("the mask page", () => {
   test("says the mask is still coming rather than showing a stale one", () => {
     const rows = values(
-      maskSection({ mask: null, error: null, stats: noStats, viewAttitude: level, chaseAtDeg: 6.7, nowMs: 1000 })
+      maskSection({
+        mask: null,
+        error: null,
+        stats: noStats,
+        filtering,
+        viewAttitude: level,
+        chaseAtDeg: 6.7,
+        nowMs: 1000
+      })
         .rows
     );
 
@@ -79,6 +90,7 @@ describe("the mask page", () => {
         mask,
         error: null,
         stats: { updatedAtMs: 4000, lastPassMs: 920, passes: 7, failures: 1 },
+        filtering,
         viewAttitude: { ...level, headingDeg: 12 },
         chaseAtDeg: 6.7,
         nowMs: 5500
@@ -100,12 +112,56 @@ describe("the mask page", () => {
 
   test("a failing segmenter names the failure", () => {
     const rows = values(
-      maskSection({ mask: null, error: "no backend", stats: noStats, viewAttitude: level, chaseAtDeg: 6.7, nowMs: 0 })
+      maskSection({
+        mask: null,
+        error: "no backend",
+        stats: noStats,
+        filtering,
+        viewAttitude: level,
+        chaseAtDeg: 6.7,
+        nowMs: 0
+      })
         .rows
     );
 
     expect(rows.State).toBe("Failing");
     expect(rows.Error).toBe("no backend");
+  });
+
+  test("carries the switch that stops the mask hiding anything", () => {
+    const onToggle = jest.fn();
+    const section = maskSection({
+      mask,
+      error: null,
+      stats: noStats,
+      filtering: { on: true, onToggle },
+      viewAttitude: level,
+      chaseAtDeg: 6.7,
+      nowMs: 0
+    });
+
+    expect(section.switches).toHaveLength(1);
+    expect(section.switches?.[0].on).toBe(true);
+    section.switches?.[0].onToggle();
+    expect(onToggle).toHaveBeenCalled();
+  });
+
+  test("says so when nothing is being hidden, so a crowded sky reads as a setting", () => {
+    const section = maskSection({
+      mask,
+      error: null,
+      stats: noStats,
+      filtering: { on: false, onToggle: () => undefined },
+      viewAttitude: level,
+      chaseAtDeg: 6.7,
+      nowMs: 0
+    });
+
+    // The segmenter is still running — the page goes on reporting on it — and
+    // the state row is where that difference is spelled out.
+    expect(values(section.rows).State).toBe("Ready · not filtering");
+    expect(values(section.rows)["Open sky"]).toBe("50%");
+    expect(section.switches?.[0].on).toBe(false);
   });
 });
 

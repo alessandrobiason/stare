@@ -150,6 +150,15 @@ type AnimatedMarkerOptions = {
   orientationFilterRef: MutableRefObject<OrientationFilter>;
   /** The newest mask, with the attitude it was taken at. */
   mask: AnchoredSkyMask | null;
+  /**
+   * Whether the mask is allowed to hide anything — the debug menu's switch.
+   *
+   * Off, every satellite above the elevation mask is drawn wherever it is, over
+   * trees and walls included. That is not a view of the sky, it is a view of
+   * the catalogue: what it is for is telling a mask that is hiding the wrong
+   * markers apart from a sky that has nothing in it.
+   */
+  maskFiltering: boolean;
   enabledCategories: Set<SatelliteCategory>;
   /**
    * Told how many markers are drawn: on a change, and no more often than
@@ -184,6 +193,7 @@ export function useAnimatedMarkers({
   epochRef,
   orientationFilterRef,
   mask,
+  maskFiltering,
   enabledCategories,
   onVisibleCountChange
 }: AnimatedMarkerOptions): AnimatedMarkers {
@@ -195,6 +205,7 @@ export function useAnimatedMarkers({
   const skyMemory = useMemo(() => new SkyMemory(), []);
 
   const maskRef = useLatestRef(mask);
+  const maskFilteringRef = useLatestRef(maskFiltering);
   const enabledCategoriesRef = useLatestRef(enabledCategories);
   const onVisibleCountChangeRef = useLatestRef(onVisibleCountChange);
   const previousFrameRef = useRef<number | null>(null);
@@ -241,6 +252,7 @@ export function useAnimatedMarkers({
 
       const attitude = orientationFilterRef.current.sample(now / 1000);
       const currentMask = maskRef.current;
+      const filtering = maskFilteringRef.current;
       const categories = enabledCategoriesRef.current;
       const visibility = visibilityRef.current;
       const visible: SatelliteMarker[] = [];
@@ -254,7 +266,11 @@ export function useAnimatedMarkers({
       // strength of never having looked. An empty frame is the honest answer
       // while the first mask is still coming, and a failing segmenter is a
       // fatal error rather than a quietly emptier sky.
-      if (currentMask) {
+      //
+      // Unless the mask has been switched off in the debug menu — the one case
+      // where having no answer about the sky is a decision someone made rather
+      // than one the app is still waiting on.
+      if (currentMask || !filtering) {
         // Where the mask is looking, not where the phone is: the satellite's
         // own direction is projected into the frame the mask was taken from,
         // so turning the phone moves the markers and leaves what the mask says
@@ -262,11 +278,16 @@ export function useAnimatedMarkers({
         // instead, every degree the phone turned between the shutter and this
         // frame is a degree of building the mask has in the wrong place — which
         // is a satellite drawn over a roof for as long as the next pass takes.
-        const skyTowards = skyProbe(currentMask, lens);
+        //
+        // Both are left unasked while the mask is switched off, which is what
+        // makes the switch a switch: the segmenter goes on taking passes and
+        // the memory goes on absorbing them, and neither is consulted about a
+        // marker until it is turned back on.
+        const skyTowards = currentMask && filtering ? skyProbe(currentMask, lens) : null;
         // What the passes before this one found, for the sky this one is not
         // aimed at. Resolved once per frame rather than per satellite, like the
         // probe above it.
-        const skyRemembered = skyMemory.probe(now / 1000);
+        const skyRemembered = filtering ? skyMemory.probe(now / 1000) : null;
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
@@ -295,10 +316,18 @@ export function useAnimatedMarkers({
           // sight, and it is not evidence of a building either. The filter
           // fades those out and keeps what they had decided, so they come back
           // as they were the moment a pass covers them again.
-          const live = skyTowards(fix.position);
-          const confidence = live ?? skyRemembered(fix.position);
-          if (confidence === null) unmapped += 1;
-          else if (live === null) remembered += 1;
+          //
+          // With the mask switched off, every direction is answered as open
+          // sky rather than skipping the filter outright: the markers it was
+          // hiding then fade in the way any other marker does, and switching
+          // it back on fades them out again instead of cutting them.
+          let confidence: number | null = 1;
+          if (skyTowards && skyRemembered) {
+            const live = skyTowards(fix.position);
+            confidence = live ?? skyRemembered(fix.position);
+            if (confidence === null) unmapped += 1;
+            else if (live === null) remembered += 1;
+          }
           const opacity = visibility.sample(fix.name, confidence);
           if (opacity <= MARKER_VISIBILITY.minimumDrawnOpacity) {
             occluded += 1;
@@ -354,6 +383,7 @@ export function useAnimatedMarkers({
     enabledCategoriesRef,
     epochRef,
     lens,
+    maskFilteringRef,
     maskRef,
     onVisibleCountChangeRef,
     orientationFilterRef,

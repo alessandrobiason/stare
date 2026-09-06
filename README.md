@@ -39,7 +39,13 @@ clock, so it is right in Oslo in June as well as on the equator (`src/components
 The `DEBUG` button swaps in the workings: the sky mask tinted over the picture —
 travelling with the sky it was cut from, so it slides and tilts with the
 buildings as the phone moves — and a tabbed panel (SENSORS / STATUS / MASK / SKY
-/ VIEW) sampled twice a second.
+/ VIEW) sampled twice a second. The MASK page carries a switch as well as
+figures: *Hide behind terrain* off stops the mask being applied at all, so every
+satellite above the elevation mask is drawn wherever it is — over trees, walls
+and rooftops included. That is a view of the catalogue rather than of the sky,
+and it is what tells a mask hiding the wrong markers apart from a sky that is
+genuinely that empty. The segmenter keeps running underneath, so the page goes
+on reporting what it would have hidden.
 
 The app is the whole of `src/`. `testing/` holds a replay harness that runs the
 same view in a browser against a recorded iPhone stream — that is how it is

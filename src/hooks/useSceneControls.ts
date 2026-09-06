@@ -14,6 +14,14 @@ export type SceneControls = {
    */
   debug: boolean;
   toggleDebug: () => void;
+  /**
+   * Whether the sky mask is allowed to hide markers behind terrain. On, because
+   * that is the view the app is for; the debug menu's switch is what turns it
+   * off, and with it off every satellite above the elevation mask is drawn
+   * wherever it is — over trees, walls and everything else.
+   */
+  skyMaskFiltering: boolean;
+  toggleSkyMaskFiltering: () => void;
 };
 
 /**
@@ -26,6 +34,7 @@ export function useSceneControls(): SceneControls {
     useState<Set<SatelliteCategory>>(allCategories);
   const [markerCount, setMarkerCount] = useState(0);
   const [debug, setDebug] = useState(false);
+  const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
 
   const toggleCategory = useCallback((category: SatelliteCategory) => {
     setEnabledCategories((current) => {
@@ -37,6 +46,7 @@ export function useSceneControls(): SceneControls {
 
   const enableAllCategories = useCallback(() => setEnabledCategories(allCategories()), []);
   const toggleDebug = useCallback(() => setDebug((on) => !on), []);
+  const toggleSkyMaskFiltering = useCallback(() => setSkyMaskFiltering((on) => !on), []);
 
   return {
     enabledCategories,
@@ -45,6 +55,8 @@ export function useSceneControls(): SceneControls {
     markerCount,
     setMarkerCount,
     debug,
-    toggleDebug
+    toggleDebug,
+    skyMaskFiltering,
+    toggleSkyMaskFiltering
   };
 }

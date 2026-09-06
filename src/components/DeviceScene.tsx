@@ -135,6 +135,8 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onMaskStatusChange={setMaskStatus}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
+        skyMaskFiltering={controls.skyMaskFiltering}
+        onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
         sceneDebugSections={() => [
           deviceSensorSection({
             // Read as the panel draws, since a reading no longer renders this.

@@ -100,6 +100,14 @@ type Props = {
   debug: boolean;
   onToggleDebug: () => void;
   /**
+   * Whether the sky mask hides the markers behind terrain, and how to change
+   * it. Off — the debug menu's switch — every satellite above the elevation
+   * mask is drawn, buildings and trees included, and the mask stops being
+   * drawn over the picture because it is no longer what the view is showing.
+   */
+  skyMaskFiltering: boolean;
+  onToggleSkyMaskFiltering: () => void;
+  /**
    * The scene's own debug pages, shown before the ones the view adds. Each
    * scene has a different answer to "where is this attitude coming from", and
    * that answer is most of what the overlay is for.
@@ -134,6 +142,8 @@ export const SkyOverlay: React.FC<Props> = ({
   onMaskStatusChange,
   debug,
   onToggleDebug,
+  skyMaskFiltering,
+  onToggleSkyMaskFiltering,
   sceneDebugSections
 }) => {
   const [fatal, setFatal] = useState<Error | null>(null);
@@ -179,6 +189,7 @@ export const SkyOverlay: React.FC<Props> = ({
     epochRef,
     orientationFilterRef: smoothed.filterRef,
     mask: segmentation.mask,
+    maskFiltering: skyMaskFiltering,
     enabledCategories,
     onVisibleCountChange: onVisibleSatelliteCountChange
   });
@@ -221,6 +232,7 @@ export const SkyOverlay: React.FC<Props> = ({
       mask: segmentation.mask,
       error: segmentation.error,
       stats: segmentation.statsRef.current,
+      filtering: { on: skyMaskFiltering, onToggle: onToggleSkyMaskFiltering },
       // Where the camera is aimed now, so the panel can say how far the mask
       // is from it: the one figure that says whether a pass is overdue.
       viewAttitude: smoothed.filterRef.current.sample(performance.now() / 1000),
@@ -274,7 +286,10 @@ export const SkyOverlay: React.FC<Props> = ({
       <View style={[styles.frame, frameStyle]}>
         {frame.render({ onDiscontinuity })}
 
-        {debug && segmentation.mask && (
+        {/* Not while it is switched off: the mask drawn over the picture is
+            the reason a marker is missing, and with nothing being hidden it
+            would be a red grid explaining markers that are all still there. */}
+        {debug && skyMaskFiltering && segmentation.mask && (
           <SkyMaskOverlay
             mask={segmentation.mask}
             orientationFilterRef={smoothed.filterRef}

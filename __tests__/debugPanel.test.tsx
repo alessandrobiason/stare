@@ -42,3 +42,41 @@ test("one page is shown at a time, starting with the scene's own", () => {
 test("a scene with nothing to report still renders rather than throwing", () => {
   expect(textOf(panel(() => []))).toBe("✕");
 });
+
+describe("a page's switches", () => {
+  const withSwitch: DebugSection[] = [
+    {
+      id: "mask",
+      title: "MASK",
+      rows: [{ label: "Open sky", value: "62%" }],
+      switches: [{ label: "Hide behind terrain", on: true, onToggle: () => undefined }]
+    }
+  ];
+
+  test("are drawn above the figures they govern, showing where they stand", () => {
+    const text = textOf(panel(() => withSwitch));
+
+    expect(text.indexOf("Hide behind terrain")).toBeLessThan(text.indexOf("Open sky"));
+    expect(text).toContain("ON");
+  });
+
+  test("are switches for anyone not reading the screen, not just labels", () => {
+    const markup = renderToStaticMarkup(panel(() => withSwitch));
+
+    expect(markup).toContain('role="switch"');
+    expect(markup).toContain('aria-label="Hide behind terrain"');
+  });
+
+  test("show where they stand rather than only that they exist", () => {
+    const off = withSwitch.map((section) => ({
+      ...section,
+      switches: [{ label: "Hide behind terrain", on: false, onToggle: () => undefined }]
+    }));
+
+    expect(textOf(panel(() => off))).toContain("OFF");
+  });
+
+  test("a page without any is the table of figures it always was", () => {
+    expect(textOf(panel())).not.toContain("ON");
+  });
+});
