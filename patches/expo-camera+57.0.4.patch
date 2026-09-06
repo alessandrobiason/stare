@@ -16,10 +16,20 @@ index 424294b..d3873be 100644
    override var reason: String {
      "Failed to save image: \(param)"
 diff --git a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
-index fc9a9bb..7fdfc30 100644
+index fc9a9bb..770649d 100644
 --- a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
 +++ b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
-@@ -27,6 +27,11 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+@@ -4,6 +4,9 @@ import ExpoModulesCore
+ 
+ protocol CameraPhotoCaptureDelegate: AnyObject {
+   var appContext: AppContext? { get }
++  /// The queue the session may be touched on. A view function runs on the main
++  /// actor, and `startRunning()` blocks until the capture graph is up.
++  var sessionQueue: DispatchQueue { get }
+   var previewLayer: AVCaptureVideoPreviewLayer { get }
+   var deviceOrientation: UIInterfaceOrientation { get }
+   var responsiveWhenOrientationLocked: Bool { get }
+@@ -27,6 +30,11 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
    private var photoCaptureOptions: TakePictureOptions?
    private var photoCapturedContinuation: CheckedContinuation<Any, Error>?
  
@@ -31,26 +41,81 @@ index fc9a9bb..7fdfc30 100644
    init(delegate: CameraPhotoCaptureDelegate) {
      self.captureDelegate = delegate
      super.init()
-@@ -69,6 +74,18 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+@@ -69,6 +77,20 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
      return try await withCheckedThrowingContinuation { continuation in
        photoCapturedContinuation = continuation
        photoCaptureOptions = options
 +      retriedWithPlainSettings = false
 +      firstFailure = nil
 +
-+      // A session that has been interrupted stops running and stays stopped:
-+      // nothing in this library restarted it, so every capture after the
-+      // interruption failed with AVErrorSessionNotRunning (-11803) for the life
-+      // of the view. Starting it here is what makes the camera come back.
-+      if let session = captureDelegate?.previewLayer.session, !session.isRunning {
-+        NSLog("expo-camera: session not running at capture time (interrupted=%d), starting it",
-+              session.isInterrupted ? 1 : 0)
-+        session.startRunning()
++      // This closure runs on the main actor, which is where a view's async
++      // functions are dispatched, so it is also the one place that can read the
++      // application state without a hop. A session cannot run while the app is
++      // in the background, and that is one of the interruption reasons a
++      // failure has to be able to name.
++      switch UIApplication.shared.applicationState {
++      case .active: CameraSessionDiagnostics.appState = "active"
++      case .inactive: CameraSessionDiagnostics.appState = "inactive"
++      case .background: CameraSessionDiagnostics.appState = "background"
++      @unknown default: CameraSessionDiagnostics.appState = "unknown"
 +      }
  
        let connection = photoOutput.connection(with: .video)
        let orientation = captureDelegate?.responsiveWhenOrientationLocked == true ?
-@@ -123,14 +140,40 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+@@ -104,7 +126,51 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+ 
+       photoSettings.photoQualityPrioritization = .balanced
+ 
+-      photoOutput.capturePhoto(with: photoSettings, delegate: self)
++      capture(with: photoSettings, on: photoOutput)
++    }
++  }
++
++  /// Fires the request, once the session is in a state that can serve it.
++  ///
++  /// A stopped session refuses every capture in a few milliseconds with
++  /// AVErrorSessionNotRunning (-11803), and nothing above this notices that the
++  /// cause is the session rather than the request: it looks exactly like a
++  /// camera that cannot take photographs. So a capture that arrives while the
++  /// session is stopped starts it first.
++  ///
++  /// Off the main thread, and that is the point of the hop rather than an
++  /// incidental tidiness. `startRunning()` blocks until the capture graph is
++  /// up — Apple's own guidance is that it must not be called on the main queue —
++  /// and this function is called from one, because view functions are
++  /// dispatched on the main actor. Called there it freezes the interface for as
++  /// long as the camera takes to come back.
++  ///
++  /// An interrupted session is not asked to start: that call is documented to
++  /// do nothing while the interruption lasts. The request goes out anyway, so
++  /// the failure is reported with the interruption named in it rather than
++  /// being swallowed here.
++  private func capture(with settings: AVCapturePhotoSettings, on output: AVCapturePhotoOutput) {
++    guard let session = captureDelegate?.previewLayer.session, !session.isRunning else {
++      output.capturePhoto(with: settings, delegate: self)
++      return
++    }
++
++    // Strongly, on purpose: this closure owns the only path left to the
++    // continuation this capture is waiting on, and a `weak self` that came back
++    // nil would leave the promise unresolved rather than failed.
++    let queue = captureDelegate?.sessionQueue ?? Self.processingQueue
++    queue.async {
++      if !session.isRunning {
++        if session.isInterrupted {
++          NSLog("expo-camera: session interrupted at capture time (%@), not starting it",
++                CameraSessionDiagnostics.lastInterruption)
++        } else {
++          NSLog("expo-camera: session not running at capture time, starting it")
++          CameraSessionDiagnostics.startAttempts += 1
++          session.startRunning()
++        }
++      }
++      output.capturePhoto(with: settings, delegate: self)
+     }
+   }
+ 
+@@ -123,14 +189,40 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
        return
      }
  
@@ -70,7 +135,7 @@ index fc9a9bb..7fdfc30 100644
 +        retriedWithPlainSettings = true
 +        firstFailure = describeCaptureFailure(error: error, output: output)
 +        DispatchQueue.main.async {
-+          output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
++          self.capture(with: AVCapturePhotoSettings(), on: output)
 +        }
 +        return
 +      }
@@ -95,7 +160,7 @@ index fc9a9bb..7fdfc30 100644
      // Processing a full-res still takes seconds and this callback can arrive on the main queue —
      // extract what we need from the photo, then do the heavy work off the delivery queue
      let imageData = photo.fileDataRepresentation()
-@@ -156,6 +199,64 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+@@ -156,6 +248,68 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
      }
    }
  
@@ -111,6 +176,7 @@ index fc9a9bb..7fdfc30 100644
 +    var parts = ["\(nsError.domain) \(nsError.code) \(nsError.localizedDescription)"]
 +
 +    parts.append("iOS=\(UIDevice.current.systemVersion)")
++    parts.append("app=\(CameraSessionDiagnostics.appState)")
 +
 +    if let session = captureDelegate?.previewLayer.session {
 +      parts.append("running=\(session.isRunning ? 1 : 0)")
@@ -119,6 +185,9 @@ index fc9a9bb..7fdfc30 100644
 +      parts.append("inputs=\(session.inputs.count)")
 +      parts.append("outputs=\(session.outputs.count)")
 +      parts.append("lastInterruption=\(CameraSessionDiagnostics.lastInterruption)")
++      parts.append("interruptions=\(CameraSessionDiagnostics.interruptions)")
++      parts.append("startAttempts=\(CameraSessionDiagnostics.startAttempts)")
++      parts.append("runtimeError=\(CameraSessionDiagnostics.lastRuntimeError)")
 +    }
 +    if let previewSize = captureDelegate?.previewLayer.frame.size {
 +      parts.append("preview=\(Int(previewSize.width))x\(Int(previewSize.height))")
@@ -161,10 +230,10 @@ index fc9a9bb..7fdfc30 100644
      guard let captureDelegate else {
        return .zero
 diff --git a/node_modules/expo-camera/ios/Current/CameraSessionManager.swift b/node_modules/expo-camera/ios/Current/CameraSessionManager.swift
-index 7a6568c..3e57637 100644
+index 7a6568c..ff2b9ca 100644
 --- a/node_modules/expo-camera/ios/Current/CameraSessionManager.swift
 +++ b/node_modules/expo-camera/ios/Current/CameraSessionManager.swift
-@@ -24,6 +24,27 @@ protocol CameraSessionManagerDelegate: AnyObject {
+@@ -24,6 +24,36 @@ protocol CameraSessionManagerDelegate: AnyObject {
    func configurePreviewRotation()
  }
  
@@ -176,6 +245,15 @@ index 7a6568c..3e57637 100644
 +/// task and read on a capture callback; nothing branches on it.
 +enum CameraSessionDiagnostics {
 +  nonisolated(unsafe) static var lastInterruption = "none"
++  /// How many times the session has been taken away, over the app's life.
++  nonisolated(unsafe) static var interruptions = 0
++  /// How many times anything has asked a stopped session to start.
++  nonisolated(unsafe) static var startAttempts = 0
++  /// The last `AVCaptureSessionRuntimeError`, whatever its code.
++  nonisolated(unsafe) static var lastRuntimeError = "none"
++  /// Where the app was the last time anyone looked. A session cannot run in
++  /// the background, and that is one of the five interruption reasons.
++  nonisolated(unsafe) static var appState = "unknown"
 +
 +  static func name(forReason reason: Int) -> String {
 +    switch reason {
@@ -192,7 +270,7 @@ index 7a6568c..3e57637 100644
  class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
    weak var delegate: CameraSessionManagerDelegate?
  
-@@ -34,6 +55,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+@@ -34,6 +64,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
    private var photoOutput: AVCapturePhotoOutput?
    private var videoFileOutput: AVCaptureMovieFileOutput?
    private var runtimeErrorTask: Task<Void, Never>?
@@ -200,10 +278,14 @@ index 7a6568c..3e57637 100644
  
    init(delegate: CameraSessionManagerDelegate) {
      self.delegate = delegate
-@@ -112,6 +134,11 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
-       if hasAvailableCameraDevice && !self.session.isRunning {
-         self.session.startRunning()
-       }
+@@ -109,9 +140,12 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+       return
+     }
+     if delegate.active {
+-      if hasAvailableCameraDevice && !self.session.isRunning {
+-        self.session.startRunning()
+-      }
++      startRunningPersistently()
 +      // The session is committed and running here, which is the first point at
 +      // which the deferred-delivery flags describe the configuration that will
 +      // actually be captured under. This fires just before onCameraReady, so it
@@ -212,7 +294,7 @@ index 7a6568c..3e57637 100644
      } else {
        self.session.stopRunning()
      }
-@@ -300,6 +327,48 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+@@ -300,6 +334,125 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
      session.commitConfiguration()
    }
  
@@ -229,6 +311,13 @@ index 7a6568c..3e57637 100644
 +  /// The reason is also kept, because "interrupted" is a symptom and the reason
 +  /// is the cause, and a capture failure has no other way to report it.
 +  func observeInterruptions() {
++    // The queue rather than `self`: capturing the manager inside a concurrent
++    // closure would keep it alive for as long as the notifications do, and a
++    // `DispatchQueue` is Sendable where it is not. Everything these loops need —
++    // the session, and the queue it may be touched on — is reachable without it.
++    guard let sessionQueue = delegate?.sessionQueue else {
++      return
++    }
 +    interruptionTask?.cancel()
 +    interruptionTask = Task { [weak self] in
 +      guard let session = self?.session else {
@@ -239,6 +328,7 @@ index 7a6568c..3e57637 100644
 +          named: .AVCaptureSessionWasInterrupted, object: session)
 +        for await note in notes {
 +          let raw = (note.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int) ?? -1
++          CameraSessionDiagnostics.interruptions += 1
 +          CameraSessionDiagnostics.lastInterruption = "\(raw) \(CameraSessionDiagnostics.name(forReason: raw))"
 +          NSLog("expo-camera: capture session interrupted, reason %@", CameraSessionDiagnostics.lastInterruption)
 +        }
@@ -249,8 +339,14 @@ index 7a6568c..3e57637 100644
 +        for await _ in notes {
 +          CameraSessionDiagnostics.lastInterruption += " (ended)"
 +          NSLog("expo-camera: capture session interruption ended, restarting")
-+          if !session.isRunning {
-+            session.startRunning()
++          // On the session queue, and never on this one: `startRunning` blocks
++          // until the graph is up, and this loop is also the only thing
++          // listening for the next interruption.
++          sessionQueue.async {
++            if !session.isRunning {
++              CameraSessionDiagnostics.startAttempts += 1
++              session.startRunning()
++            }
 +          }
 +        }
 +      }()
@@ -258,10 +354,96 @@ index 7a6568c..3e57637 100644
 +    }
 +  }
 +
++  /// How many times a start that did not take is asked for again, and how long
++  /// the ladder waits between rungs.
++  ///
++  /// Ten rungs at four hundred milliseconds is four seconds, which is longer
++  /// than any interruption that ends on its own and shorter than the app's own
++  /// six-second wait for the preview to report itself running.
++  static let startRetryLimit = 10
++  static let startRetryDelay = 0.4
++
++  /// Starts the session, and keeps asking while it refuses to run.
++  ///
++  /// `startRunning()` is not a request that succeeds or fails: it returns
++  /// having done nothing when the session cannot run, and the one caller in
++  /// this library never looked afterwards. A session asked to start in a
++  /// moment when the camera is not available — the app not yet foreground,
++  /// another client still holding the device, the previous view's session not
++  /// yet torn down — therefore stayed stopped for the life of the view, with a
++  /// black preview and every capture refused as AVErrorSessionNotRunning.
++  ///
++  /// So the result is read, and a start that did not take is asked for again
++  /// on a bounded ladder. An interrupted session is not asked at all — that
++  /// call is a documented no-op — but the ladder keeps running, because the
++  /// interruption may end without the notification arriving here first.
++  ///
++  /// Must be called on the session queue.
++  func startRunningPersistently(remainingAttempts: Int = CameraSessionManager.startRetryLimit) {
++    guard let delegate, delegate.active, hasAvailableCameraDevice else {
++      return
++    }
++    if session.isRunning {
++      return
++    }
++
++    if !session.isInterrupted {
++      CameraSessionDiagnostics.startAttempts += 1
++      session.startRunning()
++    }
++
++    if session.isRunning {
++      disableDeferredPhotoDelivery()
++      return
++    }
++
++    guard remainingAttempts > 1 else {
++      let diagnosis = "The capture session would not start: "
++        + "interrupted=\(session.isInterrupted ? 1 : 0), "
++        + "lastInterruption=\(CameraSessionDiagnostics.lastInterruption), "
++        + "app=\(CameraSessionDiagnostics.appState), "
++        + "attempts=\(CameraSessionDiagnostics.startAttempts), "
++        + "runtimeError=\(CameraSessionDiagnostics.lastRuntimeError)"
++      NSLog("expo-camera: %@", diagnosis)
++      // Said out loud rather than only logged. `onMountError` is the one way
++      // this library has of telling the app that the camera it is showing is
++      // not a camera, and a black preview is otherwise silent.
++      delegate.onMountError(["message": diagnosis])
++      return
++    }
++
++    delegate.sessionQueue.asyncAfter(deadline: .now() + Self.startRetryDelay) { [weak self] in
++      self?.startRunningPersistently(remainingAttempts: remainingAttempts - 1)
++    }
++  }
++
    func addErrorNotification() {
      guard let delegate else {
        return
-@@ -323,6 +392,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+@@ -309,11 +462,18 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+     runtimeErrorTask = Task {
+       let errors = NotificationCenter.default.notifications(named: .AVCaptureSessionRuntimeError, object: self.session)
+         .compactMap({ $0.userInfo?[AVCaptureSessionErrorKey] as? AVError })
+-      for await error in errors where error.code == .mediaServicesWereReset {
++      for await error in errors {
++        // Every code, not only the one that is acted on. A runtime error the
++        // library ignores is still the best explanation a later capture
++        // failure will have for why the session stopped.
++        CameraSessionDiagnostics.lastRuntimeError = "\(error.code.rawValue) \(error.localizedDescription)"
++        NSLog("expo-camera: capture session runtime error %@", CameraSessionDiagnostics.lastRuntimeError)
++
++        guard error.code == .mediaServicesWereReset else {
++          continue
++        }
+         delegate.sessionQueue.async {
+-          if !self.session.isRunning {
+-            self.session.startRunning()
+-          }
++          self.startRunningPersistently()
+           self.updateSessionAudioIsMuted()
+         }
+         delegate.onMountError(["message": "Camera session was reset"])
+@@ -323,6 +483,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
  
    deinit {
      runtimeErrorTask?.cancel()
@@ -269,7 +451,7 @@ index 7a6568c..3e57637 100644
    }
  
    var currentPhotoOutput: AVCapturePhotoOutput? { photoOutput }
-@@ -373,14 +443,48 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+@@ -373,14 +534,48 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
    }
  
    private func configureResponsiveCapture(_ photoOutput: AVCapturePhotoOutput) {
@@ -319,7 +501,7 @@ index 7a6568c..3e57637 100644
    }
  
    private func startSession() {
-@@ -417,6 +521,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+@@ -417,6 +612,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
  
      session.commitConfiguration()
      addErrorNotification()
@@ -327,3 +509,111 @@ index 7a6568c..3e57637 100644
      delegate.configurePreviewRotation()
      delegate.barcodeScanner?.maybeStartBarcodeScanning()
      enableTorch()
+diff --git a/node_modules/expo-camera/ios/Current/CameraView.swift b/node_modules/expo-camera/ios/Current/CameraView.swift
+index 4692d00..a9a7869 100644
+--- a/node_modules/expo-camera/ios/Current/CameraView.swift
++++ b/node_modules/expo-camera/ios/Current/CameraView.swift
+@@ -39,6 +39,10 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+     return mm
+   }()
+   private var isSessionPaused = false
++  /// Watches the session for actually running, so `onCameraReady` can wait for it.
++  private var readinessObservation: NSKeyValueObservation?
++  /// Whether `onCameraReady` has been sent. Read and written on the main queue only.
++  private var didReportReady = false
+ 
+   // MARK: Property Observers
+ 
+@@ -195,33 +199,75 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+       return
+     }
+     didStartSession = true
++
++    // `onCameraReady` used to be sent from here unconditionally, one queue hop
++    // after asking the session to start and without ever looking at whether it
++    // had. On a phone where the session would not start, that event was a
++    // false report of a working camera: the preview stayed black, every capture
++    // was refused as AVErrorSessionNotRunning, and the only signal that says
++    // "the camera is usable now" had already said so. Anything built on it —
++    // this app waits six seconds for it before handing the camera to its mask
++    // loop — was waiting for a promise that arrives whether or not it is true.
++    //
++    // `isRunning` is key-value observable, so the event can be sent when the
++    // session is genuinely running, whenever that turns out to be: on the first
++    // start, on a start the retry ladder eventually wins, or on an interruption
++    // ending minutes later.
++    readinessObservation = session.observe(\AVCaptureSession.isRunning, options: [.initial, .new]) { [weak self] _, _ in
++      self?.reportReadyIfRunning()
++    }
++
+     sessionQueue.async { [weak self] in
+       guard let self else {
+         return
+       }
+       self.sessionManager.updateCameraIsActive()
+-      DispatchQueue.main.async {
+-        self.onCameraReady()
++      self.reportReadyIfRunning()
++    }
++  }
++
++  /// Sends `onCameraReady`, once, and only for a session that is running.
++  private func reportReadyIfRunning() {
++    DispatchQueue.main.async { [weak self] in
++      guard let self, !self.didReportReady, self.session.isRunning else {
++        return
+       }
++      self.didReportReady = true
++      self.onCameraReady()
+     }
+   }
+ 
+   public func onAppForegrounded() {
++    CameraSessionDiagnostics.appState = "active"
+     sessionQueue.async { [weak self] in
+       guard let self else {
+         return
+       }
+-      if !session.isRunning && isSessionPaused {
+-        isSessionPaused = false
+-        session.startRunning()
+-        if torchEnabled {
+-          sessionManager.enableTorch()
+-        }
++      guard !session.isRunning else {
++        return
++      }
++      // Whenever the session is not running, and not only when this class is
++      // the one that stopped it.
++      //
++      // `isSessionPaused` is set solely by `onAppBackgrounded`, and only when
++      // the session was running at the time. A session that never started —
++      // because the first `startRunning()` landed while the app was not yet
++      // foreground, which is one of the five interruption reasons — therefore
++      // had `isSessionPaused == false` forever, and coming back to the
++      // foreground, the one event that could have fixed it, skipped it. That is
++      // a preview that is black for the life of the view and a camera that
++      // refuses every capture, from a session that is one call away from
++      // working.
++      isSessionPaused = false
++      sessionManager.startRunningPersistently()
++      if torchEnabled {
++        sessionManager.enableTorch()
+       }
+     }
+   }
+ 
+   public func onAppBackgrounded() {
++    CameraSessionDiagnostics.appState = "background"
+     sessionQueue.async { [weak self] in
+       guard let self else {
+         return
+@@ -344,6 +390,8 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+     NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
+     previewRotationObservation?.invalidate()
+     previewRotationObservation = nil
++    readinessObservation?.invalidate()
++    readinessObservation = nil
+     rotationCoordinator = nil
+   }
+ 

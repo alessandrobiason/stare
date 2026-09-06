@@ -197,7 +197,9 @@ error screen now reads
 
 ```
 Image could not be captured: <domain> <code> <description>,
-running=1, interrupted=0, preset=AVCaptureSessionPresetPhoto, preview=390x520,
+iOS=26.6.1, app=active, running=1, interrupted=0,
+preset=AVCaptureSessionPresetPhoto, preview=390x520,
+lastInterruption=none, interruptions=0, startAttempts=1, runtimeError=none,
 connection=on/active, device=Back Camera, activeFormat=4032x3024,
 maxPhotoDimensions=WxH, deferred=0, responsive=1, fastPriority=1,
 zeroShutterLag=1
@@ -208,6 +210,43 @@ Every term there separates causes that the bare string does not:
 camera; `preview=0x0` is a preview layer that was never laid out; a mismatch
 between `activeFormat` and `maxPhotoDimensions` is the settings combination
 AVFoundation refuses; and the domain and code name the rest outright.
+
+**The capture session, and the three ways `expo-camera` let it stay stopped.**
+That diagnostic came back from an iPhone 15 reading `AVFoundationErrorDomain
+-11803 Cannot Record, running=0, interrupted=1`, with the requested photo
+dimensions matching the active format exactly. -11803 is
+`AVErrorSessionNotRunning`: nothing was wrong with the request, the session was
+not running, and it never started again. Three separate defects hold it there,
+and the patch closes all three.
+
+`startRunning()` is not a call that succeeds or fails. It returns having done
+nothing when the session cannot run, and `updateCameraIsActive` — the one caller
+— never looked afterwards. A session asked to start in a moment when the camera
+is not available stayed stopped for the life of the view. It is now asked again
+on a bounded ladder, and a session that will not start after it says so through
+`onMountError` instead of showing black in silence.
+
+`AVCaptureSessionWasInterrupted` and `AVCaptureSessionInterruptionEnded` were
+not observed at all — only `AVCaptureSessionRuntimeError`, and only for
+`mediaServicesWereReset`. iOS interrupts a session for reasons that have nothing
+to do with the app, and nobody restarted it when the interruption ended. Both
+notifications are now observed, the reason is kept for the failure text as
+`lastInterruption`, and the end of an interruption restarts the session on the
+session queue.
+
+`onCameraReady` was sent unconditionally, one queue hop after asking the session
+to start and without looking at whether it had. On a phone where the session
+would not start, the only event that says "the camera is usable" said so anyway:
+the camera lab reported `onCameraReady=yes` for all 21 of the captures it then
+watched fail. It is now sent from a key-value observation on `isRunning`, so it
+arrives when the session is genuinely running and not before — on the first
+start, on a rung of the retry ladder, or on an interruption ending minutes
+later.
+
+A capture that arrives while the session is stopped starts it first, on the
+session queue. Not on the calling thread: a view's async functions are
+dispatched on the main actor, and `startRunning()` blocks until the capture
+graph is up.
 
 `postinstall` runs `patch-package --error-on-fail`, so an install whose patch no
 longer applies fails the job rather than quietly producing an unpatched binary.

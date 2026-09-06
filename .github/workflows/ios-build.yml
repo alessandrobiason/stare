@@ -84,6 +84,8 @@ jobs:
           require node_modules/expo-camera/ios/Current/CameraSessionManager.swift disableDeferredPhotoDelivery
           require node_modules/expo-camera/ios/Current/CameraSessionManager.swift observeInterruptions
           require node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift lastInterruption
+          require node_modules/expo-camera/ios/Current/CameraSessionManager.swift startRunningPersistently
+          require node_modules/expo-camera/ios/Current/CameraView.swift readinessObservation
           require node_modules/expo-camera/ios/Common/CameraExceptions.swift CameraImageCaptureDetailedException
           if [ "$missing" -ne 0 ]; then
             echo "::error::Refusing to build, the camera fix is not in the sources CocoaPods compiles"
@@ -164,6 +166,8 @@ jobs:
           require node_modules/expo-camera/ios/Current/CameraSessionManager.swift disableDeferredPhotoDelivery
           require node_modules/expo-camera/ios/Current/CameraSessionManager.swift observeInterruptions
           require node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift lastInterruption
+          require node_modules/expo-camera/ios/Current/CameraSessionManager.swift startRunningPersistently
+          require node_modules/expo-camera/ios/Current/CameraView.swift readinessObservation
           require node_modules/expo-camera/ios/Common/CameraExceptions.swift CameraImageCaptureDetailedException
           if [ "$missing" -ne 0 ]; then
             echo "::error::Refusing to build, the camera fix is not in the sources CocoaPods compiles"
