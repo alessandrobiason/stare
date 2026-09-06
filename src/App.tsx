@@ -1,3 +1,4 @@
+import { useKeepAwake } from "expo-keep-awake";
 import React from "react";
 import { SafeAreaView, StyleSheet } from "react-native";
 import { runBootSequence } from "./boot/bootSequence";
@@ -35,6 +36,22 @@ import { useIntro } from "./hooks/useIntro";
 const CAMERA_LAB = false;
 
 export default function App() {
+  /**
+   * Hold the screen on for as long as the app is open.
+   *
+   * The whole of using this is holding the phone up at the sky and reading what
+   * is drawn on it — minutes at a time without a touch — which is exactly what
+   * the idle timer reads as an idle phone. Left alone it dims and then locks
+   * mid-pass, and coming back costs the sensor fusion its settled attitude and
+   * the segmentation its current mask. The intro is inside it too: that screen
+   * is there to be read before anything is granted.
+   *
+   * This is only the *idle* timer, and only while the app is the thing on
+   * screen: the lock button still locks, and a backgrounded phone sleeps on its
+   * own schedule as it always did.
+   */
+  useKeepAwake();
+
   const intro = useIntro();
 
   if (CAMERA_LAB) {
