@@ -38,12 +38,16 @@ test("a failure shows the reason and a way to try again", () => {
   const text = textOf(
     screen({
       failed: true,
-      error: "No satellite catalogue could be downloaded, and none is cached on this device."
+      error:
+        "No satellite catalogue could be downloaded, and none is cached on this device. " +
+        "STARE gets orbital data from CelesTrak, a public satellite-tracking service — " +
+        "check your connection and try again in a few minutes."
     })
   );
 
   expect(text).toContain("Could not start");
   expect(text).toContain("none is cached on this device");
+  expect(text).toContain("CelesTrak");
   expect(text).toContain("TRY AGAIN");
 });
 
