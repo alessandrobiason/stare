@@ -14,6 +14,7 @@ import {
   REPLAY_LENS
 } from "./constants";
 import { replaySensorSection } from "./debugSections";
+import { ReplayControls } from "./ReplayControls";
 import { ReplayBootResult } from "./replayBoot";
 import { ReplayVideo } from "./ReplayVideo";
 import { usePlaybackTime } from "./usePlaybackTime";
@@ -149,6 +150,10 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
       />
 
       <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
+
+      {/* After the overlay, so the transport is over the tap target the scene
+          lays across the picture rather than under it. */}
+      <ReplayControls videoRef={videoRef} />
     </View>
   );
 };

@@ -69,7 +69,17 @@ export const SatelliteMarkers: React.FC<Props> = ({
     <>
       <canvas
         ref={canvasRef}
-        style={{ position: "absolute", left: 0, top: 0, width: frame.width, height: frame.height }}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: frame.width,
+          height: frame.height,
+          // As the Skia view has it on the phone: the marks are drawn over the
+          // picture, and the picture is what takes the tap that selects one.
+          // Without this the canvas swallows every press over the frame.
+          pointerEvents: "none"
+        }}
       />
       <MarkerLabels labels={scene.labels} rollDeg={scene.rollDeg} palette={palette} />
     </>
