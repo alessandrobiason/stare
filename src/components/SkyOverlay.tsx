@@ -111,6 +111,8 @@ type Props = {
   /** Whether the debug overlays are drawn on top of the normal view. */
   debug: boolean;
   onToggleDebug: () => void;
+  /** Whether boot reported anything degraded; tints the console toggle. */
+  warned?: boolean;
   /**
    * Whether the sky mask hides the markers behind terrain, and how to change
    * it. Off — the debug menu's switch — every satellite above the elevation
@@ -163,6 +165,7 @@ export const SkyOverlay: React.FC<Props> = ({
   onSkyFixChange,
   debug,
   onToggleDebug,
+  warned = false,
   skyMaskFiltering,
   onToggleSkyMaskFiltering,
   celestialAlignment,
@@ -392,7 +395,7 @@ export const SkyOverlay: React.FC<Props> = ({
       )}
 
       {debug && <DebugPanel sourceRef={debugSourceRef} onClose={onToggleDebug} />}
-      <DebugToggle on={debug} onToggle={onToggleDebug} />
+      <DebugToggle on={debug} onToggle={onToggleDebug} warned={warned} />
     </View>
   );
 };

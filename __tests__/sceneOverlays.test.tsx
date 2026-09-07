@@ -2,6 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
+import { DebugToggle } from "../src/components/DebugToggle";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SceneStatus } from "../src/components/SceneStatus";
@@ -66,12 +67,18 @@ describe("the marker count", () => {
       'aria-label="17 visible satellites"'
     );
   });
+});
 
-  test("a degraded boot tints the number rather than printing the warning", () => {
-    const warned = renderToStaticMarkup(<SceneStatus markerCount={0} warned />);
+describe("the console toggle", () => {
+  test("a degraded boot tints the pill rather than printing the warning", () => {
+    const warned = renderToStaticMarkup(
+      <DebugToggle on={false} onToggle={() => undefined} warned />
+    );
 
-    expect(textOf(<SceneStatus markerCount={0} warned />)).toBe("0");
-    expect(warned).not.toBe(renderToStaticMarkup(<SceneStatus markerCount={0} />));
+    expect(textOf(<DebugToggle on={false} onToggle={() => undefined} warned />)).toBe("CONSOLE");
+    expect(warned).not.toBe(
+      renderToStaticMarkup(<DebugToggle on={false} onToggle={() => undefined} />)
+    );
   });
 });
 

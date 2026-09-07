@@ -616,7 +616,7 @@ export const ORIENTATION_FILTER = {
  * screen, so a satellite drawn under it can be off the picture entirely. That
  * is not a degraded view, it is a wrong one, and it is worth a line over the
  * sky — one the phone can act on, and which goes away when it does, unlike
- * boot's warnings (see `SceneStatus`).
+ * boot's warnings (see `DebugToggle`).
  */
 export const COMPASS_ACCURACY = {
   /** At or below this level the view says the compass needs calibrating. */

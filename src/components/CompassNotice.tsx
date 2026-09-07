@@ -34,7 +34,7 @@ type Props = {
  * screen are the wrong satellites, steadily, and nothing about the view says so.
  *
  * Which is why this is a sentence over the sky where boot's warnings are not
- * (see `SceneStatus`). Those last the session and would be a permanent
+ * (see `DebugToggle`). Those last the session and would be a permanent
  * paragraph on any phone missing a sensor; this one names something the phone
  * can fix in five seconds, and takes itself away when it has been — the
  * platform regrades its compass as the figure-eight feeds its calibration.

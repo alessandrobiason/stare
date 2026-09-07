@@ -160,6 +160,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onSkyFixChange={setSkyFixStanding}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
+        warned={boot.warnings.length > 0}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
         celestialAlignment={controls.celestialAlignment}
@@ -185,7 +186,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         ]}
       />
 
-      <SceneStatus markerCount={controls.markerCount} warned={boot.warnings.length > 0} />
+      <SceneStatus markerCount={controls.markerCount} />
       <CompassNotice
         accuracy={compass.accuracy}
         declinationKnown={compass.declinationKnown}

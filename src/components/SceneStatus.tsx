@@ -5,8 +5,6 @@ import { panelStyles, theme } from "./theme";
 
 type Props = {
   markerCount: number;
-  /** Whether boot reported anything degraded; the detail is on the debug page. */
-  warned?: boolean;
 };
 
 /**
@@ -24,17 +22,15 @@ type Props = {
  * caption here would be a permanent word over the sky for the sake of the first
  * thirty seconds of the first launch. See `introPages`.
  *
- * A warning tints the number rather than printing itself here. Boot's warnings
- * last the whole session, so spelling them out means a permanent paragraph over
- * the sky on any phone missing a sensor; the tint says to go and read the
- * console's STATUS page, and costs no space.
+ * A degraded boot tints the console toggle rather than this panel — see
+ * `DebugToggle` — since that is the control that opens the page explaining it.
  */
-export const SceneStatus: React.FC<Props> = ({ markerCount, warned = false }) => (
+export const SceneStatus: React.FC<Props> = ({ markerCount }) => (
   <View
-    style={[panelStyles.panel, styles.status, warned && styles.warned]}
+    style={[panelStyles.panel, styles.status]}
     accessibilityLabel={fill(strings().scene.visibleSatellites, { count: markerCount })}
   >
-    <Text style={[styles.count, warned && styles.countWarned]}>{markerCount}</Text>
+    <Text style={styles.count}>{markerCount}</Text>
   </View>
 );
 
@@ -49,18 +45,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: "rgba(0, 0, 0, 0.4)"
   },
-  warned: {
-    borderWidth: 1,
-    borderColor: theme.color.warning
-  },
   count: {
     color: theme.color.textBright,
     fontSize: 18,
     fontWeight: "700",
     fontVariant: ["tabular-nums"]
-  },
-  countWarned: {
-    color: theme.color.warning
   }
 });
 

@@ -116,6 +116,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onMaskStatusChange={setMaskStatus}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
+        warned={boot.warnings.length > 0}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
         celestialAlignment={controls.celestialAlignment}
@@ -147,7 +148,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         }}
       />
 
-      <SceneStatus markerCount={controls.markerCount} warned={boot.warnings.length > 0} />
+      <SceneStatus markerCount={controls.markerCount} />
     </View>
   );
 };
