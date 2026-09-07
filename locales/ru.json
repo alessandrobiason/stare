@@ -1,0 +1,4 @@
+{
+  "NSCameraUsageDescription": "Stare рисует спутники на небе перед вами.",
+  "NSLocationWhenInUseUsageDescription": "Stare нужно ваше местоположение, чтобы определить, какие спутники у вас над головой."
+}

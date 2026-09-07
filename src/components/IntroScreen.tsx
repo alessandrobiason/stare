@@ -9,7 +9,7 @@ import {
   Text,
   View
 } from "react-native";
-import { INTRO_PAGES, introButtonLabel } from "../onboarding/introPages";
+import { introButtonLabel, introPages } from "../onboarding/introPages";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
@@ -40,6 +40,9 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   const [frame, setFrame] = useState<FrameSize | null>(null);
   const [page, setPage] = useState(0);
   const pager = useRef<ScrollView>(null);
+  // The locale cannot change while the app is open (`activeLocale`), so the
+  // pages are read once rather than rebuilt on every swipe.
+  const [pages] = useState(introPages);
 
   const measure = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -61,7 +64,7 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   );
 
   const advance = useCallback(() => {
-    if (page >= INTRO_PAGES.length - 1) {
+    if (page >= pages.length - 1) {
       onDone();
       return;
     }
@@ -70,13 +73,13 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
     // The state above is what the dots and the label read; this is only the
     // pager catching up with them.
     pager.current?.scrollTo({ x: next * (frame?.width ?? 0), y: 0, animated: true });
-  }, [frame, onDone, page]);
+  }, [frame, onDone, page, pages]);
 
   return (
     <View style={styles.root} onLayout={measure}>
       <BootSky frame={frame} turning />
 
-      {INTRO_PAGES[page]?.wordmark && (
+      {pages[page]?.wordmark && (
         <View style={styles.wordmarkLayer} pointerEvents="none">
           <Text style={styles.wordmark}>STARE</Text>
         </View>
@@ -92,11 +95,41 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
             onMomentumScrollEnd={settled}
             style={styles.pager}
           >
-            {INTRO_PAGES.map((content, index) => (
+            {pages.map((content, index) => (
               <View key={index} style={[styles.page, { width: frame.width }]}>
-                <View style={styles.card}>
+                {/* The card scrolls if it has to. Its height is four
+                    translated paragraphs plus a title, and the longest of the
+                    twelve languages comes within a few points of a 667pt
+                    screen — bottom-aligned, a page that outgrew the screen
+                    would walk off the top of it with no way to reach the rest.
+                    `flexShrink` is what caps it at the space available; with
+                    room to spare it still sizes to its own content and stays
+                    a card at the foot of the sky. */}
+                <ScrollView
+                  style={styles.card}
+                  contentContainerStyle={styles.cardContent}
+                  showsVerticalScrollIndicator={false}
+                >
                   {content.title ? <Text style={styles.title}>{content.title}</Text> : null}
                   <Text style={styles.body}>{content.body}</Text>
+
+                  {content.elements?.map((element) => (
+                    <View key={element.where} style={styles.element}>
+                      {/* The badge as the real screen wears it, so the row is
+                          a key to the panel rather than a description of it.
+                          Fixed width, so four rows of very different badges
+                          still line their text up. */}
+                      <View style={styles.badge}>
+                        <Text numberOfLines={1} style={styles.badgeLabel}>
+                          {element.badge}
+                        </Text>
+                      </View>
+                      <View style={styles.elementText}>
+                        <Text style={styles.elementWhere}>{element.where}</Text>
+                        <Text style={styles.elementMeaning}>{element.meaning}</Text>
+                      </View>
+                    </View>
+                  ))}
 
                   {content.access?.map((access) => (
                     <View key={access.name} style={styles.access}>
@@ -108,14 +141,14 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
                   {content.footnote ? (
                     <Text style={styles.footnote}>{content.footnote}</Text>
                   ) : null}
-                </View>
+                </ScrollView>
               </View>
             ))}
           </ScrollView>
 
           <View style={styles.footer}>
             <View style={styles.dots}>
-              {INTRO_PAGES.map((_, index) => (
+              {pages.map((_, index) => (
                 <View
                   key={index}
                   style={[styles.dot, index === page && styles.dotHere]}
@@ -174,7 +207,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20
   },
   card: {
-    padding: 20,
+    // Sizes to its content, and no further than the space the pager leaves —
+    // see the comment where it is used.
+    flexGrow: 0,
+    flexShrink: 1,
     borderRadius: 16,
     // Nearly opaque, where the heads-up panels are not. Those are laid over a
     // camera picture someone is trying to see past them; this one is laid over
@@ -184,6 +220,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(4, 13, 26, 0.94)",
     borderWidth: 1,
     borderColor: theme.color.divider
+  },
+  cardContent: {
+    padding: 20
   },
   title: {
     color: theme.color.textBright,
@@ -196,6 +235,52 @@ const styles = StyleSheet.create({
     color: theme.color.textDim,
     fontSize: 13,
     lineHeight: 19
+  },
+  element: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "flex-start"
+  },
+  /**
+   * A copy of the panel's own pill, at the panel's own colours.
+   *
+   * Fixed width rather than sized to its content: the four badges are a
+   * number, two words of very different length and a dot, and left to
+   * themselves they would step the explanations in and out by thirty points
+   * down the card.
+   */
+  badge: {
+    width: 74,
+    minHeight: 22,
+    marginRight: 10,
+    paddingHorizontal: 6,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.color.divider,
+    backgroundColor: "rgba(0, 0, 0, 0.4)"
+  },
+  badgeLabel: {
+    color: theme.color.textBright,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.6
+  },
+  elementText: {
+    flex: 1
+  },
+  elementWhere: {
+    color: theme.color.accent,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.6
+  },
+  elementMeaning: {
+    marginTop: 2,
+    color: theme.color.textDim,
+    fontSize: 11.5,
+    lineHeight: 16
   },
   access: {
     marginTop: 14

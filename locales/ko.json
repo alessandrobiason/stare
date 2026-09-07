@@ -1,0 +1,4 @@
+{
+  "NSCameraUsageDescription": "Stare는 눈앞의 하늘에 인공위성을 그립니다.",
+  "NSLocationWhenInUseUsageDescription": "Stare는 머리 위에 어떤 위성이 있는지 알기 위해 위치가 필요합니다."
+}

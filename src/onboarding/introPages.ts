@@ -1,31 +1,51 @@
+import { strings } from "../i18n";
+import type { IntroAccessStrings, IntroElementStrings } from "../i18n/types";
+import { CONSOLE_LABEL } from "../components/consoleLabel";
+
 /**
  * What the app says to someone opening it for the first time, and nothing more.
  *
- * Three pages: what it does, how to hold it, and what it is about to ask the
- * operating system for. That last one is the reason this exists at all. Boot
- * asks for the camera and then for a fix within a second of the app opening
- * (`bootTasks`, in that order) — two system prompts, back to back, over a
- * screen that has never explained what either of them is for. A prompt answered
- * without knowing why it was asked is usually answered "no", and both are fatal
- * to a view that places objects in the sky by knowing where you are and where
- * you are pointing.
+ * Four pages: what it does, how to hold it, what the panels around the sky
+ * are, and what it is about to ask the operating system for.
  *
- * Two, not three. The phone's motion sensors are read without a prompt of their
- * own — see `readingsNeedPermission` — so they are described rather than listed:
- * naming an access that never appears teaches someone to expect a prompt that
- * is not coming, and the page is only worth having if it matches what happens
- * next.
+ * That last one is the reason this screen exists at all. Boot asks for the
+ * camera and then for a fix within a second of the app opening (`bootTasks`,
+ * in that order) — two system prompts, back to back, over a screen that has
+ * never explained what either of them is for. A prompt answered without
+ * knowing why it was asked is usually answered "no", and both are fatal to a
+ * view that places objects in the sky by knowing where you are and where you
+ * are pointing.
  *
- * The copy is here rather than in the component for the same reason the boot
- * sky's geometry is not in its canvas: what is said is worth reading and
- * testing on its own, and the pager below it only has to lay out text.
+ * Two, not three. The phone's motion sensors are read without a prompt of
+ * their own — see `readingsNeedPermission` — so they are described rather than
+ * listed: naming an access that never appears teaches someone to expect a
+ * prompt that is not coming, and the page is only worth having if it matches
+ * what happens next.
+ *
+ * **The third page is the chrome.** Everything around the sky is a badge with
+ * no caption — a bare number in one corner, a word in another — because the
+ * screen is a camera view and every word on it is a word over the thing
+ * someone is trying to look at. That is the right trade for a panel someone
+ * has been told about once, and the wrong one for a panel nobody has: a `12`
+ * in the corner of a photograph of the sky says nothing at all about what it
+ * counts. So it is said once, here, beside a copy of each badge as it appears
+ * on the real screen.
+ *
+ * The words are in `src/i18n`, per language; the structure — which pages,
+ * in what order, wearing which badges — is here, so that it cannot drift
+ * between twelve translations. The pager below it only has to lay text out.
  */
 
 /** One thing the operating system will ask about, and why the app needs it. */
-export type IntroAccess = {
-  /** As the iOS prompt names it, so the two read as the same request. */
-  name: string;
-  reason: string;
+export type IntroAccess = IntroAccessStrings;
+
+/** One panel on the sky: the badge it wears, where it sits, and what it is. */
+export type IntroElement = IntroElementStrings & {
+  /**
+   * Drawn as it appears on the real screen, so the page is a key to the thing
+   * rather than a description of it.
+   */
+  badge: string;
 };
 
 export type IntroPage = {
@@ -34,6 +54,8 @@ export type IntroPage = {
   body: string;
   /** The permissions page, and only it, lists what will be asked for. */
   access?: readonly IntroAccess[];
+  /** The screen page, and only it, keys the panels around the sky. */
+  elements?: readonly IntroElement[];
   /** A quieter line under the page, where one is worth the space. */
   footnote?: string;
   /**
@@ -44,36 +66,53 @@ export type IntroPage = {
   wordmark?: boolean;
 };
 
-export const INTRO_PAGES: readonly IntroPage[] = [
-  {
-    wordmark: true,
-    body:
-      "Point the phone at the sky. The satellites passing over you are drawn onto " +
-      "the picture where they actually are."
-  },
-  {
-    title: "Hold it up, turn slowly",
-    body:
-      "Every mark is one object: its colour says what the satellite is for, its size " +
-      "how far away it is. Anything behind a " +
-      "building or a tree is left out rather than drawn over it."
-  },
-  {
-    title: "What it needs",
-    body: "Two things, and the phone will ask you about each of them in a moment.",
-    access: [
-      { name: "Camera", reason: "The sky in front of you, and what is standing in the way of it." },
-      { name: "Location", reason: "Which satellites are above you, and where in the sky they sit." }
-    ],
-    footnote:
-      "Which way the phone is pointed comes from its own motion sensors, which it " +
-      "reads without asking. Everything here is used on the phone alone: the only " +
-      "thing Stare sends or fetches is the public satellite catalogue, and where you " +
-      "are never leaves the device."
-  }
-];
+/**
+ * A sample count for the badge on the marker-count row.
+ *
+ * A plausible number rather than a placeholder: the badge is a copy of the
+ * panel, and a panel reading `N` teaches nothing about a panel that reads `12`.
+ */
+const SAMPLE_MARKER_COUNT = "12";
+
+/** The badge for a marker on the sky — the same filled dot the overlay draws. */
+const MARKER_BADGE = "●";
+
+export function introPages(): readonly IntroPage[] {
+  const t = strings();
+  const intro = t.intro;
+
+  return [
+    {
+      wordmark: true,
+      body: intro.what.body
+    },
+    {
+      title: intro.holding.title,
+      body: intro.holding.body
+    },
+    {
+      title: intro.screen.title,
+      body: intro.screen.body,
+      elements: [
+        { badge: SAMPLE_MARKER_COUNT, ...intro.screen.count },
+        { badge: t.filter.title, ...intro.screen.filter },
+        { badge: MARKER_BADGE, ...intro.screen.marker },
+        // Not translated, and said so on the row itself: the console is the
+        // one panel that stays in English. See `CONSOLE_LABEL`.
+        { badge: CONSOLE_LABEL, ...intro.screen.console }
+      ]
+    },
+    {
+      title: intro.access.title,
+      body: intro.access.body,
+      access: [intro.access.camera, intro.access.location],
+      footnote: intro.access.footnote
+    }
+  ];
+}
 
 /** The button under the pager: the last page is the one that starts the app. */
 export function introButtonLabel(page: number): string {
-  return page === INTRO_PAGES.length - 1 ? "ALLOW ACCESS" : "NEXT";
+  const t = strings().intro;
+  return page === introPages().length - 1 ? t.allowAccess : t.next;
 }

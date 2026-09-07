@@ -1,0 +1,4 @@
+{
+  "NSCameraUsageDescription": "Stare 会把卫星画在你面前的天空上。",
+  "NSLocationWhenInUseUsageDescription": "Stare 需要你的位置，才能知道你头顶上有哪些卫星。"
+}

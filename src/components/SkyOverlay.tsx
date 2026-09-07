@@ -31,6 +31,7 @@ import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
+import { strings } from "../i18n";
 import { DebugPanel } from "./DebugPanel";
 import { DebugToggle } from "./DebugToggle";
 import { markersUnder } from "./markerHitTest";
@@ -364,7 +365,7 @@ export const SkyOverlay: React.FC<Props> = ({
         {!debug && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Satellite markers"
+            accessibilityLabel={strings().scene.markers}
             accessibilityHint="Tap a marker to see what it is"
             style={StyleSheet.absoluteFill}
             onPress={onTapSky}

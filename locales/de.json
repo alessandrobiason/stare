@@ -1,0 +1,4 @@
+{
+  "NSCameraUsageDescription": "Stare zeichnet die Satelliten in den Himmel vor dir.",
+  "NSLocationWhenInUseUsageDescription": "Stare braucht deinen Standort, um zu wissen, welche Satelliten über dir stehen."
+}

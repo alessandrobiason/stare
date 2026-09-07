@@ -1,10 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import {
-  CATEGORY_LABELS,
-  SATELLITE_CATEGORIES,
-  SatelliteCategory
-} from "../satellite/categories";
+import { strings } from "../i18n";
+import { SATELLITE_CATEGORIES, SatelliteCategory } from "../satellite/categories";
 import { cssColor, MarkerPalette } from "./palette";
 import { panelStyles, theme } from "./theme";
 import { Toggle } from "./Toggle";
@@ -50,6 +47,7 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
   onEnableAll,
   palette
 }) => {
+  const t = strings().filter;
   const [expanded, setExpanded] = useState(false);
   const enabledCount = SATELLITE_CATEGORIES.filter((category) =>
     enabledCategories.has(category)
@@ -60,13 +58,13 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
     <View style={[panelStyles.panel, styles.position, !expanded && styles.closed]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Category filter"
+        accessibilityLabel={t.open}
         aria-expanded={expanded}
         style={[styles.header, expanded ? styles.headerOpen : styles.headerClosed]}
         hitSlop={expanded ? { top: 10, bottom: 5, left: 12, right: 12 } : undefined}
         onPress={() => setExpanded((open) => !open)}
       >
-        <Text style={[panelStyles.title, styles.headerTitle]}>FILTER</Text>
+        <Text style={[panelStyles.title, styles.headerTitle]}>{t.title}</Text>
         {filtering && (
           <Text style={styles.count}>
             {enabledCount}/{SATELLITE_CATEGORIES.length}
@@ -96,7 +94,7 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
                   ]}
                 />
                 <Text style={[styles.label, { opacity: enabled ? 1 : DIMMED_TEXT_OPACITY }]}>
-                  {CATEGORY_LABELS[category]}
+                  {t.categories[category]}
                 </Text>
                 <Toggle on={enabled} />
               </Pressable>
@@ -104,10 +102,10 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
           })}
           <View style={styles.keyRow}>
             <View style={[styles.swatch, styles.ringSwatch]} />
-            <Text style={styles.keyLabel}>RING = PARKED OVER THE EQUATOR</Text>
+            <Text style={styles.keyLabel}>{t.ringKey}</Text>
           </View>
           <Pressable onPress={onEnableAll} style={styles.showAll}>
-            <Text style={styles.showAllText}>SHOW ALL</Text>
+            <Text style={styles.showAllText}>{t.showAll}</Text>
           </Pressable>
         </>
       )}
@@ -160,7 +158,10 @@ const styles = StyleSheet.create({
   },
   row: {
     minWidth: 164,
-    height: 26,
+    // Was a fixed height; a two-line label in a long language has to be able
+    // to push the row taller rather than being cut off inside it.
+    minHeight: 26,
+    paddingVertical: 3,
     flexDirection: "row",
     alignItems: "center"
   },
@@ -179,6 +180,10 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
+    // A translated category is longer than the English it replaces, and the
+    // panel is a pill over the sky rather than a page: the row grows with the
+    // word, and the word wraps rather than running under the toggle.
+    marginRight: 6,
     color: theme.color.text,
     fontSize: 10,
     fontWeight: "600"

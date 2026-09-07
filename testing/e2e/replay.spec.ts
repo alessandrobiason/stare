@@ -8,9 +8,12 @@ import { expect, test } from "@playwright/test";
  */
 
 // The scene's marker count, which is only the number on screen; its accessible
-// name is what still says what the number counts.
+// name is what still says what the number counts — in English, which is what
+// the pinned `locale` in `playwright.config.ts` is there to guarantee. The
+// panels speak whatever language the browser asks for (`src/i18n`), and a
+// selector written against one of them has to know which.
 const BOOTED = '[aria-label$="visible satellites"]';
-const DEBUG_TOGGLE = '[aria-label="Debug mode"]';
+const CONSOLE_TOGGLE = '[aria-label="CONSOLE"]';
 
 test.describe("replay overlay", () => {
   test("boots into the scene without React refusing an update cascade", async ({ page }) => {
@@ -34,36 +37,38 @@ test.describe("replay overlay", () => {
   test("the sky mask is one canvas, not a view per cell", async ({ page }) => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
-    // The mask is a debug overlay, and the view opens in normal mode.
-    await page.locator(DEBUG_TOGGLE).click();
+    // The mask is a console overlay, and the view opens in normal mode.
+    await page.locator(CONSOLE_TOGGLE).click();
     // The mask model may still be loading; the grid only mounts once it lands.
     await page.locator("canvas").first().waitFor({ timeout: 300000 });
 
     // A view per cell is thousands of elements that react-native-web re-styles
     // on every render — and the scene renders on every video frame. At the old
     // 48x32 grid that cost 17% of the main thread and held the replay at 46 fps;
-    // the grid is finer now, which would only have made it worse. The debug
+    // the grid is finer now, which would only have made it worse. The console
     // panel itself is a few dozen elements, which is what the headroom is for.
     const divs = await page.locator("#root div").count();
     expect(divs).toBeLessThan(500);
   });
 
-  test("debug mode opens over the picture and pages between its readouts", async ({ page }) => {
+  test("the console opens over the picture and pages between its readouts", async ({ page }) => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
 
-    // Nothing debug is on screen until it is asked for.
+    // Nothing from the console is on screen until it is asked for.
     await expect(page.locator("text=Behind terrain")).toHaveCount(0);
 
-    await page.locator(DEBUG_TOGGLE).click();
+    await page.locator(CONSOLE_TOGGLE).click();
     // The scene's own page comes first: under the replay, the recorded streams.
     await expect(page.locator("text=Orbit time").first()).toBeVisible();
 
-    // One page at a time, reachable by tapping through the menu.
-    await page.locator('[role="tab"]', { hasText: "SKY" }).click();
+    // One page at a time, reachable by tapping through the menu. Matched
+    // exactly: the console gained a SKY FIX page in `fef9d06`, and a substring
+    // match for "SKY" now finds both of them.
+    await page.getByRole("tab", { name: "SKY", exact: true }).click();
     await expect(page.locator("text=Behind terrain").first()).toBeVisible();
 
-    await page.locator(DEBUG_TOGGLE).click();
+    await page.locator(CONSOLE_TOGGLE).click();
     await expect(page.locator("text=Behind terrain")).toHaveCount(0);
   });
 

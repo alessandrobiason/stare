@@ -22,6 +22,10 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: "http://localhost:8081",
+    // The app speaks the browser's language (`src/i18n`), and the selectors
+    // below are written in English. Pinned rather than inherited, so the suite
+    // does not start failing on a machine set to another locale.
+    locale: "en-US",
     launchOptions: {
       executablePath: process.env.CHROMIUM_PATH,
       args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"]

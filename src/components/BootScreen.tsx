@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { describeBuild } from "../debug/buildIdentity";
+import { strings } from "../i18n";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
@@ -44,6 +45,7 @@ export const BootScreen: React.FC<Props> = ({
   onRetry,
   wordmark = true
 }) => {
+  const t = strings().boot;
   const [frame, setFrame] = useState<FrameSize | null>(null);
   // Read once: it cannot change while the app is running.
   const [build] = useState(describeBuild);
@@ -65,7 +67,7 @@ export const BootScreen: React.FC<Props> = ({
 
       {failed && (
         <View style={styles.card}>
-          <Text style={styles.title}>Could not start</Text>
+          <Text style={styles.title}>{t.failed}</Text>
           {error ? (
             // Scrolled and selectable, because a reason can be long. The
             // camera's capture failures now carry the AVFoundation error and
@@ -83,10 +85,10 @@ export const BootScreen: React.FC<Props> = ({
 
           {retryable ? (
             <Pressable style={styles.retry} onPress={onRetry}>
-              <Text style={styles.retryLabel}>TRY AGAIN</Text>
+              <Text style={styles.retryLabel}>{t.tryAgain}</Text>
             </Pressable>
           ) : (
-            <Text style={styles.footnote}>This device cannot run the sky view.</Text>
+            <Text style={styles.footnote}>{t.unsupported}</Text>
           )}
 
           {/* Which binary is reporting this. See `describeBuild`: a fix that

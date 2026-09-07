@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { fill, strings } from "../i18n";
 import { panelStyles, theme } from "./theme";
 
 type Props = {
@@ -18,15 +19,20 @@ type Props = {
  * the view is working at all: a sky with no markers is either a filtered sky, a
  * clouded one, or a broken one, and the number is the first half of that answer.
  *
+ * What it counts is said once, on the intro's third page, beside a copy of this
+ * panel — a bare number over a photograph explains nothing on its own, and a
+ * caption here would be a permanent word over the sky for the sake of the first
+ * thirty seconds of the first launch. See `introPages`.
+ *
  * A warning tints the number rather than printing itself here. Boot's warnings
  * last the whole session, so spelling them out means a permanent paragraph over
  * the sky on any phone missing a sensor; the tint says to go and read the
- * STATUS page, and costs no space.
+ * console's STATUS page, and costs no space.
  */
 export const SceneStatus: React.FC<Props> = ({ markerCount, warned = false }) => (
   <View
     style={[panelStyles.panel, styles.status, warned && styles.warned]}
-    accessibilityLabel={`${markerCount} visible satellites`}
+    accessibilityLabel={fill(strings().scene.visibleSatellites, { count: markerCount })}
   >
     <Text style={[styles.count, warned && styles.countWarned]}>{markerCount}</Text>
   </View>

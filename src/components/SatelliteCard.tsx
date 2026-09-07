@@ -1,7 +1,8 @@
 import React, { MutableRefObject, useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { fill, strings } from "../i18n";
+import { kilometres, lookDirection, orbitPeriod, speed } from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
-import { CATEGORY_LABELS } from "../satellite/categories";
 import { SatelliteDetail } from "../types";
 import { cssColor, MarkerPalette } from "./palette";
 import { theme } from "./theme";
@@ -78,6 +79,7 @@ export const SatelliteCard: React.FC<Props> = ({
   describeRef,
   palette
 }) => {
+  const t = strings();
   const [detail, setDetail] = useState<SatelliteDetail | null>(() =>
     describeRef.current(selected)
   );
@@ -96,7 +98,7 @@ export const SatelliteCard: React.FC<Props> = ({
   }, [describeRef, selected]);
 
   return (
-    <View style={styles.sheet} accessibilityLabel="Satellite details">
+    <View style={styles.sheet} accessibilityLabel={t.card.details}>
       {names.length > 1 && (
         <ScrollView
           horizontal
@@ -146,15 +148,15 @@ export const SatelliteCard: React.FC<Props> = ({
                 ]}
               />
               <Text numberOfLines={1} style={styles.purposeLabel}>
-                {CATEGORY_LABELS[detail.category]}
-                {detail.parked ? " · HOLDS STATION" : ""}
+                {t.filter.categories[detail.category]}
+                {detail.parked ? ` · ${t.card.holdsStation}` : ""}
               </Text>
             </View>
           )}
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close satellite details"
+          accessibilityLabel={t.card.close}
           style={styles.close}
           onPress={onClose}
         >
@@ -171,16 +173,16 @@ export const SatelliteCard: React.FC<Props> = ({
 
       {detail ? (
         <View style={styles.facts}>
-          <Fact label="Distance" value={kilometres(detail.rangeKm)} />
-          <Fact label="Altitude" value={kilometres(detail.altitudeKm)} />
-          <Fact label="Speed" value={`${detail.speedKmPerSecond.toFixed(1)} km/s`} />
-          <Fact label="Look" value={lookDirection(detail)} />
-          <Fact label="Orbit" value={orbitPeriod(detail.orbitPeriodMinutes)} />
+          <Fact label={t.card.facts.distance} value={kilometres(detail.rangeKm)} />
+          <Fact label={t.card.facts.altitude} value={kilometres(detail.altitudeKm)} />
+          <Fact label={t.card.facts.speed} value={speed(detail.speedKmPerSecond)} />
+          <Fact label={t.card.facts.look} value={lookDirection(detail)} />
+          <Fact label={t.card.facts.orbit} value={orbitPeriod(detail.orbitPeriodMinutes)} />
         </View>
       ) : (
         // The catalog is reloaded every couple of hours and objects leave it —
         // an honest gap, rather than a card of dashes that looks like a fault.
-        <Text style={styles.missing}>This satellite has left the catalog.</Text>
+        <Text style={styles.missing}>{t.card.missing}</Text>
       )}
     </View>
   );
@@ -198,7 +200,7 @@ export const SatelliteCard: React.FC<Props> = ({
 const OfficialSite: React.FC<{ url: string }> = ({ url }) => (
   <Pressable
     accessibilityRole="link"
-    accessibilityLabel={`Open ${siteOf(url)}`}
+    accessibilityLabel={fill(strings().card.openSite, { site: siteOf(url) })}
     style={styles.site}
     onPress={() => {
       void Linking.openURL(url).catch(() => undefined);
@@ -227,56 +229,6 @@ const Fact: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     </Text>
   </View>
 );
-
-/**
- * A distance in kilometres, grouped for reading.
- *
- * Whole kilometres throughout: the figures run from a few hundred to the
- * thirty-six thousand of the geostationary belt, and a satellite's own position
- * moves by kilometres between two frames of this card anyway.
- */
-function kilometres(value: number): string {
-  return `${Math.round(value).toString().replace(GROUPS, ",")} km`;
-}
-
-/** Thousands, from the right: 35786 -> 35,786. */
-const GROUPS = /\B(?=(\d{3})+(?!\d))/g;
-
-/**
- * Where to point yourself: the compass bearing, and how far up from there.
- *
- * The bearing is given as a compass point as well as a number, because a number
- * on its own is only useful to someone already holding a compass — and the
- * elevation is worded rather than signed, since a satellite that has set is
- * below the horizon rather than at a negative angle.
- */
-function lookDirection({ azimuthDeg, elevationDeg }: SatelliteDetail): string {
-  const bearing = `${compassPoint(azimuthDeg)} ${Math.round(azimuthDeg)}°`;
-  return elevationDeg >= 0
-    ? `${bearing} · ${Math.round(elevationDeg)}° up`
-    : `${bearing} · ${Math.round(-elevationDeg)}° below`;
-}
-
-const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-
-/** The eight-point compass direction a bearing falls in. */
-function compassPoint(azimuthDeg: number): string {
-  const sector = Math.round(azimuthDeg / 45) % COMPASS.length;
-  return COMPASS[(sector + COMPASS.length) % COMPASS.length];
-}
-
-/**
- * How long one orbit takes, in the units that make it readable: minutes for
- * anything in low orbit, hours and minutes once a period runs past a couple of
- * hours — a geostationary object comes out at a day, which is the whole reason
- * it appears to hold still.
- */
-function orbitPeriod(minutes: number): string {
-  if (!Number.isFinite(minutes) || minutes <= 0) return "—";
-  if (minutes < 120) return `${Math.round(minutes)} min`;
-  const whole = Math.round(minutes);
-  return `${Math.floor(whole / 60)}h ${whole % 60}m`;
-}
 
 const SWATCH_SIZE = 10;
 
@@ -404,6 +356,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2
   },
   factLabel: {
+    // Shrinks before the figure does: the label is a word someone already
+    // knows by the second row, and the number is what the row is for.
+    flexShrink: 1,
     color: theme.color.textFaint,
     fontSize: 10,
     letterSpacing: 0.3

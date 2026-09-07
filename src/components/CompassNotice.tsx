@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { COMPASS_ACCURACY } from "../constants";
+import { strings } from "../i18n";
 import { panelStyles, theme } from "./theme";
 
 type Props = {
@@ -70,20 +71,11 @@ type Notice = { title: string; detail: string };
 function noticeFor(accuracy: number | undefined, declinationKnown: boolean): Notice | null {
   // Nothing at all until the compass has reported: silence here is the seconds
   // before the first heading, not a verdict.
+  const notices = strings().compassNotice;
   if (accuracy !== undefined && accuracy <= COMPASS_ACCURACY.warnAtOrBelow) {
-    return {
-      title: "Compass needs calibrating",
-      detail:
-        "Move the phone in a figure eight, away from magnets, metal and other phones. Until then the satellites can be tens of degrees from where they are drawn."
-    };
+    return notices.calibrate;
   }
-  if (!declinationKnown) {
-    return {
-      title: "Headings are magnetic north",
-      detail:
-        "This phone has not reported a true-north offset, so everything is drawn out by the local declination — a few degrees in most places."
-    };
-  }
+  if (!declinationKnown) return notices.magnetic;
   return null;
 }
 
@@ -91,14 +83,14 @@ const styles = StyleSheet.create({
   notice: {
     // Nothing here is touchable, and it sits over the picture.
     pointerEvents: "none",
-    // The bottom strip, sharing its row with the debug toggle: the toggle is
-    // 82pt wide at `right: 12`, so this stops short of it, and the satellite
+    // The bottom strip, sharing its row with the console toggle: the toggle is
+    // 92pt wide at `right: 12`, so this stops short of it, and the satellite
     // card opens from `bottom: 58` upwards and clears it too. The top corners
     // are both spoken for — the marker count on the left, the filter on the
     // right, and the filter grows downwards as it opens.
     bottom: 12,
     left: 12,
-    right: 102,
+    right: 112,
     borderWidth: 1,
     borderColor: theme.color.warning
   },

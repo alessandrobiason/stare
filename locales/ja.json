@@ -1,0 +1,4 @@
+{
+  "NSCameraUsageDescription": "Stare は目の前の空に人工衛星を描きます。",
+  "NSLocationWhenInUseUsageDescription": "Stare は頭上にどの衛星がいるかを知るために位置情報を使います。"
+}

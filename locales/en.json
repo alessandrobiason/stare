@@ -1,0 +1,4 @@
+{
+  "NSCameraUsageDescription": "Stare shows satellites over the sky in front of you.",
+  "NSLocationWhenInUseUsageDescription": "Stare needs your position to work out which satellites are overhead."
+}

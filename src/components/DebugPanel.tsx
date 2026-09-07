@@ -94,7 +94,7 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose }) =
         })}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Leave debug mode"
+          accessibilityLabel="Leave console"
           style={styles.close}
           onPress={onClose}
         >

@@ -62,6 +62,20 @@
       ],
       "onnxruntime-react-native"
     ],
+    "locales": {
+      "en": "./locales/en.json",
+      "it": "./locales/it.json",
+      "es": "./locales/es.json",
+      "fr": "./locales/fr.json",
+      "de": "./locales/de.json",
+      "pt": "./locales/pt.json",
+      "nl": "./locales/nl.json",
+      "ru": "./locales/ru.json",
+      "zh-Hans": "./locales/zh-Hans.json",
+      "ja": "./locales/ja.json",
+      "ko": "./locales/ko.json",
+      "ar": "./locales/ar.json"
+    },
     "extra": {
       "eas": {
         "projectId": "6a2d1b3b-c6d7-4981-8cf9-ad1402b4ef87"

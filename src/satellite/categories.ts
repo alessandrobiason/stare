@@ -29,14 +29,12 @@ export const SATELLITE_CATEGORIES = [
 
 export type SatelliteCategory = (typeof SATELLITE_CATEGORIES)[number];
 
-/** What the legend calls each category, in words a non-specialist can use. */
-export const CATEGORY_LABELS: Record<SatelliteCategory, string> = {
-  LANDMARK: "LANDMARKS",
-  NAVIGATION: "NAVIGATION",
-  EARTH: "EARTH WATCH",
-  COMMS: "INTERNET & TV",
-  OTHER: "OTHER"
-};
+/*
+ * What the legend calls each category is user-facing text and lives in
+ * `src/i18n` with the rest of it (`Strings["filter"]["categories"]`), in words
+ * a non-specialist can use, in twelve languages. The names in the union above
+ * are keys and are never shown.
+ */
 
 /**
  * Marker colours for a night sky, arranged as a descending lightness ladder:
