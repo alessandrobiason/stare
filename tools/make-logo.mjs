@@ -1,3 +1,5 @@
+import { deflateSync } from "node:zlib";
+import { Buffer } from "node:buffer";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -5,7 +7,9 @@ import { dirname, join } from "node:path";
 /**
  * Draws the app's logo, in the two shapes it is kept in:
  *
- * - `assets/icon.svg`, the mark on its own — one satellite, gold, on a square.
+ * - `assets/icon.svg`, the mark on its own — one satellite, gold, on a square,
+ *   and `assets/icon.png`, the same picture rasterised: the app icon proper,
+ *   because `app.json` can only point iOS at a PNG.
  * - `assets/logo-extended.svg`, the boot screen held still — that same mark
  *   five times over, on five orbits, in the five colours the satellite overlay
  *   itself uses. It is the picture the app opens on; on the phone it turns.
@@ -171,8 +175,16 @@ function stars(scale, offsetX, offsetY) {
   return drawn;
 }
 
-/** The square mark: drawn about its orbit's centre, then fitted to the square. */
-function iconSvg() {
+/**
+ * The square mark: drawn about its orbit's centre, then fitted to the square.
+ *
+ * The fit is returned as well as applied, because the PNG has to place the mark
+ * where the SVG places it and there is only one placement to get wrong. The
+ * numbers are the rounded ones the SVG carries rather than the full-precision
+ * ones behind them, so the two files are the same picture down to the pixel
+ * instead of near enough.
+ */
+function iconFit() {
   const middle = ICON.size / 2;
   const drawn = satellite(middle, middle, ICON, 1);
   const xs = [
@@ -191,11 +203,22 @@ function iconSvg() {
   const bottom = Math.max(...ys);
   // Fitted on the longer side and centred on its own bounding box, so the gap
   // the trail leaves does not push the mark off the middle of the square.
-  const scale = (ICON.size * ICON.coverage) / Math.max(right - left, bottom - top);
-  const transform =
-    `translate(${middle},${middle}) scale(${scale.toFixed(4)}) ` +
-    `translate(${round(-(left + right) / 2)},${round(-(top + bottom) / 2)})`;
+  const scale = Number(
+    ((ICON.size * ICON.coverage) / Math.max(right - left, bottom - top)).toFixed(4)
+  );
+  const shiftX = round(-(left + right) / 2);
+  const shiftY = round(-(top + bottom) / 2);
 
+  return {
+    drawn,
+    transform: `translate(${middle},${middle}) scale(${scale}) translate(${shiftX},${shiftY})`,
+    /** The same transform as arithmetic: a point of the drawing to a pixel. */
+    place: ([x, y]) => [middle + scale * (round(x) + shiftX), middle + scale * (round(y) + shiftY)],
+    scale
+  };
+}
+
+function iconSvg({ drawn, transform }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${ICON.size}" height="${
     ICON.size
   }" viewBox="0 0 ${ICON.size} ${ICON.size}">
@@ -234,12 +257,163 @@ ${satellites.join("\n")}
 `;
 }
 
+/**
+ * The icon again, as pixels. `app.json` names a PNG because that is all an iOS
+ * asset catalogue takes, and an SVG nothing on the build machine can rasterise
+ * is how `assets/icon.png` came to be a different picture from `assets/icon.svg`
+ * for a while — the App Store showed the older one, and a new build did not
+ * change that. Drawing both here is what keeps them one picture.
+ *
+ * Two shapes, no strokes and no gradients, so a scanline fill is the whole
+ * renderer: cheaper than a dependency, and it keeps the file's no-imports rule.
+ */
+
+/** Coverage is exact across a row and sampled down it, so this is what the arc's diagonals cost. */
+const SUBSAMPLES = 16;
+
+function rgb(hex) {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+}
+
+/** Adds a horizontal run's exact per-pixel overlap into one row of the coverage map. */
+function addSpan(coverage, row, size, start, end) {
+  for (let x = Math.max(0, Math.floor(start)); x < Math.min(size, Math.ceil(end)); x += 1) {
+    const overlap = Math.min(end, x + 1) - Math.max(start, x);
+    if (overlap > 0) coverage[row + x] += overlap / SUBSAMPLES;
+  }
+}
+
+/**
+ * Coverage of the polygon and the disc, in [0, 1] per pixel.
+ *
+ * Spans are merged before they are added because coverage is a union, not a
+ * sum: two overlapping runs over one pixel would otherwise darken it past
+ * full. The trail stops short of the body today, so nothing overlaps — merging
+ * is what stops that being a thing the drawing is quietly not allowed to change.
+ */
+function rasterise(size, polygon, body) {
+  const coverage = new Float64Array(size * size);
+  for (let step = 0; step < size * SUBSAMPLES; step += 1) {
+    const y = (step + 0.5) / SUBSAMPLES;
+    const crossings = [];
+    for (let i = 0; i < polygon.length; i += 1) {
+      const [x0, y0] = polygon[i];
+      const [x1, y1] = polygon[(i + 1) % polygon.length];
+      // Half-open in y: a vertex on the scanline is counted once, not twice.
+      if (y0 <= y === y1 <= y) continue;
+      crossings.push(x0 + ((y - y0) / (y1 - y0)) * (x1 - x0));
+    }
+    crossings.sort((a, b) => a - b);
+    const spans = [];
+    for (let i = 0; i + 1 < crossings.length; i += 2) spans.push([crossings[i], crossings[i + 1]]);
+
+    const dy = y - body.y;
+    if (Math.abs(dy) < body.radius) {
+      const dx = Math.sqrt(body.radius * body.radius - dy * dy);
+      spans.push([body.x - dx, body.x + dx]);
+    }
+    if (spans.length === 0) continue;
+
+    spans.sort((a, b) => a[0] - b[0]);
+    const row = Math.floor(y) * size;
+    let [start, end] = spans[0];
+    for (let i = 1; i <= spans.length; i += 1) {
+      if (i < spans.length && spans[i][0] <= end) {
+        end = Math.max(end, spans[i][1]);
+        continue;
+      }
+      addSpan(coverage, row, size, start, end);
+      if (i < spans.length) [start, end] = spans[i];
+    }
+  }
+  return coverage;
+}
+
+const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  return value >>> 0;
+});
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function chunk(tag, body) {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(body.length);
+  const tagged = Buffer.concat([Buffer.from(tag, "ascii"), body]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(tagged));
+  return Buffer.concat([length, tagged, crc]);
+}
+
+/**
+ * Truecolour, 8 bits, no alpha — colour type 2.
+ *
+ * The alpha channel is the point: App Store Connect rejects an icon that has
+ * one at all, opaque or not (ITMS-90717), which is what `tools/check-icon-opaque.mjs`
+ * guards on the Linux gate. Coverage is flattened against the background here
+ * rather than kept as transparency, so there is no channel to reject.
+ */
+function encodePng(size, pixels) {
+  const stride = size * 3;
+  const raw = Buffer.alloc(size * (stride + 1));
+  for (let y = 0; y < size; y += 1) {
+    raw[y * (stride + 1)] = 1; // Sub: neighbouring pixels differ little across a row.
+    for (let x = stride - 1; x >= 0; x -= 1) {
+      const value = pixels[y * stride + x] - (x >= 3 ? pixels[y * stride + x - 3] : 0);
+      raw[y * (stride + 1) + 1 + x] = value & 0xff;
+    }
+  }
+
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(size, 0);
+  header.writeUInt32BE(size, 4);
+  header[8] = 8; // bit depth
+  header[9] = 2; // colour type: truecolour, no alpha
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(raw, { level: 9 })),
+    chunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
+function iconPng({ drawn, place, scale }) {
+  const polygon = drawn.points.map(place);
+  const [bodyX, bodyY] = place([drawn.bodyX, drawn.bodyY]);
+  const coverage = rasterise(ICON.size, polygon, {
+    x: bodyX,
+    y: bodyY,
+    radius: round(drawn.bodyRadius) * scale
+  });
+
+  const background = rgb(ICON.background);
+  const foreground = rgb(ICON.color);
+  const pixels = Buffer.alloc(ICON.size * ICON.size * 3);
+  for (let index = 0; index < coverage.length; index += 1) {
+    const alpha = Math.min(1, coverage[index]);
+    for (let channel = 0; channel < 3; channel += 1) {
+      pixels[index * 3 + channel] = Math.round(
+        background[channel] + (foreground[channel] - background[channel]) * alpha
+      );
+    }
+  }
+  return encodePng(ICON.size, pixels);
+}
+
+const fit = iconFit();
 const assets = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
-for (const [name, svg] of [
-  ["icon.svg", iconSvg()],
+for (const [name, contents] of [
+  ["icon.svg", iconSvg(fit)],
+  ["icon.png", iconPng(fit)],
   ["logo-extended.svg", extendedSvg()]
 ]) {
   const out = join(assets, name);
-  writeFileSync(out, svg);
+  writeFileSync(out, contents);
   console.log(`wrote ${out}`);
 }

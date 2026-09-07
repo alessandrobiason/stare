@@ -68,7 +68,7 @@ if (offenders.length > 0) {
     "\nApp Store Connect rejects icons with an alpha channel (ITMS-90717).\n" +
       "Replace assets/icon.png with an opaque RGB image — flatten it against a\n" +
       "background rather than trusting a fully-opaque alpha channel to pass.\n" +
-      "tools/make-placeholder-icon.py writes one in the right format.\n" +
+      "`node tools/make-logo.mjs` writes one in the right format.\n" +
       "Note that Expo's built-in fallback icon, used when app.json names none,\n" +
       "is RGBA and will fail here.",
   );

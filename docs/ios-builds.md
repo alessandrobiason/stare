@@ -439,8 +439,10 @@ So the release signs manually, with the profile from step 4, and:
   (ITMS-90717), and the icon Expo falls back on when `app.json` names none is
   RGBA. `assets/icon.png` is opaque RGB, and `tools/check-icon-opaque.mjs` fails
   the Linux gate if that stops being true — a minute wasted instead of an hour.
-  It is placeholder art from `tools/make-placeholder-icon.py`; replace it with
-  something real before external testers see it.
+  It is drawn by `tools/make-logo.mjs`, which writes it alongside
+  `assets/icon.svg` from the same geometry: the PNG is what `app.json` names and
+  what ships, so an icon edited only as SVG never reaches the App Store. Change
+  the mark there and re-run `node tools/make-logo.mjs`.
 - **Export compliance.** `ITSAppUsesNonExemptEncryption` is `false` in
   `app.json`, since the app only makes ordinary HTTPS requests. Without it, App
   Store Connect asks the question again on every single upload.
