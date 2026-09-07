@@ -106,6 +106,28 @@ test.describe("replay overlay", () => {
     });
   });
 
+  test("the recording plays from a press on the harness's own transport", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+
+    const currentTime = () =>
+      page.evaluate(() => document.querySelector("video")?.currentTime ?? 0);
+
+    // Pressed rather than `video.play()`, which is the whole of the test: the
+    // `<video>` had `controls` of its own and they sat under the scene's tap
+    // target, so every other check here drove a recording nobody could start
+    // by hand.
+    await page.getByLabel("Play the recording").click();
+    await page.waitForTimeout(2000);
+    const playing = await currentTime();
+    expect(playing).toBeGreaterThan(0.5);
+
+    await page.getByLabel("Pause the recording").click();
+    const paused = await currentTime();
+    await page.waitForTimeout(1000);
+    expect(await currentTime()).toBeCloseTo(paused, 1);
+  });
+
   test("video time advances continuously rather than in steps", async ({ page }) => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });

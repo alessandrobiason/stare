@@ -21,6 +21,11 @@ type Props = {
  * The recorded iPhone video, used as the AR background — and, under the replay,
  * the frame the sky mask is computed from. Boot stops when it cannot be
  * resolved, so there is no missing-video state to render here.
+ *
+ * No `controls`: the scene lays its marker tap target over the whole picture,
+ * which is the app's own behaviour and not the harness's to switch off, so the
+ * native ones can be seen and never pressed. `ReplayControls` is the transport
+ * instead, rendered over that tap target rather than under it.
  */
 export const ReplayVideo: React.FC<Props> = ({ uri, videoRef, onTimeChange, onSeeked }) => {
   return (
@@ -30,7 +35,6 @@ export const ReplayVideo: React.FC<Props> = ({ uri, videoRef, onTimeChange, onSe
       style={styles.video as unknown as Record<string, unknown>}
       muted
       playsInline
-      controls
       preload="metadata"
       onLoadedMetadata={(event: VideoEvent) => onTimeChange(event.currentTarget.currentTime)}
       // Coarse (~4 Hz) but the only signal while paused; usePlaybackTime
