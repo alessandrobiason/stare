@@ -16,7 +16,9 @@ export const zh: Strings = {
       body: "天空四周有四样东西，这里全在。",
       count: {
         where: "左上角",
-        meaning: "此刻画出了多少颗卫星——不是一共有多少颗。在地平线以下、或被建筑挡住的都不计入。"
+        meaning:
+          "此刻画出了多少颗卫星——不是一共有多少颗。在地平线以下、或被建筑挡住的都不计入。" +
+          "点一下可以看到分别是哪些。"
       },
       filter: {
         where: "右上角",
@@ -51,7 +53,12 @@ export const zh: Strings = {
   },
   scene: {
     visibleSatellites: "可见卫星 {count} 颗",
-    markers: "卫星标记"
+    markers: "卫星标记",
+    breakdown: {
+      title: "视野内",
+      empty: "视野内没有卫星",
+      other: "其他"
+    }
   },
   filter: {
     title: "筛选",

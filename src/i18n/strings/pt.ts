@@ -21,7 +21,8 @@ export const pt: Strings = {
         where: "Canto superior esquerdo",
         meaning:
           "Quantos satélites estão desenhados neste momento — não quantos existem. O que " +
-          "está abaixo do horizonte, ou atrás de um edifício, não conta."
+          "está abaixo do horizonte, ou atrás de um edifício, não conta. Toque para " +
+          "ver quais são."
       },
       filter: {
         where: "Canto superior direito",
@@ -63,7 +64,12 @@ export const pt: Strings = {
   },
   scene: {
     visibleSatellites: "{count} satélites visíveis",
-    markers: "Marcas de satélites"
+    markers: "Marcas de satélites",
+    breakdown: {
+      title: "À VISTA",
+      empty: "Nada à vista",
+      other: "Outros"
+    }
   },
   filter: {
     title: "FILTRO",

@@ -16,7 +16,9 @@ export const ja: Strings = {
       body: "空のまわりに4つあります。これで全部です。",
       count: {
         where: "左上",
-        meaning: "いま描かれている衛星の数です。存在する総数ではなく、地平線の下や建物の陰にあるものは数えません。"
+        meaning:
+          "いま描かれている衛星の数です。存在する総数ではなく、地平線の下や建物の陰にあるものは数えません。" +
+          "タップすると内訳が出ます。"
       },
       filter: {
         where: "右上",
@@ -52,7 +54,12 @@ export const ja: Strings = {
   },
   scene: {
     visibleSatellites: "見えている衛星 {count} 個",
-    markers: "衛星の印"
+    markers: "衛星の印",
+    breakdown: {
+      title: "表示中",
+      empty: "表示中の衛星はありません",
+      other: "その他"
+    }
   },
   filter: {
     title: "フィルタ",

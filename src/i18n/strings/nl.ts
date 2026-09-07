@@ -21,7 +21,8 @@ export const nl: Strings = {
         where: "Linksboven",
         meaning:
           "Hoeveel satellieten er nu getekend zijn — niet hoeveel er zijn. Wat onder de " +
-          "horizon of achter een gebouw zit, telt niet mee."
+          "horizon of achter een gebouw zit, telt niet mee. Tik erop om te zien " +
+          "welke."
       },
       filter: {
         where: "Rechtsboven",
@@ -64,7 +65,12 @@ export const nl: Strings = {
   },
   scene: {
     visibleSatellites: "{count} zichtbare satellieten",
-    markers: "Satellietmarkeringen"
+    markers: "Satellietmarkeringen",
+    breakdown: {
+      title: "IN BEELD",
+      empty: "Niets in beeld",
+      other: "Overige"
+    }
   },
   filter: {
     title: "FILTER",

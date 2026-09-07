@@ -29,7 +29,8 @@ export const en: Strings = {
         where: "Top left",
         meaning:
           "How many satellites are drawn right now — not how many exist. Anything " +
-          "below the horizon, or behind a building, is not counted."
+          "below the horizon, or behind a building, is not counted. Tap it to see " +
+          "what they are."
       },
       filter: {
         where: "Top right",
@@ -72,7 +73,12 @@ export const en: Strings = {
   },
   scene: {
     visibleSatellites: "{count} visible satellites",
-    markers: "Satellite markers"
+    markers: "Satellite markers",
+    breakdown: {
+      title: "IN VIEW",
+      empty: "Nothing in view",
+      other: "Others"
+    }
   },
   filter: {
     title: "FILTER",

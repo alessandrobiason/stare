@@ -5,6 +5,7 @@ import { CompassNotice } from "../src/components/CompassNotice";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SceneStatus } from "../src/components/SceneStatus";
+import { BREAKDOWN_ROWS, tallyFleets } from "../src/satellite/fleets";
 import { allCategories } from "../src/satellite/categories";
 import { SatelliteDetail } from "../src/types";
 
@@ -57,21 +58,114 @@ describe("the category filter", () => {
 });
 
 describe("the marker count", () => {
-  test("is the number and nothing else", () => {
-    expect(textOf(<SceneStatus markerCount={17} />)).toBe("17");
+  const NOTHING = { rows: [], other: 0 };
+  const SKY = {
+    rows: [
+      { name: "Starlink", count: 10 },
+      { name: "ISS", count: 1 }
+    ],
+    other: 6
+  };
+
+  test("is the number, and the chevron that says it opens", () => {
+    // Everything else is behind the tap: the panel sits over a photograph of
+    // the sky, and closed it is worth exactly the space a two-digit number takes.
+    const text = textOf(<SceneStatus markerCount={17} fleets={SKY} />);
+
+    expect(text).toContain("17");
+    expect(text).not.toContain("Starlink");
+    expect(text).not.toContain("IN VIEW");
   });
 
   test("still says what it counts, for anyone not reading the screen", () => {
-    expect(renderToStaticMarkup(<SceneStatus markerCount={17} />)).toContain(
+    // And on the control rather than the panel, so the label the replay suite
+    // waits on is still the thing that announces itself.
+    expect(renderToStaticMarkup(<SceneStatus markerCount={17} fleets={NOTHING} />)).toContain(
       'aria-label="17 visible satellites"'
+    );
+    expect(renderToStaticMarkup(<SceneStatus markerCount={17} fleets={NOTHING} />)).toContain(
+      'aria-expanded="false"'
     );
   });
 
   test("a degraded boot tints the number rather than printing the warning", () => {
-    const warned = renderToStaticMarkup(<SceneStatus markerCount={0} warned />);
+    const warned = renderToStaticMarkup(<SceneStatus markerCount={0} fleets={NOTHING} warned />);
 
-    expect(textOf(<SceneStatus markerCount={0} warned />)).toBe("0");
-    expect(warned).not.toBe(renderToStaticMarkup(<SceneStatus markerCount={0} />));
+    expect(textOf(<SceneStatus markerCount={0} fleets={NOTHING} warned />)).toContain("0");
+    expect(warned).not.toBe(
+      renderToStaticMarkup(<SceneStatus markerCount={0} fleets={NOTHING} />)
+    );
+  });
+});
+
+describe("what the count breaks down into", () => {
+  test("names the fleets on the frame, largest first, and counts the rest", () => {
+    // The question the number provokes and cannot answer on its own. A tally
+    // that came to less than the count above it would read as a fault in one of
+    // the two, so the unnamed remainder is a row rather than a silence.
+    const breakdown = tallyFleets([
+      { name: "STARLINK-1007" },
+      { name: "ISS" },
+      { name: "STARLINK-4123" },
+      { name: "COSMOS 2251" },
+      { name: "ONEWEB-0288" },
+      { name: "GJZ 01" }
+    ]);
+
+    expect(breakdown.rows).toEqual([
+      { name: "Starlink", count: 2 },
+      { name: "ISS", count: 1 },
+      { name: "Kosmos", count: 1 },
+      { name: "OneWeb", count: 1 }
+    ]);
+    expect(breakdown.other).toBe(1);
+  });
+
+  test("equal fleets keep a stable order, so the list does not shuffle itself", () => {
+    // The tally is rebuilt four times a second. Two fleets of one marker each
+    // ordered by whatever came out of the loop first is a list that reorders
+    // under the finger reading it.
+    const names = [{ name: "ISS" }, { name: "ONEWEB-1" }, { name: "GPS BIIR-2" }];
+    const forwards = tallyFleets(names).rows.map((row) => row.name);
+
+    expect(forwards).toEqual(["GPS", "ISS", "OneWeb"]);
+    expect(tallyFleets([...names].reverse()).rows.map((row) => row.name)).toEqual(forwards);
+  });
+
+  test("lumps the long tail rather than papering the sky with ones and twos", () => {
+    const many = [
+      ...Array.from({ length: 9 }, () => ({ name: "STARLINK-1" })),
+      { name: "ONEWEB-1" },
+      { name: "GPS BIIR-2" },
+      { name: "GALILEO 5" },
+      { name: "GLONASS 1" },
+      { name: "BEIDOU-3 M1" },
+      { name: "IRIDIUM 100" },
+      { name: "LEMUR-2 A" },
+      { name: "ICEYE-X1" },
+      { name: "CAPELLA-3" },
+      { name: "UMBRA-04" }
+    ];
+    const breakdown = tallyFleets(many);
+
+    expect(breakdown.rows).toHaveLength(BREAKDOWN_ROWS);
+    // Everything still adds up to the number the corner is showing.
+    const counted = breakdown.rows.reduce((total, row) => total + row.count, 0);
+    expect(counted + breakdown.other).toBe(many.length);
+  });
+
+  test("the panel opens onto the same style as the filter opposite it", () => {
+    const open = renderToStaticMarkup(
+      <SceneStatus
+        markerCount={17}
+        fleets={{ rows: [{ name: "Starlink", count: 10 }], other: 7 }}
+      />
+    );
+
+    // Rendered shut, since that is how it lands on the screen: what the markup
+    // has to carry is the control that opens it and nothing of the list.
+    expect(open).toContain('aria-expanded="false"');
+    expect(open).not.toContain("Starlink");
   });
 });
 

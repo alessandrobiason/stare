@@ -6,6 +6,7 @@ import { rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
+import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
 import { OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
 import { AnchoredSkyMask, skyProbe } from "../vision/anchoredMask";
@@ -128,12 +129,17 @@ export type AnimatedMarkers = {
 const FRAME_RATE_SMOOTHING = 0.1;
 
 /**
- * How often the count of drawn markers is published, in milliseconds.
+ * How often the count of drawn markers, and the breakdown behind it, are
+ * published, in milliseconds.
  *
- * The loop knows it every frame, but publishing it is a state update in the
- * scene above this one — so a single marker fading past the mask cost a render
- * of the whole view to move a number in the corner by one, sixty times a
+ * The loop knows the count every frame, but publishing it is a state update in
+ * the scene above this one — so a single marker fading past the mask cost a
+ * render of the whole view to move a number in the corner by one, sixty times a
  * second at worst. Four times a second is quicker than anyone reads it.
+ *
+ * The tally is worked out here rather than every frame for the same reason and
+ * one more: it walks the drawn markers, and doing that at display rate would be
+ * a second pass over the frame for a panel that is usually closed.
  */
 const VISIBLE_COUNT_INTERVAL_MS = 250;
 
@@ -185,10 +191,10 @@ type AnimatedMarkerOptions = {
   maskFiltering: boolean;
   enabledCategories: Set<SatelliteCategory>;
   /**
-   * Told how many markers are drawn: on a change, and no more often than
-   * `VISIBLE_COUNT_INTERVAL_MS`.
+   * Told how many markers are drawn and what they are: on a change, and no
+   * more often than `VISIBLE_COUNT_INTERVAL_MS`.
    */
-  onVisibleCountChange: (count: number) => void;
+  onVisibleCountChange: (count: number, breakdown: FleetBreakdown) => void;
 };
 
 /**
@@ -244,9 +250,9 @@ export function useAnimatedMarkers({
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
   const listenersRef = useRef(new Set<(frame: MarkerFrame) => void>());
   const latestFrameRef = useRef<MarkerFrame>(EMPTY_FRAME);
-  /** The last count handed to `onVisibleCountChange`, and when. */
-  const publishedCountRef = useRef(-1);
-  const publishedCountAtRef = useRef(0);
+  /** What was last handed to `onVisibleCountChange`, and when. */
+  const publishedRef = useRef<string | null>(null);
+  const publishedAtRef = useRef(0);
 
   // Each pass, once, off the frame loop: a mask is a second of sky the app
   // would otherwise throw away when the next one lands. Cheap next to the
@@ -415,13 +421,18 @@ export function useAnimatedMarkers({
       latestFrameRef.current = drawn;
       for (const listener of listenersRef.current) listener(drawn);
 
-      if (
-        visible.length !== publishedCountRef.current &&
-        now - publishedCountAtRef.current >= VISIBLE_COUNT_INTERVAL_MS
-      ) {
-        publishedCountRef.current = visible.length;
-        publishedCountAtRef.current = now;
-        onVisibleCountChangeRef.current(visible.length);
+      // The clock is checked before the tally, so a sky that is not changing
+      // costs one walk of the frame every quarter second rather than one per
+      // frame — and the signature is checked after it, so a sky that is not
+      // changing costs no render at all.
+      if (now - publishedAtRef.current >= VISIBLE_COUNT_INTERVAL_MS) {
+        publishedAtRef.current = now;
+        const breakdown = tallyFleets(visible);
+        const published = `${visible.length}|${breakdownSignature(breakdown)}`;
+        if (published !== publishedRef.current) {
+          publishedRef.current = published;
+          onVisibleCountChangeRef.current(visible.length, breakdown);
+        }
       }
       handle = requestAnimationFrame(animate);
     });

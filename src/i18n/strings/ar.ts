@@ -20,7 +20,7 @@ export const ar: Strings = {
         where: "أعلى اليسار",
         meaning:
           "كم قمرًا مرسومًا الآن — لا كم قمرًا موجودًا. وما كان تحت الأفق أو خلف مبنى " +
-          "فلا يُحتسب."
+          "فلا يُحتسب. انقر عليه لمعرفة أيها."
       },
       filter: {
         where: "أعلى اليمين",
@@ -61,7 +61,12 @@ export const ar: Strings = {
   },
   scene: {
     visibleSatellites: "أقمار مرئية: {count}",
-    markers: "علامات الأقمار"
+    markers: "علامات الأقمار",
+    breakdown: {
+      title: "في المشهد",
+      empty: "لا شيء في المشهد",
+      other: "أخرى"
+    }
   },
   filter: {
     title: "تصفية",

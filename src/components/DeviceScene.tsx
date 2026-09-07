@@ -185,7 +185,11 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         ]}
       />
 
-      <SceneStatus markerCount={controls.markerCount} warned={boot.warnings.length > 0} />
+      <SceneStatus
+        markerCount={controls.markerCount}
+        fleets={controls.markerFleets}
+        warned={boot.warnings.length > 0}
+      />
       <CompassNotice
         accuracy={compass.accuracy}
         declinationKnown={compass.declinationKnown}

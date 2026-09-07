@@ -20,6 +20,24 @@ export type Strings = {
     visibleSatellites: string;
     /** The overlay the marks are drawn into. */
     markers: string;
+    /**
+     * What the marker count opens into: the fleets on the frame, and how many
+     * of each.
+     *
+     * The fleet names themselves are not here. They are the names their
+     * operators gave them — Starlink, Iridium, the ISS — and there is no
+     * translation of those; see `src/satellite/fleets.ts`. What is here is the
+     * panel's own three words: what it is, what it says when the sky is empty,
+     * and what it calls everything too small or too unfamiliar to name.
+     */
+    breakdown: {
+      /** The panel's title. Short: it is a pill over the sky, like the filter. */
+      title: string;
+      /** No markers at all — a filtered sky, a clouded one, or a wall. */
+      empty: string;
+      /** The last row: fleets with no name worth printing, and the long tail. */
+      other: string;
+    };
   };
   filter: {
     /** The panel's own title, closed and open. Short: it is a pill over the sky. */
