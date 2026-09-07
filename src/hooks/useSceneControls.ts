@@ -22,6 +22,16 @@ export type SceneControls = {
    */
   skyMaskFiltering: boolean;
   toggleSkyMaskFiltering: () => void;
+  /**
+   * Whether the sun and the moon are used to check the compass. On, because a
+   * heading that has been checked against the sky is the better heading in
+   * every case where one is available, and because there is nothing to weigh up
+   * — a sighting is a measurement like the magnetometer's, and the filter
+   * decides what it is worth. The debug menu's switch turns it off, which is
+   * how a correction is confirmed to have come from here.
+   */
+  celestialAlignment: boolean;
+  toggleCelestialAlignment: () => void;
 };
 
 /**
@@ -35,6 +45,7 @@ export function useSceneControls(): SceneControls {
   const [markerCount, setMarkerCount] = useState(0);
   const [debug, setDebug] = useState(false);
   const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
+  const [celestialAlignment, setCelestialAlignment] = useState(true);
 
   const toggleCategory = useCallback((category: SatelliteCategory) => {
     setEnabledCategories((current) => {
@@ -47,6 +58,7 @@ export function useSceneControls(): SceneControls {
   const enableAllCategories = useCallback(() => setEnabledCategories(allCategories()), []);
   const toggleDebug = useCallback(() => setDebug((on) => !on), []);
   const toggleSkyMaskFiltering = useCallback(() => setSkyMaskFiltering((on) => !on), []);
+  const toggleCelestialAlignment = useCallback(() => setCelestialAlignment((on) => !on), []);
 
   return {
     enabledCategories,
@@ -57,6 +69,8 @@ export function useSceneControls(): SceneControls {
     debug,
     toggleDebug,
     skyMaskFiltering,
-    toggleSkyMaskFiltering
+    toggleSkyMaskFiltering,
+    celestialAlignment,
+    toggleCelestialAlignment
   };
 }

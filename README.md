@@ -75,6 +75,7 @@ satellites → screen positions → markers, composited over the camera picture.
 | SGP4 propagation via `satellite.js`, on a rolling sweep | `src/satellite/` |
 | Rectilinear pinhole projection onto the camera's axes | `src/camera/projection.ts` |
 | Occlusion: SegFormer sky mask, horizon-capped, aimed at the sky | `src/vision/` |
+| Heading checked against the sun or the moon in the same frame | `src/vision/brightBodies.ts`, `src/fusion/celestialNorth.ts` |
 | Drawn at display rate, every marker in one canvas | `src/components/markerScene.ts`, `SatelliteMarkers` |
 | Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
 | A tap back into the sky: which markers, and what they are | `src/components/markerHitTest.ts`, `SkyTracker.describe`, `src/satellite/briefing.ts` |
@@ -112,6 +113,44 @@ at frame rate, and the filter cuts that shimmer about fivefold for a tenth of a
 degree of lag. Pitch and roll carry a slow correlated error no smoothing
 removes, so they track closely instead. Tuning lives in `ORIENTATION_FILTER` in
 `src/constants.ts`.
+
+A compass is the only thing aiming this view with nothing to check it against, so
+it is checked against the sky. The sun's bearing at a given instant from a given
+place is known to an arcminute, and on a clear day the sun is in the frame: the
+difference between where the app draws it and where the camera sees it is the
+compass error, measured rather than guessed. The frames come from the
+segmentation pass, so a sighting costs no capture — one threshold-and-flood-fill
+over a buffer that is already in memory (`src/vision/brightBodies.ts`). The
+ephemeris is [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT),
+which is topocentric and refracted: the moon's parallax is up to a degree and the
+atmosphere lifts a low sun by half of one, and both are being compared against a
+photograph of the thing itself.
+
+What makes it safe to believe is that elevation is an independent check. Turning
+the phone about the vertical moves a ray's azimuth and leaves its elevation
+exactly where it was, so how high a blob sits is a fact that does not depend on
+the heading being solved for — and it comes from gravity, which is not what is
+wrong with a compass. A street lamp is not at the sun's elevation. Past that
+gate a sighting must be repeated at the same implied bearing before it is used,
+and it then goes in as a measurement like the magnetometer's, carrying a
+standard deviation of a fraction of a degree against the compass's three to
+forty. No mode and no override: the Kalman gain snaps the north reference onto
+the sighting, holds it there, and lets it decay back to the compass over minutes
+if the sky clouds over. `CELESTIAL_ALIGNMENT` in `src/constants.ts`, and the SKY
+FIX debug page for what the last frame made of it.
+
+One thing that had to change for it to work at all. A magnetic bearing used to
+be fused on every reading, forty a second, which asserted that each was fresh
+evidence about where north is. What is wrong with a phone compass is a *bias*,
+and a bias does not average away — forty readings a second of the same captured
+field is one measurement repeated forty times, and counting it forty times is
+how the reference came to hold a half-degree standard deviation around a bearing
+thirty degrees wrong. That overconfidence is why two phones on one table each
+hold a different heading and neither wavers. The noise is now widened by the
+square root of how many readings fall inside the window over which a compass
+error holds still (`magneticCorrelationSeconds`), which leaves the compass its
+whole job of carrying the heading between sightings and costs it only the
+authority it never had.
 
 **What is up there** (`src/satellite/`, `src/data/`). The active catalog is
 downloaded from CelesTrak and cached for two hours (their rate limit, persisted
@@ -217,10 +256,10 @@ App.tsx / App.web.tsx   app entry / harness entry (bundler picks by platform)
 
 src/          the product, and nothing else
   constants.ts  tuning knobs, each with the measurement behind it
-  math/ camera/ coordinates/        quaternions, ENU -> frame, ECI -> ECEF
+  math/ camera/ coordinates/        quaternions, ENU -> frame, ECI -> ECEF, sun and moon
   satellite/ data/                  TLE parsing, SGP4 sweep, CelesTrak cache
-  device/ fusion/                   sensors, GPS, declination, attitude filter
-  vision/                           sky mask, segmentation loop, filters
+  device/ fusion/                   sensors, GPS, declination, attitude filter, sky fix
+  vision/                           sky mask, segmentation loop, filters, bright bodies
   boot/ debug/ hooks/ components/   startup gate, debug panel, glue, scene
 
 testing/      nothing here ships - see testing/README.md
@@ -393,16 +432,26 @@ running harness.
   decodes the JPEG. At one pass a second that should be affordable, but the cost
   and any preview hitch are unmeasured.
 - The device lens is assumed, not calibrated.
-- **North comes from the phone's compass, and a compass is a soft-failing
-  sensor.** A hard-iron bias — a magnetic case, a car door, a second phone on
-  the table — reads exactly like the field it corrupts: no dropout, no
-  shimmer, just a sky drawn steadily somewhere else. At mid latitudes the
-  horizontal component is about half the total, so 13 µT of bias is thirty
-  degrees of heading, which is most of the frame. The view reports what the
-  platform says about its own calibration and trusts the bearing accordingly
-  (`COMPASS_ACCURACY`), and asks for a figure-eight when it will not vouch for
-  it, but nothing here corrects a bias it cannot see. Comparing two phones is
-  the fastest way to be misled by this: yaw alone is measured from each
-  platform's own origin and the two will differ by any amount at all while both
-  are working — only `yaw + northOffset`, the "Aim" row on the STATUS page, is
-  a bearing.
+- **North comes from the phone's compass whenever the sky cannot be seen, and a
+  compass is a soft-failing sensor.** A hard-iron bias — a magnetic case, a car
+  door, a second phone on the table — reads exactly like the field it corrupts:
+  no dropout, no shimmer, just a sky drawn steadily somewhere else. At mid
+  latitudes the horizontal component is about half the total, so 13 µT of bias
+  is thirty degrees of heading, which is most of the frame. With the sun or the
+  moon in view this is now measured and corrected outright (above), and the
+  residual is a fraction of a degree for the badly-biased compasses that
+  motivated it. Without one — indoors, overcast, a moonless night — the view is
+  back to the magnetometer: it reports what the platform says about its own
+  calibration and trusts the bearing accordingly (`COMPASS_ACCURACY`), and asks
+  for a figure-eight when it will not vouch for it, but nothing corrects a bias
+  it cannot see. Comparing two phones is the fastest way to be misled: yaw alone
+  is measured from each platform's own origin and the two will differ by any
+  amount at all while both are working — only `yaw + northOffset`, the "Aim" row
+  on the STATUS page, is a bearing.
+- **A celestial fix is not remembered once the body is gone.** The correction
+  lives in the north reference's variance, so the magnetometer takes the heading
+  back as that reopens — inside half a minute for a compass the platform grades
+  high, five minutes for one it grades unusable. What would outlast it is
+  estimating the compass *bias* as a state and carrying it, which is a real
+  extension and a riskier one: a remembered bias is wrong the moment the
+  magnetic case comes off.

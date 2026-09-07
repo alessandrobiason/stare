@@ -13,7 +13,8 @@ import { aimOffsetDeg, aimToleranceDeg, AnchoredSkyMask } from "../vision/anchor
 import { applyHorizonPrior } from "../vision/horizonPrior";
 import { startSegmentationLoop } from "../vision/segmentationLoop";
 import { SkyMaskTemporalFilter, SkyMaskSensorSample } from "../vision/skyMaskTemporalFilter";
-import { segmentSky, SkyFrameGrabber } from "../vision/skySegmenter";
+import { FramePixels, segmentSky, SkyFrameGrabber } from "../vision/skySegmenter";
+import { Size } from "../vision/skySegmentation";
 
 /** How the segmentation loop has been getting on, for the debug overlay. */
 export type SkySegmentationStats = {
@@ -23,6 +24,34 @@ export type SkySegmentationStats = {
   lastPassMs: number | null;
   passes: number;
   failures: number;
+};
+
+/**
+ * A frame the segmenter has finished with, offered to whatever else has a
+ * question about the same pixels.
+ *
+ * The one thing that does is the celestial alignment, which looks for the sun
+ * or the moon in the picture to check the compass against
+ * (`useCelestialAlignment`). It is handed the frame from here rather than
+ * capturing its own because on a phone the capture *is* the cost — a still, a
+ * resample and a JPEG round trip, the better part of a second — and both
+ * questions are about the same piece of sky.
+ *
+ * The aim and the north reference travel with it for the same reason the mask's
+ * do: by the time anything reads this the phone has moved on, and a sighting
+ * placed against the attitude the phone has now would be placed against the
+ * wrong sky. See `AnchoredSkyMask`.
+ */
+export type SegmentedFrameSample = {
+  pixels: FramePixels;
+  /** The size those pixels are at: the model's input, not the frame's. */
+  size: Size;
+  /** Where the camera was aimed when the shutter fired. */
+  attitude: CameraAttitude;
+  /** The bearing to north that aim's heading was built with, at that instant. */
+  northOffsetDeg: number;
+  /** When the shutter fired, in `performance.now()` seconds. */
+  capturedAtSeconds: number;
 };
 
 export type SkySegmentation = {
@@ -113,7 +142,9 @@ export function useSkySegmentation(
    * Asks the frame source to put itself back together, if it is the sort that
    * can. See `SceneFrame.rebuild`.
    */
-  rebuildSource?: () => boolean
+  rebuildSource?: () => boolean,
+  /** Handed every frame a pass succeeded on, after the mask has been published. */
+  onFrame?: (frame: SegmentedFrameSample) => void
 ): SkySegmentation {
   const [mask, setMask] = useState<AnchoredSkyMask | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +159,8 @@ export function useSkySegmentation(
   onFatalRef.current = onFatal;
   const rebuildSourceRef = useRef(rebuildSource);
   rebuildSourceRef.current = rebuildSource;
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
 
   useEffect(() => {
     let active = true;
@@ -160,12 +193,25 @@ export function useSkySegmentation(
       // shutter cannot be recovered after the fact — hence the callback rather
       // than a timestamp handed back with the pixels. The same clock as the
       // filter, so the two agree.
-      let capture: { attitude: CameraAttitude; sample: SkyMaskSensorSample } | null = null;
+      let capture: {
+        attitude: CameraAttitude;
+        sample: SkyMaskSensorSample;
+        /**
+         * What the heading above was built with. Read here rather than when the
+         * frame comes back, because the celestial alignment turns a sighting
+         * into a correction *to this*, and the reference has moved a little in
+         * the second the capture took. See `CelestialSightingInput`.
+         */
+        northOffsetDeg: number;
+        capturedAtSeconds: number;
+      } | null = null;
       const onShutter = () => {
         const capturedAtSeconds = performance.now() / 1000;
         const attitude = orientationFilterRef.current.sample(capturedAtSeconds);
         capture = {
           attitude,
+          northOffsetDeg: orientationFilterRef.current.northOffsetDeg,
+          capturedAtSeconds,
           sample: {
             timestampSeconds: capturedAtSeconds,
             headingDeg: attitude.headingDeg,
@@ -177,12 +223,12 @@ export function useSkySegmentation(
       };
 
       try {
-        const raw = await segmentSky(grabber, onShutter);
+        const pass = await segmentSky(grabber, onShutter);
         if (!active) return;
         // A grabber that returned pixels without reporting a shutter would leave
         // the mask with no aim to be read at, which is not something to guess at.
         if (!capture) throw new Error("The frame was segmented without a shutter reading");
-        const { attitude, sample } = capture;
+        const { attitude, sample, northOffsetDeg, capturedAtSeconds } = capture;
 
         failures = 0;
         anchor = attitude;
@@ -199,12 +245,22 @@ export function useSkySegmentation(
         // returns and warps it into the next frame, so a mask cleared
         // afterwards would have its ground handed back by the very next blend.
         // Applied here it is carried forward with the attitude it was taken at.
-        const grounded = applyHorizonPrior(raw, attitude, lens);
+        const grounded = applyHorizonPrior(pass.mask, attitude, lens);
         // Published with `attitude` and not with the attitude the phone has by
         // now: the mask describes the frame the model was given, and the whole
         // point of carrying the aim along is that the two are a second apart.
         setMask({ mask: filterRef.current.update(grounded, sample), attitude });
         setError(null);
+
+        // After the mask, never before it: this is the second question about
+        // the frame and the first one is what the view is waiting on.
+        onFrameRef.current?.({
+          pixels: pass.pixels,
+          size: pass.size,
+          attitude,
+          northOffsetDeg,
+          capturedAtSeconds
+        });
       } catch (cause) {
         if (!active) return;
         landed = false;

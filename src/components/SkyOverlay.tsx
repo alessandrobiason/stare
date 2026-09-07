@@ -11,6 +11,7 @@ import { SKY_MASK_CHASE_FRACTION } from "../constants";
 import { cachedCatalog } from "../data/tleCache";
 import {
   catalogSection,
+  celestialSection,
   DebugSection,
   DebugSource,
   maskSection,
@@ -18,6 +19,7 @@ import {
   viewSection
 } from "../debug/sections";
 import { useAnimatedMarkers } from "../hooks/useAnimatedMarkers";
+import { useCelestialAlignment } from "../hooks/useCelestialAlignment";
 import { useLatestRef } from "../hooks/useLatestRef";
 import { useSkyPalette } from "../hooks/useSkyPalette";
 import { useSkySegmentation } from "../hooks/useSkySegmentation";
@@ -96,6 +98,15 @@ type Props = {
   onVisibleSatelliteCountChange: (count: number) => void;
   /** Told what the sky mask is doing, so a scene can show it. */
   onMaskStatusChange?: (status: string) => void;
+  /**
+   * Told when the heading stops being the compass's and becomes the sky's, and
+   * when it lapses back.
+   *
+   * Reported up rather than acted on here because the thing that changes is a
+   * phone's — the line asking for a compass calibration (`CompassNotice`), which
+   * a recording has no equivalent of. See `useCelestialAlignment.fixStanding`.
+   */
+  onSkyFixChange?: (standing: boolean) => void;
   /** Whether the debug overlays are drawn on top of the normal view. */
   debug: boolean;
   onToggleDebug: () => void;
@@ -107,6 +118,14 @@ type Props = {
    */
   skyMaskFiltering: boolean;
   onToggleSkyMaskFiltering: () => void;
+  /**
+   * Whether the sun and the moon are used to check the compass, and how to
+   * change it. On, the heading is corrected against whichever of them is in the
+   * frame; off, it is whatever the magnetometer says. See
+   * `useCelestialAlignment`.
+   */
+  celestialAlignment: boolean;
+  onToggleCelestialAlignment: () => void;
   /**
    * The scene's own debug pages, shown before the ones the view adds. Each
    * scene has a different answer to "where is this attitude coming from", and
@@ -140,10 +159,13 @@ export const SkyOverlay: React.FC<Props> = ({
   onEnableAll,
   onVisibleSatelliteCountChange,
   onMaskStatusChange,
+  onSkyFixChange,
   debug,
   onToggleDebug,
   skyMaskFiltering,
   onToggleSkyMaskFiltering,
+  celestialAlignment,
+  onToggleCelestialAlignment,
   sceneDebugSections
 }) => {
   const [fatal, setFatal] = useState<Error | null>(null);
@@ -165,6 +187,21 @@ export const SkyOverlay: React.FC<Props> = ({
   const palette = useSkyPalette(epochRef);
   const grabberRef = useLatestRef<SkyFrameGrabber | null>(frame.grabber);
 
+  // Checks the heading against the sun or the moon, on the frames the sky
+  // segmentation is capturing anyway. Declared before the segmentation because
+  // that is what hands it those frames — the second question about a picture
+  // that has already been paid for. See `useCelestialAlignment`.
+  const celestial = useCelestialAlignment({
+    epochRef,
+    lens: frame.lens,
+    orientationFilterRef: smoothed.filterRef,
+    enabled: celestialAlignment
+  });
+
+  // Destructured, because the object's identity changes whenever a fix starts or
+  // lapses and this is handed to the frame source, which redraws for it.
+  const { reset: resetCelestial } = celestial;
+
   const segmentation = useSkySegmentation(
     grabberRef,
     frame.lens,
@@ -172,7 +209,8 @@ export const SkyOverlay: React.FC<Props> = ({
     // What the segmentation filter warps its previous mask by.
     smoothed.readingRef,
     setFatal,
-    frame.rebuild
+    frame.rebuild,
+    celestial.onFrame
   );
 
   const {
@@ -239,6 +277,11 @@ export const SkyOverlay: React.FC<Props> = ({
       chaseAtDeg: aimToleranceDeg(frame.lens, SKY_MASK_CHASE_FRACTION),
       nowMs: performance.now()
     }),
+    celestialSection({
+      stats: celestial.statsRef.current,
+      checking: { on: celestialAlignment, onToggle: onToggleCelestialAlignment },
+      nowSeconds: performance.now() / 1000
+    }),
     skySection({
       tracker: tracker.stats(),
       markers: markerStatsRef.current,
@@ -267,14 +310,20 @@ export const SkyOverlay: React.FC<Props> = ({
     onMaskStatusChangeRef.current?.(maskStatus);
   }, [maskStatus, onMaskStatusChangeRef]);
 
+  const onSkyFixChangeRef = useLatestRef(onSkyFixChange);
+  useEffect(() => {
+    onSkyFixChangeRef.current?.(celestial.fixStanding);
+  }, [celestial.fixStanding, onSkyFixChangeRef]);
+
   const onDiscontinuity = useCallback(() => {
     // Frames are no longer contiguous, so the mask prior is worthless — and so
     // is an attitude estimate built from the frames before the jump, or what
     // each marker had settled on about the sky it was crossing.
     segmentation.reset();
     smoothed.reset();
+    resetCelestial();
     resetMarkers();
-  }, [resetMarkers, segmentation, smoothed]);
+  }, [resetCelestial, resetMarkers, segmentation, smoothed]);
 
   // Thrown during render so `FatalErrorBoundary` can catch it: an async failure
   // in the segmentation loop has no call stack React can see, and the view must

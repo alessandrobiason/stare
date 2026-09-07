@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@shopify/react-native-skia": "2.6.2",
+    "astronomy-engine": "^2.1.19",
     "expo": "^57.0.0",
     "expo-asset": "~57.0.13",
     "expo-camera": "~57.0.4",

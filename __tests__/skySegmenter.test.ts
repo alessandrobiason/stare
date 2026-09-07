@@ -1,4 +1,4 @@
-import { maskGridFor, Size } from "../src/vision/skySegmentation";
+import { maskGridFor, modelInputSize, Size } from "../src/vision/skySegmentation";
 import { segmentSky, ShutterCallback, SkyFrameGrabber } from "../src/vision/skySegmenter";
 
 /** What happened, in the order it happened, across one pass. */
@@ -36,7 +36,7 @@ function slowGrabber(): SkyFrameGrabber {
 
 test("the shutter is reported before the work the frame is put through", async () => {
   const seen: string[] = [];
-  const mask = await segmentSky(slowGrabber(), () => seen.push("read the attitude"));
+  const pass = await segmentSky(slowGrabber(), () => seen.push("read the attitude"));
 
   // The mask is aimed by the attitude read at the shutter, so that reading has
   // to happen while the camera is still on the frame being segmented — not after
@@ -46,5 +46,11 @@ test("the shutter is reported before the work the frame is put through", async (
   expect(mockOrder).toEqual(["shutter", "pixels", "model"]);
 
   // And the pass is otherwise the pass it was: a mask over the frame's own grid.
-  expect({ columns: mask.columns, rows: mask.rows }).toEqual(maskGridFor(FRAME));
+  expect({ columns: pass.mask.columns, rows: pass.mask.rows }).toEqual(maskGridFor(FRAME));
+
+  // The pixels the model was shown come back with it, at the size it was given
+  // them: the celestial alignment reads the same frame rather than capturing
+  // another one. See `SegmentedFrame`.
+  expect(pass.size).toEqual(modelInputSize(FRAME));
+  expect(pass.pixels.pixels.length).toBe(pass.size.width * pass.size.height * 4);
 });

@@ -1,6 +1,7 @@
 import {
   aimReadout,
   catalogSection,
+  celestialSection,
   deviceSensorSection,
   maskSection,
   skySection,
@@ -430,4 +431,90 @@ test("both modes name their sensors page the same, so the menu does not move", (
       replayStart: new Date()
     }).id
   );
+});
+
+
+describe("the sky-fix page", () => {
+  const sighting = {
+    body: "sun" as const,
+    northOffsetDeg: -12,
+    correctionDeg: -28.4,
+    noiseDeg: 0.62,
+    at: { left: 41.2, top: 63.8 },
+    altitudeDeg: 34.5,
+    elevationResidualDeg: 0.3,
+    offAxisDeg: 11.4
+  };
+  const checking = { on: true, onToggle: () => undefined };
+
+  test("says what the compass was out by, which is the figure the page is for", () => {
+    const rows = values(
+      celestialSection({
+        stats: {
+          status: "sun: -28.4° at ±0.6°",
+          looking: "sun",
+          applied: sighting,
+          appliedAtSeconds: 100,
+          frames: 40,
+          sightings: 12,
+          fixes: 11
+        },
+        checking,
+        nowSeconds: 102.5
+      }).rows
+    );
+
+    // The correction, not the bearing: what the sighting *changed* is what says
+    // how wrong the magnetometer was, and it is read against the platform's own
+    // grade of the same compass on the sensors page.
+    expect(rows["Fix applied"]).toBe("sun -28.4° at ±0.62°");
+    expect(rows["Age"]).toBe("2.5 s");
+    expect(rows["Found at"]).toBe("41%, 64% · 11.4° off axis");
+    expect(rows["Elevation"]).toBe("34.5° up · 0.3° residual");
+    expect(rows["Frames"]).toBe("40 seen · 12 sighted · 11 used");
+  });
+
+  test("a page with nothing to report still says what it is waiting for", () => {
+    const section = celestialSection({
+      stats: {
+        status: "Neither body between 10° and 70° up",
+        looking: "nothing up",
+        applied: null,
+        appliedAtSeconds: null,
+        frames: 3,
+        sightings: 0,
+        fixes: 0
+      },
+      checking,
+      nowSeconds: 10
+    });
+    const rows = values(section.rows);
+
+    expect(rows["Bodies up"]).toBe("nothing up");
+    expect(rows["Fix applied"]).toBe("—");
+    // No age for a fix that never landed, rather than a figure counted from
+    // nothing.
+    expect(rows).not.toHaveProperty("Age");
+    expect(rows["Usable band"]).toBe("10–70° up");
+  });
+
+  test("the switch that tells a corrected heading from an uncorrected one", () => {
+    const section = celestialSection({
+      stats: {
+        status: "",
+        looking: "sun",
+        applied: null,
+        appliedAtSeconds: null,
+        frames: 0,
+        sightings: 0,
+        fixes: 0
+      },
+      checking: { on: false, onToggle: () => undefined },
+      nowSeconds: 0
+    });
+
+    expect(section.switches).toEqual([
+      { label: "Check compass against the sky", on: false, onToggle: expect.any(Function) }
+    ]);
+  });
 });

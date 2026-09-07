@@ -64,6 +64,36 @@ export function northOffsetNoiseDeg(accuracy: number | undefined): number {
   return byLevel[level];
 }
 
+/**
+ * How far to trust one magnetic bearing, having accounted for the fact that the
+ * reading before it said very nearly the same thing for the same reason.
+ *
+ * The grade the platform gives its compass describes the *error* of a bearing,
+ * and on a phone that error is dominated by a bias — a magnet, a steel desk,
+ * another phone — which is the same from one reading to the next. Fusing forty
+ * of those a second as independent measurements divides their noise by the
+ * square root of forty and leaves the reference certain of a wrong bearing,
+ * which is the failure this whole file's north term exists around.
+ *
+ * So the quoted noise is widened by the square root of how many readings fall
+ * inside the window over which the error holds still
+ * (`ORIENTATION_FILTER.magneticCorrelationSeconds`). The effect is that the
+ * compass delivers one honest bearing per window however fast it is sampled:
+ * the reference converges to the accuracy the compass actually has, a sighting
+ * of the sun can outweigh it, and nothing else about the filter changes.
+ *
+ * Widening rather than fusing every nth reading, because the two are only
+ * equivalent for white noise. A phone's magnetic noise is not: it has
+ * structure at the frame rate, and sampling that at a fixed interval aliases
+ * it into a standing offset.
+ */
+function magneticNoiseDeg(measurement: AttitudeMeasurement, elapsedSeconds: number): number {
+  const quoted = measurement.northOffsetNoiseDeg ?? ORIENTATION_FILTER.magneticNoiseDeg;
+  const interval = Math.max(elapsedSeconds, ORIENTATION_FILTER.minimumMagneticIntervalSeconds);
+  const readings = ORIENTATION_FILTER.magneticCorrelationSeconds / interval;
+  return quoted * Math.sqrt(Math.max(1, readings));
+}
+
 function gyroMagnitudeDegPerSecond(measurement: AttitudeMeasurement): number {
   const gyro = measurement.gyroRadPerSecond;
   return gyro ? toDegrees(Math.hypot(gyro.x, gyro.y, gyro.z)) : 0;
@@ -106,6 +136,44 @@ export class OrientationFilter {
     this.lastTimestampSeconds = null;
   }
 
+  /**
+   * The bearing the heading is currently being built with: where the attitude
+   * source's yaw origin is thought to sit relative to north.
+   *
+   * Read by the celestial alignment at the moment a frame is captured, because
+   * what a sighting of the sun measures is the *heading*, and turning that back
+   * into a correction to this needs the value this had when that heading was
+   * produced — a second earlier, by the time the frame has come back. See
+   * `CelestialSightingInput.northOffsetDeg`.
+   */
+  get northOffsetDeg(): number {
+    return this.northReference.angle;
+  }
+
+  /**
+   * Corrects that bearing from something other than the magnetometer.
+   *
+   * The same state and the same filter the magnetic readings correct, on
+   * purpose. A sighting of the sun arrives with a standard deviation of a
+   * fraction of a degree against the compass's three to forty, so the Kalman
+   * gain does all of the work an override would have done — the reference snaps
+   * onto the sighting, and the magnetometer's next several hundred readings
+   * barely move it because its variance has collapsed. It then decays back
+   * towards the compass as `predict` reopens that variance — measured at about
+   * half a minute for a compass the platform grades high and five for one it
+   * will not vouch for — which is the right behaviour for a fix that is no
+   * longer being renewed and would have taken a mode flag and an unwind to
+   * arrange by hand. The corollary is that the correction is not remembered:
+   * see the note in the README on estimating the compass bias instead.
+   *
+   * No `predict` here: this arrives between readings, and the next `update`
+   * advances the reference over the whole interval either way. That slightly
+   * over-widens the estimate, which is the safe direction.
+   */
+  correctNorthOffset(bearingDeg: number, noiseDeg: number): void {
+    this.northReference.correct(bearingDeg, noiseDeg);
+  }
+
   /** Fuses one reading and returns the smoothed attitude at its timestamp. */
   update(measurement: AttitudeMeasurement): SmoothedOrientation {
     const previous = this.lastTimestampSeconds;
@@ -127,7 +195,7 @@ export class OrientationFilter {
       // unusable has to be taken as one rather than fused as if it were good.
       this.northReference.correct(
         measurement.northOffsetDeg,
-        measurement.northOffsetNoiseDeg ?? ORIENTATION_FILTER.magneticNoiseDeg
+        magneticNoiseDeg(measurement, elapsed)
       );
     }
 
