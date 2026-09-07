@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     // notice beside it holds its own edge clear of the same figure.
     minWidth: 92,
     paddingHorizontal: 14,
-    borderRadius: 19,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: theme.color.divider,
     alignItems: "center",
