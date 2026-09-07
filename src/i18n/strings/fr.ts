@@ -21,7 +21,8 @@ export const fr: Strings = {
         where: "En haut à gauche",
         meaning:
           "Combien de satellites sont dessinés en ce moment — pas combien il en existe. " +
-          "Ce qui est sous l'horizon ou derrière un mur ne compte pas."
+          "Ce qui est sous l'horizon ou derrière un mur ne compte pas. Touchez-le pour " +
+          "voir lesquels."
       },
       filter: {
         where: "En haut à droite",
@@ -64,7 +65,12 @@ export const fr: Strings = {
   },
   scene: {
     visibleSatellites: "{count} satellites visibles",
-    markers: "Marques des satellites"
+    markers: "Marques des satellites",
+    breakdown: {
+      title: "EN VUE",
+      empty: "Rien en vue",
+      other: "Autres"
+    }
   },
   filter: {
     title: "FILTRE",

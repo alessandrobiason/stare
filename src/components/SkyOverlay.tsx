@@ -27,6 +27,7 @@ import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrie
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
+import { FleetBreakdown } from "../satellite/fleets";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
@@ -35,6 +36,7 @@ import { strings } from "../i18n";
 import { DebugPanel } from "./DebugPanel";
 import { DebugToggle } from "./DebugToggle";
 import { markersUnder } from "./markerHitTest";
+import { pressPoint } from "./pressPoint";
 import { SatelliteCard } from "./SatelliteCard";
 import { SatelliteMarkers } from "./SatelliteMarkers";
 import { SkyMaskOverlay } from "./SkyMaskOverlay";
@@ -96,7 +98,8 @@ type Props = {
   enabledCategories: Set<SatelliteCategory>;
   onToggleCategory: (category: SatelliteCategory) => void;
   onEnableAll: () => void;
-  onVisibleSatelliteCountChange: (count: number) => void;
+  /** Told how many markers are drawn, and what they are: see `SceneStatus`. */
+  onVisibleSatelliteCountChange: (count: number, fleets: FleetBreakdown) => void;
   /** Told what the sky mask is doing, so a scene can show it. */
   onMaskStatusChange?: (status: string) => void;
   /**
@@ -253,15 +256,13 @@ export const SkyOverlay: React.FC<Props> = ({
    * between the markers is how a card is dismissed, which is the gesture
    * anything drawn over a photograph has to honour.
    */
-  const onTapSky = ({ nativeEvent }: GestureResponderEvent) => {
-    const { locationX, locationY } = nativeEvent;
-    // A press raised by a keyboard rather than by a finger carries no point.
-    if (!frameStyle || !Number.isFinite(locationX) || !Number.isFinite(locationY)) return;
+  const onTapSky = (event: GestureResponderEvent) => {
+    // Where the press landed is a platform question, and `pressPoint` is the
+    // whole of it: React Native measures it, the web has to be measured.
+    const point = pressPoint(event);
+    if (!frameStyle || !point) return;
 
-    const hits = markersUnder(latestFrameRef.current, frameStyle, {
-      x: locationX,
-      y: locationY
-    });
+    const hits = markersUnder(latestFrameRef.current, frameStyle, point);
     const names = hits.map((hit) => hit.name);
     setSelection(names.length === 0 ? null : { names, selected: names[0] });
   };

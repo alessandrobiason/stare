@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { allCategories, SatelliteCategory } from "../satellite/categories";
+import { FleetBreakdown } from "../satellite/fleets";
 
 export type SceneControls = {
   enabledCategories: Set<SatelliteCategory>;
@@ -7,7 +8,12 @@ export type SceneControls = {
   enableAllCategories: () => void;
   /** Reported from the render loop; React bails out when the value is unchanged. */
   markerCount: number;
-  setMarkerCount: (count: number) => void;
+  /**
+   * What those markers are, by fleet — what the count opens into when it is
+   * tapped (`SceneStatus`). Published by the same loop, on the same tick.
+   */
+  markerFleets: FleetBreakdown;
+  setMarkerCount: (count: number, fleets: FleetBreakdown) => void;
   /**
    * Which of the two view modes is running: normal, or normal plus the debug
    * overlays. Off on open — debug is what someone asks for, not what they land in.
@@ -34,18 +40,31 @@ export type SceneControls = {
   toggleCelestialAlignment: () => void;
 };
 
+/** Nothing counted yet: the breakdown a scene shows before its first frame. */
+const NO_FLEETS: FleetBreakdown = { rows: [], other: 0 };
+
 /**
  * The controls both scenes carry: which categories are drawn, how many markers
- * the last frame placed, and whether the debug overlays are up. The same sky
- * either way, so the same controls — a phone and the replay behave identically.
+ * the last frame placed and what they are, and whether the debug overlays are
+ * up. The same sky either way, so the same controls — a phone and the replay
+ * behave identically.
  */
 export function useSceneControls(): SceneControls {
   const [enabledCategories, setEnabledCategories] =
     useState<Set<SatelliteCategory>>(allCategories);
-  const [markerCount, setMarkerCount] = useState(0);
+  const [markerCount, setCount] = useState(0);
+  const [markerFleets, setFleets] = useState<FleetBreakdown>(NO_FLEETS);
   const [debug, setDebug] = useState(false);
   const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
   const [celestialAlignment, setCelestialAlignment] = useState(true);
+
+  // One callback for the two, because the loop publishes them together: handed
+  // over separately they would be two state updates for one tick of the same
+  // figure, and a render in between showing a count the breakdown disagrees with.
+  const publishMarkers = useCallback((count: number, fleets: FleetBreakdown) => {
+    setCount(count);
+    setFleets(fleets);
+  }, []);
 
   const toggleCategory = useCallback((category: SatelliteCategory) => {
     setEnabledCategories((current) => {
@@ -65,7 +84,8 @@ export function useSceneControls(): SceneControls {
     toggleCategory,
     enableAllCategories,
     markerCount,
-    setMarkerCount,
+    markerFleets,
+    setMarkerCount: publishMarkers,
     debug,
     toggleDebug,
     skyMaskFiltering,

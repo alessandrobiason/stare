@@ -148,7 +148,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         }}
       />
 
-      <SceneStatus markerCount={controls.markerCount} />
+      <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
     </View>
   );
 };

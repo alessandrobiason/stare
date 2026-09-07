@@ -16,7 +16,9 @@ export const ko: Strings = {
       body: "하늘 주위에 네 가지가 있습니다. 이게 전부입니다.",
       count: {
         where: "왼쪽 위",
-        meaning: "지금 그려진 위성의 수입니다. 전체 개수가 아니며, 지평선 아래나 건물에 가린 것은 세지 않습니다."
+        meaning:
+          "지금 그려진 위성의 수입니다. 전체 개수가 아니며, 지평선 아래나 건물에 가린 것은 세지 않습니다. " +
+          "탭하면 어떤 위성인지 보여 줍니다."
       },
       filter: {
         where: "오른쪽 위",
@@ -52,7 +54,12 @@ export const ko: Strings = {
   },
   scene: {
     visibleSatellites: "보이는 위성 {count}개",
-    markers: "위성 표시"
+    markers: "위성 표시",
+    breakdown: {
+      title: "보이는 위성",
+      empty: "보이는 위성이 없습니다",
+      other: "기타"
+    }
   },
   filter: {
     title: "필터",
