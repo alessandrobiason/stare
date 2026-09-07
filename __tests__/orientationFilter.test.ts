@@ -49,6 +49,12 @@ describe("how far a bearing to north is trusted", () => {
     // The first correction seeds the estimate outright and the next few behave
     // like a running average whatever the noise is — what the grade buys is the
     // *steady-state* gain, which is where the ratio between the two lives.
+    //
+    // Two minutes of it, because settling is slower than it looks: a bearing is
+    // fused with its noise widened for how correlated the readings are
+    // (`magneticCorrelationSeconds`), and the poor grade starts from a variance
+    // that much larger. Ten seconds left it still on its way down, and a
+    // reference still falling has a gain higher than the one being compared.
     const headingAfterJump = (noiseDeg: number): number => {
       const filter = new OrientationFilter();
       let timestampSeconds = 0;
@@ -58,7 +64,7 @@ describe("how far a bearing to north is trusted", () => {
         );
         timestampSeconds += RATE;
       };
-      for (let step = 0; step < 600; step += 1) feed(0);
+      for (let step = 0; step < 7200; step += 1) feed(0);
       for (let step = 0; step < 30; step += 1) feed(40);
       return filter.sample(timestampSeconds).headingDeg;
     };

@@ -1,4 +1,5 @@
 import {
+  CELESTIAL_ALIGNMENT,
   COMPASS_ACCURACY,
   MINIMUM_SATELLITE_ELEVATION_DEG,
   SATELLITE_TRACKING,
@@ -9,6 +10,7 @@ import {
   TLE_RETRY_INTERVAL_MS
 } from "../constants";
 import { CameraAttitude } from "../camera/attitude";
+import { CelestialAlignmentStats } from "../hooks/useCelestialAlignment";
 import { CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
@@ -197,6 +199,96 @@ export function maskSection({
     rows,
     switches: [
       { label: "Hide behind terrain", on: filtering.on, onToggle: filtering.onToggle }
+    ]
+  };
+}
+
+export type CelestialDebugInput = {
+  stats: CelestialAlignmentStats;
+  /**
+   * Whether the sky is being used to check the compass, and how to change it.
+   *
+   * A switch rather than a setting, and it belongs on a debug page rather than
+   * in the app, because there is nothing here for anyone to decide: with it on
+   * the heading is right whenever the sun is out, and with it off the heading is
+   * whatever the magnetometer says. What it is for is telling the two apart —
+   * turning it off is how a heading that moved is confirmed to have moved
+   * because of this rather than in spite of it.
+   */
+  checking: { on: boolean; onToggle: () => void };
+  /** `performance.now()` seconds when the panel sampled, for the fix's age. */
+  nowSeconds: number;
+};
+
+/**
+ * What the sky has had to say about the compass.
+ *
+ * The page to read when two phones side by side disagree about which way they
+ * are pointing, which is the thing this exists for. The magnetometer cannot be
+ * checked against anything else on the phone — a hard-iron bias reads exactly
+ * like the field it corrupts — so the only way to know a heading is right is to
+ * find something in the frame whose bearing is already known, and the sun is
+ * that thing. If "Fix applied" says a correction of thirty degrees, thirty
+ * degrees is what the compass was out by.
+ */
+export function celestialSection({
+  stats,
+  checking,
+  nowSeconds
+}: CelestialDebugInput): DebugSection {
+  const { applied } = stats;
+  const rows: DebugRow[] = [
+    { label: "Bodies up", value: stats.looking },
+    { label: "Last frame", value: stats.status, wrap: true }
+  ];
+
+  if (applied) {
+    // The correction rather than the bearing: what the sighting *changed* is
+    // the figure that says how wrong the compass was, and it is the one worth
+    // reading against `COMPASS_ACCURACY`'s grade of the same compass.
+    rows.push({
+      label: "Fix applied",
+      value: `${applied.body} ${applied.correctionDeg >= 0 ? "+" : ""}${degrees(applied.correctionDeg)} at ±${degrees(applied.noiseDeg, 2)}`
+    });
+    rows.push({
+      label: "Age",
+      value:
+        stats.appliedAtSeconds === null
+          ? NONE
+          : `${fixed(nowSeconds - stats.appliedAtSeconds, 1)} s`
+    });
+    // Where it was in the frame and how far up: between them these are most of
+    // the sighting's noise, so a fix that looks poor is explained here.
+    rows.push({
+      label: "Found at",
+      value: `${fixed(applied.at.left, 0)}%, ${fixed(applied.at.top, 0)}% · ${degrees(applied.offAxisDeg)} off axis`
+    });
+    rows.push({
+      label: "Elevation",
+      value: `${degrees(applied.altitudeDeg)} up · ${degrees(applied.elevationResidualDeg)} residual`
+    });
+  } else {
+    rows.push({ label: "Fix applied", value: NONE });
+  }
+
+  rows.push({
+    label: "Frames",
+    value: `${stats.frames} seen · ${stats.sightings} sighted · ${stats.fixes} used`
+  });
+  // The band a body has to be in before it is looked for at all, so a page
+  // reading "nothing up" in broad daylight is explained by the sun being
+  // overhead rather than by the detection having failed.
+  rows.push({
+    label: "Usable band",
+    value: `${CELESTIAL_ALIGNMENT.minimumAltitudeDeg}–${CELESTIAL_ALIGNMENT.maximumAltitudeDeg}° up`
+  });
+
+  return {
+    id: "celestial",
+    title: "SKY FIX",
+    rows,
+    switches: [
+      { label: "Check compass against the sky", on: checking.on, onToggle: checking.onToggle }
     ]
   };
 }

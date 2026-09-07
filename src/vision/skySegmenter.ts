@@ -79,6 +79,25 @@ export async function preloadSkySegmenter(): Promise<void> {
 }
 
 /**
+ * A completed pass: what the model made of the frame, and the frame itself.
+ *
+ * The pixels are handed back rather than dropped because there is a second
+ * question worth asking of the same picture — whether the sun or the moon is in
+ * it, which is what tells the app whether its compass is lying
+ * (`src/vision/brightBodies.ts`). Asking it here costs nothing: the capture,
+ * the resample and the JPEG round trip have all already been paid for, and on a
+ * phone they are the entire cost. Taking a second frame for it would have
+ * doubled the most expensive thing this app does, to look at the same sky.
+ */
+export type SegmentedFrame = {
+  mask: SkyMask;
+  /** Exactly the pixels the model was given. */
+  pixels: FramePixels;
+  /** And the size they are at, which is the model's input rather than the frame's. */
+  size: Size;
+};
+
+/**
  * Segments the sky in the frame `grabber` is showing.
  *
  * `onShutter` fires when that frame is taken rather than when the mask comes
@@ -88,14 +107,18 @@ export async function preloadSkySegmenter(): Promise<void> {
 export async function segmentSky(
   grabber: SkyFrameGrabber,
   onShutter: ShutterCallback = () => undefined
-): Promise<SkyMask> {
+): Promise<SegmentedFrame> {
   const frame = grabber.size();
   if (!frame) throw new Error("Sky segmentation has no frame to read");
 
   const model = await loadModel();
   const input = modelInputSize(frame);
-  const { pixels, channels } = await grabber.grab(input, onShutter);
-  const logits = await model.run(toModelTensor(pixels, input, channels), input);
+  const captured = await grabber.grab(input, onShutter);
+  const logits = await model.run(toModelTensor(captured.pixels, input, captured.channels), input);
 
-  return poolSkyLogits(logits, input, maskGridFor(frame));
+  return {
+    mask: poolSkyLogits(logits, input, maskGridFor(frame)),
+    pixels: captured,
+    size: input
+  };
 }

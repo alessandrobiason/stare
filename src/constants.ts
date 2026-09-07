@@ -540,6 +540,48 @@ export const ORIENTATION_FILTER = {
    * enough not to sit a degree behind real drift.
    */
   magneticDriftDegPerRootSecond: 0.4,
+  /**
+   * How long a phone compass's error stays the same, in seconds — the window
+   * over which its readings are one measurement rather than many.
+   *
+   * The readings arrive around forty a second and used to be fused at forty a
+   * second, which quietly asserted that each was fresh evidence about where
+   * north is. They are not. What is wrong with a phone compass is a *bias* — a
+   * magnet in a case, a steel desk, another phone on the same table — and a
+   * bias does not average away. Forty readings a second of the same captured
+   * field is one piece of information repeated forty times, and counting it
+   * forty times is what let the reference settle to a standard deviation of
+   * half a degree around a bearing that was thirty degrees wrong.
+   *
+   * That overconfidence is not academic: it is exactly why two phones side by
+   * side each hold a different heading and neither wavers. It is also what a
+   * sighting of the sun has to argue against, and against forty readings a
+   * second the sighting loses on arithmetic however much sharper it is.
+   *
+   * So the noise a magnetic bearing is fused with is widened by the square root
+   * of how many readings fall inside this window, which is the standard
+   * correction for correlated samples and leaves the *rate* of information
+   * unchanged at one honest reading per window. Widening rather than dropping
+   * readings, because a compass whose noise happens to be periodic — and a
+   * phone's is, at the frame rate — would be aliased by taking every nth one,
+   * and sampled at the wrong phase a systematic error is what comes out.
+   *
+   * Half a second is well inside the drift the reference is allowed anyway
+   * (`magneticDriftDegPerRootSecond`), so the compass keeps its whole job of
+   * carrying the heading between sightings and loses only the authority it
+   * never had.
+   */
+  magneticCorrelationSeconds: 0.5,
+  /**
+   * Shortest reading interval the widening above will assume, in seconds.
+   *
+   * Two readings arriving at the same timestamp — the first of a session, or a
+   * motion and a magnetometer sample publishing together — would otherwise
+   * divide by nothing. A hundred hertz is faster than either sensor is asked
+   * for (`UPDATE_INTERVAL_MS`), so it bounds the widening without ever being
+   * the figure in normal running.
+   */
+  minimumMagneticIntervalSeconds: 0.01,
   /** Angular acceleration allowed while the device is still, in deg/s^2. */
   baseAngularAccelerationDegPerSecondSquared: 10,
   /** Extra angular acceleration allowed per deg/s of measured turn rate. */
@@ -581,6 +623,170 @@ export const COMPASS_ACCURACY = {
   warnAtOrBelow: 2,
   /** What each level is called, indexed by it, for the readouts. */
   names: ["unusable", "low", "medium", "high"]
+} as const;
+
+/**
+ * How the sun and the moon are turned into a bearing, and how far that bearing
+ * is trusted (`src/fusion/celestialNorth.ts`).
+ *
+ * The compass is the only thing aiming this view that has no check on it. It
+ * fails silently and plausibly (`COMPASS_ACCURACY`), the platform's own grade of
+ * it is a coarse four-level guess, and nothing else on the phone knows which way
+ * is north. But something in the picture does: on a clear day the sun is in the
+ * frame, its bearing is known to an arcminute from the clock and the GPS fix,
+ * and the difference between where it is drawn and where it is seen is the
+ * compass error outright — no calibration, no figure-eight, and nothing for the
+ * person holding the phone to do.
+ *
+ * The figures below are all about not believing the wrong bright thing. A
+ * street lamp, a window catching the sun and the moon are the same blob to a
+ * threshold, and a sighting that is accepted is worth thirty degrees of heading,
+ * so the gates are set to throw away far more than they let through.
+ */
+export const CELESTIAL_ALIGNMENT = {
+  /**
+   * How far above the horizon a body must be before it is looked for.
+   *
+   * Below this the sighting is worth little and wrong often: refraction is
+   * lifting the disc by a third of a degree and rising, the air is thick enough
+   * to redden and spread it, and the horizon is where the lamps, headlights and
+   * lit windows that could be mistaken for it all live.
+   */
+  minimumAltitudeDeg: 10,
+  /**
+   * And how far up it stops being a bearing at all.
+   *
+   * Azimuth is ill-conditioned near the zenith — the same angular error in the
+   * sighting spans `1 / cos(altitude)` times as much of it — so a sun overhead
+   * says almost nothing about which way the phone is facing. The noise model
+   * below already carries that factor; this is where it has grown large enough
+   * (about three) that the sighting is not worth the risk of having found the
+   * wrong thing.
+   */
+  maximumAltitudeDeg: 70,
+  /**
+   * How far the sighting's own elevation may sit from the ephemeris before it
+   * is thrown away.
+   *
+   * This is the gate that does nearly all the work, and it is free: elevation
+   * comes from pitch and roll, which are gravity's, and gravity is not what is
+   * wrong with a compass. It is also independent of the heading being solved
+   * for — turning the phone about the vertical moves a ray's azimuth and leaves
+   * its elevation alone — so it tests the sighting without assuming the answer.
+   *
+   * A street lamp at four degrees is not a sun at forty; a reflection in a
+   * window is at the wrong height almost always. Four degrees covers the
+   * attitude filter's own error and the lens being assumed rather than
+   * measured, and admits very little else.
+   */
+  elevationAgreementDeg: 4,
+  /**
+   * The largest heading correction a sighting is allowed to ask for.
+   *
+   * A compass captured by a magnet is tens of degrees out, which is the whole
+   * point of this, so the bound has to be generous. Past it the disagreement is
+   * more likely to be a sighting of the wrong object than a compass that wrong,
+   * and adopting it would swing the view somewhere new and confident.
+   */
+  maximumCorrectionDeg: 80,
+  /**
+   * How far two consecutive sightings may disagree and still count as the same
+   * body seen twice.
+   *
+   * Nothing is fed to the filter on one sighting. Two agreeing is what
+   * separates the sun from the one bright thing that happened to pass every
+   * other gate: a false positive has to be repeated, at the same implied
+   * bearing, from a frame the phone has usually moved between — which a
+   * reflection does not manage and the sun does trivially.
+   */
+  agreementDeg: 3,
+  /**
+   * How long a sighting stands as something for the next one to agree with.
+   *
+   * Longer than the gap between segmentation passes by enough to survive a few
+   * failed ones, and short enough that two sightings either side of it are not
+   * treated as consecutive: the phone can be carried a long way in half a
+   * minute, and the agreement test assumes the two are of the same sky.
+   */
+  holdSeconds: 20,
+  /**
+   * Angular error assumed in a sighting at the centre of the frame, in degrees,
+   * before the two terms below are applied.
+   *
+   * Covers the centroid — the disc is a few pixels across at the model's input
+   * size and its centre is found to well inside one — together with the pitch
+   * and roll the ray is built from. It is deliberately several times the
+   * arcminute the ephemeris itself is good to: what is uncertain here is the
+   * phone, never the sky.
+   */
+  baseNoiseDeg: 0.4,
+  /**
+   * Extra angular error per degree away from the centre of the frame, as a
+   * fraction of that angle.
+   *
+   * The lens is assumed rather than calibrated — `DEVICE_CAMERA` is one focal
+   * length for every phone the app runs on — so a sighting's angle off the
+   * optical axis is only as good as that figure. The error is proportional to
+   * the angle, which is what makes a body near the middle of the frame worth
+   * several near its corner, and the filter weighs them accordingly instead of
+   * the code having to choose.
+   */
+  lensNoiseFraction: 0.04,
+  /**
+   * Luminance below the frame's brightest pixel at which a blob stops being
+   * part of it, and the floor no blob may be dimmer than.
+   *
+   * Relative rather than absolute because the same numbers have to find a sun
+   * that has saturated the sensor and a moon that has not. Both are the
+   * brightest thing in their own frame by a distance; nothing else in daylight
+   * is within forty counts of the sun, and at night the moon clears the sky
+   * around it by far more than that.
+   */
+  peakDropCounts: 40,
+  minimumPeakLuminance: 150,
+  /**
+   * Bounds on the disc, as the angular radius of a circle of the blob's area.
+   *
+   * The sun and the moon are both about a quarter of a degree in radius and the
+   * camera makes both bigger — a saturated sun blooms across a good part of a
+   * degree, more through haze. The floor throws out a hot pixel and a distant
+   * lamp; the ceiling throws out the case this would otherwise fail worst on, a
+   * bright overcast where a whole quarter of the sky passes a relative
+   * threshold and its centroid is nothing at all.
+   */
+  minimumRadiusDeg: 0.1,
+  maximumRadiusDeg: 6,
+  /** Pixels a blob must cover before its centroid is worth taking. */
+  minimumBlobPixels: 4,
+  /**
+   * How many bright blobs are pulled out of a frame and offered to the gates.
+   *
+   * More than one because the brightest thing in the frame is not always the
+   * one being looked for — a window returning the sun can out-read the sun
+   * itself once the sun is behind haze — and the gates, not the ranking, are
+   * what decides. Kept small because each one costs a flood fill, and because a
+   * frame that needs more than a few has too much in it to be sure about: a
+   * body is only accepted when exactly one candidate passes.
+   */
+  candidateBlobs: 4,
+  /**
+   * How long after the last sighting the heading is still the sky's rather than
+   * the compass's, in seconds.
+   *
+   * Not a property of this code but a measurement of what the filter does with
+   * it. A sighting collapses the north reference's variance; the random walk
+   * then reopens it (`magneticDriftDegPerRootSecond`) and the magnetometer
+   * gradually takes the reference back. How gradually depends on the grade: a
+   * compass the platform vouches for reclaims it inside half a minute, one it
+   * grades unusable takes five.
+   *
+   * Thirty seconds is the fast end of that, which is the safe end for what this
+   * is used for — deciding whether to stop asking someone to calibrate a
+   * compass that is no longer aiming anything. Wrong in this direction, the app
+   * asks for a figure-eight that was not needed; wrong the other way, it stays
+   * silent about a compass that has quietly taken the sky back.
+   */
+  fixStandsForSeconds: 30
 } as const;
 
 /**

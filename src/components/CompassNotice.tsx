@@ -8,6 +8,17 @@ type Props = {
   accuracy: number | undefined;
   /** Whether a declination has been had; without one the offsets are to magnetic north. */
   declinationKnown: boolean;
+  /**
+   * Whether the sun or the moon is currently aiming the view instead of the
+   * compass (`useCelestialAlignment`).
+   *
+   * Silences both notices below, because both are about a bearing that is no
+   * longer the one in use. Asking for a figure-eight while the sky is holding
+   * the heading is asking for work that would change nothing on screen, and a
+   * warning nobody needs to act on is how people learn to ignore the ones they
+   * do.
+   */
+  skyFixStanding: boolean;
 };
 
 /**
@@ -30,9 +41,20 @@ type Props = {
  * Two states, and the accuracy wins: a compass the platform will not vouch for
  * makes the declination question moot, since a few degrees of true-versus-
  * magnetic is not what is wrong with a bearing that may be forty out.
+ *
+ * And no states at all while the sky is aiming the view. Both notices are about
+ * the magnetic bearing, and a sighting of the sun replaces it outright
+ * (`useCelestialAlignment`) — including the declination, since what a sighting
+ * measures is the bearing to *true* north and not the one the field points
+ * along. Whichever of the two would have been shown is a question about a
+ * quantity nothing on screen is currently using.
  */
-export const CompassNotice: React.FC<Props> = ({ accuracy, declinationKnown }) => {
-  const notice = noticeFor(accuracy, declinationKnown);
+export const CompassNotice: React.FC<Props> = ({
+  accuracy,
+  declinationKnown,
+  skyFixStanding
+}) => {
+  const notice = skyFixStanding ? null : noticeFor(accuracy, declinationKnown);
   if (!notice) return null;
 
   return (

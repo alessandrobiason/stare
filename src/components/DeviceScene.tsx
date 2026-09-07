@@ -40,6 +40,12 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
   const compass = useCompassAccuracy(orientation);
   const controls = useSceneControls();
   const [maskStatus, setMaskStatus] = useState("Waiting for the first sky mask…");
+  /**
+   * Whether the sun or the moon is currently aiming the view instead of the
+   * magnetometer, which decides whether there is any point asking for a compass
+   * calibration. See `useCelestialAlignment`.
+   */
+  const [skyFixStanding, setSkyFixStanding] = useState(false);
   const cameraRef = useRef<CameraView | null>(null);
   /**
    * Whether the camera can be captured from, in a ref rather than state.
@@ -145,10 +151,13 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onEnableAll={controls.enableAllCategories}
         onVisibleSatelliteCountChange={controls.setMarkerCount}
         onMaskStatusChange={setMaskStatus}
+        onSkyFixChange={setSkyFixStanding}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
+        celestialAlignment={controls.celestialAlignment}
+        onToggleCelestialAlignment={controls.toggleCelestialAlignment}
         sceneDebugSections={() => [
           deviceSensorSection({
             // Read as the panel draws, since a reading no longer renders this.
@@ -171,7 +180,11 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
       />
 
       <SceneStatus markerCount={controls.markerCount} warned={boot.warnings.length > 0} />
-      <CompassNotice accuracy={compass.accuracy} declinationKnown={compass.declinationKnown} />
+      <CompassNotice
+        accuracy={compass.accuracy}
+        declinationKnown={compass.declinationKnown}
+        skyFixStanding={skyFixStanding}
+      />
     </View>
   );
 };

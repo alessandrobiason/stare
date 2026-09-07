@@ -78,7 +78,7 @@ describe("the marker count", () => {
 describe("the compass notice", () => {
   /** What the notice says for a compass at `accuracy`, with a declination in hand. */
   const at = (accuracy: number | undefined) =>
-    textOf(<CompassNotice accuracy={accuracy} declinationKnown />);
+    textOf(<CompassNotice accuracy={accuracy} declinationKnown skyFixStanding={false} />);
 
   test("says nothing before the compass has reported", () => {
     // Silence here is the seconds before the first heading, not a verdict.
@@ -105,14 +105,31 @@ describe("the compass notice", () => {
   });
 
   test("a missing declination is said instead, and only when nothing worse is", () => {
-    const magnetic = textOf(<CompassNotice accuracy={3} declinationKnown={false} />);
+    const magnetic = textOf(
+      <CompassNotice accuracy={3} declinationKnown={false} skyFixStanding={false} />
+    );
     expect(magnetic).toContain("magnetic north");
 
     // A compass that may be forty degrees out makes the true-versus-magnetic
     // question moot, so the graver of the two is the one shown.
-    const uncalibrated = textOf(<CompassNotice accuracy={0} declinationKnown={false} />);
+    const uncalibrated = textOf(
+      <CompassNotice accuracy={0} declinationKnown={false} skyFixStanding={false} />
+    );
     expect(uncalibrated).toContain("Compass needs calibrating");
     expect(uncalibrated).not.toContain("magnetic north");
+  });
+
+  test("and nothing at all while the sun is aiming the view", () => {
+    // Both notices are about the magnetic bearing, and a sighting of the sun
+    // replaces it outright — including the declination, since what a sighting
+    // measures is the bearing to true north. Asking for a figure-eight here
+    // would be asking for work that changes nothing on screen.
+    expect(
+      textOf(<CompassNotice accuracy={0} declinationKnown={false} skyFixStanding />)
+    ).toBe("");
+    expect(textOf(<CompassNotice accuracy={3} declinationKnown={false} skyFixStanding />)).toBe(
+      ""
+    );
   });
 });
 

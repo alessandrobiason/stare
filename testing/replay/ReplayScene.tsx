@@ -118,6 +118,8 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onToggleDebug={controls.toggleDebug}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
+        celestialAlignment={controls.celestialAlignment}
+        onToggleCelestialAlignment={controls.toggleCelestialAlignment}
         sceneDebugSections={() => {
           // Read as the panel draws, since a video frame no longer renders this.
           const snapshot = replay.snapshotRef.current;
