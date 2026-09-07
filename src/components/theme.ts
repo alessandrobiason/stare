@@ -36,6 +36,8 @@ export const panelStyles = StyleSheet.create({
     position: "absolute",
     padding: 10,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.color.divider,
     backgroundColor: theme.color.panel
   },
   title: {
