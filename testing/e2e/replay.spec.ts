@@ -72,6 +72,40 @@ test.describe("replay overlay", () => {
     await expect(page.locator("text=Behind terrain")).toHaveCount(0);
   });
 
+  /**
+   * The app in a language the browser asked for, end to end.
+   *
+   * The only place the whole chain runs for real: the platform is asked what
+   * language it wants, an answer is matched against what the app speaks, and
+   * the panels render in it. Every unit test above this point stubs one of
+   * those three, and the bug that shipped lived in the first one — detection
+   * came back empty on a phone and the app fell back to English with nothing
+   * on screen to say so.
+   *
+   * The web build reads `navigator.languages`, which is what `locale` sets
+   * here; a phone reads its own settings module. Different sources, same
+   * `resolveLocale` and the same string tables behind them.
+   */
+  test.describe("in a browser asking for Italian", () => {
+    test.use({ locale: "it-IT" });
+
+    test("the panels come up in Italian, not in English", async ({ page }) => {
+      await page.goto("/");
+      // The marker count says what it counts, in Italian.
+      await page
+        .locator('[aria-label$="satelliti visibili"]')
+        .first()
+        .waitFor({ timeout: 300000 });
+
+      // The filter pill, which is a translated word over the sky.
+      await expect(page.getByText("FILTRO", { exact: true }).first()).toBeVisible();
+      await expect(page.locator(BOOTED)).toHaveCount(0);
+
+      // And the console stays in English, deliberately — see `CONSOLE_LABEL`.
+      await expect(page.locator(CONSOLE_TOGGLE)).toBeVisible();
+    });
+  });
+
   test("video time advances continuously rather than in steps", async ({ page }) => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });

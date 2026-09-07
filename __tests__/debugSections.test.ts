@@ -46,7 +46,19 @@ describe("the status page", () => {
     });
 
     expect(section.title).toBe("STATUS");
-    expect(section.rows.map((row) => row.label)).toEqual(["Position", "Sky mask"]);
+    expect(section.rows.map((row) => row.label)).toEqual(["Position", "Sky mask", "Language"]);
+  });
+
+  test("and says what language it decided to speak, and who told it", () => {
+    // An app in the wrong language looks the same however the detection
+    // failed. This row is the difference between a bug report and a shrug —
+    // see `localeReadout`, and the shipped bug it exists because of.
+    const [row] = statusSection({ rows: [], warnings: [] }).rows;
+
+    expect(row.label).toBe("Language");
+    // The suite pins English (`jest.setup.ts`); on a phone this is the source
+    // that answered and the tags it offered.
+    expect(row.value).toBe("en · pinned · en");
   });
 
   test("boot's warnings land here, spelled out rather than clipped to a line", () => {
@@ -56,14 +68,16 @@ describe("the status page", () => {
     }).rows;
 
     // Numbered, because two warnings sharing a label would be one row.
-    expect(rows.map((row) => row.label)).toEqual(["Warning 1", "Warning 2"]);
+    expect(rows.map((row) => row.label)).toEqual(["Language", "Warning 1", "Warning 2"]);
     expect(rows.every((row) => row.wrap)).toBe(true);
   });
 
   test("a single warning is not numbered, because there is nothing to count", () => {
     const rows = statusSection({ rows: [], warnings: ["No fix yet."] }).rows;
 
-    expect(rows).toEqual([{ label: "Warning", value: "No fix yet.", wrap: true }]);
+    expect(rows.filter((row) => row.label !== "Language")).toEqual([
+      { label: "Warning", value: "No fix yet.", wrap: true }
+    ]);
   });
 });
 

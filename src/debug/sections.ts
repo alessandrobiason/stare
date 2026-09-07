@@ -10,6 +10,7 @@ import {
   TLE_RETRY_INTERVAL_MS
 } from "../constants";
 import { CameraAttitude } from "../camera/attitude";
+import { localeReport } from "../i18n/locale";
 import { CelestialAlignmentStats } from "../hooks/useCelestialAlignment";
 import { CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
@@ -92,6 +93,10 @@ export type StatusDebugInput = {
  * readout rather than as part of the picture, which is what these pages are
  * for, and the normal view keeps only the marker count — the one figure there
  * that is about the sky rather than about the machinery behind it.
+ *
+ * The language is here for the same reason boot's warnings are: it is a thing
+ * that can be quietly wrong, and every way of it being wrong looks the same
+ * from a photograph of the screen. See `localeReadout`.
  */
 export function statusSection({ rows, warnings }: StatusDebugInput): DebugSection {
   return {
@@ -99,6 +104,7 @@ export function statusSection({ rows, warnings }: StatusDebugInput): DebugSectio
     title: "STATUS",
     rows: [
       ...rows,
+      { label: "Language", value: localeReadout(), wrap: true },
       ...warnings.map((warning, index) => ({
         label: warnings.length > 1 ? `Warning ${index + 1}` : "Warning",
         value: warning,
@@ -106,6 +112,24 @@ export function statusSection({ rows, warnings }: StatusDebugInput): DebugSectio
       }))
     ]
   };
+}
+
+/**
+ * What language the app decided to speak, and what the phone told it.
+ *
+ * An app in the wrong language is a bug report with nothing in it: the screen
+ * looks the same whether the platform was never asked, answered with a shape
+ * nothing read, or genuinely said English. This row is the difference — the
+ * language in use, which of the sources answered, and the tags it offered.
+ *
+ * `no source answered` is the one worth reading closely. It means every way of
+ * asking came back empty, which on a phone should not happen: `Intl` is the
+ * last of them and Hermes is built with it on.
+ */
+export function localeReadout(): string {
+  const { locale, source, tags } = localeReport();
+  if (source === "none") return `${locale} · no source answered`;
+  return `${locale} · ${source} · ${tags.join(", ")}`;
 }
 
 export type MaskDebugInput = {
