@@ -79,6 +79,20 @@ export type Strings = {
     tryAgain: string;
     unsupported: string;
   };
+  /**
+   * The language picker: the intro's top right corner, and the console.
+   *
+   * Two words, because the languages themselves are not translated — a list of
+   * endonyms is the one list that reads the same whichever language it is
+   * currently in (`LANGUAGE_NAMES`). These are what say what the list is *for*,
+   * and they are mostly read by a screen reader rather than seen.
+   */
+  language: {
+    /** Names the control, and heads the list it opens. */
+    title: string;
+    /** Dismissing that list without choosing. */
+    close: string;
+  };
 };
 
 type Notice = { title: string; detail: string };

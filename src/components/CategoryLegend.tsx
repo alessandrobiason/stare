@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
 import { SATELLITE_CATEGORIES, SatelliteCategory } from "../satellite/categories";
 import { cssColor, MarkerPalette } from "./palette";
@@ -47,6 +48,10 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
   onEnableAll,
   palette
 }) => {
+  // The one thing that gets through the memo above: none of these props change
+  // when the console's picker changes the language, and every word in the panel
+  // does. See `useLocale`.
+  useLocale();
   const t = strings().filter;
   const [expanded, setExpanded] = useState(false);
   const enabledCount = SATELLITE_CATEGORIES.filter((category) =>

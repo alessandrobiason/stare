@@ -121,5 +121,9 @@ export const ru: Strings = {
     failed: "Не удалось запустить",
     tryAgain: "ПОВТОРИТЬ",
     unsupported: "Это устройство не может показать вид неба."
+  },
+  language: {
+    title: "Язык",
+    close: "Закрыть список языков"
   }
 };

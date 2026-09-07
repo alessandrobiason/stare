@@ -122,5 +122,9 @@ export const nl: Strings = {
     failed: "Kon niet starten",
     tryAgain: "OPNIEUW",
     unsupported: "Dit toestel kan de hemelweergave niet draaien."
+  },
+  language: {
+    title: "Taal",
+    close: "Talenlijst sluiten"
   }
 };

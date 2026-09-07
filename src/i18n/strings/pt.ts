@@ -120,5 +120,9 @@ export const pt: Strings = {
     failed: "Não foi possível iniciar",
     tryAgain: "TENTAR DE NOVO",
     unsupported: "Este aparelho não consegue mostrar a vista do céu."
+  },
+  language: {
+    title: "Idioma",
+    close: "Fechar a lista de idiomas"
   }
 };

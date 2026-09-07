@@ -1,17 +1,22 @@
 /**
- * Which language the app speaks, decided once from the phone's own setting.
+ * Which language the app speaks: the phone's own setting, unless someone here
+ * has said otherwise.
  *
- * There is no language picker, and there should not be one. The phone already
- * carries the answer — someone has told it what language they read, usually
- * years ago — and a second setting inside one app is a second place to get it
- * wrong. So this reads the platform's ordered list of preferred languages and
- * takes the first one the app can actually speak.
+ * The phone is asked first and is right nearly always — someone has told it
+ * what language they read, usually years ago. What it cannot answer for is the
+ * phone that is not the reader's: a shared one, a work one set to the language
+ * of the company that issued it, or one whose owner reads a language the app
+ * does not ship and would rather have their second than English. So there is a
+ * picker, in the two places it can be found without hunting — the top right
+ * corner of the intro, and the console's STATUS page — and what it chooses is
+ * remembered on the device (`chosenLocale`) and beats every source below.
  *
- * **Resolved once, at the first read, and never again.** The locale cannot
- * change while the app is open: iOS restarts an app when its language setting
- * changes, and the web build reloads. Caching it means the strings can be a
- * plain module-level lookup rather than a context every panel has to subscribe
- * to, on a screen that re-renders sixty times a second.
+ * **Resolved once and then held, and changed only by that picker.** Nothing
+ * else can move it: iOS restarts an app whose language setting changed, and
+ * the web build reloads. So a reading is a plain module-level lookup rather
+ * than a context, and the handful of components that render words subscribe
+ * with `subscribeLocale` — see `useLocale` — rather than the whole tree
+ * re-rendering behind a provider at sixty frames a second.
  *
  * **English is the fallback, and it is a real one.** Every string exists in
  * English, and a locale the app does not ship falls back to it whole rather
@@ -28,6 +33,8 @@
  * order, each is named, and which one answered is on the console's STATUS page
  * (`localeReport`) rather than left to be guessed at from a screenshot.
  */
+
+import { PersistentStore, persistentStore } from "../data/persistentStore";
 
 /**
  * The languages the app is written in, English first.
@@ -55,6 +62,29 @@ export const LOCALES = [
 export type Locale = (typeof LOCALES)[number];
 
 export const FALLBACK_LOCALE: Locale = "en";
+
+/**
+ * Each language in its own words, for the picker.
+ *
+ * Endonyms, and untranslated: someone looking for their language in a list is
+ * looking for the word they would write it with, and "Japanese" is no use to
+ * anyone who cannot already read the language the list is currently in. This
+ * is the one list in the app that reads the same in all twelve.
+ */
+export const LANGUAGE_NAMES: Record<Locale, string> = {
+  en: "English",
+  it: "Italiano",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  pt: "Português",
+  nl: "Nederlands",
+  ru: "Русский",
+  zh: "中文",
+  ja: "日本語",
+  ko: "한국어",
+  ar: "العربية"
+};
 
 /** Locales written right to left, which is the one layout question a language asks. */
 const RIGHT_TO_LEFT = new Set<Locale>(["ar"]);
@@ -88,6 +118,8 @@ function primarySubtag(tag: string): string {
 
 /** Where a list of preferred languages came from, for the console page. */
 export type LocaleSource =
+  /** Picked here, by whoever is holding the phone, and remembered on it. */
+  | "chosen"
   | "navigator"
   | "settingsManager"
   | "i18nManager"
@@ -230,6 +262,11 @@ function isTag(value: unknown): value is string {
 let current: LocaleReport | null = null;
 
 function detect(): LocaleReport {
+  // Ahead of every source, because it is the one answer that was given by the
+  // person reading the screen rather than inferred on their behalf.
+  const chosen = chosenLocale();
+  if (chosen) return { locale: chosen, source: "chosen", tags: [chosen] };
+
   for (const ask of SOURCES) {
     const { source, tags } = ask();
     if (tags.length > 0) return { locale: resolveLocale(tags), source, tags };
@@ -263,4 +300,96 @@ export function localeReport(): LocaleReport {
  */
 export function setLocaleForTesting(locale: Locale | undefined): void {
   current = locale ? { locale, source: "pinned", tags: [locale] } : null;
+  announce();
 }
+
+/**
+ * The language chosen on this device, kept between launches.
+ *
+ * Written the moment the picker is used and read before anything asks the
+ * platform, so a language chosen once stays chosen: an app that reverted to
+ * the phone's setting on the next launch would be a picker that does not work.
+ *
+ * A file of two dozen bytes beside the intro flag and the catalogue — see
+ * `persistentStore` for where that lands on each platform. Anything unreadable,
+ * unparseable, or naming a language this build does not ship reads as no
+ * choice at all, and the phone is asked as it always was.
+ */
+type StoredLocale = { locale: Locale };
+
+const store = persistentStore({
+  fileName: "locale.json",
+  storageKey: "stare.locale"
+});
+
+/** Test seam: swaps the backing store. Pass `undefined` to restore detection. */
+export function setLocaleStoreForTesting(next: PersistentStore | null | undefined): void {
+  store.setForTesting(next);
+}
+
+function chosenLocale(): Locale | null {
+  try {
+    const raw = store.get()?.read();
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    const named = (parsed as Partial<StoredLocale> | null)?.locale;
+    return LOCALES.find((locale) => locale === named) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whoever is holding the phone says what language it should be in.
+ *
+ * Takes effect on the frame after this returns rather than at the next launch:
+ * the components that render words subscribe below, and the intro's pages are
+ * rebuilt from the new table. Storage is best effort — a device that cannot be
+ * written to still changes language for this session, and asks the phone again
+ * next launch, which is a better failure than a picker that appears to do
+ * nothing.
+ */
+export function setLocale(locale: Locale): void {
+  current = { locale, source: "chosen", tags: [locale] };
+  try {
+    store.get()?.write(JSON.stringify({ locale } satisfies StoredLocale));
+  } catch {
+    // Nothing to do, and nothing worth saying about it on screen.
+  }
+  announce();
+}
+
+/** Forgets the choice and follows the phone again. A test seam, for now. */
+export function clearChosenLocale(): void {
+  try {
+    store.get()?.remove();
+  } catch {
+    // Unreachable either way.
+  }
+  current = null;
+  announce();
+}
+
+/**
+ * Told when the language changes, which is the only time it ever does.
+ *
+ * A set of callbacks rather than a React context: the scene under these panels
+ * re-renders at display rate, and a provider around it would put every word on
+ * screen behind that render. What subscribes is `useLocale`, in the four or
+ * five components that actually say something.
+ */
+const listeners = new Set<() => void>();
+
+export function subscribeLocale(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function announce(): void {
+  // A copy, so a listener that unsubscribes as it is called does not skip the
+  // one behind it.
+  for (const listener of [...listeners]) listener();
+}
+

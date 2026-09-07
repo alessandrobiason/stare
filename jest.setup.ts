@@ -1,4 +1,4 @@
-import { setLocaleForTesting } from "./src/i18n/locale";
+import { setLocaleForTesting, setLocaleStoreForTesting } from "./src/i18n/locale";
 
 /**
  * The suite speaks English unless a test says otherwise.
@@ -12,5 +12,12 @@ import { setLocaleForTesting } from "./src/i18n/locale";
  * Tests that care about a language set it themselves with the same seam, and
  * clear it in `afterEach`; that clearing returns to detection, which is why the
  * pin is re-applied before every test rather than once.
+ *
+ * The device's remembered choice is taken away at the same time: it is read
+ * ahead of every detection source, and a suite that reached real storage would
+ * be a suite whose language depended on what the last run left behind.
  */
-beforeEach(() => setLocaleForTesting("en"));
+beforeEach(() => {
+  setLocaleStoreForTesting(null);
+  setLocaleForTesting("en");
+});

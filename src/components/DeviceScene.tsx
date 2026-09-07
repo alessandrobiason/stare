@@ -7,6 +7,7 @@ import { DEVICE_CAMERA, DEVICE_CAMERA_FIELD_OF_VIEW } from "../constants";
 import { aimReadout, deviceSensorSection, statusSection } from "../debug/sections";
 import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
 import { useCompassAccuracy } from "../hooks/useCompassAccuracy";
+import { useLocale } from "../hooks/useLocale";
 import { useDeviceOrientation } from "../hooks/useDeviceOrientation";
 import { useLiveSky } from "../hooks/useLiveSky";
 import { useSceneControls } from "../hooks/useSceneControls";
@@ -32,6 +33,11 @@ type Props = {
  * so rather than the view pretending the whole sky is clear.
  */
 export const DeviceScene: React.FC<Props> = ({ boot }) => {
+  // Where a language chosen in the console reaches the view: this renders the
+  // panels that say something — the count, the compass notice, the filter and
+  // the card, by way of `SkyOverlay` — and none of them would otherwise have
+  // any reason to render again. See `useLocale`.
+  useLocale();
   const { observer, epochRef } = useLiveSky(boot.observer);
   const orientation = useDeviceOrientation(boot.capabilities, boot.declinationDeg);
   // The one thing about the sensors this view renders from, and it renders only

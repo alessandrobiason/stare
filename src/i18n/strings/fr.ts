@@ -122,5 +122,9 @@ export const fr: Strings = {
     failed: "Démarrage impossible",
     tryAgain: "RÉESSAYER",
     unsupported: "Cet appareil ne peut pas afficher la vue du ciel."
+  },
+  language: {
+    title: "Langue",
+    close: "Fermer la liste des langues"
   }
 };

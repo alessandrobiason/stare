@@ -121,5 +121,9 @@ export const de: Strings = {
     failed: "Start fehlgeschlagen",
     tryAgain: "NOCHMAL VERSUCHEN",
     unsupported: "Dieses Gerät kann die Himmelsansicht nicht anzeigen."
+  },
+  language: {
+    title: "Sprache",
+    close: "Sprachliste schließen"
   }
 };

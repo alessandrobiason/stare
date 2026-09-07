@@ -104,8 +104,9 @@ describe("reading the phone's preferred languages", () => {
   });
 
   test("the answer is read once and held", () => {
-    // The panels read it on every frame, and the locale cannot change while
-    // the app is open — iOS restarts an app whose language setting changed.
+    // The panels read it on every frame, and nothing but the picker moves it —
+    // iOS restarts an app whose own language setting changed. See
+    // `setLocale`, and `languageChoice.test.tsx` for the picker's half of it.
     withNativeModule("SettingsManager", { getConstants: () => ({ settings: { AppleLanguages: ["ko-KR"] } }) }, () => {
       expect(activeLocale()).toBe("ko");
       const modules = NativeModules as unknown as Record<string, unknown>;

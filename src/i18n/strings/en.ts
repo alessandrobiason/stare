@@ -129,5 +129,9 @@ export const en: Strings = {
     failed: "Could not start",
     tryAgain: "TRY AGAIN",
     unsupported: "This device cannot run the sky view."
+  },
+  language: {
+    title: "Language",
+    close: "Close the language list"
   }
 };

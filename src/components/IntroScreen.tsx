@@ -9,9 +9,11 @@ import {
   Text,
   View
 } from "react-native";
+import { useLocale } from "../hooks/useLocale";
 import { introButtonLabel, introPages } from "../onboarding/introPages";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
+import { LanguagePicker } from "./LanguagePicker";
 import { FrameSize } from "./markerGeometry";
 import { theme } from "./theme";
 
@@ -35,14 +37,21 @@ type Props = {
  * Pages advance by swipe or by the button, which is the same button throughout
  * and only changes what it says on the last page: there it is the one that lets
  * boot — and so the system's own permission prompts — begin.
+ *
+ * The corner holds the language picker, and this is the screen that most needs
+ * one: everything here is a paragraph, and a phone whose language is not its
+ * reader's makes all four pages useless at once. See `LanguagePicker`.
  */
 export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   const [frame, setFrame] = useState<FrameSize | null>(null);
   const [page, setPage] = useState(0);
   const pager = useRef<ScrollView>(null);
-  // The locale cannot change while the app is open (`activeLocale`), so the
-  // pages are read once rather than rebuilt on every swipe.
-  const [pages] = useState(introPages);
+  // Subscribing rather than reading: nothing here needs to know *which*
+  // language it is in, only to be rebuilt from the string table when the
+  // corner picker changes it. This screen renders on a swipe, so reading the
+  // four pages again costs nothing worth memoising.
+  useLocale();
+  const pages = introPages();
 
   const measure = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -166,6 +175,9 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
           </View>
         </>
       ) : null}
+
+      {/* Last, so the list it opens is over the pages and the footer both. */}
+      <LanguagePicker />
     </View>
   );
 };

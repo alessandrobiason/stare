@@ -118,5 +118,9 @@ export const ar: Strings = {
     failed: "تعذّر البدء",
     tryAgain: "إعادة المحاولة",
     unsupported: "هذا الجهاز لا يمكنه تشغيل عرض السماء."
+  },
+  language: {
+    title: "اللغة",
+    close: "إغلاق قائمة اللغات"
   }
 };

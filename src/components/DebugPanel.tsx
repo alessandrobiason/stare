@@ -1,6 +1,6 @@
 import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { DebugSection, DebugSource, DebugSwitch } from "../debug/sections";
+import { DebugChoice, DebugSection, DebugSource, DebugSwitch } from "../debug/sections";
 import { theme } from "./theme";
 import { Toggle } from "./Toggle";
 
@@ -54,21 +54,34 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose }) =
   );
 
   /**
-   * Flips a switch, then re-reads the pages once the view around the panel has
-   * caught up.
+   * Re-reads the pages once the view around the panel has caught up with a
+   * control that was just used.
    *
-   * A switch's position belongs to the scene rather than to this panel, and the
-   * scene's state has not moved yet when the press handler returns — so left to
-   * the sampling timer, a switch would sit in its old position for up to half a
-   * second after being pressed, which reads as a control that does nothing.
+   * A control's position belongs to the scene rather than to this panel, and
+   * the scene's state has not moved yet when the press handler returns — so
+   * left to the sampling timer, a switch would sit in its old position for up
+   * to half a second after being pressed, which reads as a control that does
+   * nothing.
    */
+  const settle = useCallback(() => {
+    if (settleRef.current !== null) clearTimeout(settleRef.current);
+    settleRef.current = setTimeout(() => setSections(sourceRef.current()), 0);
+  }, [sourceRef]);
+
   const flip = useCallback(
     (control: DebugSwitch) => {
       control.onToggle();
-      if (settleRef.current !== null) clearTimeout(settleRef.current);
-      settleRef.current = setTimeout(() => setSections(sourceRef.current()), 0);
+      settle();
     },
-    [sourceRef]
+    [settle]
+  );
+
+  const pick = useCallback(
+    (control: DebugChoice, id: string) => {
+      control.onSelect(id);
+      settle();
+    },
+    [settle]
   );
 
   // Falling back to the first section rather than remembering an index keeps a
@@ -115,6 +128,36 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose }) =
             <Text style={styles.switchLabel}>{control.label}</Text>
             <Toggle on={control.on} />
           </Pressable>
+        ))}
+
+        {active?.choices?.map((control) => (
+          <View key={control.label} style={styles.choice}>
+            <Text style={styles.switchLabel}>{control.label}</Text>
+            {/* Wraps: twelve languages do not fit a phone's width in one line,
+                and a row that scrolled sideways would hide the options at the
+                end of it behind a gesture nobody would go looking for. */}
+            <View accessibilityRole="radiogroup" style={styles.options}>
+              {control.options.map((option) => {
+                const on = option.id === control.selected;
+                return (
+                  <Pressable
+                    key={option.id}
+                    // A radio rather than a button: what matters about one of
+                    // these is which of the twelve is the case, and a row of
+                    // buttons announces twelve labels and no answer.
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    style={[styles.option, on && styles.optionOn]}
+                    onPress={() => pick(control, option.id)}
+                  >
+                    <Text style={[styles.optionLabel, on && styles.optionLabelOn]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
         ))}
 
         {active?.rows.map((row) => (
@@ -204,6 +247,40 @@ const styles = StyleSheet.create({
     color: theme.color.textFaint,
     fontSize: 10,
     letterSpacing: 0.3
+  },
+  /** A control with its options under it, rather than beside it: see above. */
+  choice: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    gap: 6
+  },
+  options: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5
+  },
+  option: {
+    // Smaller than a thumb, and deliberately: twelve of these share a phone's
+    // width, and the row they are in is reached once and then left alone.
+    minHeight: 26,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: theme.color.divider,
+    backgroundColor: theme.color.control
+  },
+  optionOn: {
+    borderColor: theme.color.accent,
+    backgroundColor: theme.color.controlActive
+  },
+  optionLabel: {
+    color: theme.color.textDim,
+    fontSize: 11
+  },
+  optionLabelOn: {
+    color: theme.color.textBright,
+    fontWeight: "700"
   },
   // Brighter than a figure's label: this one is a control, not a caption.
   switchLabel: {

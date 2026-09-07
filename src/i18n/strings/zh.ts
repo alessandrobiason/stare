@@ -105,5 +105,9 @@ export const zh: Strings = {
     failed: "无法启动",
     tryAgain: "重试",
     unsupported: "此设备无法运行天空视图。"
+  },
+  language: {
+    title: "语言",
+    close: "关闭语言列表"
   }
 };

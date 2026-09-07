@@ -25,7 +25,7 @@ export type { Strings } from "./types";
  */
 export const STRINGS: Record<Locale, Strings> = { en, it, es, fr, de, pt, nl, ru, zh, ja, ko, ar };
 
-/** What the app says, in the language the phone asked for. */
+/** What the app says, in the language the app is currently set to. */
 export function strings(): Strings {
   return STRINGS[activeLocale()] ?? STRINGS[FALLBACK_LOCALE];
 }

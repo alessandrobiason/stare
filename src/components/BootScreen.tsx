@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { describeBuild } from "../debug/buildIdentity";
+import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
@@ -45,6 +46,9 @@ export const BootScreen: React.FC<Props> = ({
   onRetry,
   wordmark = true
 }) => {
+  // Subscribed to, because this screen outlives a language change: the intro's
+  // picker is one screen away, and boot is what comes after it. See `useLocale`.
+  useLocale();
   const t = strings().boot;
   const [frame, setFrame] = useState<FrameSize | null>(null);
   // Read once: it cannot change while the app is running.

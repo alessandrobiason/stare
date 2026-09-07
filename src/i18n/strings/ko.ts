@@ -109,5 +109,9 @@ export const ko: Strings = {
     failed: "시작하지 못했습니다",
     tryAgain: "다시 시도",
     unsupported: "이 기기에서는 하늘 화면을 실행할 수 없습니다."
+  },
+  language: {
+    title: "언어",
+    close: "언어 목록 닫기"
   }
 };

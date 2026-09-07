@@ -122,5 +122,9 @@ export const es: Strings = {
     failed: "No se ha podido iniciar",
     tryAgain: "REINTENTAR",
     unsupported: "Este dispositivo no puede mostrar la vista del cielo."
+  },
+  language: {
+    title: "Idioma",
+    close: "Cerrar la lista de idiomas"
   }
 };

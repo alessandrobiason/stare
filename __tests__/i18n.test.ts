@@ -159,6 +159,13 @@ describe("and says it in the space it is given", () => {
     expect(width(t.intro.allowAccess, 11, 1.5)).toBeLessThan(320);
   });
 
+  test.each(LOCALES)("%s fits the language picker", (locale) => {
+    // The heading over the list the corner of the intro opens: a 150pt menu,
+    // less 12 of padding either side. The languages under it are endonyms and
+    // the same in every locale, so this line is the only one that can grow.
+    expect(width(stringsFor(locale).language.title, 10, 1)).toBeLessThan(126);
+  });
+
   test.each(LOCALES)("%s fits the compass notice", (locale) => {
     // The notice runs from `left: 12` to `right: 112` — the console pill keeps
     // the rest of that row — so on the narrowest phone this ships to it is

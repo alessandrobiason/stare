@@ -10,7 +10,14 @@ import {
   TLE_RETRY_INTERVAL_MS
 } from "../constants";
 import { CameraAttitude } from "../camera/attitude";
-import { localeReport } from "../i18n/locale";
+import {
+  activeLocale,
+  LANGUAGE_NAMES,
+  Locale,
+  LOCALES,
+  localeReport,
+  setLocale
+} from "../i18n/locale";
 import { CelestialAlignmentStats } from "../hooks/useCelestialAlignment";
 import { CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
@@ -55,6 +62,24 @@ export type DebugRow = { label: string; value: string; wrap?: boolean };
 export type DebugSwitch = { label: string; on: boolean; onToggle: () => void };
 
 /**
+ * One setting on a page with more than two positions: a row of options, one of
+ * which is currently the case.
+ *
+ * A switch with more than two positions, and used for exactly one thing — the
+ * language. It is here rather than in the app's own panels because those are
+ * four badges over a camera picture, and a fifth control over the sky costs
+ * more than a setting nobody changes twice is worth. The console is already
+ * where this app keeps what is read once and then left alone.
+ */
+export type DebugChoice = {
+  label: string;
+  options: readonly { id: string; label: string }[];
+  /** The `id` of the option that is currently the case. */
+  selected: string;
+  onSelect: (id: string) => void;
+};
+
+/**
  * One page of the debug overlay: a tab and what it shows. Sections are what the
  * panel's menu is built from, so a scene adds a page by returning another one.
  *
@@ -66,6 +91,7 @@ export type DebugSection = {
   title: string;
   rows: DebugRow[];
   switches?: DebugSwitch[];
+  choices?: DebugChoice[];
 };
 
 /**
@@ -110,7 +136,33 @@ export function statusSection({ rows, warnings }: StatusDebugInput): DebugSectio
         value: warning,
         wrap: true
       }))
-    ]
+    ],
+    choices: [languageChoice()]
+  };
+}
+
+/**
+ * The language, as something to change rather than only to read.
+ *
+ * Beside the readout above, which is the point: someone who has found this
+ * page has found the row saying the app is in a language they did not ask for,
+ * and the fix belongs where the diagnosis is. The intro carries the same
+ * choice in its corner (`LanguagePicker`) for the launch where this page has
+ * not been found yet.
+ *
+ * The label is English like everything else on these pages; the options are
+ * not translated at all, because a list of languages is written in the
+ * languages it lists. See `LANGUAGE_NAMES`.
+ */
+export function languageChoice(): DebugChoice {
+  return {
+    label: "Language",
+    options: LOCALES.map((locale) => ({ id: locale, label: LANGUAGE_NAMES[locale] })),
+    selected: activeLocale(),
+    onSelect: (id) => {
+      const chosen = LOCALES.find((locale): locale is Locale => locale === id);
+      if (chosen) setLocale(chosen);
+    }
   };
 }
 

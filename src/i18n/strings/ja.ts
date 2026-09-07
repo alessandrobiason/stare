@@ -109,5 +109,9 @@ export const ja: Strings = {
     failed: "起動できませんでした",
     tryAgain: "再試行",
     unsupported: "この端末では空のビューを実行できません。"
+  },
+  language: {
+    title: "言語",
+    close: "言語の一覧を閉じる"
   }
 };
