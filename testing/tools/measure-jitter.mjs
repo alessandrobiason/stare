@@ -16,6 +16,10 @@
  *    reasonable stand-in for a phone; 1x measures the machine you are on, which
  *    no user has.
  *
+ * `--start` seeks the recording before measuring, because the marker loop is a
+ * good part of what is being measured and it costs nothing while the camera is
+ * pointed at the pavement — which is where most recordings begin.
+ *
  *   node testing/tools/measure-jitter.mjs --url http://localhost:8081 --throttle 1,4,6
  */
 import { chromium } from "playwright";
@@ -28,6 +32,7 @@ for (let index = 2; index < process.argv.length; index += 2) {
 const URL_ = args.get("url") ?? "http://localhost:8081";
 const SECONDS = Number(args.get("seconds") ?? 12);
 const RATES = (args.get("throttle") ?? "1").split(",").map(Number);
+const START = Number(args.get("start") ?? 0);
 const CHROMIUM = process.env.CHROMIUM_PATH ?? "/usr/bin/chromium";
 
 const browser = await chromium.launch({
@@ -40,18 +45,29 @@ page.on("pageerror", (error) => console.log(`  [pageerror] ${error.message}`));
 console.log(`Loading ${URL_} ...`);
 await page.goto(URL_, { waitUntil: "domcontentloaded", timeout: 180000 });
 
-// Boot downloads a 16k-entry TLE catalog and a multi-megabyte ONNX model.
-await page.locator("text=/visible satellites/").first().waitFor({ timeout: 300000 });
-await page.evaluate(async () => {
-  const video = document.querySelector("video");
-  if (!video) return;
-  video.muted = true;
-  try {
-    await video.play();
-  } catch {
-    /* autoplay may still be refused; `video advanced` below will say so */
-  }
-});
+// Boot downloads a 16k-entry TLE catalog and a multi-megabyte ONNX model. The
+// count in the corner is drawn as a bare number, so what says how many
+// satellites it stands for — and so what marks the scene as open — is its
+// accessible name rather than its text.
+const COUNT = '[aria-label$="visible satellites"]';
+await page.locator(COUNT).first().waitFor({ timeout: 300000 });
+await page.evaluate(
+  async (start) => {
+    const video = document.querySelector("video");
+    if (!video) return;
+    video.muted = true;
+    if (start > 0) {
+      video.currentTime = start;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    try {
+      await video.play();
+    } catch {
+      /* autoplay may still be refused; `video advanced` below will say so */
+    }
+  },
+  START
+);
 
 const client = await page.context().newCDPSession(page);
 console.log(`Booted. Recording ${SECONDS}s per throttle level.\n`);
@@ -85,8 +101,8 @@ for (const rate of RATES) {
         gaps.push(now - previous);
         previous = now;
         if (video) videoTimes.push(video.currentTime);
-        const shown = document.body.innerText.match(/(\d+) visible satellites/);
-        if (shown) markerCounts.push(Number(shown[1]));
+        const shown = document.querySelector('[aria-label$="visible satellites"]');
+        if (shown) markerCounts.push(Number(shown.getAttribute("aria-label").split(" ")[0]));
         if (now - started >= seconds * 1000) resolve();
         else requestAnimationFrame(tick);
       };

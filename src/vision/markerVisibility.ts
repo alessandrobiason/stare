@@ -5,6 +5,11 @@ import { clamp } from "../math/angles";
 type Track = {
   /** Low-passed sky confidence where this marker sits. */
   confidence: number;
+  /**
+   * Whether `confidence` holds a reading at all, or the nought a track opened
+   * over sky nothing had looked at yet was given for want of one.
+   */
+  seeded: boolean;
   /** Which side of the band it last came down on. */
   visible: boolean;
   /** What is actually drawn, walking towards `visible` at the fade rate. */
@@ -36,8 +41,11 @@ type Track = {
  * `SkyMaskTemporalFilter` already does what can safely be done to the mask.
  *
  * A frame is `beginFrame`, a `sample` per marker, then `endFrame`. Anything not
- * sampled has left the frame — set, elevation mask, or a category switched off
- * — and is forgotten, so the map stays the size of what is on screen.
+ * sampled has left the sky the loop is following and is forgotten, so the map
+ * stays the size of what is being tracked. That is a little more than what is
+ * on screen: `useAnimatedMarkers` samples the satellites just outside the frame
+ * as well, so that one a turn brings into view arrives with its decision
+ * already made and its fade already spent (`MARKER_WARMING_MARGIN`).
  */
 export class MarkerVisibilityFilter {
   private readonly tracks = new Map<string, Track>();
@@ -80,6 +88,7 @@ export class MarkerVisibilityFilter {
       // opacity, so a marker rising into the frame fades in like any other.
       this.tracks.set(key, {
         confidence: confidence ?? 0,
+        seeded: confidence !== null,
         visible: confidence !== null && confidence >= SKY_CONFIDENCE_THRESHOLD,
         opacity: 0,
         frame: this.frame
@@ -99,13 +108,28 @@ export class MarkerVisibilityFilter {
     // turned onto stays on screen for the better part of two seconds, over a
     // building nobody has looked at yet.
     if (confidence !== null) {
-      track.confidence += (confidence - track.confidence) * this.confidenceGain;
-      if (
-        track.visible
-          ? track.confidence < MARKER_VISIBILITY.hideConfidence
-          : track.confidence >= MARKER_VISIBILITY.showConfidence
-      ) {
-        track.visible = !track.visible;
+      if (track.seeded) {
+        track.confidence += (confidence - track.confidence) * this.confidenceGain;
+        if (
+          track.visible
+            ? track.confidence < MARKER_VISIBILITY.hideConfidence
+            : track.confidence >= MARKER_VISIBILITY.showConfidence
+        ) {
+          track.visible = !track.visible;
+        }
+      } else {
+        // The first answer there has ever been about this marker, taken at its
+        // word — exactly as a track created over sky the mask could already
+        // answer for takes the reading it opens with. Low-passed instead, a
+        // marker that came into the frame ahead of the segmenter spends 1.9
+        // seconds climbing out of a value nothing ever measured before it can
+        // be drawn, on top of whatever the pass itself took to arrive. That
+        // wait is the whole of why turning onto new sky felt broken, and it
+        // was never evidence about anything: the nought is the absence of a
+        // reading, not a reading of nought.
+        track.seeded = true;
+        track.confidence = confidence;
+        track.visible = confidence >= SKY_CONFIDENCE_THRESHOLD;
       }
     }
 

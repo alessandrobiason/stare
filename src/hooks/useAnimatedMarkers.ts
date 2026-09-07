@@ -1,10 +1,6 @@
 import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  FrameLens,
-  FramePoint,
-  projectBeyondFrame,
-  projectToFrame
-} from "../camera/projection";
+import { axesFromAttitude } from "../camera/attitude";
+import { FrameLens, FramePoint, projectWithAxes } from "../camera/projection";
 import { MARKER_VISIBILITY, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import { rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
@@ -140,6 +136,34 @@ const FRAME_RATE_SMOOTHING = 0.1;
  * second at worst. Four times a second is quicker than anyone reads it.
  */
 const VISIBLE_COUNT_INTERVAL_MS = 250;
+
+/**
+ * How far past the frame's edges a satellite is still followed, as a share of
+ * the frame's own half-width and half-height.
+ *
+ * What a marker costs to put on screen is not only where it is: it is a
+ * decision about whether the sky it sits in is clear, and then a crossfade into
+ * it (`MarkerVisibilityFilter`). Both take time, and until this they were both
+ * started at the frame's edge — so the sky a turn arrived on came up empty and
+ * filled in behind it. Followed a frame's width out on every side, a satellite
+ * has settled into the opacity it belongs at before the turn reaches it. One is
+ * a band of about 19 degrees on this camera — the projection is tangential, so
+ * doubling the half-width is not doubling the angle — which is a third of a
+ * second at 60 deg/s, or the whole of `fadeSeconds` at 50.
+ *
+ * A band rather than the whole sky, which was the first thing tried and was
+ * worse. A satellite off the frame is answered for by `SkyMemory` — the live
+ * mask reaches nowhere near it — and every frame it spends out there is another
+ * frame of the same remembered answer going into its low pass. Left out there
+ * long enough it settles hard on what the memory last saw, and the band the
+ * filter arbitrates with then costs it two live passes to change its mind: over
+ * the recording's one long stretch of a phone pointed away from the sky, the
+ * markers came back a good deal slower with the whole sky warmed than with none
+ * of it. A band is bounded by how long it takes to pan across one, which is
+ * under a second, so nothing has time to settle on a memory that far from what
+ * the camera is looking at.
+ */
+const MARKER_WARMING_MARGIN = 1;
 
 type AnimatedMarkerOptions = {
   catalog: SatelliteCatalog;
@@ -288,12 +312,14 @@ export function useAnimatedMarkers({
         // aimed at. Resolved once per frame rather than per satellite, like the
         // probe above it.
         const skyRemembered = filtering ? skyMemory.probe(now / 1000) : null;
+        // Six trigonometric calls, and one attitude for the whole frame. Built
+        // per satellite — which is what `projectToFrame` does — they were most
+        // of what the projection cost, at several hundred satellites a frame.
+        const axes = axesFromAttitude(attitude);
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
 
-          const point = projectToFrame(fix.position, attitude, lens);
-          if (!point) continue;
           // Hide satellites the segmentation says are behind terrain or
           // buildings — but through the visibility filter, so what decides it
           // is a run of mask passes rather than the newest one on its own. The
@@ -321,14 +347,36 @@ export function useAnimatedMarkers({
           // sky rather than skipping the filter outright: the markers it was
           // hiding then fade in the way any other marker does, and switching
           // it back on fades them out again instead of cutting them.
+          //
+          // Asked of the satellites just outside the frame as well as the ones
+          // on it, so that a turn arrives on markers that have already made
+          // their minds up and faded in rather than on ones starting from
+          // nothing at the edge — see `MARKER_WARMING_MARGIN`. An off-frame
+          // direction is answered by the same two probes as any other, so this
+          // is not a way around having looked: sky nothing has mapped stays
+          // unanswered, and undrawn, wherever the phone is pointed.
+          const point = projectWithAxes(fix.position, axes, lens);
+          if (!point) continue;
+          // Percent from the centre on the wider of the two axes: 50 is the
+          // frame's own edge, and anything past the margin is far enough away
+          // that no turn is about to bring it in.
+          const offCentre = Math.max(Math.abs(point.left - 50), Math.abs(point.top - 50));
+          if (offCentre > 50 * (1 + MARKER_WARMING_MARGIN)) continue;
+
           let confidence: number | null = 1;
+          let fromMemory = false;
           if (skyTowards && skyRemembered) {
             const live = skyTowards(fix.position);
             confidence = live ?? skyRemembered(fix.position);
-            if (confidence === null) unmapped += 1;
-            else if (live === null) remembered += 1;
+            fromMemory = live === null && confidence !== null;
           }
           const opacity = visibility.sample(fix.name, confidence);
+
+          // Past here the marker is being drawn rather than kept warm, so the
+          // ones in the margin drop out and the figures count the frame.
+          if (offCentre > 50) continue;
+          if (confidence === null) unmapped += 1;
+          else if (fromMemory) remembered += 1;
           if (opacity <= MARKER_VISIBILITY.minimumDrawnOpacity) {
             occluded += 1;
             continue;
@@ -345,7 +393,7 @@ export function useAnimatedMarkers({
             // is left between the two points is the orbit rather than the hand
             // holding the phone. Allowed off-frame: a trail about to leave the
             // view is the one whose direction says the most.
-            next: fix.parked ? null : projectBeyondFrame(fix.nextPosition, attitude, lens)
+            next: fix.parked ? null : projectWithAxes(fix.nextPosition, axes, lens)
           });
         }
         visibility.endFrame();

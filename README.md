@@ -175,7 +175,7 @@ fixed pixel budget — and sooner than that when the phone has been turned off
 what the last pass covered, since a gap is only quiet worth having while the
 camera is still (`segmentationLoop.ts`). The model runs under ONNX Runtime —
 React Native on the phone, WASM in the browser — behind one shared module, so it
-is the same algorithm either side. Five things sit between its output and a marker being
+is the same algorithm either side. Six things sit between its output and a marker being
 hidden:
 
 - **An aim, not a decal** (`anchoredMask.ts`). A mask is a grid over a *frame*,
@@ -212,7 +212,21 @@ hidden:
   to pass and every marker over that cell blinks with it. Each marker instead
   low-passes the confidence along its own path and switches only on clearing the
   far side of a band — two agreeing passes to move it, a mask alternating clear
-  and blocked moves it never — and crossfades when it does.
+  and blocked moves it never — and crossfades when it does. What the low pass
+  arbitrates is *answers*, so the first one a marker ever gets is taken at its
+  word instead. Averaged in from the nought a marker with nothing to go on
+  starts at, a satellite the phone had turned onto ahead of the segmenter spent
+  1.9 seconds climbing out of a figure nothing had measured — on top of the
+  pass it was already waiting for, and for most of a walk through a city that
+  was the whole of the delay in turning.
+- **Warmed a frame ahead** (`useAnimatedMarkers.ts`). Both of those cost time —
+  a decision, then a fade — and both used to start at the frame's edge, so the
+  sky a turn arrived on came up empty and filled in behind it. The loop follows
+  the satellites a frame's width past every edge as well, and a turn then brings
+  in markers that are already drawn. A band rather than the whole sky, which was
+  tried and was worse: off the frame only the memory can answer, and a satellite
+  left out there long enough settles hard on what it last saw, which the band
+  above then charges two live passes to undo.
 
 The first run downloads a 95 MB model and caches it;
 `EXPO_PUBLIC_SKYWATER_MODEL_URL` and `EXPO_PUBLIC_ONNX_WASM_URL` point at

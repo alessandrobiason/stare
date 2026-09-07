@@ -114,6 +114,45 @@ test("drops a marker the mask has no reading for without spending the band on it
   expect(held[0]).toBe(1);
 });
 
+test("a marker that turned up before the segmenter did is drawn by the pass that reaches it", () => {
+  // The phone has been turned onto sky nothing had looked at, so the marker's
+  // first frames carry no reading at all, and the pass that finally covers it
+  // is the first thing ever said about it.
+  const filter = new MarkerVisibilityFilter();
+  const time = clock();
+  const waiting = play(filter, "SAT", [null, null, null], time);
+  expect(waiting[waiting.length - 1]).toBe(0);
+
+  // Taken at its word, as the same reading would have been on the marker's own
+  // first frame: what is left is the crossfade. Averaged in from the nought a
+  // track with nothing to go on opens at, it would instead have spent 1.9
+  // seconds climbing to `showConfidence` before the fade could even start.
+  const covered = play(filter, "SAT", [0.95], time);
+  expect(covered[0]).toBe(1);
+});
+
+test("the first reading is taken at its word whichever way it goes", () => {
+  // The seeding above is not a thumb on the scale for drawing things: a marker
+  // whose first answer is a wall is hidden by it just as promptly.
+  const filter = new MarkerVisibilityFilter();
+  const time = clock();
+  play(filter, "SAT", [null, null], time);
+
+  expect(play(filter, "SAT", [0.05], time)[0]).toBe(0);
+});
+
+test("a seeded marker still owes the band two passes to change its mind", () => {
+  // Being taken at its word buys the first reading nothing beyond the first:
+  // once a track carries a reading, one stray pass moves it no further than it
+  // moves a marker that has been drawn since it rose.
+  const filter = new MarkerVisibilityFilter();
+  const time = clock();
+  play(filter, "SAT", [null, 0.95, 0.95], time);
+
+  expect(play(filter, "SAT", [0.02], time)[0]).toBe(1);
+  expect(play(filter, "SAT", [0.02], time)[0]).toBeLessThan(1);
+});
+
 test("a marker out of the mask's reach comes back as it was, not from scratch", () => {
   const { filter, time } = settled();
   play(filter, "SAT", [null, null], time);
@@ -169,12 +208,14 @@ test("holds its answer while the smoothed confidence sits inside the band", () =
   expect(falling[falling.length - 1]).toBe(1);
 });
 
-test("forgets markers that leave the frame", () => {
+test("forgets markers the loop stops mentioning", () => {
   const { filter, time } = settled("SAT");
   expect(filter.size()).toBe(1);
 
-  // A frame without it: below the elevation mask, off the frame, or its
-  // category switched off.
+  // A frame without it: set, below the elevation mask, or its category switched
+  // off. Crossing the frame's own edge is not enough — the loop goes on
+  // sampling for a frame's width past it, which is what lets a turn find those
+  // markers already decided.
   filter.beginFrame(time.next());
   filter.endFrame();
   expect(filter.size()).toBe(0);
