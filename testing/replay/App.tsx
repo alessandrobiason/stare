@@ -1,5 +1,5 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { BootScreen } from "../../src/components/BootScreen";
 import { FatalErrorBoundary } from "../../src/components/FatalErrorBoundary";
 import { useAppBoot } from "../../src/hooks/useAppBoot";
@@ -23,7 +23,10 @@ export default function App() {
   );
 
   return (
-    <SafeAreaView style={styles.root}>
+    // Full bleed, as the app's own root is: the harness's picture is fitted
+    // rather than covering (see `ReplayScene`), but what decides that is the
+    // scene's frame rather than an inset around the whole window.
+    <View style={styles.root}>
       {boot.result && (
         <FatalErrorBoundary onError={boot.reportFatal}>
           <ReplayScene boot={boot.result} />
@@ -38,7 +41,7 @@ export default function App() {
           onRetry={boot.retry}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -39,12 +39,19 @@ body {
   color: var(--text);
 }
 
-/* ---- The phone, outside the app: the status bar and the home indicator. */
+/* ---- The phone, over the app: the status bar and the home indicator.
+
+   Over rather than above it. The camera fills the screen — there is no chrome
+   around the app any more (`src/App.tsx`) — so these are laid on the picture
+   and only the sensor housing is black. The panels below keep clear of both by
+   sitting in the safe area (`SafeAreaLayer`). */
 
 .statusbar {
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
   height: 59px;
-  background: #000;
 }
 
 .statusbar .clock {
@@ -78,9 +85,11 @@ body {
 }
 
 .homebar {
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 34px;
-  background: #000;
 }
 
 .homebar span {
@@ -94,24 +103,22 @@ body {
   background: rgba(255, 255, 255, 0.92);
 }
 
-/* ---- The app: the sky view, and the picture fitted inside it.
-   `SkyOverlay.frameStyleFor` fits the camera's own 3:4 shape into the space the
-   safe area leaves, which is why the picture is a box in the middle of a navy
-   screen rather than the whole of it. */
+/* ---- The app: the picture, covering the screen, and the panels over it.
+   `frameBoxFor` scales the camera's own 3:4 shape until it fills the screen
+   and lets the sides run off it, which is why the picture is the whole of the
+   display rather than a box in the middle of a navy one. Its size and offset
+   are written by `render.mjs`, which is where the box is worked out. */
 
-.content {
+.screen {
   position: relative;
-  height: 839px;
+  width: 430px;
+  height: 932px;
   overflow: hidden;
   background: var(--background);
 }
 
 .picture {
   position: absolute;
-  left: 0;
-  width: 430px;
-  height: 573.33px;
-  top: 132.83px;
   overflow: hidden;
 }
 
@@ -119,8 +126,15 @@ body {
   position: absolute;
   left: 0;
   top: 0;
-  width: 430px;
-  height: 573.33px;
+}
+
+/* The panels' own box: the screen, inset off the sensor housing and the home
+   indicator. Every panel below places itself in a corner of this. */
+
+.hud {
+  position: absolute;
+  left: 0;
+  right: 0;
 }
 
 .labels {

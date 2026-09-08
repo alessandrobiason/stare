@@ -4,6 +4,29 @@ import { SATELLITE_MARKERS } from "../constants";
 /** The frame the markers are drawn over, in layout pixels. */
 export type FrameSize = { width: number; height: number };
 
+/**
+ * How the picture is laid over the screen.
+ *
+ * `cover` fills the screen with it and lets the frame run off the edges;
+ * `contain` fits the whole frame into the space available and leaves the rest
+ * of the screen empty.
+ */
+export type FrameFit = "cover" | "contain";
+
+/**
+ * The part of the frame someone can actually see, in frame percent.
+ *
+ * The whole of it under `contain`, and the middle of it under `cover`, where
+ * the screen is the window and the frame is wider than the window. Everything
+ * outside it is drawn and then clipped, which is what makes the difference
+ * invisible to the projection and visible to anything that counts what is on
+ * screen.
+ */
+export type FrameViewport = { left: number; top: number; right: number; bottom: number };
+
+/** The frame entire: what a fitted picture shows, and the default everywhere. */
+export const WHOLE_FRAME: FrameViewport = { left: 0, top: 0, right: 100, bottom: 100 };
+
 /** How far a marker's own motion carries it across the frame, in pixels. */
 export type TrailReach = {
   /** Displacement from the marker to where it will be, in layout pixels. */
@@ -67,11 +90,93 @@ export function trailReach(
  * the projection itself makes when it is asked to keep a point inside the view.
  * It is shared rather than repeated because a marker whose head has left the
  * frame is still drawn while its trail crosses it (`trailOnFrame`), and
- * everything that treats a marker as one of the ones *on screen* — the visible
- * count, the landmark labels, a tap — has to agree about which those are.
+ * everything that treats a marker as one of the ones being *drawn* has to agree
+ * about which those are.
+ *
+ * On the frame is not the same thing as on the screen once the picture covers
+ * one — see `pointInViewport`, which is what the visible count asks instead.
  */
 export function pointOnFrame(point: FramePoint): boolean {
-  return Math.abs(point.left - 50) <= 50 && Math.abs(point.top - 50) <= 50;
+  return pointInViewport(point, WHOLE_FRAME);
+}
+
+/**
+ * The box the picture is drawn in, in layout pixels, or `null` before there is
+ * a screen to measure it against.
+ *
+ * The box always carries the camera's own shape, whichever way it is fitted,
+ * and that is the whole of why this function exists. Markers and mask are
+ * placed in percentages of the frame, so they land where the projection put
+ * them only if the box they are placed in covers the field of view they were
+ * projected against. Stretching a 4:3 camera onto a 19.5:9 screen instead
+ * repoints those percentages at a different piece of sky at a different scale,
+ * and the markers drift as the camera moves.
+ *
+ * So the shape is kept and the size is chosen. `contain` picks the largest box
+ * that fits, which leaves the screen part empty — the harness's window, where
+ * the whole recorded frame is the thing being looked at. `cover` picks the
+ * smallest box that fills the screen, which puts the rest of the frame past its
+ * edges: the phone, where the app is a camera and a camera that stops short of
+ * the edge of the screen is a picture of a camera. Nothing is scaled or
+ * squashed either way, so the projection cannot tell the two apart — under
+ * `cover` some of what it places is simply outside the window, and `viewportOf`
+ * is how anything that cares about that finds out.
+ */
+export function frameBoxFor(
+  available: FrameSize | null,
+  aspectRatio: number,
+  fit: FrameFit
+): FrameSize | null {
+  if (!available || available.width <= 0 || available.height <= 0) return null;
+  const filled = available.height * aspectRatio;
+  const width =
+    fit === "cover" ? Math.max(available.width, filled) : Math.min(available.width, filled);
+  return { width, height: width / aspectRatio };
+}
+
+/**
+ * Which part of `box` the screen is showing, in frame percent.
+ *
+ * The box is centred in the space available, so what is cut is split evenly
+ * between the two edges of whichever axis overflows — and neither axis
+ * overflows when the picture is fitted, which is why the answer there is the
+ * whole frame.
+ */
+export function viewportOf(box: FrameSize, available: FrameSize): FrameViewport {
+  const across = visibleShare(available.width, box.width);
+  const down = visibleShare(available.height, box.height);
+  return {
+    left: 50 - across * 50,
+    right: 50 + across * 50,
+    top: 50 - down * 50,
+    bottom: 50 + down * 50
+  };
+}
+
+/** How much of a box's axis fits in the space available, in `(0, 1]`. */
+function visibleShare(available: number, box: number): number {
+  if (!(box > 0)) return 1;
+  return Math.min(1, available / box);
+}
+
+/**
+ * Whether a projected point lands where someone can see it.
+ *
+ * The question `pointOnFrame` used to be the whole of: with the picture fitted,
+ * the frame and the screen were the same box. Under `cover` they are not, and
+ * the two questions come apart — a marker off the window is still on the frame,
+ * still drawn, and still clipped. What is drawn is the frame's business (a
+ * marker sliding out of view leaves tip last, and its trail is clipped at the
+ * edge like any other); what is *counted* is this one's, because the number in
+ * the corner is a claim about the sky in front of the person holding the phone.
+ */
+export function pointInViewport(point: FramePoint, viewport: FrameViewport): boolean {
+  return (
+    point.left >= viewport.left &&
+    point.left <= viewport.right &&
+    point.top >= viewport.top &&
+    point.top <= viewport.bottom
+  );
 }
 
 /**

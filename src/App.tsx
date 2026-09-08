@@ -1,6 +1,6 @@
 import { useKeepAwake } from "expo-keep-awake";
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
+import { StatusBar, StyleSheet, View } from "react-native";
 import { runBootSequence } from "./boot/bootSequence";
 import { bootTasks } from "./boot/bootTasks";
 import { BootScreen } from "./components/BootScreen";
@@ -35,6 +35,33 @@ import { useIntro } from "./hooks/useIntro";
  */
 const CAMERA_LAB = false;
 
+/**
+ * The whole of the screen, and the clock and battery over the top of it.
+ *
+ * There is no chrome around this app any more: the camera is the background,
+ * edge to edge, and every screen before it — the intro, the boot sky — fills
+ * the same space. What used to inset all of them was a `SafeAreaView` at this
+ * root, which is the wrong place for one: it insets the picture along with the
+ * panels, and a camera with the notch's height of black above it is a smaller
+ * camera rather than a safer one. The insets moved to where the writing is
+ * (`SafeAreaLayer`), and the picture reaches the corners.
+ *
+ * The status bar is over the picture now rather than over a background of the
+ * app's own, hence the style. Every screen here is dark — the boot sky, the
+ * intro's card, the panels over the camera — and the default is black text,
+ * which was already the wrong half of a choice that has no answer good for
+ * both a bright sky and a dark one. Set from JavaScript rather than in
+ * `app.json`: the plist Expo generates leaves the style to the app
+ * (`UIViewControllerBasedStatusBarAppearance` is false), so this ships as an
+ * over-the-air update instead of a new binary — see `docs/ios-builds.md`.
+ */
+const Screen: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <View style={styles.root}>
+    <StatusBar barStyle="light-content" />
+    {children}
+  </View>
+);
+
 export default function App() {
   /**
    * Hold the screen on for as long as the app is open.
@@ -56,17 +83,17 @@ export default function App() {
 
   if (CAMERA_LAB) {
     return (
-      <SafeAreaView style={styles.root}>
+      <Screen>
         <CameraLab />
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   if (intro.pending) {
     return (
-      <SafeAreaView style={styles.root}>
+      <Screen>
         <IntroScreen onDone={intro.complete} />
-      </SafeAreaView>
+      </Screen>
     );
   }
 
@@ -88,7 +115,7 @@ const BootedApp: React.FC<{ wordmark: boolean }> = ({ wordmark }) => {
   );
 
   return (
-    <SafeAreaView style={styles.root}>
+    <Screen>
       {boot.result && (
         <FatalErrorBoundary onError={boot.reportFatal}>
           <DeviceScene boot={boot.result} />
@@ -104,7 +131,7 @@ const BootedApp: React.FC<{ wordmark: boolean }> = ({ wordmark }) => {
           wordmark={wordmark}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   );
 };
 

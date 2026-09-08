@@ -193,7 +193,10 @@ const scenes = [
       ...starlinkTrain({ from: { left: 10, top: 9 }, to: { left: 45, top: 26 }, count: 5, headingDeg: -26 }),
       { left: 53.5, top: 30.5, rangeKm: 950, category: "COMMS", headingDeg: -26, travelPct: 5.4, opacity: 0.3 },
       {
-        left: 22,
+        // Far enough in from the frame's left edge for its name to be read: the
+        // picture covers the screen, so the sides of the frame are cropped and
+        // a label out there is cut in half. See `frameBoxFor`.
+        left: 28,
         top: 43,
         rangeKm: 520,
         category: "LANDMARK",
@@ -271,17 +274,17 @@ const scenes = [
     sky: { ...NIGHT_CITY, seed: 77 },
     palette: "night",
     panels: { filter: "closed", status: "open" },
+    // The named fleets only. What is left over is worked out by the generator
+    // from the marks actually on the screen, so the rows and the count above
+    // them always add up — see `statusPanel`.
     breakdown: {
       rows: [
-        ["Starlink", 7],
+        ["Starlink", 6],
         ["SES", 3],
-        ["Galileo", 3],
+        ["Galileo", 2],
         ["GPS", 2],
         ["ISS", 1]
-      ],
-      // The rows and this have to add up to the count above them: a breakdown
-      // that comes to less than its own total reads as a fault in one of the two.
-      other: 12
+      ]
     },
     markers: [
       ...geostationaryBelt({ top: 57, from: 8, to: 96, count: 7, seed: 17 }),

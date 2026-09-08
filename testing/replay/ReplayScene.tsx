@@ -4,6 +4,7 @@ import { statusSection } from "../../src/debug/sections";
 import { useDeviceOrientation } from "../../src/hooks/useDeviceOrientation";
 import { useSceneControls } from "../../src/hooks/useSceneControls";
 import { AttitudeSource } from "../../src/hooks/useSmoothedOrientation";
+import { SafeAreaLayer } from "../../src/components/SafeAreaLayer";
 import { SceneStatus } from "../../src/components/SceneStatus";
 import { SceneFrame, SkyOverlay } from "../../src/components/SkyOverlay";
 import {
@@ -50,6 +51,14 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
     () => ({
       label: "Recorded video",
       sizePx: { widthPx: REPLAY_CAMERA.widthPx, heightPx: REPLAY_CAMERA.heightPx },
+      // Fitted rather than covering, which is the one place this scene departs
+      // from the phone's. The app fills a portrait screen with a portrait
+      // camera and loses the sides of the frame to it; this runs in a laptop's
+      // landscape window, where covering would leave a tall recording showing
+      // a column up the middle. The whole recorded frame is the thing being
+      // checked here — the projection is developed against it — so the harness
+      // shows all of it. See `SceneFrame.fit`.
+      fit: "contain",
       fieldOfView: REPLAY_CAMERA_FIELD_OF_VIEW,
       lens: REPLAY_LENS,
       grabber: videoFrameGrabber(() => videoRef.current),
@@ -149,11 +158,16 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         }}
       />
 
-      <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
+      {/* The same layer the app puts its panels in, so the harness is the app's
+          layout as well as its view. A browser window has no notch, so what
+          it insets here is nothing at all. See `SafeAreaLayer`. */}
+      <SafeAreaLayer>
+        <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
 
-      {/* After the overlay, so the transport is over the tap target the scene
-          lays across the picture rather than under it. */}
-      <ReplayControls videoRef={videoRef} />
+        {/* After the overlay, so the transport is over the tap target the scene
+            lays across the picture rather than under it. */}
+        <ReplayControls videoRef={videoRef} />
+      </SafeAreaLayer>
     </View>
   );
 };
