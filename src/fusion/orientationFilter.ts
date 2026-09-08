@@ -1,6 +1,6 @@
 import { CameraAttitude } from "../camera/attitude";
 import { ORIENTATION_FILTER } from "../constants";
-import { toDegrees, wrapDegrees180, wrapDegrees360 } from "../math/angles";
+import { toDegrees, toRadians, wrapDegrees180, wrapDegrees360 } from "../math/angles";
 import { AngleKalmanFilter, AngleRandomWalkFilter } from "./angleKalman";
 
 /**
@@ -97,6 +97,30 @@ function magneticNoiseDeg(measurement: AttitudeMeasurement, elapsedSeconds: numb
 function gyroMagnitudeDegPerSecond(measurement: AttitudeMeasurement): number {
   const gyro = measurement.gyroRadPerSecond;
   return gyro ? toDegrees(Math.hypot(gyro.x, gyro.y, gyro.z)) : 0;
+}
+
+/**
+ * The fastest one Euler axis can be turning while the body turns at
+ * `gyroRateDegPerSecond`, in deg/s — the bound a rate estimate has to stay
+ * inside to be describing motion rather than a mis-timed reading.
+ *
+ * The Euler rates are the body rate resolved onto axes that are not orthogonal:
+ * the pitch rate is at most the body rate, and the heading and roll rates at
+ * most that divided by `cos(pitch)`, which is the larger of the two and so
+ * bounds all three. Plus the slack, and floored away from the vertical, both of
+ * which `ORIENTATION_FILTER` explains — as it does why this exists at all.
+ *
+ * A reading with no gyro cannot be bounded this way and gets the backstop
+ * instead, which is above anything a hand does rather than anything a sensor
+ * does.
+ */
+function believableRateDegPerSecond(gyroRateDegPerSecond: number, pitchDeg: number): number {
+  if (gyroRateDegPerSecond <= 0) return ORIENTATION_FILTER.maxRateWithoutGyroDegPerSecond;
+  const cosPitch = Math.max(
+    Math.abs(Math.cos(toRadians(pitchDeg))),
+    ORIENTATION_FILTER.verticalPitchCosineFloor
+  );
+  return gyroRateDegPerSecond / cosPitch + ORIENTATION_FILTER.rateSlackDegPerSecond;
 }
 
 /**
@@ -209,6 +233,17 @@ export class OrientationFilter {
     );
     this.pitch.correct(measurement.pitchDeg, ORIENTATION_FILTER.pitchNoiseDeg);
     this.roll.correct(measurement.rollDeg, ORIENTATION_FILTER.rollNoiseDeg);
+
+    // What the gyro says is possible, applied after the corrections rather than
+    // to them: a reading handed over late carries a sound angle and an interval
+    // that never happened, so what has to be thrown away is the rate the two of
+    // them imply and not the angle itself. Corrected first, clamped second, the
+    // view keeps following the phone and stops coasting on a rate no hand could
+    // produce — see the note in `ORIENTATION_FILTER`.
+    const believable = believableRateDegPerSecond(gyroRate, this.pitch.angle);
+    this.heading.limitRate(believable);
+    this.pitch.limitRate(believable);
+    this.roll.limitRate(believable);
 
     this.lastTimestampSeconds = measurement.timestampSeconds;
     return this.orientationAt(0);

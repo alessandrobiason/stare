@@ -482,11 +482,20 @@ export const MARKER_VISIBILITY = {
   fadeSeconds: 0.35,
   /**
    * Longest step the filter integrates over. A stalled frame — the app coming
-   * back to the foreground, a long GC — would otherwise arrive as one huge
-   * `dt` and snap every marker to its target, which is the pop this exists to
-   * remove.
+   * back to the foreground, a long GC, a sky pass decoding its JPEG — would
+   * otherwise arrive as one huge `dt` and snap every marker to its target,
+   * which is the pop this exists to remove.
+   *
+   * Under `fadeSeconds`, and by a good margin, because that is what makes the
+   * sentence above true rather than merely intended: a step at or above the
+   * fade *is* the snap, so a cap set above it stops nothing at all. This was
+   * half a second — long enough for one 200 ms frame, which a chased mask pass
+   * can produce while the phone is being turned, to cut a marker outright and
+   * leave it fading back in. A frame this long is already a stall rather than a
+   * slow frame: at 60 Hz it is six of them, and the display does not produce
+   * one while it is keeping up.
    */
-  maxStepSeconds: 0.5,
+  maxStepSeconds: 0.1,
   /** Below this opacity a marker is not worth drawing, and counts as hidden. */
   minimumDrawnOpacity: 0.02
 } as const;
@@ -596,7 +605,58 @@ export const ORIENTATION_FILTER = {
   /** Longest the view will coast on the rate estimate before it just holds. */
   maxExtrapolationSeconds: 0.1,
   /** Gap beyond which the filter restarts instead of fusing across it. */
-  maxSampleGapSeconds: 0.5
+  maxSampleGapSeconds: 0.5,
+  /*
+   * The next three bound the rate estimate by what the gyro says the phone is
+   * actually doing, and they are here because of one failure.
+   *
+   * A reading is stamped when it is *handled* (`useSmoothedOrientation`), which
+   * is the only clock the render loop shares with it. Handling is not when the
+   * sensor took it: block the JavaScript thread — a sky pass decoding its JPEG,
+   * a long GC — and every reading taken during the block arrives afterwards,
+   * back to back, each stamped a fraction of a millisecond after the last. What
+   * the filter is then handed is a device that turned seven degrees in half a
+   * millisecond, and a constant-velocity filter believes it: the rate state went
+   * to four and then thirty *thousand* degrees a second, and `sample` coasted a
+   * tenth of a second on that, which put the drawn heading 30 to 170 degrees
+   * from where the phone was pointing. The markers left the frame, and with the
+   * frame empty every visibility track was forgotten and faded back in from
+   * nothing — the fraction of a second of empty sky this whole block is for.
+   * Only ever while turning, because the lie is (angle change)/(interval) and a
+   * still phone has no angle change to divide.
+   *
+   * The gyro is the answer, because it measures the turn rate directly rather
+   * than inferring it from two angles and a timestamp. It is not resolved onto
+   * the Euler axes — the reason it only lends `gyroRateShare` to the process
+   * noise — but it does bound them: with the body turning at w, the pitch rate
+   * is at most w, and the heading and roll rates at most w/cos(pitch), which
+   * dominates every one of the three. So a rate outside that band is not fast
+   * motion, it is a timestamp that is not describing the reading it came with.
+   */
+  /**
+   * Rate allowed on an axis beyond the gyro's bound, in deg/s. Slack for the
+   * gyro's own noise, for the reading it is a moment out of step with, and so
+   * that a phone the gyro reports as still can still be tracked. Small enough
+   * that coasting the whole `maxExtrapolationSeconds` on it is a few degrees.
+   */
+  rateSlackDegPerSecond: 45,
+  /**
+   * Smallest `cos(pitch)` the bound above is evaluated at, so an axis pointed
+   * at the zenith — where heading and roll are the same rotation and both are
+   * divided by nothing — has a finite bound rather than no bound at all. 0.1 is
+   * 84 degrees up, past which the cap is eleven times the gyro's magnitude.
+   */
+  verticalPitchCosineFloor: 0.1,
+  /**
+   * The bound where a reading carries no gyro at all, in deg/s.
+   *
+   * Every source that aims this view does carry one — the phone's
+   * `DeviceMotion`, and the recording's own stream — so this is the backstop
+   * rather than a working figure, and it is set where hand motion stops instead
+   * of where the sensor does: a flick of the wrist is a few hundred degrees a
+   * second, and nothing holding a phone reaches this.
+   */
+  maxRateWithoutGyroDegPerSecond: 720
 } as const;
 
 /**

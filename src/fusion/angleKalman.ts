@@ -1,4 +1,4 @@
-import { wrapDegrees180 } from "../math/angles";
+import { clamp, wrapDegrees180 } from "../math/angles";
 
 /**
  * Scalar Kalman filter over one angle, carrying angular rate as a second state.
@@ -97,6 +97,25 @@ export class AngleKalmanFilter {
     this.p00 -= gainAngle * this.p00;
     this.p01 -= gainAngle * priorP01;
     this.p11 -= gainRate * priorP01;
+  }
+
+  /**
+   * Holds the rate state inside `maxDegPerSecond`, in both directions.
+   *
+   * The state only, not the covariance: what this answers is a measurement the
+   * filter's model cannot describe — an angle step delivered in an interval too
+   * short to have contained it — and the filter's uncertainty about the rate is
+   * unchanged by the fact that one correction overshot. Left widened, the next
+   * honest reading still carries the gain to move the rate wherever it belongs.
+   *
+   * A projection onto what is possible rather than a rejection of the reading,
+   * because the angle the reading carries is good even when the interval it
+   * arrived in is not: the phone really is pointing there, and only the story
+   * about how fast it got there is wrong.
+   */
+  limitRate(maxDegPerSecond: number): void {
+    if (!this.started) return;
+    this.rateDegPerSecond = clamp(this.rateDegPerSecond, -maxDegPerSecond, maxDegPerSecond);
   }
 
   /**

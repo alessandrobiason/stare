@@ -138,8 +138,14 @@ noise opens up with measured turn rate, so it smooths while still and tracks
 while moving. Heading is the channel that pays: its magnetic term is near-white
 at frame rate, and the filter cuts that shimmer about fivefold for a tenth of a
 degree of lag. Pitch and roll carry a slow correlated error no smoothing
-removes, so they track closely instead. Tuning lives in `ORIENTATION_FILTER` in
-`src/constants.ts`.
+removes, so they track closely instead. The rate the filter carries is bounded by
+what the gyro says the phone is doing, because a reading is stamped when it is
+handled rather than when it was taken: block the main thread mid-turn and the
+readings taken during the block all arrive at once, describing degrees of turn in
+fractions of a millisecond. Believed, that put the drawn sky over a hundred
+degrees from where the phone was pointing for a few frames — every marker off the
+frame and then fading back in, which is what a quick sweep across the sky used to
+flicker with. Tuning lives in `ORIENTATION_FILTER` in `src/constants.ts`.
 
 A compass is the only thing aiming this view with nothing to check it against, so
 it is checked against the sky. The sun's bearing at a given instant from a given

@@ -5,7 +5,7 @@ import {
   northOffsetNoiseDeg,
   OrientationFilter
 } from "../src/fusion/orientationFilter";
-import { toDegrees, wrapDegrees180 } from "../src/math/angles";
+import { toDegrees, toRadians, wrapDegrees180 } from "../src/math/angles";
 import {
   RecordingData,
   attitudeFromArkit,
@@ -187,6 +187,100 @@ test("a gap in the readings restarts the estimate instead of sweeping across it"
     level({ timestampSeconds: 120 * RATE + 60, yawDeg: 200 })
   );
   expect(afterSeek.headingDeg).toBeCloseTo(200);
+});
+
+describe("readings the platform delivered late", () => {
+  /**
+   * A pan at `rateDegPerSecond`, with the JavaScript thread blocked for
+   * `stallSeconds` in the middle of it.
+   *
+   * The sensor goes on sampling through the block and every reading it took
+   * arrives afterwards, back to back, each stamped as it is *handled* — which is
+   * the only clock the render loop shares with it (`useSmoothedOrientation`). So
+   * the filter is handed several degrees of turn per half millisecond, which is
+   * the shape of the failure this is about: it used to be believed, and the view
+   * then coasted a tenth of a second on a rate of thousands of degrees a second
+   * and drew the sky nowhere near where the phone was pointing.
+   *
+   * Returns the worst error the frames drawn over the next third of a second
+   * would have been placed with, and the fastest rate the filter reported.
+   */
+  function afterAStall(rateDegPerSecond: number, stallSeconds: number) {
+    const filter = new OrientationFilter();
+    const sensor = 0.05;
+    const yawAt = (seconds: number) => wrapDegrees180(seconds * rateDegPerSecond);
+    const feed = (stamp: number, seconds: number) =>
+      filter.update({
+        timestampSeconds: stamp,
+        yawDeg: yawAt(seconds),
+        pitchDeg: 20,
+        rollDeg: 0,
+        northOffsetDeg: 0,
+        gyroRadPerSecond: { x: 0, y: toRadians(rateDegPerSecond), z: 0 }
+      });
+
+    let sensorSeconds = 0;
+    for (; sensorSeconds < 3; sensorSeconds += sensor) feed(sensorSeconds, sensorSeconds);
+
+    // The queue, flushed: every reading taken during the block, in order, a
+    // fraction of a millisecond apart.
+    const resumedAt = sensorSeconds + stallSeconds;
+    let stamp = resumedAt;
+    let reported = 0;
+    for (let index = 1; index <= Math.floor(stallSeconds / sensor); index += 1) {
+      reported = Math.max(
+        reported,
+        feed(stamp, sensorSeconds + index * sensor).rotationRateDegPerSecond
+      );
+      stamp += 0.0005;
+    }
+
+    let worstErrorDeg = 0;
+    let nextReadingAt = resumedAt + sensor;
+    for (let now = stamp; now < resumedAt + 0.3; now += 1 / 60) {
+      while (nextReadingAt <= now) {
+        reported = Math.max(reported, feed(nextReadingAt, nextReadingAt).rotationRateDegPerSecond);
+        nextReadingAt += sensor;
+      }
+      const drawn = filter.sample(now);
+      worstErrorDeg = Math.max(
+        worstErrorDeg,
+        Math.abs(wrapDegrees180(drawn.headingDeg - yawAt(now)))
+      );
+    }
+
+    return { worstErrorDeg, reported };
+  }
+
+  test("are not read as a turn no hand could make", () => {
+    // 150 deg/s is a brisk but ordinary sweep across the sky, and 200 ms is one
+    // chased sky pass' worth of blocked main thread. Unbounded, this drew the
+    // heading 170 degrees out — the whole sky off the frame, which is the
+    // fraction of a second of empty view this guards.
+    const { worstErrorDeg, reported } = afterAStall(150, 0.2);
+    expect(worstErrorDeg).toBeLessThan(15);
+    expect(reported).toBeLessThan(4 * 150);
+  });
+
+  test("leave an error that grows with the stall rather than exploding at one", () => {
+    // What is left is honest: readings a fifth of a second old fused as though
+    // they were current, which lags the estimate and then decays as real ones
+    // arrive. It has to stay a lag rather than becoming a launch.
+    const errors = [0.1, 0.2, 0.3, 0.45].map(
+      (stall) => afterAStall(150, stall).worstErrorDeg
+    );
+    for (const error of errors) expect(error).toBeLessThan(20);
+    expect(errors[0]).toBeLessThan(errors[2]);
+  });
+
+  test("cannot be got round by turning fast enough to justify anything", () => {
+    // The bound is the gyro's, so a reading claiming a rate the gyro does not
+    // support is held whatever the pan underneath it is doing.
+    for (const rate of [40, 90, 250, 400]) {
+      const { worstErrorDeg } = afterAStall(rate, 0.3);
+      expect(worstErrorDeg).toBeLessThan(40);
+    }
+  });
 });
 
 test("time running backwards restarts the estimate too", () => {

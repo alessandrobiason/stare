@@ -144,3 +144,34 @@ test("the random walk filter still follows a slow drift", () => {
   expect(filter.angle).toBeGreaterThan(18);
   expect(filter.angle).toBeLessThan(20.5);
 });
+
+test("the rate state can be held inside what is possible, and still move after", () => {
+  const filter = new AngleKalmanFilter();
+  filter.correct(0, 0.15);
+  // An angle step delivered in an interval far too short to have contained it,
+  // which is what a reading handled late looks like from in here.
+  filter.predict(0.0005, 300);
+  filter.correct(7.5, 0.15);
+  expect(Math.abs(filter.rate)).toBeGreaterThan(1000);
+
+  filter.limitRate(200);
+  expect(filter.rate).toBeCloseTo(200);
+
+  // The covariance is left alone, so the next honest reading still carries the
+  // gain to put the rate wherever the measurements say it belongs: five degrees
+  // over fifty milliseconds is a hundred a second, and the clamped estimate is
+  // pulled most of the way down to it by that one reading.
+  const before = filter.angle;
+  filter.predict(0.05, 300);
+  filter.correct(wrapDegrees180(before + 5), 0.15);
+  expect(filter.rate).toBeGreaterThan(50);
+  expect(filter.rate).toBeLessThan(150);
+});
+
+test("a rate limit does nothing to a filter with no estimate yet", () => {
+  const filter = new AngleKalmanFilter();
+  filter.limitRate(10);
+  expect(filter.isStarted).toBe(false);
+  filter.correct(140, 0.2);
+  expect(filter.angle).toBeCloseTo(140);
+});

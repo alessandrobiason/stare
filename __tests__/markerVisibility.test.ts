@@ -48,18 +48,48 @@ function settled(key = "SAT") {
 
 test("fades a new marker in rather than popping it on", () => {
   const filter = new MarkerVisibilityFilter();
+  const time = clock();
 
-  filter.beginFrame(0);
+  filter.beginFrame(time.at());
   expect(filter.sample("SAT", 0.95)).toBe(0);
   filter.endFrame();
 
-  filter.beginFrame(MARKER_VISIBILITY.fadeSeconds / 2);
-  expect(filter.sample("SAT", 0.95)).toBeCloseTo(0.5);
+  /** Runs `seconds` of display frames over open sky, and returns the opacity. */
+  const over = (seconds: number): number => {
+    const until = time.at() + seconds;
+    let opacity = 0;
+    while (time.at() < until) {
+      filter.beginFrame(time.next());
+      opacity = filter.sample("SAT", 0.95);
+      filter.endFrame();
+    }
+    return opacity;
+  };
+
+  // In display frames rather than in one step of half a fade. The fade is
+  // measured in time, so a run of ordinary frames covering half of it is half of
+  // it — but a single frame that long is a stall rather than a frame, and
+  // `maxStepSeconds` deliberately declines to spend most of a fade on one.
+  expect(over(MARKER_VISIBILITY.fadeSeconds / 2)).toBeCloseTo(0.5, 1);
+  expect(over(MARKER_VISIBILITY.fadeSeconds / 2)).toBe(1);
+});
+
+test("a stalled frame cannot cut a drawn marker outright", () => {
+  // The one that was visible: a chased mask pass blocks the main thread for a
+  // couple of hundred milliseconds mid-turn, and the frame that follows it
+  // arrives as a single huge step. Charged in full — which a cap above
+  // `fadeSeconds` allowed — it spends the whole fade at once and the marker is
+  // simply gone, then fades back in once it has an answer again.
+  const { filter, time } = settled();
+
+  filter.beginFrame(time.at() + 0.25);
+  const afterTheStall = filter.sample("SAT", null);
   filter.endFrame();
 
-  filter.beginFrame(MARKER_VISIBILITY.fadeSeconds);
-  expect(filter.sample("SAT", 0.95)).toBe(1);
-  filter.endFrame();
+  expect(afterTheStall).toBeCloseTo(
+    1 - MARKER_VISIBILITY.maxStepSeconds / MARKER_VISIBILITY.fadeSeconds
+  );
+  expect(afterTheStall).toBeGreaterThan(MARKER_VISIBILITY.minimumDrawnOpacity);
 });
 
 test("holds a drawn marker through a mask that flickers around the threshold", () => {
