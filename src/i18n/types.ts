@@ -56,6 +56,15 @@ export type Strings = {
     holdsStation: string;
     /** The link out to the operator's own page. `{site}`. */
     openSite: string;
+    /**
+     * What the photograph of a landmark is, for a screen reader. `{name}`.
+     *
+     * Never seen: the picture is the picture. It names the object rather than
+     * describing the image, because what is on screen is a photograph of a thing
+     * the card has just named, and no fixed sentence can describe a picture
+     * fetched at the moment of the tap.
+     */
+    photo: string;
     /** The catalog is reloaded underneath an open card, and objects leave it. */
     missing: string;
     facts: {

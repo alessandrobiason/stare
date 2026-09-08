@@ -6,6 +6,10 @@ import { DebugToggle } from "../src/components/DebugToggle";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SceneStatus } from "../src/components/SceneStatus";
+import {
+  clearLandmarkPhotosForTesting,
+  loadLandmarkPhoto
+} from "../src/satellite/landmarkPhotos";
 import { BREAKDOWN_ROWS, tallyFleets } from "../src/satellite/fleets";
 import { allCategories } from "../src/satellite/categories";
 import { SatelliteDetail } from "../src/types";
@@ -407,6 +411,92 @@ describe("the tapped satellite's card", () => {
     expect(renderToStaticMarkup(card({ "STARLINK-1234": detail() }))).toContain(
       'aria-label="Close satellite details"'
     );
+  });
+
+  describe("the photograph", () => {
+    /** The file's entry on Commons, as the API answers for it. */
+    const IMAGE_INFO = JSON.stringify({
+      query: {
+        pages: [
+          {
+            imageinfo: [
+              {
+                thumburl:
+                  "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/ISS-56.jpg/960px-ISS-56.jpg",
+                descriptionurl: "https://commons.wikimedia.org/wiki/File:ISS-56.jpg",
+                mime: "image/jpeg",
+                extmetadata: {
+                  Artist: { value: "NASA/Roscosmos" },
+                  LicenseShortName: { value: "Public domain" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    });
+
+    beforeEach(() => clearLandmarkPhotosForTesting());
+    afterEach(() => jest.restoreAllMocks());
+
+    /**
+     * Renders with the picture already resolved.
+     *
+     * The fetch is what the card starts on mount, and `renderToStaticMarkup`
+     * runs no effects — so the lookup is done here, which is also the case that
+     * matters most on a phone: a card reopened on an object whose picture is
+     * already in hand draws it on the first frame.
+     */
+    async function withPhotoResolved(): Promise<void> {
+      jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(IMAGE_INFO, { status: 200 }));
+      await loadLandmarkPhoto("ISS-56 International Space Station fly-around (07).jpg");
+    }
+
+    test("a landmark is shown, not only described", async () => {
+      await withPhotoResolved();
+
+      const markup = renderToStaticMarkup(
+        card({ ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" }) })
+      );
+
+      // What is on screen is a picture, so what is asserted is what a screen
+      // reader is told it is: react-native-web paints the file itself as a
+      // background once it has loaded, and renders nothing of it server-side.
+      expect(markup).toContain('aria-label="Photograph of ISS"');
+      expect(markup).toContain('role="img"');
+    });
+
+    test("the picture is credited, because most of these licences ask for it", async () => {
+      await withPhotoResolved();
+
+      const text = textOf(
+        card({ ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" }) })
+      );
+
+      // The author and the licence, over a link to the page carrying both in
+      // full — not a bare domain, which credits nobody.
+      expect(text).toContain("NASA/Roscosmos · Public domain");
+    });
+
+    test("the rest of the catalogue keeps its card the size it was", async () => {
+      await withPhotoResolved();
+
+      const markup = renderToStaticMarkup(card({ "STARLINK-1234": detail() }));
+
+      expect(markup).not.toContain('role="img"');
+      expect(markup).not.toContain("Public domain");
+    });
+
+    test("a card whose picture never arrives reads exactly as it did before", () => {
+      // No lookup has resolved, which is every card's first frame and every
+      // card's only frame on a phone with no signal.
+      const text = textOf(
+        card({ ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" }) })
+      );
+
+      expect(text).toContain("International Space Station");
+      expect(text).not.toContain("Public domain");
+    });
   });
 
   test("says so when the catalog no longer carries what was tapped", () => {

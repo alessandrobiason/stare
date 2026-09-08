@@ -1,8 +1,14 @@
 import React, { MutableRefObject, useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { fill, strings } from "../i18n";
 import { kilometres, lookDirection, orbitPeriod, speed } from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
+import {
+  cachedLandmarkPhoto,
+  landmarkPhotoFile,
+  loadLandmarkPhoto,
+  LandmarkPhoto
+} from "../satellite/landmarkPhotos";
 import { SatelliteDetail } from "../types";
 import { cssColor, MarkerPalette } from "./palette";
 import { theme } from "./theme";
@@ -55,6 +61,15 @@ const SAMPLE_INTERVAL_MS = 500;
  * else, and it carries the operator's own page where there is one — see
  * `briefingFor`.
  *
+ * **And a photograph, for the objects there is one of.** Words cannot settle
+ * what a thing looks like, and for the stations, the observatories and the
+ * vehicles visiting them the picture is the answer to the question that was
+ * actually asked. It sits above the text, because it is understood before the
+ * text is read. It is fetched rather than bundled, so it arrives a moment after
+ * the card does and is absent entirely for a phone with no signal — which is why
+ * it is drawn as a strip that appears rather than a gap that fills, and why
+ * every failure in `landmarkPhotos.ts` ends as a card with no picture on it.
+ *
  * **A tap over a cluster.** The sky puts markers on top of each other, so a tap
  * frequently means several satellites at once. The alternatives were a pair of
  * arrows through them or a list to drill into, and both hide the thing being
@@ -87,6 +102,9 @@ export const SatelliteCard: React.FC<Props> = ({
   // Resolved on each render rather than memoised: it is a walk down a list of
   // name patterns, against a card that re-renders twice a second.
   const briefing = detail ? briefingFor(detail) : null;
+  // The same walk, ending in a table lookup, and a string rather than an object
+  // so the photograph below is not remounted twice a second.
+  const photoFile = detail ? landmarkPhotoFile(detail) : null;
 
   useEffect(() => {
     setDetail(describeRef.current(selected));
@@ -164,6 +182,11 @@ export const SatelliteCard: React.FC<Props> = ({
         </Pressable>
       </View>
 
+      {/* Keyed by the file, so switching between two satellites under one finger
+          starts the picture over rather than showing the Soyuz's for the frame
+          before the ISS's effect has run. */}
+      {photoFile && <Photograph key={photoFile} file={photoFile} of={selected} />}
+
       {briefing && (
         <View style={styles.briefing}>
           <Text style={styles.briefingText}>{briefing.text}</Text>
@@ -184,6 +207,79 @@ export const SatelliteCard: React.FC<Props> = ({
         // an honest gap, rather than a card of dashes that looks like a fault.
         <Text style={styles.missing}>{t.card.missing}</Text>
       )}
+    </View>
+  );
+};
+
+/**
+ * The picture of the thing, with the credit that comes with using it.
+ *
+ * Drawn only once there is something to draw. The alternatives were a spinner
+ * and a placeholder block, and both spend a strip of a card that is sitting over
+ * a live camera view announcing that a picture is on its way — which is worth
+ * less than the sky it covers, and reads as a fault on the phones where the
+ * picture never arrives at all. Appearing a beat later is the smaller surprise.
+ *
+ * `onError` is not belt-and-braces. The picture is fetched over whatever
+ * connection a phone held up at the sky has, from a file somebody else can
+ * replace, and a decode can simply fail — any of which takes the strip back off
+ * the card rather than leaving a broken frame on it.
+ */
+const Photograph: React.FC<{ file: string; of: string }> = ({ file, of }) => {
+  // What is already known, so a reopened card draws its picture on the first
+  // frame instead of fading the same one in again.
+  const [photo, setPhoto] = useState<LandmarkPhoto | null>(
+    () => cachedLandmarkPhoto(file) ?? null
+  );
+  const [broken, setBroken] = useState(false);
+
+  // Mounted per file — the card keys it by file name — so there is no state here
+  // to carry from one object to the next, and this only ever runs once.
+  useEffect(() => {
+    let live = true;
+    void loadLandmarkPhoto(file).then((found) => {
+      // The card outlives the request only some of the time: a tap through a
+      // cluster switches file, and a tap on the sky closes the card outright.
+      if (live) setPhoto(found);
+    });
+    return () => {
+      live = false;
+    };
+  }, [file]);
+
+  if (!photo || broken) return null;
+
+  return (
+    <View style={styles.photo}>
+      <Image
+        // The label says what the picture is of rather than describing it: this
+        // is a photograph of a named object, and the name is the description.
+        accessibilityRole="image"
+        accessibilityLabel={fill(strings().card.photo, { name: of })}
+        source={{ uri: photo.imageUrl }}
+        style={styles.photoImage}
+        resizeMode="cover"
+        onError={() => setBroken(true)}
+      />
+      {/* Over the picture rather than under it, because the card is bounded by
+          the sky above it: a caption bar costs the bottom of one photograph,
+          where a row of its own costs a line of the description. */}
+      <Pressable
+        accessibilityRole="link"
+        style={styles.credit}
+        onPress={() => {
+          void Linking.openURL(photo.pageUrl).catch(() => undefined);
+        }}
+      >
+        {/* No label of its own: what it says is what it opens, and a spoken
+            label that differed from the visible one would be a second name for
+            the same control. Two thirds of these pictures are NASA's and in the
+            public domain; the rest are CC BY, CC BY-SA or CC0 and are being
+            credited because they ask to be. */}
+        <Text numberOfLines={1} style={styles.creditLabel}>
+          {photo.credit} ↗
+        </Text>
+      </Pressable>
     </View>
   );
 };
@@ -320,6 +416,42 @@ const styles = StyleSheet.create({
     color: theme.color.textDim,
     fontSize: 13,
     fontWeight: "700"
+  },
+  photo: {
+    marginTop: 8,
+    // A strip rather than a whole picture. The card is anchored to the bottom of
+    // a live camera view, and every point it grows is a point of sky it covers;
+    // this is about as short as a spacecraft against black stays recognisable,
+    // and about as much of a portrait picture as can be cropped away safely.
+    height: 150,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.color.divider,
+    // What is behind the picture while its bytes arrive. Not the same thing as a
+    // placeholder for the lookup: by the time this box exists the URL is known,
+    // so it is a moment of dark panel rather than a promise of a picture.
+    backgroundColor: theme.color.control
+  },
+  photoImage: {
+    width: "100%",
+    height: "100%"
+  },
+  credit: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // A thumb-sized target, like every other control on the sky.
+    minHeight: 30,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+    // Dark enough to read white text over the bright side of any photograph.
+    backgroundColor: theme.color.panel
+  },
+  creditLabel: {
+    color: theme.color.textDim,
+    fontSize: 10,
+    letterSpacing: 0.3
   },
   briefing: {
     paddingHorizontal: 10,

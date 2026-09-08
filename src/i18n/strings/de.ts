@@ -89,6 +89,7 @@ export const de: Strings = {
     close: "Details schließen",
     holdsStation: "STEHT STILL",
     openSite: "{site} öffnen",
+    photo: "Foto von {name}",
     missing: "Dieser Satellit steht nicht mehr im Katalog.",
     facts: {
       distance: "Entfernung",

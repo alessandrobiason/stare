@@ -98,6 +98,7 @@ export const en: Strings = {
     close: "Close satellite details",
     holdsStation: "HOLDS STATION",
     openSite: "Open {site}",
+    photo: "Photograph of {name}",
     missing: "This satellite has left the catalog.",
     facts: {
       distance: "Distance",
