@@ -1,5 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DebugPanel } from "../src/components/DebugPanel";
 import { IntroScreen } from "../src/components/IntroScreen";
 import { LanguagePicker } from "../src/components/LanguagePicker";
@@ -15,6 +16,29 @@ import {
   setLocaleStoreForTesting,
   subscribeLocale
 } from "../src/i18n/locale";
+
+/**
+ * A whole screen, mounted the way the app mounts one.
+ *
+ * Anything that lays its panels out in the safe area needs the provider that
+ * knows where the notch is (`SafeAreaLayer`), and it needs to be told the
+ * insets rather than left to measure them: a static render runs no effects, so
+ * a provider that has not been handed any would render nothing at all. Zero on
+ * every edge, which is what a browser reports and what the harness runs
+ * against.
+ */
+function onAScreen(screen: React.ReactElement): React.ReactElement {
+  return (
+    <SafeAreaProvider
+      initialMetrics={{
+        insets: { top: 0, left: 0, right: 0, bottom: 0 },
+        frame: { x: 0, y: 0, width: 390, height: 844 }
+      }}
+    >
+      {screen}
+    </SafeAreaProvider>
+  );
+}
 
 /**
  * Changing the language from inside the app.
@@ -81,7 +105,7 @@ describe("the picker in the corner of the intro", () => {
     // Four pages of paragraphs, and no way past them but reading one: a
     // wrongly detected language costs the whole of onboarding at once.
     setLocaleForTesting("it");
-    const markup = renderToStaticMarkup(<IntroScreen onDone={() => undefined} />);
+    const markup = renderToStaticMarkup(onAScreen(<IntroScreen onDone={() => undefined} />));
 
     expect(markup).toContain('aria-label="Lingua: Italiano"');
   });

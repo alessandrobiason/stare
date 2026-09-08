@@ -24,11 +24,11 @@ listing: most people see one and a half frames.
 
 | # | File | What it shows | Caption |
 | --- | --- | --- | --- |
-| 1 | `01-sky.png` | The plain view: a night sky over a city, thirty-one marks on it, the count and the filter in their corners. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
+| 1 | `01-sky.png` | The plain view: a night sky over a city filling the screen, twenty-one marks on it, the count and the filter in their corners. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
 | 2 | `02-tap.png` | A tap on the ISS: the selection ring on the sky, the strip of names the tap covered, the briefing and the five figures. | **Tap a light, learn what it is** — What it is, who flies it, how far away — and the figures keep moving while you read. |
 | 3 | `03-occlusion.png` | A tower up the right of the frame. The Starlink train runs down to its corner, one mark mid-fade on the edge, and nothing over the building. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
 | 4 | `04-legend.png` | The same app at midday, filter open: the five categories, the parked ring, and the daylight palette on a bright sky. | **Colour is what it is for** — Size is how far away. A ring holds station over the equator. Day or night, the sky decides the ink. |
-| 5 | `05-inview.png` | The count opened into the breakdown behind it: Starlink 7, SES 3, Galileo 3, GPS 2, ISS 1, twelve others. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
+| 5 | `05-inview.png` | The count opened into the breakdown behind it: Starlink 6, SES 3, Galileo 2, GPS 2, ISS 1, six others. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
 
 Frames 3 and 4 are the two that are hard to copy and are the reason to keep
 them: hiding satellites behind buildings is the thing no other sky app does,
@@ -52,15 +52,22 @@ Two passes, in `tools/screenshots/render.mjs`:
 2. **The store frame** around it: the caption, the night the boot screen is
    drawn on, and that image laid in.
 
-The layout inside the screen is the app's, and reproduces two things that are
-easy to get wrong by eye:
+The layout inside the screen is the app's, and reproduces three things that
+are easy to get wrong by eye:
 
-- The picture is the camera's own 3:4 box **fitted** into the safe area
-  (`SkyOverlay.frameStyleFor`), not filled — so it is 430 × 573 points in the
-  middle of the screen, with the app's background above and below it. That is
-  what the phone shows; the panels sit over the whole view rather than inside
-  the picture, which is why the count and the filter are above the picture's top
-  edge.
+- The picture is the camera's own 3:4 box **covering** the screen
+  (`frameBoxFor`), not fitted into it — so it is 699 × 932 points, centred, with
+  a third of its width off the sides and none of the app's background showing.
+  That is what the phone shows: the camera reaches all four corners, the status
+  bar and the home indicator are over it rather than beside it, and the panels
+  are inset off both by the safe area (`SafeAreaLayer`), which is why the count
+  and the filter sit below the sensor housing rather than against the screen's
+  own top edge.
+- The count is the marks **on the screen** rather than the marks on the frame,
+  which is the figure the app publishes (`pointInViewport`) and the reason the
+  first frame, whose scene holds thirty-one markers, shows twenty-one. The breakdown's "Others" row
+  is derived from that count, so the rows always add up to the number above
+  them.
 - Marks are sized, rimmed, tailed and haloed by the rules in
   `src/components/markerScene.ts` — 17 points across at 400 km down to 8 at
   40,000, a rim at 0.16 of the diameter, a tail of the ground covered in twelve
@@ -70,6 +77,8 @@ Where the numbers come from, if a frame has to be argued about:
 
 | In the frame | In the app |
 | --- | --- |
+| The picture's box, and how much of it is on screen | `frameBoxFor`, `viewportOf` in `src/components/markerGeometry.ts` |
+| The safe area the panels are inset by | `src/components/SafeAreaLayer.tsx` |
 | Marker sizes, rims, tails, rings, halos | `src/components/markerScene.ts`, `SATELLITE_MARKERS` in `src/constants.ts` |
 | Marker colours, night and daylight | `src/satellite/categories.ts`, `src/components/palette.ts` |
 | Panels, card, console pill | `SceneStatus`, `CategoryLegend`, `SatelliteCard`, `DebugToggle`, `theme.ts` |
@@ -98,7 +107,9 @@ Ranked by what each is worth.
    tall building crossing the upper half (frame 3 lives or dies on this), a
    bright daylit sky with a roof line at the bottom (frame 4), and two more
    night skies. Portrait, from the rear wide camera, and framed as the app
-   frames it — mostly sky, the horizon in the bottom quarter. Drop them in
+   frames it — mostly sky, the horizon in the bottom quarter. Only the middle
+   third of the width is on screen, so whatever the frame is about belongs
+   there. Drop them in
    `tools/screenshots/backgrounds/` named after the scene (`03-occlusion.jpg`)
    and they replace the drawn sky with nothing else changed.
 2. **Or, better, five real screenshots.** A TestFlight build on a phone, the

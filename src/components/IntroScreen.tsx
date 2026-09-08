@@ -15,6 +15,7 @@ import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { LanguagePicker } from "./LanguagePicker";
 import { FrameSize } from "./markerGeometry";
+import { SafeAreaLayer } from "./SafeAreaLayer";
 import { theme } from "./theme";
 
 type Props = {
@@ -44,6 +45,16 @@ type Props = {
  */
 export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   const [frame, setFrame] = useState<FrameSize | null>(null);
+  /**
+   * The safe area inside that frame, which is what the pages are laid out in.
+   *
+   * Measured separately rather than derived, because the two boxes are now
+   * different things: the sky is drawn over the whole screen, notch and home
+   * indicator included, and the words are not. A page is one screenful wide, so
+   * a pager sized to the frame instead would scroll by a little more than it
+   * shows on any phone with insets down the sides.
+   */
+  const [safeBox, setSafeBox] = useState<FrameSize | null>(null);
   const [page, setPage] = useState(0);
   const pager = useRef<ScrollView>(null);
   // Subscribing rather than reading: nothing here needs to know *which*
@@ -56,6 +67,15 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   const measure = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setFrame((current) =>
+      current && current.width === width && current.height === height
+        ? current
+        : { width, height }
+    );
+  }, []);
+
+  const measureSafeBox = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setSafeBox((current) =>
       current && current.width === width && current.height === height
         ? current
         : { width, height }
@@ -81,8 +101,8 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
     setPage(next);
     // The state above is what the dots and the label read; this is only the
     // pager catching up with them.
-    pager.current?.scrollTo({ x: next * (frame?.width ?? 0), y: 0, animated: true });
-  }, [frame, onDone, page, pages]);
+    pager.current?.scrollTo({ x: next * (safeBox?.width ?? 0), y: 0, animated: true });
+  }, [safeBox, onDone, page, pages]);
 
   return (
     <View style={styles.root} onLayout={measure}>
@@ -94,90 +114,98 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
         </View>
       )}
 
-      {frame ? (
-        <>
-          <ScrollView
-            ref={pager}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={settled}
-            style={styles.pager}
-          >
-            {pages.map((content, index) => (
-              <View key={index} style={[styles.page, { width: frame.width }]}>
-                {/* The card scrolls if it has to. Its height is four
-                    translated paragraphs plus a title, and the longest of the
-                    twelve languages comes within a few points of a 667pt
-                    screen — bottom-aligned, a page that outgrew the screen
-                    would walk off the top of it with no way to reach the rest.
-                    `flexShrink` is what caps it at the space available; with
-                    room to spare it still sizes to its own content and stays
-                    a card at the foot of the sky. */}
-                <ScrollView
-                  style={styles.card}
-                  contentContainerStyle={styles.cardContent}
-                  showsVerticalScrollIndicator={false}
+      {/* The sky above is drawn over the whole screen; everything read or
+          tapped is inside the safe area. The pager measures itself in here
+          rather than against the frame, so a page is exactly one screenful of
+          the box it scrolls in. See `SafeAreaLayer`. */}
+      <SafeAreaLayer>
+        <View style={styles.contentBox} onLayout={measureSafeBox}>
+          {safeBox ? (
+            <>
+              <ScrollView
+                ref={pager}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={settled}
+                style={styles.pager}
+              >
+                {pages.map((content, index) => (
+                  <View key={index} style={[styles.page, { width: safeBox.width }]}>
+                    {/* The card scrolls if it has to. Its height is four
+                        translated paragraphs plus a title, and the longest of
+                        the twelve languages comes within a few points of a
+                        667pt screen — bottom-aligned, a page that outgrew the
+                        screen would walk off the top of it with no way to reach
+                        the rest. `flexShrink` is what caps it at the space
+                        available; with room to spare it still sizes to its own
+                        content and stays a card at the foot of the sky. */}
+                    <ScrollView
+                      style={styles.card}
+                      contentContainerStyle={styles.cardContent}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {content.title ? <Text style={styles.title}>{content.title}</Text> : null}
+                      <Text style={styles.body}>{content.body}</Text>
+
+                      {content.elements?.map((element) => (
+                        <View key={element.where} style={styles.element}>
+                          {/* The badge as the real screen wears it, so the row
+                              is a key to the panel rather than a description of
+                              it. Fixed width, so four rows of very different
+                              badges still line their text up. */}
+                          <View style={styles.badge}>
+                            <Text numberOfLines={1} style={styles.badgeLabel}>
+                              {element.badge}
+                            </Text>
+                          </View>
+                          <View style={styles.elementText}>
+                            <Text style={styles.elementWhere}>{element.where}</Text>
+                            <Text style={styles.elementMeaning}>{element.meaning}</Text>
+                          </View>
+                        </View>
+                      ))}
+
+                      {content.access?.map((access) => (
+                        <View key={access.name} style={styles.access}>
+                          <Text style={styles.accessName}>{access.name}</Text>
+                          <Text style={styles.accessReason}>{access.reason}</Text>
+                        </View>
+                      ))}
+
+                      {content.footnote ? (
+                        <Text style={styles.footnote}>{content.footnote}</Text>
+                      ) : null}
+                    </ScrollView>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <View style={styles.footer}>
+                <View style={styles.dots}>
+                  {pages.map((_, index) => (
+                    <View
+                      key={index}
+                      style={[styles.dot, index === page && styles.dotHere]}
+                    />
+                  ))}
+                </View>
+
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.button}
+                  onPress={advance}
                 >
-                  {content.title ? <Text style={styles.title}>{content.title}</Text> : null}
-                  <Text style={styles.body}>{content.body}</Text>
-
-                  {content.elements?.map((element) => (
-                    <View key={element.where} style={styles.element}>
-                      {/* The badge as the real screen wears it, so the row is
-                          a key to the panel rather than a description of it.
-                          Fixed width, so four rows of very different badges
-                          still line their text up. */}
-                      <View style={styles.badge}>
-                        <Text numberOfLines={1} style={styles.badgeLabel}>
-                          {element.badge}
-                        </Text>
-                      </View>
-                      <View style={styles.elementText}>
-                        <Text style={styles.elementWhere}>{element.where}</Text>
-                        <Text style={styles.elementMeaning}>{element.meaning}</Text>
-                      </View>
-                    </View>
-                  ))}
-
-                  {content.access?.map((access) => (
-                    <View key={access.name} style={styles.access}>
-                      <Text style={styles.accessName}>{access.name}</Text>
-                      <Text style={styles.accessReason}>{access.reason}</Text>
-                    </View>
-                  ))}
-
-                  {content.footnote ? (
-                    <Text style={styles.footnote}>{content.footnote}</Text>
-                  ) : null}
-                </ScrollView>
+                  <Text style={styles.buttonLabel}>{introButtonLabel(page)}</Text>
+                </Pressable>
               </View>
-            ))}
-          </ScrollView>
+            </>
+          ) : null}
+        </View>
 
-          <View style={styles.footer}>
-            <View style={styles.dots}>
-              {pages.map((_, index) => (
-                <View
-                  key={index}
-                  style={[styles.dot, index === page && styles.dotHere]}
-                />
-              ))}
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              style={styles.button}
-              onPress={advance}
-            >
-              <Text style={styles.buttonLabel}>{introButtonLabel(page)}</Text>
-            </Pressable>
-          </View>
-        </>
-      ) : null}
-
-      {/* Last, so the list it opens is over the pages and the footer both. */}
-      <LanguagePicker />
+        {/* Last, so the list it opens is over the pages and the footer both. */}
+        <LanguagePicker />
+      </SafeAreaLayer>
     </View>
   );
 };
@@ -189,6 +217,11 @@ const styles = StyleSheet.create({
     // the same night rather than a flash of a different one.
     backgroundColor: BOOT_SKY_BACKGROUND,
     overflow: "hidden"
+  },
+  // Everything read or tapped, inside the safe area: the pages, the footer,
+  // and the box the pager measures a page against.
+  contentBox: {
+    flex: 1
   },
   pager: {
     flex: 1

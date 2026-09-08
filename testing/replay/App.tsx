@@ -1,5 +1,6 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 import { BootScreen } from "../../src/components/BootScreen";
 import { FatalErrorBoundary } from "../../src/components/FatalErrorBoundary";
 import { useAppBoot } from "../../src/hooks/useAppBoot";
@@ -23,22 +24,34 @@ export default function App() {
   );
 
   return (
-    <SafeAreaView style={styles.root}>
-      {boot.result && (
-        <FatalErrorBoundary onError={boot.reportFatal}>
-          <ReplayScene boot={boot.result} />
-        </FatalErrorBoundary>
-      )}
+    // The app's own root, to the letter: the provider the panels read their
+    // insets from (`SafeAreaLayer`), and a full-bleed view under it. A browser
+    // window has no notch, so what it reports here is zero on every edge — the
+    // harness runs the same layout against the same numbers rather than a
+    // different one that happens to look similar.
+    //
+    // There are no initial metrics on the web — the browser's insets are read
+    // from a probe element once the page is up — so this renders nothing until
+    // the first measurement lands, a tick before the boot screen it was going
+    // to show anyway.
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <View style={styles.root}>
+        {boot.result && (
+          <FatalErrorBoundary onError={boot.reportFatal}>
+            <ReplayScene boot={boot.result} />
+          </FatalErrorBoundary>
+        )}
 
-      {boot.phase !== "ready" && (
-        <BootScreen
-          failed={boot.phase === "failed"}
-          error={boot.error}
-          retryable={boot.retryable}
-          onRetry={boot.retry}
-        />
-      )}
-    </SafeAreaView>
+        {boot.phase !== "ready" && (
+          <BootScreen
+            failed={boot.phase === "failed"}
+            error={boot.error}
+            retryable={boot.retryable}
+            onRetry={boot.retry}
+          />
+        )}
+      </View>
+    </SafeAreaProvider>
   );
 }
 
