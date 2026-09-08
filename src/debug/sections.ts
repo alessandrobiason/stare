@@ -461,7 +461,11 @@ export function catalogSection({ cache, nowMs }: CatalogDebugInput): DebugSectio
 export type ViewDebugInput = {
   /** What the picture is, in the frame's own words. */
   source: string;
-  /** The fitted box the picture and the markers share, in layout points. */
+  /**
+   * The box the picture and the markers share, in layout points. On the phone
+   * it is wider than the screen: the picture covers rather than fits, and the
+   * view clips what is past the edges. See `frameBoxFor`.
+   */
   box: { width: number; height: number } | null;
   /** The frame the projection is placed in, in pixels. */
   frame: { widthPx: number; heightPx: number };

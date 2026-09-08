@@ -15,6 +15,7 @@ import { AttitudeSource } from "../hooks/useSmoothedOrientation";
 import { cameraFrameGrabber } from "../vision/cameraFrameGrabber";
 import { CameraBackground } from "./CameraBackground";
 import { CompassNotice } from "./CompassNotice";
+import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SceneStatus } from "./SceneStatus";
 import { SceneFrame, SkyOverlay } from "./SkyOverlay";
 
@@ -25,6 +26,11 @@ type Props = {
 /**
  * The app: the phone's camera with the catalog projected onto it, aimed by its
  * sensors and placed by its GPS.
+ *
+ * The camera fills the screen: the frame keeps its own 4:3 shape, is scaled
+ * until it covers the phone and is clipped where it runs past the edges, and
+ * everything this scene writes over it is inset off the notch and the home
+ * indicator instead. See `SceneFrame.fit` and `SafeAreaLayer`.
  *
  * Boot settled everything it needs — catalog downloaded, sensors present, first
  * fix in, camera granted and the sky model loaded — so no loading states are
@@ -100,6 +106,9 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
     () => ({
       label: "Phone camera",
       sizePx: { widthPx: DEVICE_CAMERA.widthPx, heightPx: DEVICE_CAMERA.heightPx },
+      // Edge to edge: the camera is the screen, and the sides of the 4:3 frame
+      // that do not fit a tall phone run off it. See `frameBoxFor`.
+      fit: "cover",
       fieldOfView: DEVICE_CAMERA_FIELD_OF_VIEW,
       lens: DEVICE_LENS,
       grabber: cameraFrameGrabber(() => (cameraReadyRef.current ? cameraRef.current : null), {
@@ -186,12 +195,18 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         ]}
       />
 
-      <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
-      <CompassNotice
-        accuracy={compass.accuracy}
-        declinationKnown={compass.declinationKnown}
-        skyFixStanding={skyFixStanding}
-      />
+      {/* The scene's own two panels, inset off the notch and the home
+          indicator while the camera underneath them is not. The overlay's
+          panels sit in a layer of their own for the same reason, and both
+          measure from the same safe corners. See `SafeAreaLayer`. */}
+      <SafeAreaLayer>
+        <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
+        <CompassNotice
+          accuracy={compass.accuracy}
+          declinationKnown={compass.declinationKnown}
+          skyFixStanding={skyFixStanding}
+        />
+      </SafeAreaLayer>
     </View>
   );
 };

@@ -1,7 +1,13 @@
 import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { axesFromAttitude } from "../camera/attitude";
 import { FrameLens, FramePoint, projectWithAxes } from "../camera/projection";
-import { pointOnFrame, trailOnFrame } from "../components/markerGeometry";
+import {
+  FrameViewport,
+  pointInViewport,
+  pointOnFrame,
+  trailOnFrame,
+  WHOLE_FRAME
+} from "../components/markerGeometry";
 import { MARKER_VISIBILITY, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import { rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
@@ -196,7 +202,19 @@ type AnimatedMarkerOptions = {
   maskFiltering: boolean;
   enabledCategories: Set<SatelliteCategory>;
   /**
-   * Told how many markers are drawn and what they are: on a change, and no
+   * The part of the frame that is on screen, which is not all of it once the
+   * picture covers the screen rather than fitting inside it (`frameBoxFor`).
+   *
+   * Only the count is measured against it. What is *drawn* is still the whole
+   * frame: a marker past the window is clipped rather than dropped, exactly as
+   * the half of a trail hanging over an edge always has been, and dropping it
+   * instead would put the decision about a satellite's visibility (and the
+   * crossfade behind it) back at an edge — which is what the warming margin
+   * exists to keep it away from.
+   */
+  viewport?: FrameViewport;
+  /**
+   * Told how many markers are on screen and what they are: on a change, and no
    * more often than `VISIBLE_COUNT_INTERVAL_MS`.
    */
   onVisibleCountChange: (count: number, breakdown: FleetBreakdown) => void;
@@ -230,6 +248,7 @@ export function useAnimatedMarkers({
   mask,
   maskFiltering,
   enabledCategories,
+  viewport = WHOLE_FRAME,
   onVisibleCountChange
 }: AnimatedMarkerOptions): AnimatedMarkers {
   const tracker = useMemo(
@@ -241,6 +260,9 @@ export function useAnimatedMarkers({
 
   const maskRef = useLatestRef(mask);
   const maskFilteringRef = useLatestRef(maskFiltering);
+  // A ref, because it changes on a layout — a rotation, or the harness's window
+  // being dragged — and the loop must not be torn down and rebuilt for one.
+  const viewportRef = useLatestRef(viewport);
   const enabledCategoriesRef = useLatestRef(enabledCategories);
   const onVisibleCountChangeRef = useLatestRef(onVisibleCountChange);
   const previousFrameRef = useRef<number | null>(null);
@@ -449,16 +471,21 @@ export function useAnimatedMarkers({
       // changing costs no render at all.
       if (now - publishedAtRef.current >= VISIBLE_COUNT_INTERVAL_MS) {
         publishedAtRef.current = now;
-        // The marks on the frame, not everything drawn onto it: a satellite
-        // kept for its trail alone is out of the view, and the count opens onto
-        // a list of names — one naming an object nobody can see a mark for is
-        // worse than a count that lets go of it at the edge.
-        const onFrame = visible.filter((marker) => pointOnFrame(marker.point));
-        const breakdown = tallyFleets(onFrame);
-        const published = `${onFrame.length}|${breakdownSignature(breakdown)}`;
+        // The marks someone can see, not everything drawn onto the frame. Two
+        // things are dropped here for the same reason: a satellite kept only
+        // for a trail that still crosses the frame, and — once the picture
+        // covers the screen — one placed on the part of the frame that runs off
+        // it. The count opens onto a list of names, and one naming an object
+        // there is no mark on the screen for is worse than a count that lets go
+        // of it at the edge.
+        const onScreen = visible.filter((marker) =>
+          pointInViewport(marker.point, viewportRef.current)
+        );
+        const breakdown = tallyFleets(onScreen);
+        const published = `${onScreen.length}|${breakdownSignature(breakdown)}`;
         if (published !== publishedRef.current) {
           publishedRef.current = published;
-          onVisibleCountChangeRef.current(onFrame.length, breakdown);
+          onVisibleCountChangeRef.current(onScreen.length, breakdown);
         }
       }
       handle = requestAnimationFrame(animate);
@@ -474,7 +501,8 @@ export function useAnimatedMarkers({
     onVisibleCountChangeRef,
     orientationFilterRef,
     skyMemory,
-    tracker
+    tracker,
+    viewportRef
   ]);
 
   const reset = useCallback(() => {

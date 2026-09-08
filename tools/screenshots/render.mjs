@@ -45,6 +45,34 @@ const outDir = join(root, "docs", "app-store");
 const FRAME = { width: 1290, height: 2796 };
 /** iPhone 6.9": 430 x 932 points at three times the pixels. */
 const SCREEN = { width: 430, height: 932 };
+/**
+ * The camera's own shape, and the box it fills the screen with.
+ *
+ * `DEVICE_CAMERA` is 1080 x 1440 — 3:4 in portrait — and the app covers the
+ * screen with it rather than fitting it inside (`frameBoxFor`): the box keeps
+ * that shape, is scaled until it fills the screen and runs off the sides,
+ * which on this phone is a third of the frame's width. Everything is placed in
+ * percentages of the box, exactly as the projection hands them over, and the
+ * screen crops what is past its edges.
+ */
+const CAMERA_ASPECT = 1080 / 1440;
+const PICTURE = {
+  width: Math.max(SCREEN.width, SCREEN.height * CAMERA_ASPECT),
+  height: Math.max(SCREEN.width / CAMERA_ASPECT, SCREEN.height)
+};
+/**
+ * The safe area the panels are inset by, in points: the sensor housing above
+ * and the home indicator below (`SafeAreaLayer`). A portrait iPhone has none
+ * either side.
+ */
+const SAFE = { top: 59, bottom: 34 };
+/** The part of the frame the screen shows, in frame percent. See `viewportOf`. */
+const VIEWPORT = {
+  left: 50 - Math.min(1, SCREEN.width / PICTURE.width) * 50,
+  right: 50 + Math.min(1, SCREEN.width / PICTURE.width) * 50,
+  top: 50 - Math.min(1, SCREEN.height / PICTURE.height) * 50,
+  bottom: 50 + Math.min(1, SCREEN.height / PICTURE.height) * 50
+};
 /** How wide the phone sits in the frame, and the scale that follows from it. */
 const SCREEN_IN_FRAME_PX = 1090;
 const DEVICE_SCALE = SCREEN_IN_FRAME_PX / SCREEN.width;
@@ -171,9 +199,36 @@ const DAYLIGHT_COLORS = {
 const OUTLINE = { night: "rgba(3, 9, 17, 0.85)", daylight: "rgba(244, 248, 253, 0.9)" };
 
 function statusPanel(scene) {
-  const count = scene.markers.length;
+  // What is on the screen rather than what is on the frame, as the app counts
+  // it: the picture covers the screen, so the marks past its sides are drawn
+  // and clipped, and a count that included them would be a number nobody can
+  // check against the sky in front of them. See `pointInViewport`.
+  const count = scene.markers.filter(
+    (marker) =>
+      marker.left >= VIEWPORT.left &&
+      marker.left <= VIEWPORT.right &&
+      marker.top >= VIEWPORT.top &&
+      marker.top <= VIEWPORT.bottom
+  ).length;
   const open = scene.panels.status === "open";
-  const breakdown = scene.breakdown ?? { rows: [], other: 0 };
+  const breakdown = scene.breakdown ?? { rows: [] };
+  /*
+   * What is left once the named fleets are taken out, worked out here rather
+   * than written down beside them.
+   *
+   * The app tallies the marks it has just drawn and lumps everything it cannot
+   * name into one row (`tallyFleets`), so a breakdown that came to more or less
+   * than the count above it would be a fault in one of the two. Deriving it is
+   * what keeps the two in step when the count changes — which it does whenever
+   * the picture is reframed, since only the marks on the screen are counted.
+   */
+  const named = breakdown.rows.reduce((total, [, tally]) => total + tally, 0);
+  const other = count - named;
+  if (other < 0) {
+    throw new Error(
+      `${scene.id}: the breakdown names ${named} of ${count} marks on screen`
+    );
+  }
   const rows = open
     ? `<div class="breakdown">
         <div class="panel-title">IN VIEW</div>
@@ -183,7 +238,7 @@ function statusPanel(scene) {
               `<div class="row"><span class="name">${escape(name)}</span><span class="tally">${tally}</span></div>`
           )
           .join("\n        ")}
-        <div class="row other"><span class="name">Others</span><span class="tally">${breakdown.other}</span></div>
+        <div class="row other"><span class="name">Others</span><span class="tally">${other}</span></div>
       </div>`
     : "";
 
@@ -280,7 +335,7 @@ function screenHtml(scene, faces) {
     ...scene,
     background,
     deviceScale: DEVICE_SCALE,
-    picture: { width: 430, height: 573.33 }
+    picture: PICTURE
   };
 
   return `<!doctype html>
@@ -294,21 +349,44 @@ ${faces}
 <style>
 ${asset("screen.css")}
 </style>
+<style>
+/* The one thing the stylesheet cannot know: how big the covering box is, and
+   how far off the left edge it starts. Derived here so the two agree. */
+.picture, .picture canvas {
+  width: ${PICTURE.width}px;
+  height: ${PICTURE.height}px;
+}
+.picture {
+  left: ${(SCREEN.width - PICTURE.width) / 2}px;
+  top: ${(SCREEN.height - PICTURE.height) / 2}px;
+}
+.hud {
+  top: ${SAFE.top}px;
+  bottom: ${SAFE.bottom}px;
+}
+</style>
 </head>
 <body>
-  ${statusBar()}
-  <div class="content">
+  <div class="screen">
     <div class="picture">
       <canvas id="sky"></canvas>
       <canvas id="markers"></canvas>
       <div class="labels" id="labels"></div>
     </div>
-    ${statusPanel(scene)}
-    ${legendPanel(scene)}
-    ${cardPanel(scene)}
-    <div class="console">CONSOLE</div>
+
+    <!-- The phone's own furniture, over the picture rather than beside it:
+         full screen, the camera reaches the top and bottom of the display. -->
+    ${statusBar()}
+    <div class="homebar"><span></span></div>
+
+    <!-- And the app's panels, inset off both of them. See \`SafeAreaLayer\`. -->
+    <div class="hud">
+      ${statusPanel(scene)}
+      ${legendPanel(scene)}
+      ${cardPanel(scene)}
+      <div class="console">CONSOLE</div>
+    </div>
   </div>
-  <div class="homebar"><span></span></div>
 <script>
 ${asset("sky.js")}
 </script>

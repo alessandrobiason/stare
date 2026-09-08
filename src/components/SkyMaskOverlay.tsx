@@ -13,7 +13,8 @@ type Props = {
   orientationFilterRef: MutableRefObject<OrientationFilter>;
   /** The frame the mask was taken on, which is the one it is drawn over. */
   lens: FrameLens;
-  /** The box the picture is fitted into, in pixels. */
+  /** The box the picture is drawn in, in pixels — larger than the screen when
+   * the picture covers it, and clipped by the view above. See `frameBoxFor`. */
   frame: FrameSize | null;
 };
 

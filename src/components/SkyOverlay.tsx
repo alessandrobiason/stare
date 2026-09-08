@@ -35,8 +35,17 @@ import { CategoryLegend } from "./CategoryLegend";
 import { strings } from "../i18n";
 import { DebugPanel } from "./DebugPanel";
 import { DebugToggle } from "./DebugToggle";
+import {
+  frameBoxFor,
+  FrameFit,
+  FrameSize,
+  FrameViewport,
+  viewportOf,
+  WHOLE_FRAME
+} from "./markerGeometry";
 import { markersUnder } from "./markerHitTest";
 import { pressPoint } from "./pressPoint";
+import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SatelliteCard } from "./SatelliteCard";
 import { SatelliteMarkers } from "./SatelliteMarkers";
 import { SkyMaskOverlay } from "./SkyMaskOverlay";
@@ -55,6 +64,17 @@ export type SceneFrame = {
   label: string;
   /** The frame the projection is placed in, in pixels. */
   sizePx: { widthPx: number; heightPx: number };
+  /**
+   * How that frame is laid over the screen: `cover` fills it and lets the
+   * frame's edges past it, `contain` fits the whole frame inside.
+   *
+   * The phone covers — it is a camera, and a camera that stops short of the
+   * edge of the screen is a picture of a camera. The harness fits, because its
+   * window is a laptop's and the whole recorded frame is the thing being looked
+   * at there. Required rather than defaulted, so a new scene has to say which
+   * of the two it is. See `frameBoxFor`.
+   */
+  fit: FrameFit;
   fieldOfView: { horizontalDeg: number; verticalDeg: number };
   /** Half-extents of that field of view, which the markers are projected with. */
   lens: FrameLens;
@@ -72,7 +92,7 @@ export type SceneFrame = {
    */
   rebuild?: () => boolean;
   /**
-   * Draws the picture, filling the fitted box behind the markers.
+   * Draws the picture, filling the box behind the markers.
    *
    * `onDiscontinuity` is for a source that can jump — a seek in a video. It
    * drops the mask prior and the attitude estimate, both of which assume the
@@ -145,10 +165,26 @@ type Props = {
  * composited over it, plus the debug overlays when they are switched on.
  *
  * Everything specific to where the picture comes from is in the `frame` it is
- * handed — its shape, its lens, how to draw it and how to read its pixels — so
- * this holds no branches for one source or another. Two view modes: normal
- * draws the markers, debug adds the sky mask over the picture and a panel of
- * the figures behind it.
+ * handed — its shape, its lens, how to draw it, how to read its pixels and how
+ * it is laid over the screen — so this holds no branches for one source or
+ * another. Two view modes: normal draws the markers, debug adds the sky mask
+ * over the picture and a panel of the figures behind it.
+ *
+ * The picture is the whole screen and the panels are laid over it, rather than
+ * the picture being one part of a screen and the panels the others. On the
+ * phone it covers: the frame keeps the camera's shape, is scaled until it fills
+ * the screen and is clipped where it runs past it (`frameBoxFor`), so the sky
+ * is edge to edge and no part of the layout is spent on black. That the frame
+ * is bigger than the window is invisible to everything that draws — markers,
+ * mask and taps are all placed against the box, as they always were — and
+ * visible only to the count, which asks `viewport` what is on screen.
+ *
+ * It costs the overlay the pixels it hides: the marker canvas spans the box
+ * rather than the screen, so it is about twice the area of the display and the
+ * cropped third of it is drawn and thrown away. That is the price of the crop
+ * and it is paid by the same single draw the whole overlay has always been
+ * (`SatelliteMarkers`) — a larger surface, not more work per frame — so it is
+ * fill rate rather than the shape count that decides the frame budget.
  *
  * The picture is also the one control the normal view has: a tap on it asks
  * what is under the finger (`markersUnder`) and opens a card about it
@@ -176,16 +212,30 @@ export const SkyOverlay: React.FC<Props> = ({
   sceneDebugSections
 }) => {
   const [fatal, setFatal] = useState<Error | null>(null);
-  const [available, setAvailable] = useState<Size | null>(null);
+  const [available, setAvailable] = useState<FrameSize | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const onLayout = useCallback(
     ({ nativeEvent }: LayoutChangeEvent) => setAvailable(nativeEvent.layout),
     []
   );
   const aspectRatio = frame.sizePx.widthPx / frame.sizePx.heightPx;
+  const fit = frame.fit;
   const frameStyle = useMemo(
-    () => frameStyleFor(available, aspectRatio),
-    [available, aspectRatio]
+    () => frameBoxFor(available, aspectRatio, fit),
+    [available, aspectRatio, fit]
+  );
+  /**
+   * How much of that box the screen is showing.
+   *
+   * The whole of it while the picture is fitted, and the middle of it while it
+   * covers — a 4:3 camera filling a tall phone runs a third of its width off
+   * the sides. Everything drawn goes on being placed against the box, which is
+   * what keeps the markers on the picture; this is only for the count, which is
+   * a statement about the sky someone can see rather than about the frame.
+   */
+  const viewport = useMemo<FrameViewport>(
+    () => (available && frameStyle ? viewportOf(frameStyle, available) : WHOLE_FRAME),
+    [available, frameStyle]
   );
 
   const smoothed = useSmoothedOrientation(attitude);
@@ -236,6 +286,7 @@ export const SkyOverlay: React.FC<Props> = ({
     mask: segmentation.mask,
     maskFiltering: skyMaskFiltering,
     enabledCategories,
+    viewport,
     onVisibleCountChange: onVisibleSatelliteCountChange
   });
 
@@ -377,26 +428,32 @@ export const SkyOverlay: React.FC<Props> = ({
         )}
       </View>
 
-      <CategoryLegend
-        enabledCategories={enabledCategories}
-        onToggleCategory={onToggleCategory}
-        onEnableAll={onEnableAll}
-        palette={palette}
-      />
-
-      {!debug && selection && (
-        <SatelliteCard
-          names={selection.names}
-          selected={selection.selected}
-          onSelect={(name) => setSelection({ names: selection.names, selected: name })}
-          onClose={() => setSelection(null)}
-          describeRef={describeRef}
+      {/* The panels, inset off the notch and the home indicator while the
+          picture underneath them is not. Each one still places itself in a
+          corner of its parent; the layer is what makes that corner the safe
+          one. See `SafeAreaLayer`. */}
+      <SafeAreaLayer>
+        <CategoryLegend
+          enabledCategories={enabledCategories}
+          onToggleCategory={onToggleCategory}
+          onEnableAll={onEnableAll}
           palette={palette}
         />
-      )}
 
-      {debug && <DebugPanel sourceRef={debugSourceRef} onClose={onToggleDebug} />}
-      <DebugToggle on={debug} onToggle={onToggleDebug} warned={warned} />
+        {!debug && selection && (
+          <SatelliteCard
+            names={selection.names}
+            selected={selection.selected}
+            onSelect={(name) => setSelection({ names: selection.names, selected: name })}
+            onClose={() => setSelection(null)}
+            describeRef={describeRef}
+            palette={palette}
+          />
+        )}
+
+        {debug && <DebugPanel sourceRef={debugSourceRef} onClose={onToggleDebug} />}
+        <DebugToggle on={debug} onToggle={onToggleDebug} warned={warned} />
+      </SafeAreaLayer>
     </View>
   );
 };
@@ -410,8 +467,6 @@ function describeMask(anchored: AnchoredSkyMask | null, error: string | null): s
   return error ? `Sky mask failing: ${error}` : "Waiting for the first sky mask…";
 }
 
-type Size = { width: number; height: number };
-
 /**
  * What a tap picked out: the satellites under the finger, and which of them is
  * being read about.
@@ -423,33 +478,22 @@ type Size = { width: number; height: number };
  */
 type Selection = { names: string[]; selected: string };
 
-/**
- * The largest box of the camera's shape that fits in `available`.
- *
- * Markers and mask are placed in percentages of the frame, so they land where
- * the projection put them only if that frame covers the field of view they were
- * projected against. Filling the screen instead — cropping the sides off a 4:3
- * camera on a tall phone — repoints those percentages at a different piece of
- * sky at a different scale, and the markers drift as the camera moves. So the
- * picture is fitted, and everything shares the fitted box.
- */
-function frameStyleFor(available: Size | null, aspectRatio: number): Size | null {
-  if (!available || available.width <= 0 || available.height <= 0) return null;
-  const width = Math.min(available.width, available.height * aspectRatio);
-  return { width, height: width / aspectRatio };
-}
-
 const styles = StyleSheet.create({
   sky: {
     flex: 1,
+    // What crops a covering picture: the box keeps the camera's shape and runs
+    // off the screen, and this is the window it runs off. Centred, so what is
+    // cut is split between the two edges rather than taken off one of them.
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
+    // Only ever seen behind a fitted picture — under `cover` the frame covers
+    // this whole view. See `frameBoxFor`.
     backgroundColor: theme.color.background
   },
   frame: {
-    // Nothing to fit to until the first layout arrives, and the picture is
-    // still loading then, so an empty box is all this would show anyway.
+    // Nothing to size against until the first layout arrives, and the picture
+    // is still loading then, so an empty box is all this would show anyway.
     width: 0,
     height: 0,
     overflow: "hidden"
