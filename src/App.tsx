@@ -1,6 +1,7 @@
 import { useKeepAwake } from "expo-keep-awake";
 import React from "react";
 import { StatusBar, StyleSheet, View } from "react-native";
+import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 import { runBootSequence } from "./boot/bootSequence";
 import { bootTasks } from "./boot/bootTasks";
 import { BootScreen } from "./components/BootScreen";
@@ -51,15 +52,29 @@ const CAMERA_LAB = false;
  * intro's card, the panels over the camera — and the default is black text,
  * which was already the wrong half of a choice that has no answer good for
  * both a bright sky and a dark one. Set from JavaScript rather than in
- * `app.json`: the plist Expo generates leaves the style to the app
- * (`UIViewControllerBasedStatusBarAppearance` is false), so this ships as an
- * over-the-air update instead of a new binary — see `docs/ios-builds.md`.
+ * `app.json`, which the plist Expo generates allows
+ * (`UIViewControllerBasedStatusBarAppearance` is false): a native config file
+ * is a rebuild to change, and this is a decision about how the app looks.
  */
 const Screen: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <View style={styles.root}>
-    <StatusBar barStyle="light-content" />
-    {children}
-  </View>
+  /*
+   * The provider is what knows where the notch and the home indicator are, and
+   * it is mounted here rather than around one screen because every screen the
+   * app has now reaches the edges: the intro, the boot sky and the camera all
+   * pass through this.
+   *
+   * `initialMetrics` is the insets the platform already knew at launch, handed
+   * over synchronously. Without it the provider renders nothing at all until
+   * its first measurement arrives, which on the phone is a frame of blank
+   * screen before the boot sky — and the one thing this app must not open on is
+   * a flash of a different colour (see `BOOT_SKY_BACKGROUND`).
+   */
+  <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      {children}
+    </View>
+  </SafeAreaProvider>
 );
 
 export default function App() {

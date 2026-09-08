@@ -264,7 +264,11 @@ corner, which is a claim about the sky someone can see rather than about the
 frame, so it counts the marks inside the visible window (`viewportOf`). What is
 inset instead is the writing: the panels sit in a layer that carries the safe
 area (`SafeAreaLayer`), so each one measures its corner from the notch and the
-home indicator rather than from the screen's edge.
+home indicator rather than from the screen's edge. Those insets are the phone's
+own, from `react-native-safe-area-context` — the one native dependency this
+layout has, and the reason it needs a build rather than an over-the-air update.
+A browser reports zero on every edge, so the harness runs the same layer
+against the same numbers.
 
 Nothing that changes at sensor rate is React state. Attitude readings arrive
 twenty to forty times a second and go straight into the filter on a
@@ -405,6 +409,12 @@ clock, observer, attitude, frame pixels, the ONNX runtime). The overlay,
 markers, segmentation pipeline, filters, fusion, catalog, boot and debug panel
 are the app's own code imported from `src/`, which is what makes a result here
 worth anything. [`testing/README.md`](testing/README.md) has the full table.
+
+The jest suites run in that same web build: `react-native` maps to
+`react-native-web`, and `.web.tsx`/`.web.ts`/`.web.js` win the file-extension
+race, so a package split by platform — `react-native-safe-area-context`, whose
+native half is a view jest cannot instantiate — resolves to the implementation
+the harness itself runs.
 
 ### Test data
 

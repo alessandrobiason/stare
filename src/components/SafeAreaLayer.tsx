@@ -1,5 +1,6 @@
 import React from "react";
-import { SafeAreaView, StyleProp, StyleSheet, ViewStyle } from "react-native";
+import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   children: React.ReactNode;
@@ -25,37 +26,52 @@ type Props = {
  * whole of the change: the corner each one measures from becomes the safe one
  * instead of the screen's. Nothing else about a panel knows this exists.
  *
- * `box-none`, so the layer is not a sheet of glass over the sky: a tap between
- * the panels falls through to the picture underneath, which is the one control
- * the normal view has (`SkyOverlay`). Only the panels themselves take touches.
+ * `pointerEvents: "box-none"`, so the layer is not a sheet of glass over the
+ * sky: a tap between the panels falls through to the picture underneath, which
+ * is the one control the normal view has (`SkyOverlay`). Only the panels
+ * themselves take touches.
  *
- * ---
+ * The insets come from `react-native-safe-area-context` — the phone's real
+ * ones, read from the window rather than assumed from a screen size, and the
+ * same numbers in the replay harness, where a browser reports
+ * `env(safe-area-inset-*)` and every one of them is zero. They are applied here
+ * as padding rather than by the library's own `SafeAreaView` so that the
+ * mechanism above is a line of code rather than a component's behaviour: this
+ * layer is the only place in the app that knows what a notch is, and what it
+ * does with that has to be readable.
  *
- * `SafeAreaView` is deprecated in React Native, and this is deliberately the
- * only file that imports it.
- *
- * The replacement is `react-native-safe-area-context`, which is a native
- * module — and a native module is not a thing this app can add for a layout
- * change. `runtimeVersion` is the fingerprint policy, so a new autolinked
- * package changes the hash that decides which installed binaries an
- * over-the-air update may reach (`fingerprint.config.js`): the whole of this
- * interface would then wait on a TestFlight build and Apple's review to reach
- * a phone, instead of the two-minute publish it costs as JavaScript. Deprecated
- * and shipping today beats current and shipping next week for a component whose
- * job is four numbers.
- *
- * It is one import in one file, which is what makes it a swap rather than a
- * migration when the app next takes a native dependency for a reason of its own.
+ * Both roots mount `SafeAreaProvider` (`src/App.tsx`, `testing/replay/App.tsx`);
+ * without one, `useSafeAreaInsets` throws rather than quietly reporting zero,
+ * which is the failure worth having — an app that has silently stopped insetting
+ * anything looks fine until it is held in front of a notch.
  */
-export const SafeAreaLayer: React.FC<Props> = ({ children, style }) => (
-  <SafeAreaView pointerEvents="box-none" style={[styles.layer, style]}>
-    {children}
-  </SafeAreaView>
-);
+export const SafeAreaLayer: React.FC<Props> = ({ children, style }) => {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={[
+        styles.layer,
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right
+        },
+        style
+      ]}
+    >
+      {children}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   layer: {
-    ...StyleSheet.absoluteFill
+    ...StyleSheet.absoluteFill,
+    // In the style rather than as the `pointerEvents` prop, which both React
+    // Native and the web have moved on from and the latter warns about.
+    pointerEvents: "box-none"
   }
 });
 
