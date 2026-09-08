@@ -27,3 +27,10 @@ public/
 test-results/
 playwright-report/
 dist-perf/
+
+# App Store screenshot working files: the pages the frames are shot from, the
+# Inter download they are set in, and any real camera captures dropped in for
+# a background. The finished frames in docs/app-store are committed.
+tools/screenshots/.build/
+tools/screenshots/.cache/
+tools/screenshots/backgrounds/
