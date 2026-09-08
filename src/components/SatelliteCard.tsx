@@ -5,7 +5,7 @@ import { kilometres, lookDirection, orbitPeriod, speed } from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
 import {
   cachedLandmarkPhoto,
-  landmarkPhotoTitle,
+  landmarkPhotoFile,
   loadLandmarkPhoto,
   LandmarkPhoto
 } from "../satellite/landmarkPhotos";
@@ -104,7 +104,7 @@ export const SatelliteCard: React.FC<Props> = ({
   const briefing = detail ? briefingFor(detail) : null;
   // The same walk, ending in a table lookup, and a string rather than an object
   // so the photograph below is not remounted twice a second.
-  const photoTitle = detail ? landmarkPhotoTitle(detail) : null;
+  const photoFile = detail ? landmarkPhotoFile(detail) : null;
 
   useEffect(() => {
     setDetail(describeRef.current(selected));
@@ -182,10 +182,10 @@ export const SatelliteCard: React.FC<Props> = ({
         </Pressable>
       </View>
 
-      {/* Keyed by the article, so switching between two satellites under one
-          finger starts the picture over rather than showing the Soyuz's for the
-          frame before the ISS's effect has run. */}
-      {photoTitle && <Photograph key={photoTitle} title={photoTitle} of={selected} />}
+      {/* Keyed by the file, so switching between two satellites under one finger
+          starts the picture over rather than showing the Soyuz's for the frame
+          before the ISS's effect has run. */}
+      {photoFile && <Photograph key={photoFile} file={photoFile} of={selected} />}
 
       {briefing && (
         <View style={styles.briefing}>
@@ -220,32 +220,32 @@ export const SatelliteCard: React.FC<Props> = ({
  * less than the sky it covers, and reads as a fault on the phones where the
  * picture never arrives at all. Appearing a beat later is the smaller surprise.
  *
- * `onError` is not belt-and-braces: the URL is assembled from a thumbnail path
- * (`landmarkPhotos.ts`), the request goes out over whatever connection a phone
- * held up at the sky has, and a decode can simply fail. Any of that takes the
- * strip back off the card rather than leaving a broken frame on it.
+ * `onError` is not belt-and-braces. The picture is fetched over whatever
+ * connection a phone held up at the sky has, from a file somebody else can
+ * replace, and a decode can simply fail — any of which takes the strip back off
+ * the card rather than leaving a broken frame on it.
  */
-const Photograph: React.FC<{ title: string; of: string }> = ({ title, of }) => {
+const Photograph: React.FC<{ file: string; of: string }> = ({ file, of }) => {
   // What is already known, so a reopened card draws its picture on the first
   // frame instead of fading the same one in again.
   const [photo, setPhoto] = useState<LandmarkPhoto | null>(
-    () => cachedLandmarkPhoto(title) ?? null
+    () => cachedLandmarkPhoto(file) ?? null
   );
   const [broken, setBroken] = useState(false);
 
-  // Mounted per article — the card keys it by title — so there is no state here
+  // Mounted per file — the card keys it by file name — so there is no state here
   // to carry from one object to the next, and this only ever runs once.
   useEffect(() => {
     let live = true;
-    void loadLandmarkPhoto(title).then((found) => {
+    void loadLandmarkPhoto(file).then((found) => {
       // The card outlives the request only some of the time: a tap through a
-      // cluster switches title, and a tap on the sky closes the card outright.
+      // cluster switches file, and a tap on the sky closes the card outright.
       if (live) setPhoto(found);
     });
     return () => {
       live = false;
     };
-  }, [title]);
+  }, [file]);
 
   if (!photo || broken) return null;
 
@@ -264,9 +264,22 @@ const Photograph: React.FC<{ title: string; of: string }> = ({ title, of }) => {
       {/* Over the picture rather than under it, because the card is bounded by
           the sky above it: a caption bar costs the bottom of one photograph,
           where a row of its own costs a line of the description. */}
-      <View style={styles.credit}>
-        <OfficialSite url={photo.creditUrl} />
-      </View>
+      <Pressable
+        accessibilityRole="link"
+        style={styles.credit}
+        onPress={() => {
+          void Linking.openURL(photo.pageUrl).catch(() => undefined);
+        }}
+      >
+        {/* No label of its own: what it says is what it opens, and a spoken
+            label that differed from the visible one would be a second name for
+            the same control. Two thirds of these pictures are NASA's and in the
+            public domain; the rest are CC BY, CC BY-SA or CC0 and are being
+            credited because they ask to be. */}
+        <Text numberOfLines={1} style={styles.creditLabel}>
+          {photo.credit} ↗
+        </Text>
+      </Pressable>
     </View>
   );
 };
@@ -279,11 +292,6 @@ const Photograph: React.FC<{ title: string; of: string }> = ({ title, of }) => {
  * is being asked, which is the whole reason a link is worth a tap. Failures are
  * swallowed — a device with nothing able to open a URL is not a reason to
  * unhandle a rejection over a camera view.
- *
- * The photograph's credit is the same control pointed at a different kind of
- * page: `commons.wikimedia.org` is where the picture's author and licence are
- * written down, and naming the site is how the card already says "this goes
- * somewhere else, and here is who is answering".
  */
 const OfficialSite: React.FC<{ url: string }> = ({ url }) => (
   <Pressable
@@ -413,8 +421,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     // A strip rather than a whole picture. The card is anchored to the bottom of
     // a live camera view, and every point it grows is a point of sky it covers;
-    // this is about as short as a spacecraft against black stays recognisable.
-    height: 132,
+    // this is about as short as a spacecraft against black stays recognisable,
+    // and about as much of a portrait picture as can be cropped away safely.
+    height: 150,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: theme.color.divider,
@@ -432,10 +441,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    // A thumb-sized target, like every other control on the sky.
+    minHeight: 30,
     paddingHorizontal: 10,
     justifyContent: "center",
     // Dark enough to read white text over the bright side of any photograph.
     backgroundColor: theme.color.panel
+  },
+  creditLabel: {
+    color: theme.color.textDim,
+    fontSize: 10,
+    letterSpacing: 0.3
   },
   briefing: {
     paddingHorizontal: 10,

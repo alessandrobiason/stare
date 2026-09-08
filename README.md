@@ -33,19 +33,29 @@ the operator's own page or nothing (`src/satellite/briefing.ts`).
 **And for the landmarks it shows them, too.** Words cannot settle what a thing
 looks like, so the two stations, the great observatories and the vehicles
 visiting them carry a photograph above the description — the picture is
-understood before the text is read. They are not bundled: twenty photographs
-worth looking at is several megabytes of app download for a panel most launches
-never open, and they would then be frozen at the version shipped. Each is fetched
-the first time somebody taps that object, keyed by the Wikipedia article whose
-lead image it is — a title outlives a file, follows renames, and cannot rot into
-a 404 the way a copied CDN path does — and only files hosted on Wikimedia Commons
-are shown, which is the licence check: an image is on Commons because it is
-freely licensed, where one uploaded to Wikipedia itself is usually a non-free
-logo or press photograph kept under fair use. The credit under each picture opens
-the file's own page, which carries its author and licence. Nothing about it is
-load-bearing: no network, no article, no picture, or a picture the phone will not
-decode all end as the card that was there before
-(`src/satellite/landmarkPhotos.ts`).
+understood before the text is read. Mostly NASA's own photographs of the thing
+in orbit, and an agency rendering where nobody has ever photographed it: nothing
+has taken a picture of NuSTAR since it left the rocket.
+
+They are not bundled. Nineteen pictures worth looking at is several megabytes of
+app download for a panel most launches never open, and they would then be frozen
+at the version shipped, so each is fetched the first time somebody taps that
+object and left to the platform's own HTTP cache after that. Each is a named file
+on Wikimedia Commons, looked at before it was written down — the article's lead
+image was the first attempt and two of the twelve observatories lead with the
+mission's *logo* — and checked at the size the card draws it, which is a strip,
+and which is what ruled out a picture of CHEOPS that was perfectly good and,
+cropped to a strip, an abstract. The URL is asked for rather than assembled:
+Wikimedia serves thumbnails only at sizes it has decided on, so the width is a
+request and the answer is a rendition it will actually serve.
+
+Existing on Commons is the licence check — that is what says a picture is free to
+show — and the caption is the author and the licence out of the file's own
+metadata, over a link to the page carrying both in full. Two thirds of them are
+NASA's and in the public domain; the rest are CC BY, CC BY-SA or CC0, which ask
+to be credited. Nothing about it is load-bearing: no network, no file, a file
+whose licence has changed, or a picture the phone will not decode all end as the
+card that was there before (`src/satellite/landmarkPhotos.ts`).
 
 A fingertip covers a good deal more sky than an eight-pixel marker, so the
 target is the finger's size rather than the mark's, and a tap that covers
@@ -479,15 +489,19 @@ running harness.
   is measured from each platform's own origin and the two will differ by any
   amount at all while both are working — only `yaw + northOffset`, the "Aim" row
   on the STATUS page, is a bearing.
-- **The landmark photographs have not been seen on a device.** They are resolved
-  at run time against Wikimedia's summary endpoint, and neither the endpoint nor
-  the article titles in `src/satellite/landmarkPhotos.ts` have been exercised
-  against the live service — the suite drives the parsing and the caching against
-  responses of the documented shape, which is not the same thing. The failure is
-  quiet by design: a renamed article, or one whose lead image has been replaced
-  with a non-free file, shows no picture, and that looks exactly like a phone with
-  no signal. Each is one string to correct, and the twenty of them are worth
-  looking at once on hardware.
+- **The landmark photographs have not been seen on a device.** Every one of the
+  nineteen was checked against Commons as it is written in
+  `src/satellite/landmarkPhotos.ts` — the file exists, the lookup resolves, the
+  picture it returns is served and is freely licensed, and the crop was looked at
+  — but that was a laptop and a browser, not the card on a phone.
+  `STARE_LIVE_PHOTOS=1 npx jest landmarkPhotos` re-runs the checking part of that
+  against Commons; the rest of the suite mocks the network, as it must. The
+  failure is quiet by design: a file renamed out from under the table shows no
+  picture, which looks exactly like a phone with no signal.
+- **One photograph is 1.7 MB.** Wikimedia will not scale a file up, and the only
+  honest picture of a Shenzhou is a PNG barely wider than the card. It is
+  downloaded once, only by somebody who taps a Shenzhou, and cached after that —
+  but it is twelve times the next largest.
 - **A celestial fix is not remembered once the body is gone.** The correction
   lives in the north reference's variance, so the magnetometer takes the heading
   back as that reopens — inside half a minute for a compass the platform grades

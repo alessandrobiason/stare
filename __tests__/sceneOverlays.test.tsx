@@ -414,13 +414,26 @@ describe("the tapped satellite's card", () => {
   });
 
   describe("the photograph", () => {
-    /** The article's lead image, as Wikimedia would answer for it. */
-    const SUMMARY = JSON.stringify({
-      thumbnail: {
-        source:
-          "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ISS-56.jpg/320px-ISS-56.jpg"
-      },
-      originalimage: { width: 4000 }
+    /** The file's entry on Commons, as the API answers for it. */
+    const IMAGE_INFO = JSON.stringify({
+      query: {
+        pages: [
+          {
+            imageinfo: [
+              {
+                thumburl:
+                  "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/ISS-56.jpg/960px-ISS-56.jpg",
+                descriptionurl: "https://commons.wikimedia.org/wiki/File:ISS-56.jpg",
+                mime: "image/jpeg",
+                extmetadata: {
+                  Artist: { value: "NASA/Roscosmos" },
+                  LicenseShortName: { value: "Public domain" }
+                }
+              }
+            ]
+          }
+        ]
+      }
     });
 
     beforeEach(() => clearLandmarkPhotosForTesting());
@@ -435,8 +448,8 @@ describe("the tapped satellite's card", () => {
      * already in hand draws it on the first frame.
      */
     async function withPhotoResolved(): Promise<void> {
-      jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(SUMMARY, { status: 200 }));
-      await loadLandmarkPhoto("International Space Station");
+      jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(IMAGE_INFO, { status: 200 }));
+      await loadLandmarkPhoto("ISS-56 International Space Station fly-around (07).jpg");
     }
 
     test("a landmark is shown, not only described", async () => {
@@ -451,9 +464,18 @@ describe("the tapped satellite's card", () => {
       // background once it has loaded, and renders nothing of it server-side.
       expect(markup).toContain('aria-label="Photograph of ISS"');
       expect(markup).toContain('role="img"');
-      // And the credit: the file's own page on Commons, which carries the
-      // author and the licence the picture is used under.
-      expect(markup).toContain('aria-label="Open commons.wikimedia.org"');
+    });
+
+    test("the picture is credited, because most of these licences ask for it", async () => {
+      await withPhotoResolved();
+
+      const text = textOf(
+        card({ ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" }) })
+      );
+
+      // The author and the licence, over a link to the page carrying both in
+      // full — not a bare domain, which credits nobody.
+      expect(text).toContain("NASA/Roscosmos · Public domain");
     });
 
     test("the rest of the catalogue keeps its card the size it was", async () => {
@@ -462,7 +484,7 @@ describe("the tapped satellite's card", () => {
       const markup = renderToStaticMarkup(card({ "STARLINK-1234": detail() }));
 
       expect(markup).not.toContain('role="img"');
-      expect(markup).not.toContain("commons.wikimedia.org");
+      expect(markup).not.toContain("Public domain");
     });
 
     test("a card whose picture never arrives reads exactly as it did before", () => {
@@ -473,7 +495,7 @@ describe("the tapped satellite's card", () => {
       );
 
       expect(text).toContain("International Space Station");
-      expect(text).not.toContain("commons.wikimedia.org");
+      expect(text).not.toContain("Public domain");
     });
   });
 
