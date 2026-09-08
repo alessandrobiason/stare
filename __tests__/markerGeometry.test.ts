@@ -2,6 +2,8 @@ import { SATELLITE_MARKERS } from "../src/constants";
 import {
   labellablePoints,
   markerDiameterPx,
+  pointOnFrame,
+  trailOnFrame,
   trailReach
 } from "../src/components/markerGeometry";
 
@@ -45,6 +47,45 @@ test("takes the trail direction in pixels, not in percent", () => {
 
 test("draws no trail for an object that is holding station", () => {
   expect(trailReach({ left: 50, top: 50 }, { left: 50, top: 50 }, FRAME)).toBeNull();
+});
+
+test("counts a point as on the frame up to its very edge", () => {
+  expect(pointOnFrame({ left: 50, top: 50 })).toBe(true);
+  expect(pointOnFrame({ left: 0, top: 100 })).toBe(true);
+  expect(pointOnFrame({ left: -0.1, top: 50 })).toBe(false);
+  expect(pointOnFrame({ left: 50, top: 100.1 })).toBe(false);
+});
+
+test("keeps a marker whose mark has left the frame but whose trail has not", () => {
+  // Travelling left to right and gone off the right edge: the trail runs back
+  // the way it came, which is still across the view.
+  const gone = { left: 110, top: 50 };
+  expect(pointOnFrame(gone)).toBe(false);
+  expect(trailOnFrame(gone, { left: 140, top: 50 })).toBe(true);
+});
+
+test("lets go of a marker once its trail has left the frame too", () => {
+  // The same satellite a moment later: the whole shape, tip included, is past
+  // the edge, and there is nothing left of it to draw.
+  expect(trailOnFrame({ left: 140, top: 50 }, { left: 170, top: 50 })).toBe(false);
+});
+
+test("measures the trail backwards from the mark", () => {
+  // A satellite just off the top edge heading further off it drags its trail
+  // back down into the frame; one heading back in has already taken its trail
+  // out of the frame ahead of it.
+  expect(trailOnFrame({ left: 50, top: -5 }, { left: 50, top: -15 })).toBe(true);
+  expect(trailOnFrame({ left: 50, top: -5 }, { left: 50, top: 5 })).toBe(false);
+});
+
+test("holds a trail that crosses a corner without either end being on the frame", () => {
+  // Head off the right edge and climbing, so the tip it trails — the
+  // reflection of where it is heading — is off the bottom, and the line
+  // between the two clips the corner. The test has to answer for the middle of
+  // a segment, not only for its ends.
+  expect(trailOnFrame({ left: 105, top: 80 }, { left: 135, top: 30 })).toBe(true);
+  // The same shape carried out past the corner: nothing of it is in view.
+  expect(trailOnFrame({ left: 130, top: 105 }, { left: 160, top: 55 })).toBe(false);
 });
 
 test("keeps the label clearance in layout pixels, not in frame percent", () => {

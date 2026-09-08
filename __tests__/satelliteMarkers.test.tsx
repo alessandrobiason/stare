@@ -196,6 +196,24 @@ test("drops the second of two landmark labels sharing a coordinate", () => {
   expect(labels.map((label) => label.name)).toEqual(["ISS"]);
 });
 
+test("keeps the tail of a landmark that has left the frame, but not its name", () => {
+  // A satellite is kept on the frame while its trail crosses it, mark and all,
+  // so the tail slides out tip last instead of being cut at the border. The
+  // name is not: set below a centre that is off the top edge, it would be half
+  // a label hanging into the frame under nothing.
+  const { glyphs, labels } = scene([
+    marker({
+      name: "ISS",
+      category: "LANDMARK",
+      point: { left: 50, top: -1 },
+      next: { left: 50, top: -11 }
+    })
+  ]);
+
+  expect(glyphs[0].tail).not.toBeNull();
+  expect(labels).toEqual([]);
+});
+
 test("places a name below its marker, by a transform rather than a layout position", () => {
   // Position is a layout property and a transform is not, and every name moves
   // every frame: as `left` and `top` that is a layout pass over the whole

@@ -132,3 +132,17 @@ test("offers one entry per name, since a name is what is looked up afterwards", 
 
   expect(hits.map((hit) => hit.name)).toEqual(["TBA - TO BE ASSIGNED", "STARLINK-1234"]);
 });
+
+test("ignores a marker kept on the frame only for its trail", () => {
+  // Off the top edge and drawn for the tail it still has across the frame: a
+  // tap near that edge is asking about the marks it can see, and there is no
+  // mark of this one to see.
+  const gone = marker({
+    name: "ISS",
+    point: { left: 50, top: -1 },
+    next: { left: 50, top: -11 }
+  });
+  const hits = markersUnder(frame([gone]), FRAME, { x: 360, y: 4 });
+
+  expect(hits).toEqual([]);
+});

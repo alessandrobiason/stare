@@ -1,6 +1,6 @@
 import { MARKER_SELECTION } from "../constants";
 import { MarkerFrame, SatelliteMarker } from "../hooks/useAnimatedMarkers";
-import { FrameSize, markerDiameterPx } from "./markerGeometry";
+import { FrameSize, markerDiameterPx, pointOnFrame } from "./markerGeometry";
 import { DESIGN_FRAME_WIDTH_PX } from "./markerScene";
 
 /** Where a tap landed, in layout pixels from the frame's top-left corner. */
@@ -51,6 +51,10 @@ export function markersUnder(
 
   const hits: { marker: SatelliteMarker; distancePx: number; depth: number }[] = [];
   frame.markers.forEach((marker, depth) => {
+    // Marks on the frame answer for themselves; one kept only because its
+    // trail still crosses the frame (`trailOnFrame`) is off the screen, and a
+    // tap near an edge must not pick out a satellite there is no mark under.
+    if (!pointOnFrame(marker.point)) return;
     const x = (marker.point.left / 100) * box.width;
     const y = (marker.point.top / 100) * box.height;
     const distancePx = Math.hypot(x - tap.x, y - tap.y);

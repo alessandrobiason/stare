@@ -61,6 +61,74 @@ export function trailReach(
 }
 
 /**
+ * Whether a projected point lands on the frame at all.
+ *
+ * The frame is `0..100` on both axes in these coordinates, so this is the test
+ * the projection itself makes when it is asked to keep a point inside the view.
+ * It is shared rather than repeated because a marker whose head has left the
+ * frame is still drawn while its trail crosses it (`trailOnFrame`), and
+ * everything that treats a marker as one of the ones *on screen* — the visible
+ * count, the landmark labels, a tap — has to agree about which those are.
+ */
+export function pointOnFrame(point: FramePoint): boolean {
+  return Math.abs(point.left - 50) <= 50 && Math.abs(point.top - 50) <= 50;
+}
+
+/**
+ * Whether the trail behind a marker crosses the frame, given where the object
+ * is and where it is heading.
+ *
+ * What this is for is the head that has *already* left. A trail is the ground
+ * the object has just covered, and at twelve seconds of orbital motion the long
+ * ones are a good fraction of the frame across — so dropping a satellite the
+ * moment its mark passed the edge cut a tail that was still most of the way
+ * across the view, and a phone turning at any speed did it several times a
+ * second. What the eye reads there is not a satellite leaving: it is trails
+ * being clipped off at the border, which is the flicker the edge had.
+ *
+ * Kept while its trail is on the frame, the same satellite instead slides out
+ * of view the way it arrived — tip last — and the canvas clips what is past the
+ * edge, as it already does for the half of a tail that hangs over one.
+ *
+ * The tail runs *backwards*: from the mark to the reflection of where the
+ * object is heading (`markerScene`), which is where it was a trail-window ago.
+ * Both points arrive as percentages, and percent is a per-axis scaling of
+ * pixels, so the frame is still the box `0..100` and the tail is still a
+ * straight segment — the test costs no frame size and no trigonometry. The
+ * segment is clipped against the box a slab at a time: it meets the frame when
+ * what is left of it after both axes is not empty.
+ */
+export function trailOnFrame(from: FramePoint, to: FramePoint): boolean {
+  const tipLeft = 2 * from.left - to.left;
+  const tipTop = 2 * from.top - to.top;
+
+  let enters = 0;
+  let leaves = 1;
+
+  const dx = tipLeft - from.left;
+  if (dx === 0) {
+    if (from.left < 0 || from.left > 100) return false;
+  } else {
+    const first = -from.left / dx;
+    const second = (100 - from.left) / dx;
+    enters = Math.max(enters, Math.min(first, second));
+    leaves = Math.min(leaves, Math.max(first, second));
+  }
+
+  const dy = tipTop - from.top;
+  if (dy === 0) {
+    if (from.top < 0 || from.top > 100) return false;
+  } else {
+    const first = -from.top / dy;
+    const second = (100 - from.top) / dy;
+    enters = Math.max(enters, Math.min(first, second));
+    leaves = Math.min(leaves, Math.max(first, second));
+  }
+
+  return enters <= leaves;
+}
+
+/**
  * Picks which of `points` may carry a label, in the order given.
  *
  * A label is the most expensive thing the overlay can spend, so the ones it

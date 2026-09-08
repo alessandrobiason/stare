@@ -4,6 +4,7 @@ import {
   FrameSize,
   labellablePoints,
   markerDiameterPx,
+  pointOnFrame,
   trailReach,
   TrailReach
 } from "./markerGeometry";
@@ -201,7 +202,15 @@ export function buildMarkerScene(
   // Which landmarks get to keep their name. Crew and cargo vehicles share a
   // coordinate with the station they are docked to, so the decision has to be
   // made across the whole frame rather than marker by marker.
-  const landmarks = frame.markers.filter((marker) => marker.category === "LANDMARK");
+  //
+  // Only the ones whose mark is on the frame: a satellite kept for its trail
+  // (`trailOnFrame`) has its centre outside the view, and a name set below a
+  // centre just past an edge is a label with nothing under it — half of one
+  // sliding in at the top of the frame, which is the flicker the trails were
+  // kept to stop.
+  const landmarks = frame.markers.filter(
+    (marker) => marker.category === "LANDMARK" && pointOnFrame(marker.point)
+  );
   const allowed = labellablePoints(
     landmarks.map((marker) => marker.point),
     box

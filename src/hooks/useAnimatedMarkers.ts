@@ -1,6 +1,7 @@
 import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { axesFromAttitude } from "../camera/attitude";
 import { FrameLens, FramePoint, projectWithAxes } from "../camera/projection";
+import { pointOnFrame, trailOnFrame } from "../components/markerGeometry";
 import { MARKER_VISIBILITY, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import { rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
@@ -68,7 +69,11 @@ function drawOrder(marker: SatelliteMarker): number {
 
 /** What the last drawn frame did with the satellites it was handed. */
 export type MarkerStats = {
-  /** Markers placed on the frame. */
+  /**
+   * Markers placed on the frame, the ones kept for a trail that still crosses
+   * it after their own mark has left included — this is what was drawn, which
+   * is a shade more than the figure the visible count publishes.
+   */
   drawn: number;
   /**
    * Above the elevation mask and in front of the camera, but behind terrain —
@@ -369,6 +374,14 @@ export function useAnimatedMarkers({
           const offCentre = Math.max(Math.abs(point.left - 50), Math.abs(point.top - 50));
           if (offCentre > 50 * (1 + MARKER_WARMING_MARGIN)) continue;
 
+          // Where the object is heading, resolved against the same attitude as
+          // the marker itself, so what is left between the two points is the
+          // orbit rather than the hand holding the phone. Taken before the
+          // frame test rather than after it, because it is what that test asks
+          // about: the trail is drawn backwards from the mark, and a mark that
+          // has left the frame can still have most of its trail on it.
+          const next = fix.parked ? null : projectWithAxes(fix.nextPosition, axes, lens);
+
           let confidence: number | null = 1;
           let fromMemory = false;
           if (skyTowards && skyRemembered) {
@@ -380,7 +393,18 @@ export function useAnimatedMarkers({
 
           // Past here the marker is being drawn rather than kept warm, so the
           // ones in the margin drop out and the figures count the frame.
-          if (offCentre > 50) continue;
+          //
+          // A mark off the frame stays only for its trail: dropped the instant
+          // its head crossed the edge, the tail behind it went with it, which
+          // over a border a turning phone sweeps a marker across every few
+          // frames reads as trails being cut off rather than travelling out of
+          // view. Kept while the trail is still on the frame, the shape leaves
+          // the way it came in — tip last — and the canvas clips the rest.
+          //
+          // The warming margin above is not in the way of that: it is a whole
+          // frame width, which no trail this window is long enough to cross.
+          const onFrame = pointOnFrame(point);
+          if (!onFrame && !(next && trailOnFrame(point, next))) continue;
           if (confidence === null) unmapped += 1;
           else if (fromMemory) remembered += 1;
           if (opacity <= MARKER_VISIBILITY.minimumDrawnOpacity) {
@@ -395,11 +419,9 @@ export function useAnimatedMarkers({
             point,
             rangeKm: rangeKm(fix.position),
             opacity,
-            // Resolved against the same attitude as the marker itself, so what
-            // is left between the two points is the orbit rather than the hand
-            // holding the phone. Allowed off-frame: a trail about to leave the
-            // view is the one whose direction says the most.
-            next: fix.parked ? null : projectWithAxes(fix.nextPosition, axes, lens)
+            // Allowed off-frame: a trail about to leave the view is the one
+            // whose direction says the most.
+            next
           });
         }
         visibility.endFrame();
@@ -427,11 +449,16 @@ export function useAnimatedMarkers({
       // changing costs no render at all.
       if (now - publishedAtRef.current >= VISIBLE_COUNT_INTERVAL_MS) {
         publishedAtRef.current = now;
-        const breakdown = tallyFleets(visible);
-        const published = `${visible.length}|${breakdownSignature(breakdown)}`;
+        // The marks on the frame, not everything drawn onto it: a satellite
+        // kept for its trail alone is out of the view, and the count opens onto
+        // a list of names — one naming an object nobody can see a mark for is
+        // worse than a count that lets go of it at the edge.
+        const onFrame = visible.filter((marker) => pointOnFrame(marker.point));
+        const breakdown = tallyFleets(onFrame);
+        const published = `${onFrame.length}|${breakdownSignature(breakdown)}`;
         if (published !== publishedRef.current) {
           publishedRef.current = published;
-          onVisibleCountChangeRef.current(visible.length, breakdown);
+          onVisibleCountChangeRef.current(onFrame.length, breakdown);
         }
       }
       handle = requestAnimationFrame(animate);
