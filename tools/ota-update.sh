@@ -7,8 +7,7 @@
 # Usage:
 #   ./tools/ota-update.sh "what this update changes" [branch]
 #
-#   branch defaults to "production", the channel the installed build listens
-#   on.
+#   branch defaults to "main", the branch we're updating.
 #
 # One-time setup: either `npx eas-cli login`, or export EXPO_TOKEN with an
 # access token from expo.dev -> account settings -> access tokens -- the same
@@ -19,7 +18,7 @@
 set -euo pipefail
 
 message="${1:-}"
-branch="${2:-production}"
+branch="${2:-main}"
 
 if [ -z "$message" ]; then
   echo "usage: $0 \"what this update changes\" [branch]" >&2
@@ -56,6 +55,7 @@ npx eas-cli@latest update \
   --branch "$branch" \
   --message "$message" \
   --platform ios \
+  --environment "$branch" \
   --non-interactive
 
 echo
