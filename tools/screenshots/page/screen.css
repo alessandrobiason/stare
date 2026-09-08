@@ -1,0 +1,497 @@
+/*
+ * The app's own heads-up panels, in CSS.
+ *
+ * Every number here is copied from the React Native style it mirrors —
+ * `theme.ts`, `SceneStatus`, `CategoryLegend`, `SatelliteCard`, `DebugToggle`,
+ * `MarkerLabels` — and the screen is laid out in points, so a value written
+ * `fontSize: 10` there is `10px` here. The frame is rendered at a device scale
+ * factor instead of being scaled up afterwards, which is what keeps the text
+ * as crisp as the phone draws it.
+ */
+
+:root {
+  --panel: rgba(3, 12, 24, 0.82);
+  --panel-light: rgba(3, 12, 24, 0.78);
+  --text: #e5eef5;
+  --text-dim: #d8e4ed;
+  --text-bright: #ffffff;
+  --text-faint: rgba(216, 228, 237, 0.45);
+  --accent: #9be7c4;
+  --control: rgba(255, 255, 255, 0.12);
+  --control-active: rgba(255, 255, 255, 0.28);
+  --divider: rgba(255, 255, 255, 0.18);
+  --background: #07162c;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  width: 430px;
+  height: 932px;
+  overflow: hidden;
+  background: #000;
+  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  color: var(--text);
+}
+
+/* ---- The phone, outside the app: the status bar and the home indicator. */
+
+.statusbar {
+  position: relative;
+  height: 59px;
+  background: #000;
+}
+
+.statusbar .clock {
+  position: absolute;
+  left: 43px;
+  top: 19px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: #fff;
+}
+
+.statusbar .indicators {
+  position: absolute;
+  right: 38px;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.statusbar .island {
+  position: absolute;
+  left: 50%;
+  top: 11px;
+  width: 126px;
+  height: 37px;
+  margin-left: -63px;
+  border-radius: 19px;
+  background: #000;
+}
+
+.homebar {
+  position: relative;
+  height: 34px;
+  background: #000;
+}
+
+.homebar span {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 144px;
+  height: 5px;
+  margin-left: -72px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* ---- The app: the sky view, and the picture fitted inside it.
+   `SkyOverlay.frameStyleFor` fits the camera's own 3:4 shape into the space the
+   safe area leaves, which is why the picture is a box in the middle of a navy
+   screen rather than the whole of it. */
+
+.content {
+  position: relative;
+  height: 839px;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.picture {
+  position: absolute;
+  left: 0;
+  width: 430px;
+  height: 573.33px;
+  top: 132.83px;
+  overflow: hidden;
+}
+
+.picture canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 430px;
+  height: 573.33px;
+}
+
+.labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.labels span {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* ---- The marker count, top left (`SceneStatus`). */
+
+.panel {
+  position: absolute;
+  border-radius: 6px;
+  border: 1px solid var(--divider);
+  background: var(--panel);
+}
+
+.status {
+  top: 20px;
+  left: 12px;
+  min-width: 40px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.status .header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+}
+
+.status.open .header {
+  justify-content: flex-start;
+  padding-bottom: 2px;
+}
+
+.status .count {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.chevron {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+
+.status .breakdown {
+  padding: 0 10px 10px;
+}
+
+.panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-bright);
+  margin-bottom: 7px;
+}
+
+.status .breakdown .panel-title {
+  margin-bottom: 6px;
+}
+
+.status .row {
+  display: flex;
+  align-items: center;
+  min-width: 150px;
+  min-height: 20px;
+  padding: 2px 0;
+}
+
+.status .row .name {
+  flex: 1;
+  margin-right: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.status .row .tally {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.status .row.other {
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid var(--divider);
+}
+
+.status .row.other .name,
+.status .row.other .tally {
+  color: var(--text-faint);
+}
+
+/* ---- The category filter, top right (`CategoryLegend`). */
+
+.legend {
+  top: 24px;
+  right: 12px;
+  background: var(--panel-light);
+  padding: 0;
+}
+
+.legend .header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-height: 20px;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.legend.open {
+  padding: 10px;
+}
+
+.legend.open .header {
+  padding: 0;
+  margin-bottom: 7px;
+}
+
+.legend .header .panel-title {
+  margin-bottom: 0;
+}
+
+.legend .row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-width: 164px;
+  min-height: 26px;
+  padding: 3px 0;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  margin-right: 7px;
+  border: 1.5px solid;
+  flex: none;
+}
+
+.legend .row .name {
+  flex: 1;
+  margin-right: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.toggle {
+  width: 34px;
+  height: 19px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--control);
+  flex: none;
+}
+
+.toggle.on {
+  background: var(--control-active);
+}
+
+.toggle span {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.legend .key {
+  margin-top: 4px;
+  padding-top: 6px;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--divider);
+}
+
+.legend .key .ring {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  margin-right: 7px;
+  border: 2px solid var(--text-dim);
+  background: transparent;
+  flex: none;
+}
+
+.legend .key span {
+  flex: 1;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-faint);
+}
+
+.legend .show-all {
+  margin-top: 6px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  text-align: center;
+  border-top: 1px solid var(--divider);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-bright);
+}
+
+/* ---- The console toggle, bottom right (`DebugToggle`). */
+
+.console {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  height: 38px;
+  min-width: 92px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid var(--divider);
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+/* ---- What a tapped satellite is (`SatelliteCard`). */
+
+.card {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 58px;
+  border-radius: 10px;
+  border: 1px solid var(--divider);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.card .strip {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.card .chip {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 15px;
+  background: var(--control);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.card .chip.on {
+  background: var(--control-active);
+  color: var(--text-bright);
+}
+
+.card .head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0 0 10px;
+}
+
+.card .heading {
+  flex: 1;
+}
+
+.card .name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-bright);
+}
+
+.card .purpose {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.card .purpose .purpose-label {
+  flex: 1;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-faint);
+}
+
+.card .close {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.card .briefing {
+  padding: 7px 10px 0;
+}
+
+.card .briefing p {
+  font-size: 11.5px;
+  line-height: 16px;
+  color: var(--text);
+}
+
+.card .site {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-bright);
+}
+
+.card .facts {
+  padding: 6px 10px 9px;
+}
+
+.card .fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.card .fact .label {
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  color: var(--text-faint);
+}
+
+.card .fact .value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
