@@ -22,7 +22,7 @@ function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
 
 /** A drawn frame, in the painter's order the marker loop publishes it in. */
 function frame(markers: SatelliteMarker[]): MarkerFrame {
-  return { markers, rollDeg: 0 };
+  return { markers, paths: [], rollDeg: 0 };
 }
 
 /** Frame coordinates for a point at `x, y` layout pixels. */

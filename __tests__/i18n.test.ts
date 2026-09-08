@@ -3,7 +3,7 @@ import path from "node:path";
 import appJson from "../app.json";
 import { BRIEFING_IDS, briefingFor } from "../src/satellite/briefing";
 import { BRIEFING_TEXTS } from "../src/i18n/briefings";
-import { kilometres, lookDirection, orbitPeriod, speed } from "../src/i18n/format";
+import { clockTime, kilometres, lookDirection, orbitPeriod, speed } from "../src/i18n/format";
 import { introPages } from "../src/onboarding/introPages";
 import {
   FALLBACK_LOCALE,
@@ -222,6 +222,25 @@ describe("the figures follow the reader's conventions", () => {
     // either convention held to throughout.
     setLocaleForTesting("ar");
     expect(kilometres(35786)).toMatch(/35.786/);
+  });
+
+  test("the clock written on the sky is the one the phone keeps", () => {
+    // The time a landmark's next pass begins is set on the frame beside its
+    // path, and whether that reads as 22:13 or 10:13 PM is regional rather than
+    // linguistic — `LOCALES` has one entry for the English of both London and
+    // Chicago. Pinning a language leaves it as the only tag there is, which is
+    // what these assert against.
+    const when = new Date(2026, 7, 29, 22, 13, 0);
+
+    setLocaleForTesting("de");
+    expect(clockTime(when)).toBe("22:13");
+
+    setLocaleForTesting("en");
+    expect(clockTime(when)).toMatch(/^\d{1,2}:13\s?(AM|PM)$/i);
+
+    // And Latin digits in Arabic, as everywhere else.
+    setLocaleForTesting("ar");
+    expect(clockTime(when)).toMatch(/[0-9]{1,2}:[0-9]{2}/);
   });
 
   test("an orbit with no period is a dash rather than a wrong figure", () => {

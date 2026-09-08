@@ -1,5 +1,5 @@
 import { fill, strings } from "./index";
-import { activeLocale, Locale } from "./locale";
+import { activeLocale, Locale, LocaleReport, localeReport } from "./locale";
 
 /**
  * The figures on the satellite card, in the reader's own conventions.
@@ -83,6 +83,68 @@ export function orbitPeriod(minutes: number): string {
     hours: groupNumber(Math.floor(whole / 60)),
     minutes: (whole % 60).toString()
   });
+}
+
+/**
+ * A clock time, in the reader's own convention: `21:14` or `9:14 PM`.
+ *
+ * The one figure written on the sky itself rather than on a card — the moment a
+ * landmark's next pass begins, set under the point on its path where it does
+ * (`markerScene`). A time rather than a countdown, because it is read once and
+ * remembered, and because a countdown on a line redrawn sixty times a second is
+ * a number that never stops moving.
+ *
+ * Whether that is a 24-hour clock or a 12-hour one is not something the app's
+ * own language can answer. `LOCALES` is one entry per *language* — `en` covers
+ * both London and Chicago, which disagree about this — so the clock is
+ * formatted against the tags the platform actually offered
+ * (`LocaleReport.tags`) and falls back to the language only when there are
+ * none. That is the same argument the numbers above are formatted on, one level
+ * further down: a time is a regional convention rather than a linguistic one,
+ * and the phone knows its region even where this app does not. A language
+ * chosen by hand still wins, because choosing one leaves it as the only tag.
+ *
+ * Digits stay Latin, for the reason at the top of this module. Not the console's
+ * `clockTime` (`src/debug/format.ts`), which prints UTC to the millisecond for
+ * a reader comparing it against a sensor trace: that one is a readout and this
+ * one is the time to be outside by.
+ *
+ * The formatter is kept because building one is tens of microseconds and this
+ * is called from the frame path, where the same handful of times is formatted
+ * again on every frame. There is one per set of tags, and a session has one.
+ */
+export function clockTime(when: Date): string {
+  const formatter = clockFormat(localeReport());
+  if (formatter) return formatter.format(when);
+  return `${when.getHours()}:${when.getMinutes().toString().padStart(2, "0")}`;
+}
+
+const clockFormats = new Map<string, Intl.DateTimeFormat | null>();
+
+function clockFormat(report: LocaleReport): Intl.DateTimeFormat | null {
+  const preferred = [...report.tags, report.locale];
+  const key = preferred.join(",");
+  const known = clockFormats.get(key);
+  if (known !== undefined) return known;
+
+  // The platform's own tags first, then the language on its own: `Intl` throws
+  // on the whole list if the first tag in it is malformed, and a tag arrives
+  // here as whatever the platform put in it.
+  const made = timeFormat(preferred) ?? timeFormat([report.locale]);
+  clockFormats.set(key, made);
+  return made;
+}
+
+function timeFormat(tags: readonly string[]): Intl.DateTimeFormat | null {
+  try {
+    // The `-u-nu-latn` extension pins the digits, as above.
+    return new Intl.DateTimeFormat(
+      tags.map((tag) => `${tag}-u-nu-latn`),
+      { hour: "numeric", minute: "2-digit" }
+    );
+  } catch {
+    return null;
+  }
 }
 
 /** The eight-point compass direction a bearing falls in, in the local compass. */

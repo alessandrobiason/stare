@@ -4,8 +4,9 @@ import { MarkerLabels } from "../src/components/MarkerLabels";
 import { buildMarkerScene, GlyphShape } from "../src/components/markerScene";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
-import { MarkerFrame, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
+import { MarkerFrame, MarkerPath, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
 import { CATEGORY_COLORS } from "../src/satellite/categories";
+import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../src/constants";
 
 const FRAME = { width: 720, height: 1280 };
 
@@ -23,14 +24,14 @@ function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
 }
 
 /** The overlay as it is drawn: shapes in pixels, whichever canvas draws them. */
-function scene(markers: SatelliteMarker[], rollDeg = 0, box = FRAME) {
-  const frame: MarkerFrame = { markers, rollDeg };
+function scene(markers: SatelliteMarker[], rollDeg = 0, box = FRAME, paths: MarkerPath[] = []) {
+  const frame: MarkerFrame = { markers, paths, rollDeg };
   return buildMarkerScene(frame, box, NIGHT_PALETTE);
 }
 
 /** The same, with one satellite selected: what a tap leaves on the frame. */
 function selectedScene(markers: SatelliteMarker[], name: string, box = FRAME) {
-  return buildMarkerScene({ markers, rollDeg: 0 }, box, NIGHT_PALETTE, name);
+  return buildMarkerScene({ markers, paths: [], rollDeg: 0 }, box, NIGHT_PALETTE, name);
 }
 
 /** A tail's three corners, as points: the tip it tapers to and its head. */
@@ -302,5 +303,124 @@ describe("the ring around a tapped satellite", () => {
     const large = selectedScene([marker({ name: "SAT" })], "SAT", { width: 1440, height: 2560 });
 
     expect(large.selection!.radius).toBeCloseTo(small.selection!.radius * 4);
+  });
+});
+
+describe("a landmark's path across the sky", () => {
+  /** One planned pass, projected: a straight run across the middle of the frame. */
+  function path(overrides: Partial<MarkerPath> = {}): MarkerPath {
+    return {
+      name: "ISS",
+      key: "25544@1",
+      category: "LANDMARK",
+      lines: [
+        [
+          { left: 20, top: 50 },
+          { left: 50, top: 50 },
+          { left: 80, top: 50 }
+        ]
+      ],
+      ticks: [{ at: { left: 50, top: 50 }, ahead: { left: 60, top: 50 } }],
+      start: null,
+      startsAtMs: Date.UTC(2026, 7, 29, 20, 37, 0),
+      lead: 0,
+      ...overrides
+    };
+  }
+
+  test("draws it as a thin rimmed line in the landmark colour", () => {
+    const [shape] = scene([], 0, FRAME, [path()]).paths;
+
+    expect(shape.color).toBe(CATEGORY_COLORS.LANDMARK);
+    // Thinner than the marks it runs between, and rimmed like all of them: a
+    // path is two thousand pixels long and must not be the loudest thing on a
+    // photograph of the sky.
+    expect(shape.width).toBeLessThan(SATELLITE_MARKERS.farDiameterPx);
+    expect(shape.rimWidth).toBeGreaterThan(shape.width);
+  });
+
+  test("places the arc in pixels on the frame it is drawn into", () => {
+    const [shape] = scene([], 0, FRAME, [path()]).paths;
+    expect(shape.lines).toHaveLength(1);
+    // Percent of the frame, in the order the pass runs.
+    expect(shape.lines[0]).toEqual([144, 640, 360, 640, 576, 640]);
+  });
+
+  test("scales with the frame, as every other size does", () => {
+    const full = scene([], 0, FRAME, [path()]).paths[0];
+    const half = scene([], 0, { width: 360, height: 640 }, [path()]).paths[0];
+    expect(half.width).toBeCloseTo(full.width / 2, 6);
+  });
+
+  test("fades it by how far ahead the pass is", () => {
+    const now = scene([], 0, FRAME, [path({ lead: 0 })]).paths[0];
+    const later = scene([], 0, FRAME, [path({ lead: 1 })]).paths[0];
+
+    expect(now.alpha).toBeCloseTo(LANDMARK_PATHS.nearOpacity, 6);
+    expect(later.alpha).toBeCloseTo(LANDMARK_PATHS.farOpacity, 6);
+    expect(later.alpha).toBeLessThan(now.alpha);
+  });
+
+  test("lays a time mark across the path rather than along it", () => {
+    const [shape] = scene([], 0, FRAME, [path()]).paths;
+    expect(shape.ticks).toHaveLength(1);
+
+    const [x1, y1, x2, y2] = shape.ticks[0];
+    // The path here runs left to right, so its marks run up and down — and are
+    // as long as the mark is quoted at, measured in pixels rather than percent.
+    expect(x1).toBeCloseTo(360, 6);
+    expect(x2).toBeCloseTo(360, 6);
+    expect(Math.hypot(x2 - x1, y2 - y1)).toBeCloseTo(LANDMARK_PATHS.tickLengthPx, 6);
+    expect((y1 + y2) / 2).toBeCloseTo(640, 6);
+  });
+
+  test("drops a mark whose direction is a single point", () => {
+    // Nothing to draw across: two identical positions carry no direction, and
+    // normalising the difference between them is a division by zero.
+    const degenerate = path({
+      ticks: [{ at: { left: 50, top: 50 }, ahead: { left: 50, top: 50 } }]
+    });
+    expect(scene([], 0, FRAME, [degenerate]).paths[0].ticks).toEqual([]);
+  });
+
+  test("names a pass that has not begun with the time it begins", () => {
+    const rise = path({ start: { left: 30, top: 70 } });
+    const { labels } = scene([], 0, FRAME, [rise]);
+
+    expect(labels).toHaveLength(1);
+    // The name and the time it rises at, a line each: the two together are
+    // wider than the box a label is set in.
+    expect(labels[0].name).toMatch(/^ISS\n\d{1,2}[:.]\d{2}/);
+    // Under the point where the object comes over the horizon, which is where
+    // someone would stand to watch it.
+    expect(labels[0].x).toBeCloseTo(216, 6);
+    expect(labels[0].y).toBeCloseTo(896, 6);
+    expect(labels[0].offsetY).toBeGreaterThan(0);
+  });
+
+  test("says nothing about a pass that is already under way", () => {
+    // Its object is on the frame with its own name under it; a second label
+    // saying when it rose is a label about the past.
+    expect(scene([], 0, FRAME, [path({ start: null })]).labels).toEqual([]);
+  });
+
+  test("gives way to a marker's own name where the two would collide", () => {
+    const landmark = marker({ name: "ISS", category: "LANDMARK", point: { left: 30, top: 70 } });
+    const rise = path({ start: { left: 30, top: 70 } });
+    const { labels } = scene([landmark], 0, FRAME, [rise]);
+
+    expect(labels).toHaveLength(1);
+    expect(labels[0].name).toBe("ISS");
+  });
+
+  test("keys a rise apart from the mark it is named after", () => {
+    // Both are the same object on one frame, and two views under one key is one
+    // view: the marker's name would take the rise's place, or the other way on.
+    const landmark = marker({ name: "ISS", category: "LANDMARK" });
+    const rise = path({ start: { left: 10, top: 90 } });
+    const keys = scene([landmark], 0, FRAME, [rise]).labels.map((label) => label.key);
+
+    expect(keys).toHaveLength(2);
+    expect(new Set(keys).size).toBe(2);
   });
 });

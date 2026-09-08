@@ -1,10 +1,13 @@
 import { SATELLITE_MARKERS } from "../src/constants";
 import {
+  clipPolyline,
+  clipSegment,
   labellablePoints,
   markerDiameterPx,
   pointOnFrame,
   trailOnFrame,
-  trailReach
+  trailReach,
+  WHOLE_FRAME
 } from "../src/components/markerGeometry";
 
 /** The recording's own frame, so pixel figures read at their design size. */
@@ -113,4 +116,75 @@ test("labels landmarks that are far enough apart to be read", () => {
     { left: 80, top: 80 }
   ];
   expect(labellablePoints(points, FRAME)).toEqual([true, true]);
+});
+
+describe("clipping a line to the frame", () => {
+  test("leaves a segment already inside it alone", () => {
+    const clipped = clipSegment({ left: 20, top: 20 }, { left: 80, top: 80 }, WHOLE_FRAME);
+    expect(clipped).toEqual({ from: { left: 20, top: 20 }, to: { left: 80, top: 80 } });
+  });
+
+  test("cuts the part that hangs over an edge, on the line it was drawn along", () => {
+    const clipped = clipSegment({ left: 50, top: 50 }, { left: 150, top: 100 }, WHOLE_FRAME);
+    // Halfway along, where the segment crosses the right-hand edge: the top
+    // must follow, or the drawn line leaves at the wrong angle.
+    expect(clipped?.to.left).toBeCloseTo(100);
+    expect(clipped?.to.top).toBeCloseTo(75);
+  });
+
+  test("says nothing crosses when nothing does", () => {
+    expect(clipSegment({ left: 120, top: 10 }, { left: 140, top: 90 }, WHOLE_FRAME)).toBeNull();
+  });
+
+  test("keeps a segment that passes clean through both edges", () => {
+    const clipped = clipSegment({ left: -50, top: 50 }, { left: 150, top: 50 }, WHOLE_FRAME);
+    expect(clipped?.from.left).toBeCloseTo(0);
+    expect(clipped?.to.left).toBeCloseTo(100);
+  });
+
+  test("breaks a path that leaves the frame and comes back into two runs", () => {
+    // A landmark's arc crossing a corner of the view, out of it, and back: two
+    // lines rather than one drawn straight across the sky between them.
+    const runs = clipPolyline(
+      [
+        { left: 50, top: 50 },
+        { left: 150, top: 50 },
+        { left: 150, top: 90 },
+        { left: 50, top: 90 }
+      ],
+      WHOLE_FRAME
+    );
+
+    expect(runs).toHaveLength(2);
+    expect(runs[0][0]).toEqual({ left: 50, top: 50 });
+    expect(runs[0][1].left).toBeCloseTo(100);
+    expect(runs[1][0].left).toBeCloseTo(100);
+    expect(runs[1][runs[1].length - 1]).toEqual({ left: 50, top: 90 });
+  });
+
+  test("keeps a path that only touches the frame in the middle", () => {
+    const runs = clipPolyline(
+      [
+        { left: -200, top: 50 },
+        { left: 50, top: 50 },
+        { left: 300, top: 50 }
+      ],
+      WHOLE_FRAME
+    );
+    expect(runs).toHaveLength(1);
+    expect(runs[0].map((point) => Math.round(point.left))).toEqual([0, 50, 100]);
+  });
+
+  test("has nothing to draw for a path that never reaches the frame", () => {
+    expect(
+      clipPolyline(
+        [
+          { left: 150, top: 10 },
+          { left: 160, top: 40 },
+          { left: 170, top: 80 }
+        ],
+        WHOLE_FRAME
+      )
+    ).toEqual([]);
+  });
 });

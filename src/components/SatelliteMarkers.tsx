@@ -8,6 +8,7 @@ import {
   Circle,
   GlyphShape,
   MarkerScene,
+  PathShape,
   SelectionRing,
   TailShape
 } from "./markerScene";
@@ -92,10 +93,13 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
       paint.setStrokeJoin(StrokeJoin.Round);
       paint.setStrokeCap(StrokeCap.Round);
 
-      // One path, rewound per marker: a tail is three points, and allocating a
+      // One path, rewound per shape: a tail is three points, and allocating a
       // native object for each of seventy of them every frame is the kind of
-      // cost this whole arrangement exists to avoid.
+      // cost this whole arrangement exists to avoid. The landmarks' arcs are
+      // rewound into the same one, for the same reason.
       const tail = Skia.Path.Make();
+      // Under the marks, and first: a path is what the marks are read against.
+      for (const path of scene.paths) drawPath(canvas, paint, tail, path, scene.palette);
       for (const glyph of scene.glyphs) drawGlyph(canvas, paint, tail, glyph, scene.palette);
       // Over every mark, including the ones in front of the selected satellite:
       // a ring half hidden behind a passing dot says nothing.
@@ -132,7 +136,7 @@ function drawGlyph(
   }
 
   if (glyph.tail) {
-    trace(tail, glyph.tail);
+    trace(tail, glyph.tail.points, true);
     rim(canvas, paint, tail, glyph.tail, palette.outline, glyph.alpha);
   }
 
@@ -145,6 +149,34 @@ function drawGlyph(
   circle(canvas, paint, glyph, glyph.core, glyph.color, glyph.alpha);
 }
 
+/**
+ * One landmark's path: the arc it will travel, and the clock minutes on it.
+ *
+ * Rims first for the whole shape and colour afterwards, rather than rim and
+ * colour a run at a time. A time mark crosses the line it belongs to, so drawn
+ * in pairs the mark's own rim is laid over the line's colour and every mark
+ * cuts a dark notch through the arc it is measuring.
+ */
+function drawPath(
+  canvas: SkCanvas,
+  paint: SkPaint,
+  line: SkPath,
+  shape: PathShape,
+  palette: MarkerPalette
+): void {
+  const draw = (points: number[], color: string, alpha: number, width: number) => {
+    trace(line, points, false);
+    stroke(paint, color, alpha, width);
+    canvas.drawPath(line, paint);
+  };
+
+  const ink = palette.outline;
+  for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const tick of shape.ticks) draw(tick, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
+  for (const tick of shape.ticks) draw(tick, shape.color, shape.alpha, shape.width);
+}
+
 /** The ring that says which satellite the info card is describing. */
 function drawSelection(canvas: SkCanvas, paint: SkPaint, ring: SelectionRing): void {
   stroke(paint, ring.rim.color, ring.rim.alpha * ring.alpha, ring.rimWidth);
@@ -153,14 +185,18 @@ function drawSelection(canvas: SkCanvas, paint: SkPaint, ring: SelectionRing): v
   canvas.drawCircle(ring.x, ring.y, ring.radius, paint);
 }
 
-/** The tail's polygon, into the path this frame is reusing. */
-function trace(path: SkPath, shape: TailShape): void {
+/**
+ * Flat `x, y` pairs into the path this frame is reusing: closed for a tail,
+ * which is a filled triangle, and open for an arc, which is a stroked line and
+ * would otherwise be drawn a segment back to where it started.
+ */
+function trace(path: SkPath, points: number[], close: boolean): void {
   path.rewind();
-  path.moveTo(shape.points[0], shape.points[1]);
-  for (let index = 2; index < shape.points.length; index += 2) {
-    path.lineTo(shape.points[index], shape.points[index + 1]);
+  path.moveTo(points[0], points[1]);
+  for (let index = 2; index < points.length; index += 2) {
+    path.lineTo(points[index], points[index + 1]);
   }
-  path.close();
+  if (close) path.close();
 }
 
 /**

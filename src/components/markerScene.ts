@@ -1,5 +1,6 @@
-import { SATELLITE_MARKERS } from "../constants";
-import { MarkerFrame } from "../hooks/useAnimatedMarkers";
+import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../constants";
+import { MarkerFrame, MarkerPath } from "../hooks/useAnimatedMarkers";
+import { clockTime } from "../i18n/format";
 import {
   FrameSize,
   labellablePoints,
@@ -68,6 +69,15 @@ import { Ink, MarkerPalette } from "./palette";
  * module's; see `palette.ts`.
  */
 export type MarkerScene = {
+  /**
+   * The landmarks' upcoming passes, drawn under everything else.
+   *
+   * Under, because a path is the ground a mark is read against rather than
+   * something to read in its own right: it is the longest shape on the frame by
+   * two orders of magnitude, and a line crossing over the marks would be the
+   * thing the eye lands on. See `LANDMARK_PATHS`.
+   */
+  paths: PathShape[];
   /** Far to near, so the nearer marker is the one on top. */
   glyphs: GlyphShape[];
   /** The ring around the marker being read about, or `null` when none is. */
@@ -171,8 +181,49 @@ export type SelectionRing = {
   alpha: number;
 };
 
+/**
+ * One landmark's path across the sky, as the lines that draw it.
+ *
+ * A stroked polyline rather than the tapered polygon a trail is drawn as, and
+ * for the opposite reason. A trail is a dozen pixels of the object's own body
+ * and has to say which end the object is at; a path is two thousand pixels of
+ * sky the object has not reached yet, and what it has to do is stay legible
+ * while crossing a photograph without becoming the subject of it. So it is thin,
+ * even, and rimmed like everything else the overlay draws.
+ *
+ * The time marks are what make it a timetable rather than a curve: each is a
+ * short stroke *across* the line, at a round clock minute, at a cadence the
+ * pass chooses for itself (`ticksAlong`). Across rather than along, and a
+ * stroke rather than a dot, because a dot on a line is a satellite in this
+ * overlay's vocabulary and the marks are not objects.
+ */
+export type PathShape = {
+  /**
+   * The arc, as runs of flat `x, y` pairs in layout pixels. More than one when
+   * the path leaves the view and comes back into it.
+   */
+  lines: number[][];
+  /** The time marks: each a stroke, as the flat pair `x, y, x, y`. */
+  ticks: number[][];
+  /** The category colour, which for a landmark path is the landmark colour. */
+  color: string;
+  /** How solid the line is, which says how far ahead the pass is. */
+  alpha: number;
+  /** Width of the line, and of the rim laid under it. */
+  width: number;
+  rimWidth: number;
+};
+
 /** A landmark's name, and the mark it belongs under. */
 export type LabelPlacement = {
+  /**
+   * What identifies this label between frames.
+   *
+   * The name is not enough on its own any more: a landmark can be named twice
+   * on one frame — once under its marker, and once at the point where its next
+   * pass begins — and two views keyed by the same string is one view.
+   */
+  key: string;
   name: string;
   /** The marker's centre; the label is placed below it and turns about it. */
   x: number;
@@ -211,8 +262,14 @@ export function buildMarkerScene(
   const landmarks = frame.markers.filter(
     (marker) => marker.category === "LANDMARK" && pointOnFrame(marker.point)
   );
+  // A path that has not started yet is named too, at the point where its object
+  // will come over the horizon — which is the one thing on the frame that says
+  // *when* as well as where. Those names compete with the marks' for the same
+  // clear space, and the marks win: a name over something someone can look at
+  // now outranks one over a place something will be in an hour.
+  const rises = frame.paths.flatMap((path) => (path.start ? [{ path, point: path.start }] : []));
   const allowed = labellablePoints(
-    landmarks.map((marker) => marker.point),
+    [...landmarks.map((marker) => marker.point), ...rises.map((rise) => rise.point)],
     box
   );
   const named = new Set(landmarks.filter((_, index) => allowed[index]).map((one) => one.name));
@@ -269,6 +326,7 @@ export function buildMarkerScene(
 
     if (landmark && named.has(marker.name)) {
       labels.push({
+        key: marker.name,
         name: marker.name,
         x,
         y,
@@ -278,7 +336,96 @@ export function buildMarkerScene(
     }
   }
 
-  return { glyphs, selection, labels, rollDeg: frame.rollDeg, palette };
+  rises.forEach((rise, index) => {
+    if (!allowed[landmarks.length + index]) return;
+    const alpha = pathOpacity(rise.path.lead);
+    labels.push({
+      key: rise.path.key,
+      // The name and the clock time it gets there, which is the whole answer to
+      // "when do I go outside". A time rather than a countdown because that is
+      // what someone reads once and remembers; the line itself is what says how
+      // long the pass lasts, in the marks along it.
+      //
+      // On two lines, because a name and a time on one do not fit the box a
+      // label is set in — `SOYUZ-MS 33 22:13` is half again as wide as it — and
+      // the half that would be cut is the time. Broken here rather than left to
+      // wrap, so where it breaks is not a question about a typeface.
+      name: `${rise.path.name}\n${clockTime(new Date(rise.path.startsAtMs))}`,
+      x: (rise.point.left / 100) * box.width,
+      y: (rise.point.top / 100) * box.height,
+      offsetY: RISE_LABEL_GAP_PX * scale,
+      alpha
+    });
+  });
+
+  return {
+    paths: frame.paths.map((path) => pathShapeFor(path, box, scale, palette)),
+    glyphs,
+    selection,
+    labels,
+    rollDeg: frame.rollDeg,
+    palette
+  };
+}
+
+/**
+ * One projected pass as the lines that draw it.
+ *
+ * The rim is the same idea as a marker's — a wider stroke of the outline colour
+ * laid under the coloured one, so the line survives a photograph of whatever the
+ * camera is pointed at — and the same arithmetic, so a path and a mark are
+ * outlined to the same weight on any frame size.
+ */
+function pathShapeFor(
+  path: MarkerPath,
+  box: FrameSize,
+  scale: number,
+  palette: MarkerPalette
+): PathShape {
+  const width = LANDMARK_PATHS.widthPx * scale;
+  const across = (LANDMARK_PATHS.tickLengthPx * scale) / 2;
+  const ticks: number[][] = [];
+
+  for (const tick of path.ticks) {
+    const x = (tick.at.left / 100) * box.width;
+    const y = (tick.at.top / 100) * box.height;
+    // The direction the path runs in, taken in pixels rather than in percent:
+    // the frame is not square, so a mark laid out in percent would sit square
+    // to the line only where the line happened to be level. Same reason the
+    // markers' tails are measured in pixels (`trailReach`).
+    const dx = ((tick.ahead.left - tick.at.left) / 100) * box.width;
+    const dy = ((tick.ahead.top - tick.at.top) / 100) * box.height;
+    const length = Math.hypot(dx, dy);
+    if (!(length > 0)) continue;
+    ticks.push([
+      x + (dy / length) * across,
+      y - (dx / length) * across,
+      x - (dy / length) * across,
+      y + (dx / length) * across
+    ]);
+  }
+
+  return {
+    lines: path.lines.map((line) =>
+      line.flatMap((point) => [(point.left / 100) * box.width, (point.top / 100) * box.height])
+    ),
+    ticks,
+    color: palette.categories[path.category],
+    alpha: pathOpacity(path.lead),
+    width,
+    rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO)
+  };
+}
+
+/**
+ * How solid a path is drawn, from how far ahead its pass is.
+ *
+ * The only channel a path has that a marker does not, and it is spent on time:
+ * see `LANDMARK_PATHS.nearOpacity`.
+ */
+function pathOpacity(lead: number): number {
+  const { nearOpacity, farOpacity } = LANDMARK_PATHS;
+  return nearOpacity + (farOpacity - nearOpacity) * lead;
 }
 
 /**
@@ -351,3 +498,12 @@ const SELECTION_WIDTH_PX = 3;
  */
 export const LABEL_BOX_PX = SATELLITE_MARKERS.labelClearancePx.x * 2;
 const LABEL_GAP_PX = 5;
+/**
+ * How far below a rise point its name is set, in pixels at the design width.
+ *
+ * Further than a marker's own name sits below its mark, because there is no
+ * mark here: what the name is placed under is a point on a line, and set as
+ * close as a marker's it reads as a label on the line rather than on the place
+ * the line begins.
+ */
+const RISE_LABEL_GAP_PX = 10;

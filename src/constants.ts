@@ -254,6 +254,178 @@ export const SATELLITE_MARKERS = {
 } as const;
 
 /**
+ * The landmarks' own orbits, drawn across the sky ahead of them
+ * (`src/satellite/orbitPath.ts`).
+ *
+ * A marker says where an object is and a trail says which way it is going, and
+ * for most of the catalogue that is the whole of what is worth saying. The
+ * landmarks are the exception, and they are the exception twice over. They are
+ * the couple of dozen objects someone would actually wait outside for, and they
+ * are the ones whose trail says least: a trail is twelve seconds long, and
+ * twelve seconds of the station is a few degrees — a stub that answers "which
+ * way" and nothing at all about "when" or "from where". So a landmark carries
+ * its path instead: the arc it will trace between rising and setting, drawn
+ * whole, with the clock time it starts at.
+ *
+ * That is also what makes the path worth drawing when its object is nowhere on
+ * screen. A marker off the frame is invisible and there is nothing to be done
+ * about it but turn the phone and hope; a path off the frame is a line running
+ * out of the edge of the view, and following it is how a phone is turned onto
+ * something that has not risen yet.
+ */
+export const LANDMARK_PATHS = {
+  /**
+   * How far ahead a path is drawn, in hours.
+   *
+   * Long enough to be a plan for the evening rather than a description of the
+   * next few minutes, short enough that what is drawn is still the sky someone
+   * is standing under: three hours is two passes of the station over one place,
+   * and the second of them is already an hour and a half of the Earth turning
+   * away from where the first one was.
+   */
+  windowHours: 3,
+  /**
+   * How often the paths are worked out again, in seconds.
+   *
+   * The whole plan is a couple of thousand propagations (see `searchStepSeconds`),
+   * which is a tenth of what a single sweep of the active catalogue costs — but
+   * it is not frame work, and it is not spent per frame. What is spent per frame
+   * is projecting a few hundred points that were settled a minute ago. The
+   * drawn path is trimmed to the present on every frame (`pathFrom`), so a plan
+   * this old is not a stale picture: it is the same arc with less of it left.
+   */
+  refreshSeconds: 60,
+  /**
+   * How far the observer may move before the paths are worked out again, in
+   * metres.
+   *
+   * Looser than the sky memory's twenty-five (`SKY_MEMORY.observerDriftMetres`)
+   * because what moves is different. That grid holds directions to the roof
+   * across the street, which crossing the street changes entirely; this holds
+   * directions to something four hundred kilometres up, where a walk of a
+   * quarter kilometre is under a thousandth of a degree.
+   */
+  observerDriftMetres: 250,
+  /**
+   * Step the plan marches at while the object is below the elevation floor, in
+   * seconds.
+   *
+   * This is what a pass is *found* with rather than what it is drawn with, so
+   * it is charged against the three-hour window: 45 seconds is 240 propagations
+   * per landmark, and a couple of thousand for the tier. The one thing it can
+   * miss is a pass shorter than a step, which for anything in low orbit means
+   * one that peaks within half a degree of the floor — below
+   * `minimumPeakElevationDeg`, and so not drawn even when it is found.
+   */
+  searchStepSeconds: 45,
+  /**
+   * How many times the floor crossing is then bisected.
+   *
+   * Six halvings of a 45-second step is under a second, which is a fraction of
+   * a degree of arc: the path starts where the marker will appear rather than
+   * up to a step past it.
+   */
+  crossingRefinements: 6,
+  /**
+   * How far apart the samples along a path are, in degrees of arc.
+   *
+   * Spaced by angle rather than by time, because the two are not the same thing
+   * on a pass: the station crosses a degree a second overhead and a tenth of
+   * that near the horizon, and Chandra takes an hour to cover what the station
+   * covers in a minute. Sampling on a clock therefore either draws a corner
+   * every few degrees overhead or spends hundreds of propagations on an object
+   * that is barely moving. The step is chosen from the object's own angular
+   * rate instead, measured between the last two samples.
+   *
+   * Four degrees is a chord that sags 0.02 degrees from the arc it stands in
+   * for — a fifth of a pixel on this frame — and a projection this one maps a
+   * great circle to a straight line exactly, so the straight segments drawn
+   * between the samples are the path rather than an approximation of it.
+   */
+  sampleStepDeg: 4,
+  /** The step to open with, before there are two samples to measure a rate from. */
+  initialStepSeconds: 10,
+  /** Bounds on that step, in seconds: fast overhead, slow at the far end. */
+  minimumStepSeconds: 2,
+  maximumStepSeconds: 300,
+  /** Samples one pass may take, whatever the rate says. A stop, not a budget. */
+  maximumSamples: 400,
+  /**
+   * How high a pass has to reach to be worth pointing anyone at, in degrees.
+   *
+   * Not a visibility test — the mask answers that from the picture — but a
+   * question of what a line is *for*. A pass that never clears ten degrees is
+   * an arc along the rooftops, and telling someone to look there is telling
+   * them to look at a building. The pass already under way is exempt: its
+   * object is on the frame and drawing everything about it except the path it
+   * is on is worse than drawing a low arc.
+   */
+  minimumPeakElevationDeg: 10,
+  /**
+   * How many paths are drawn at once.
+   *
+   * The limit is legibility rather than cost. Each path is up to a hundred and
+   * eighty degrees of sky, so on a sixty-degree frame two or three of them
+   * cross the view at any moment; past four the lines start to read as a mesh
+   * over the picture rather than as a route each. Which four is decided by
+   * breadth first — every landmark's next pass before any landmark's second —
+   * so a station that comes round twice cannot take the whole allowance.
+   */
+  maximumPaths: 4,
+  /**
+   * When two passes are the same object twice, in seconds and degrees.
+   *
+   * The catalogue lists a crew ferry separately from the station it is docked
+   * to, and both are landmarks, so the station's arc would be drawn three or
+   * four times over — same line, same minute, four names stacked at the rise
+   * point. Two passes that start within a minute and a half of each other
+   * within three degrees of the same piece of sky are one arc, and the entry
+   * kept is the one with the lower catalogue number: a ferry is launched to a
+   * station, so the station is the older number of the two.
+   */
+  duplicateSeconds: 90,
+  duplicateDeg: 3,
+  /**
+   * The cadences a time mark may be placed at, in minutes, and how far apart
+   * two of them have to fall on the sky.
+   *
+   * The marks are what turn a line into a timetable — how long the object takes
+   * to cross, and how far along it will be when you get outside — so they are
+   * placed on round clock minutes rather than at even spacing. Which cadence is
+   * chosen is the path's own business: a minute of the station is sixty degrees
+   * overhead and a minute of Chandra is a fifth of one, so the coarsest that
+   * keeps two marks a hand's width apart would be unreadable on one and the
+   * finest would be a smear on the other. The first cadence whose marks clear
+   * twelve degrees wins.
+   */
+  tickMinutes: [1, 2, 5, 10, 15, 30, 60],
+  tickSeparationDeg: 12,
+  /**
+   * Line width and time-mark length, in frame pixels at `DESIGN_FRAME_WIDTH_PX`.
+   *
+   * Thinner than anything else the overlay draws. A path is the longest shape
+   * on the frame by two orders of magnitude — a marker is seventeen pixels and
+   * an arc is two thousand — so it carries its weight in length rather than in
+   * width, and a line drawn at the width of a trail would be the loudest thing
+   * on a photograph of the sky.
+   */
+  widthPx: 2,
+  tickLengthPx: 9,
+  /**
+   * How solid the line is at each end of the window: the pass under way, and
+   * one three hours out.
+   *
+   * The fade is the only thing on the path that says *when* without being read:
+   * the arc of the object crossing now is the one nearly opaque line on the
+   * frame, and the one that comes round after midnight is a ghost of it. It
+   * also settles what happens as an hour goes by, which is that a path brightens
+   * as its pass approaches rather than appearing when it arrives.
+   */
+  nearOpacity: 0.8,
+  farOpacity: 0.25
+} as const;
+
+/**
  * Tapping a marker to read what it is (`src/components/markerHitTest.ts`).
  *
  * The overlay says what a satellite is *for* with colour and how far away it is

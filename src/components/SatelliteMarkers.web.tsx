@@ -7,6 +7,7 @@ import {
   Circle,
   GlyphShape,
   MarkerScene,
+  PathShape,
   SelectionRing,
   TailShape
 } from "./markerScene";
@@ -91,10 +92,39 @@ function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
   // running two edges out to the spike where they would have met.
   context.lineJoin = "round";
   context.lineCap = "round";
+  // Under the marks, and first: a path is what the marks are read against.
+  for (const path of scene.paths) drawPath(context, path, scene.palette);
   for (const glyph of scene.glyphs) drawGlyph(context, glyph, scene.palette);
   // Over every mark, including the ones in front of the selected satellite: a
   // ring half hidden behind a passing dot says nothing.
   if (scene.selection) drawSelection(context, scene.selection);
+}
+
+/**
+ * One landmark's path: the arc it will travel, and the clock minutes on it.
+ *
+ * Rims for the whole shape first and colour afterwards, as on the phone: a time
+ * mark crosses the line it belongs to, and drawn in pairs each mark's rim would
+ * cut a dark notch through the arc it is measuring.
+ */
+function drawPath(
+  context: CanvasRenderingContext2D,
+  shape: PathShape,
+  palette: MarkerPalette
+): void {
+  const draw = (points: number[], color: string, alpha: number, width: number) => {
+    trace(context, points, false);
+    context.globalAlpha = alpha;
+    context.strokeStyle = color;
+    context.lineWidth = width;
+    context.stroke();
+  };
+
+  const ink = palette.outline;
+  for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const tick of shape.ticks) draw(tick, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
+  for (const tick of shape.ticks) draw(tick, shape.color, shape.alpha, shape.width);
 }
 
 /** The ring that says which satellite the info card is describing. */
@@ -146,7 +176,7 @@ function drawGlyph(
   if (glyph.tail) rim(context, glyph.tail, palette.outline, glyph.alpha);
   circle(glyph.rim, palette.outline.color, palette.outline.alpha * glyph.alpha);
   if (glyph.tail) {
-    trace(context, glyph.tail);
+    trace(context, glyph.tail.points, true);
     context.globalAlpha = glyph.alpha;
     context.fillStyle = glyph.color;
     context.fill();
@@ -164,7 +194,7 @@ function rim(
   ink: Ink,
   alpha: number
 ): void {
-  trace(context, shape);
+  trace(context, shape.points, true);
   context.globalAlpha = ink.alpha * alpha;
   context.fillStyle = ink.color;
   context.fill();
@@ -173,14 +203,18 @@ function rim(
   context.stroke();
 }
 
-/** The tail's polygon, as the context's current path. */
-function trace(context: CanvasRenderingContext2D, shape: TailShape): void {
+/**
+ * Flat `x, y` pairs as the context's current path: closed for a tail, which is
+ * a filled triangle, and open for an arc, which is a stroked line and would
+ * otherwise be drawn a segment back to where it started.
+ */
+function trace(context: CanvasRenderingContext2D, points: number[], close: boolean): void {
   context.beginPath();
-  context.moveTo(shape.points[0], shape.points[1]);
-  for (let index = 2; index < shape.points.length; index += 2) {
-    context.lineTo(shape.points[index], shape.points[index + 1]);
+  context.moveTo(points[0], points[1]);
+  for (let index = 2; index < points.length; index += 2) {
+    context.lineTo(points[index], points[index + 1]);
   }
-  context.closePath();
+  if (close) context.closePath();
 }
 
 const TWO_PI = Math.PI * 2;

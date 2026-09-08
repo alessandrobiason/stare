@@ -104,6 +104,7 @@ satellites → screen positions → markers, composited over the camera picture.
 | Occlusion: SegFormer sky mask, horizon-capped, aimed at the sky | `src/vision/` |
 | Heading checked against the sun or the moon in the same frame | `src/vision/brightBodies.ts`, `src/fusion/celestialNorth.ts` |
 | Drawn at display rate, every marker in one canvas | `src/components/markerScene.ts`, `SatelliteMarkers` |
+| Where the landmarks will be for the next few hours | `src/satellite/orbitPath.ts`, `src/hooks/useOrbitPaths.ts` |
 | Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
 | A tap back into the sky: which markers, and what they are | `src/components/markerHitTest.ts`, `SkyTracker.describe`, `src/satellite/briefing.ts`, `src/satellite/landmarkPhotos.ts` |
 
@@ -284,6 +285,35 @@ harness, which is a browser and already has one. The cost now grows with the
 number of circles rather than with the number of views. The landmark names stay
 views, because text needs a typeface handed to a canvas and there are never
 more than a couple of dozen names.
+
+**The landmarks carry their orbits with them** (`src/satellite/orbitPath.ts`).
+A marker says where an object is and a trail says which way it is going, which
+is the whole of what is worth saying about sixteen thousand satellites and much
+too little to say about the dozen anyone would go outside for. The question
+about the station is not where it is — most of the time it is under the floor,
+and no marker can be drawn for that — but *when* it comes over and *where* to
+stand. So a landmark is drawn with the arc it will trace across the sky:
+rise to set, for every pass in the next three hours, with round clock minutes
+marked along it and the time the next one begins written where it starts.
+
+The plan is a few thousand propagations, made once a minute off the frame
+thread in slices (`src/timeSlice.ts`) and trimmed to the present on every frame,
+so the line always starts at the object and never at where it was when the plan
+was made. It is sampled by *angle* rather than by the clock — four degrees a
+step, chosen from the object's own rate — which is what makes one arc out of a
+station crossing at a degree a second and Chandra crawling at a degree a minute.
+Four paths at a time, breadth first, with a ferry docked to a station collapsed
+into the station's own line; below ten degrees a pass is along the rooftops and
+is not drawn at all.
+
+Two things make it worth having. A path is drawn **whether or not its object is
+on the frame**, so a line running out of the top of the view is a direction to
+turn the phone, and following it is how you find something that has not risen
+yet. And it is drawn **whether or not the sky mask has anything to say about
+it**: the mask decides whether an object can be seen, and a path is not a
+sighting — it is where to point, which is worth drawing across the roof the
+thing is about to come out from behind. The marker itself still waits for the
+mask, exactly as every other marker does.
 
 The picture is the whole screen. The camera keeps its own 4:3 shape, is scaled
 until it covers the display and is clipped where it runs past the edges

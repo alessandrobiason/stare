@@ -204,34 +204,111 @@ export function pointInViewport(point: FramePoint, viewport: FrameViewport): boo
  * what is left of it after both axes is not empty.
  */
 export function trailOnFrame(from: FramePoint, to: FramePoint): boolean {
-  const tipLeft = 2 * from.left - to.left;
-  const tipTop = 2 * from.top - to.top;
+  const tip = { left: 2 * from.left - to.left, top: 2 * from.top - to.top };
+  return clipSegment(from, tip, WHOLE_FRAME) !== null;
+}
 
+/**
+ * The part of a straight segment that lies inside a box, or `null` when none of
+ * it does.
+ *
+ * Both ends arrive in frame percent, and percent is a per-axis scaling of
+ * pixels, so a straight line is still straight and the box is still a box: the
+ * clip costs no frame size and no trigonometry. It is the parametric one —
+ * walk the segment from 0 to 1, let each of the four edges push the entry
+ * forward or pull the exit back, and what is left over is the crossing — which
+ * answers "does it cross at all" and "where" in the same arithmetic. The
+ * markers' trails ask the first question (`trailOnFrame`) and the landmarks'
+ * paths ask the second (`clipPolyline`).
+ */
+export function clipSegment(
+  from: FramePoint,
+  to: FramePoint,
+  box: FrameViewport
+): { from: FramePoint; to: FramePoint } | null {
+  const dx = to.left - from.left;
+  const dy = to.top - from.top;
   let enters = 0;
   let leaves = 1;
 
-  const dx = tipLeft - from.left;
-  if (dx === 0) {
-    if (from.left < 0 || from.left > 100) return false;
-  } else {
-    const first = -from.left / dx;
-    const second = (100 - from.left) / dx;
-    enters = Math.max(enters, Math.min(first, second));
-    leaves = Math.min(leaves, Math.max(first, second));
+  // Each edge as "how fast the segment approaches it" against "how far outside
+  // it starts": a segment running parallel to an edge is either wholly inside
+  // it or wholly out, and one crossing it moves the entry or the exit.
+  const edges: [number, number][] = [
+    [-dx, from.left - box.left],
+    [dx, box.right - from.left],
+    [-dy, from.top - box.top],
+    [dy, box.bottom - from.top]
+  ];
+
+  for (const [towards, outside] of edges) {
+    if (towards === 0) {
+      if (outside < 0) return null;
+      continue;
+    }
+    const at = outside / towards;
+    if (towards < 0) {
+      if (at > leaves) return null;
+      if (at > enters) enters = at;
+    } else {
+      if (at < enters) return null;
+      if (at < leaves) leaves = at;
+    }
   }
 
-  const dy = tipTop - from.top;
-  if (dy === 0) {
-    if (from.top < 0 || from.top > 100) return false;
-  } else {
-    const first = -from.top / dy;
-    const second = (100 - from.top) / dy;
-    enters = Math.max(enters, Math.min(first, second));
-    leaves = Math.min(leaves, Math.max(first, second));
-  }
-
-  return enters <= leaves;
+  return {
+    from: { left: from.left + dx * enters, top: from.top + dy * enters },
+    to: { left: from.left + dx * leaves, top: from.top + dy * leaves }
+  };
 }
+
+/**
+ * A polyline clipped to a box, as the runs of it that survive.
+ *
+ * What this is for is the sheer length of a landmark's path: an arc from one
+ * horizon to the other is most of a full turn of sky, so on a frame spanning
+ * sixty degrees the great majority of every path is somewhere off the screen,
+ * and the piece of it that crosses the view is a few points out of fifty. The
+ * canvas would clip the rest anyway — but not before the segment that leaves
+ * the camera's near plane has been handed to it a thousand frames wide
+ * (`projectChain`), and not without walking every point of every path on every
+ * frame.
+ *
+ * More than one run comes back when a path leaves the box and re-enters it,
+ * which a pass overhead does whenever the phone is held across its line.
+ */
+export function clipPolyline(points: FramePoint[], box: FrameViewport): FramePoint[][] {
+  const runs: FramePoint[][] = [];
+  let run: FramePoint[] = [];
+
+  const close = () => {
+    if (run.length > 1) runs.push(run);
+    run = [];
+  };
+
+  for (let index = 1; index < points.length; index += 1) {
+    const clipped = clipSegment(points[index - 1], points[index], box);
+    if (!clipped) {
+      close();
+      continue;
+    }
+    // A segment that starts where the last one ended continues the run; one
+    // that starts anywhere else has come back into the box somewhere new.
+    const tail = run[run.length - 1];
+    if (!tail || Math.abs(tail.left - clipped.from.left) > JOIN_EPSILON ||
+        Math.abs(tail.top - clipped.from.top) > JOIN_EPSILON) {
+      close();
+      run.push(clipped.from);
+    }
+    run.push(clipped.to);
+  }
+
+  close();
+  return runs;
+}
+
+/** How far apart two clipped ends may be and still be the same point, in percent. */
+const JOIN_EPSILON = 1e-9;
 
 /**
  * Picks which of `points` may carry a label, in the order given.

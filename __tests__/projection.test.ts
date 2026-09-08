@@ -1,5 +1,10 @@
-import { CameraAttitude } from "../src/camera/attitude";
-import { DEVICE_LENS, projectToFrame, rayThroughFrame } from "../src/camera/projection";
+import { axesFromAttitude, CameraAttitude } from "../src/camera/attitude";
+import {
+  DEVICE_LENS,
+  projectChain,
+  projectToFrame,
+  rayThroughFrame
+} from "../src/camera/projection";
 import { DEVICE_CAMERA_FIELD_OF_VIEW } from "../src/constants";
 import { EnuPosition } from "../src/types";
 
@@ -128,4 +133,51 @@ test("the centre of the frame looks along the optical axis", () => {
   // Elevation of the ray is the camera's own pitch, bearing its own heading.
   expect((Math.asin(ray.up) * 180) / Math.PI).toBeCloseTo(35);
   expect((Math.atan2(ray.east, ray.north) * 180) / Math.PI).toBeCloseTo(90);
+});
+
+describe("a chain of positions through the sky", () => {
+  const axes = axesFromAttitude(aim());
+
+  test("comes back as one run while it stays in front of the camera", () => {
+    const runs = projectChain([at(-20, 10), at(0, 10), at(20, 10)], axes, DEVICE_LENS);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toHaveLength(3);
+    // Left to right across the frame, in the order it was handed over.
+    expect(runs[0][0].left).toBeLessThan(runs[0][1].left);
+    expect(runs[0][1].left).toBeCloseTo(50);
+    expect(runs[0][1].left).toBeLessThan(runs[0][2].left);
+  });
+
+  test("is cut on the plane behind the camera rather than at its last good point", () => {
+    // An arc from in front of the camera to well behind it. Dropping the point
+    // that cannot be placed would end the line a whole sample short of the edge
+    // of the view, which reads as a path giving up before it gets there.
+    const runs = projectChain([at(0, 10), at(80, 10), at(160, 10)], axes, DEVICE_LENS);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toHaveLength(3);
+
+    const [ahead, edge, cut] = runs[0];
+    expect(ahead.left).toBeCloseTo(50);
+    // The second point is beside the camera and lands far off the frame; the
+    // cut carries the line further out in the same direction rather than back.
+    expect(edge.left).toBeGreaterThan(100);
+    expect(cut.left).toBeGreaterThan(edge.left);
+  });
+
+  test("breaks into runs where it passes behind the camera and comes back", () => {
+    const runs = projectChain(
+      [at(0, 10), at(60, 10), at(180, 10), at(300, 10), at(0, 10)],
+      axes,
+      DEVICE_LENS
+    );
+    expect(runs).toHaveLength(2);
+    // The one point behind the camera contributes to neither run, but each run
+    // reaches the plane it was cut on.
+    expect(runs[0][0].left).toBeCloseTo(50);
+    expect(runs[1][runs[1].length - 1].left).toBeCloseTo(50);
+  });
+
+  test("has nothing to draw when the whole path is behind the camera", () => {
+    expect(projectChain([at(150, 10), at(180, 10), at(210, 10)], axes, DEVICE_LENS)).toEqual([]);
+  });
 });

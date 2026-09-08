@@ -33,7 +33,7 @@ export const MarkerLabels: React.FC<Props> = ({ labels, rollDeg, palette }) => {
     <>
       {labels.map((label) => (
         <Label
-          key={label.name}
+          key={label.key}
           name={label.name}
           x={label.x}
           y={label.y}
@@ -80,7 +80,12 @@ const Label = React.memo(function Label({
       ]}
     >
       <Text
-        numberOfLines={1}
+        // Two, for the rise of a pass that has not started: a name and the
+        // clock time it begins, which is a line each (`markerScene`). A
+        // marker's own name is one word and takes one of them — unless it is
+        // long enough not to fit the box, and `Einstein Probe` is, in which
+        // case wrapping it says more than cutting it did.
+        numberOfLines={2}
         style={[
           styles.label,
           { top: LABEL_BOX_PX / 2 + offsetY, color, textShadowColor: shadowColor }

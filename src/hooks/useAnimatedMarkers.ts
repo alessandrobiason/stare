@@ -1,25 +1,29 @@
 import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { axesFromAttitude } from "../camera/attitude";
-import { FrameLens, FramePoint, projectWithAxes } from "../camera/projection";
+import { axesFromAttitude, CameraAxes } from "../camera/attitude";
+import { FrameLens, FramePoint, projectChain, projectWithAxes } from "../camera/projection";
 import {
+  clipPolyline,
   FrameViewport,
   pointInViewport,
   pointOnFrame,
   trailOnFrame,
   WHOLE_FRAME
 } from "../components/markerGeometry";
-import { MARKER_VISIBILITY, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
+import { LANDMARK_PATHS, MARKER_VISIBILITY, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import { rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
+import { clamp } from "../math/angles";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
 import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
+import { pathFrom, SkyPass } from "../satellite/orbitPath";
 import { OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
 import { AnchoredSkyMask, skyProbe } from "../vision/anchoredMask";
 import { MarkerVisibilityFilter } from "../vision/markerVisibility";
 import { SkyMemory } from "../vision/skyMemory";
 import { useLatestRef } from "./useLatestRef";
+import { useOrbitPaths } from "./useOrbitPaths";
 
 export type SatelliteMarker = {
   name: string;
@@ -44,17 +48,52 @@ export type SatelliteMarker = {
 };
 
 /**
- * One drawn frame: where every marker goes, and the camera roll they are drawn
- * against. The roll travels with them because it comes from the same filter at
- * the same instant — published separately, it would cost a second state update
- * per frame and leave labels tilted for an attitude the markers never used.
+ * A landmark's upcoming pass, projected onto the frame.
+ *
+ * The line the marks are read against: where the object will cross, drawn
+ * whether or not the object itself is anywhere near the view. See
+ * `src/satellite/orbitPath.ts` for what a pass is and `LANDMARK_PATHS` for why
+ * only the landmarks get one.
+ */
+export type MarkerPath = {
+  /** The object's name, for the label at a rise that has not happened yet. */
+  name: string;
+  /** Unique among the paths on one frame: the object, and which pass this is. */
+  key: string;
+  category: SatelliteCategory;
+  /**
+   * The arc, as the runs of it that cross the view: more than one when a path
+   * leaves the frame and comes back, none when the whole of it is elsewhere.
+   */
+  lines: FramePoint[][];
+  /** Round clock minutes along it, each with the path just ahead of it. */
+  ticks: { at: FramePoint; ahead: FramePoint }[];
+  /**
+   * Where the object joins the path, for a pass it has not joined yet — which
+   * is the one point on a path worth naming, since it is where and when to look.
+   * `null` for the pass under way, whose marker is already on the frame.
+   */
+  start: FramePoint | null;
+  /** When it gets there, for the label under that point. */
+  startsAtMs: number;
+  /** How far ahead the pass is, in `[0, 1]` across the planning window. */
+  lead: number;
+};
+
+/**
+ * One drawn frame: where every marker goes, the landmarks' paths across it, and
+ * the camera roll they are drawn against. The roll travels with them because it
+ * comes from the same filter at the same instant — published separately, it
+ * would cost a second state update per frame and leave labels tilted for an
+ * attitude the markers never used.
  */
 export type MarkerFrame = {
   markers: SatelliteMarker[];
+  paths: MarkerPath[];
   rollDeg: number;
 };
 
-const EMPTY_FRAME: MarkerFrame = { markers: [], rollDeg: 0 };
+const EMPTY_FRAME: MarkerFrame = { markers: [], paths: [], rollDeg: 0 };
 
 /**
  * How a drawn frame reaches the overlay: a subscription, not a value.
@@ -99,6 +138,15 @@ export type MarkerStats = {
    * counts is markers that would have been undrawable until the next pass.
    */
   remembered: number;
+  /**
+   * Landmark paths crossing the frame, out of the handful planned.
+   *
+   * Zero with the tier filtered out, and zero for a plan whose arcs are all
+   * somewhere else — which is the figure to look at when a line is expected and
+   * nothing is drawn, since it separates "the plan has nothing in it" from
+   * "the plan has something and the phone is pointed away from it".
+   */
+  paths: number;
 };
 
 /**
@@ -182,6 +230,92 @@ const VISIBLE_COUNT_INTERVAL_MS = 250;
  */
 const MARKER_WARMING_MARGIN = 1;
 
+/**
+ * How far past the frame's edges a path is still drawn, in frame percent.
+ *
+ * A whole frame past every edge, which is generous for something that is
+ * clipped at the border anyway — and that is the point. What is being kept out
+ * is not the part of the line that is off screen but the part that is
+ * arbitrarily far off it: the segment leaving the camera's near plane is
+ * thousands of frames long by construction (`projectChain`), and a canvas
+ * handed geometry at that scale is a canvas asked to rasterise a line whose
+ * ends are nowhere near the picture. Clipped to a box a frame wider than the
+ * view, every path is a handful of short segments and the drawn result is
+ * identical.
+ */
+const PATH_BOX: FrameViewport = { left: -100, top: -100, right: 200, bottom: 200 };
+
+/**
+ * The planned passes as lines on this frame, at this instant.
+ *
+ * Three things happen here, and the order of them is the whole function. The
+ * pass is trimmed to the present, so the line starts at the object rather than
+ * where it was when the plan was made (`pathFrom`); it is projected against the
+ * frame's own axes, cut where it passes behind the camera; and what is left is
+ * clipped to a box around the view.
+ *
+ * A path with nothing left on the frame is dropped rather than carried as an
+ * empty shape — a landmark rising behind the person holding the phone costs
+ * this frame a walk of fifty points and draws nothing.
+ *
+ * Exported for the tests rather than for other callers: it is the one step of
+ * the loop that turns a plan into geometry, and the only one whose answer can
+ * be checked against a pass whose sky positions are known.
+ */
+export function projectPaths(
+  passes: readonly SkyPass[],
+  atMs: number,
+  axes: CameraAxes,
+  lens: FrameLens
+): MarkerPath[] {
+  const windowMs = LANDMARK_PATHS.windowHours * 60 * 60 * 1000;
+  const drawn: MarkerPath[] = [];
+
+  for (const pass of passes) {
+    const ahead = pathFrom(pass, atMs);
+    if (ahead.length < 2) continue;
+
+    const lines: FramePoint[][] = [];
+    for (const run of projectChain(ahead, axes, lens)) {
+      for (const clipped of clipPolyline(run, PATH_BOX)) lines.push(clipped);
+    }
+    if (lines.length === 0) continue;
+
+    // The marks that have not gone by yet, and only where both ends of one land
+    // in front of the camera: a mark is drawn across the path, and half of a
+    // direction is not a direction.
+    const ticks: { at: FramePoint; ahead: FramePoint }[] = [];
+    for (const tick of pass.ticks) {
+      if (tick.atMs < atMs) continue;
+      const at = projectWithAxes(tick.position, axes, lens);
+      if (!at || !pointOnFrame(at)) continue;
+      const next = projectWithAxes(tick.ahead, axes, lens);
+      if (next) ticks.push({ at, ahead: next });
+    }
+
+    // Where the object joins the path, while it still has to. Asked of the
+    // clock rather than of the plan's own `started`, which was true a minute
+    // ago at most: a pass that has begun since then would otherwise carry a
+    // label naming a rise time that has already gone by.
+    const start =
+      pass.startsAtMs > atMs ? projectWithAxes(pass.samples[0].position, axes, lens) : null;
+    drawn.push({
+      name: pass.name,
+      key: `${pass.noradId}@${pass.startsAtMs}`,
+      category: pass.category,
+      lines,
+      ticks,
+      start: start && pointOnFrame(start) ? start : null,
+      startsAtMs: pass.startsAtMs,
+      // Nought while the object is on the path, one at the far end of the
+      // planning window: what the line's own weight is read off (`nearOpacity`).
+      lead: clamp((pass.startsAtMs - atMs) / windowMs, 0, 1)
+    });
+  }
+
+  return drawn;
+}
+
 type AnimatedMarkerOptions = {
   catalog: SatelliteCatalog;
   /** The frame being drawn onto: the phone's camera, or the harness's video. */
@@ -257,6 +391,14 @@ export function useAnimatedMarkers({
   );
   // Outlives every mask that feeds it, which is the point: see `SkyMemory`.
   const skyMemory = useMemo(() => new SkyMemory(), []);
+  // The landmarks' upcoming passes, replanned on their own slow schedule off
+  // this loop entirely. What the loop does with them is project them, which is
+  // a few hundred dot products against the same axes the markers use.
+  const pathsRef = useOrbitPaths({
+    catalog,
+    epochRef,
+    enabled: enabledCategories.has("LANDMARK")
+  });
 
   const maskRef = useLatestRef(mask);
   const maskFilteringRef = useLatestRef(maskFiltering);
@@ -270,7 +412,8 @@ export function useAnimatedMarkers({
     drawn: 0,
     occluded: 0,
     unmapped: 0,
-    remembered: 0
+    remembered: 0,
+    paths: 0
   });
   const visibilityRef = useRef(new MarkerVisibilityFilter());
   const frameRateRef = useRef(0);
@@ -317,6 +460,22 @@ export function useAnimatedMarkers({
       let unmapped = 0;
       let remembered = 0;
 
+      // Six trigonometric calls, and one attitude for the whole frame. Built
+      // per satellite — which is what `projectToFrame` does — they were most of
+      // what the projection cost, at several hundred satellites a frame. Built
+      // here rather than with the markers because the paths are placed against
+      // them too, and the paths are drawn whether or not there is a mask.
+      const axes = axesFromAttitude(attitude);
+
+      // The lines the landmarks are about to travel along. Not the mask's
+      // business: what it answers is whether an object can be *seen* from here,
+      // and a path is not a sighting — it is where to point the phone, which is
+      // worth drawing over the roof the object will come out from behind. Its
+      // marker still waits for the mask, as every marker does.
+      const paths = categories.has("LANDMARK")
+        ? projectPaths(pathsRef.current, time.getTime(), axes, lens)
+        : [];
+
       // No mask, no markers. Drawing them anyway — which is what happens the
       // moment this is written as "hide them only if the mask says to" — claims
       // a clear line of sight to every satellite in the catalogue on the
@@ -345,10 +504,6 @@ export function useAnimatedMarkers({
         // aimed at. Resolved once per frame rather than per satellite, like the
         // probe above it.
         const skyRemembered = filtering ? skyMemory.probe(now / 1000) : null;
-        // Six trigonometric calls, and one attitude for the whole frame. Built
-        // per satellite — which is what `projectToFrame` does — they were most
-        // of what the projection cost, at several hundred satellites a frame.
-        const axes = axesFromAttitude(attitude);
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
@@ -454,14 +609,20 @@ export function useAnimatedMarkers({
         visibility.reset();
       }
 
-      markerStatsRef.current = { drawn: visible.length, occluded, unmapped, remembered };
+      markerStatsRef.current = {
+        drawn: visible.length,
+        occluded,
+        unmapped,
+        remembered,
+        paths: paths.length
+      };
 
       // Farthest first, so nearer markers draw over the ones behind them and
       // the overlay reads as having depth. Landmarks go last whatever their
       // range: they are the one tier that must not end up underneath a dot.
       visible.sort((first, second) => drawOrder(first) - drawOrder(second));
 
-      const drawn: MarkerFrame = { markers: visible, rollDeg: attitude.rollDeg };
+      const drawn: MarkerFrame = { markers: visible, paths, rollDeg: attitude.rollDeg };
       latestFrameRef.current = drawn;
       for (const listener of listenersRef.current) listener(drawn);
 
@@ -500,6 +661,7 @@ export function useAnimatedMarkers({
     maskRef,
     onVisibleCountChangeRef,
     orientationFilterRef,
+    pathsRef,
     skyMemory,
     tracker,
     viewportRef

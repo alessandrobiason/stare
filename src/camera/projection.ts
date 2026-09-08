@@ -144,3 +144,96 @@ export function rayThroughFrame(
     up: (forward.up + horizontal * right.up + vertical * up.up) / length
   };
 }
+
+/**
+ * How far in front of the camera a position is, in the units it is given in.
+ *
+ * The depth the projection divides by, on its own: a position with none of it
+ * is beside the camera and one with less is behind it, and neither can be
+ * placed on a frame at all. Exposed because a *line* through the sky can have
+ * one end either side of that plane — see `projectChain` — where a single point
+ * can only be dropped.
+ */
+export function depthAlong(position: EnuPosition, axes: CameraAxes): number {
+  const { forward } = axes;
+  return position.east * forward.east + position.north * forward.north + position.up * forward.up;
+}
+
+/**
+ * How far back from the plane behind the camera the crossing point is placed,
+ * as a share of the step it is found on.
+ *
+ * A point exactly on the plane has no projection — the divide is by zero — and
+ * one just in front of it projects a long way off the frame, which is where it
+ * belongs: the line leaves the view and keeps going. A thousandth of the step
+ * is far enough in front to be finite and near enough that the direction the
+ * line leaves at is the direction it would have left at. What stops the
+ * coordinates growing without bound is the clip that follows (`clipPolyline`),
+ * not this.
+ */
+const NEAR_PLANE_BACKOFF = 1e-3;
+
+/**
+ * A chain of positions projected onto the frame, cut where it passes behind the
+ * camera.
+ *
+ * The markers are points and a point behind the camera is simply not drawn. A
+ * landmark's path is a line a hundred and eighty degrees long
+ * (`src/satellite/orbitPath.ts`), so on any frame it crosses, most of it is
+ * behind the camera and the interesting part is the crossing itself: drop the
+ * points that cannot be placed and the line stops short of the edge of the view
+ * by up to a whole sample, which reads as a path that gives up before it gets
+ * there. So the segment that straddles the plane is cut on it instead, and the
+ * cut point carries the line off the frame in the direction it was heading.
+ *
+ * Returns one run of points per stretch in front of the camera — usually one,
+ * two when a path leaves the view and comes back into it — with the runs too
+ * short to draw a line from left out.
+ */
+export function projectChain(
+  positions: readonly EnuPosition[],
+  axes: CameraAxes,
+  lens: FrameLens
+): FramePoint[][] {
+  const runs: FramePoint[][] = [];
+  let run: FramePoint[] = [];
+  let previous: EnuPosition | null = null;
+  let previousDepth = 0;
+
+  const place = (position: EnuPosition) => {
+    const point = projectWithAxes(position, axes, lens);
+    if (point) run.push(point);
+  };
+
+  for (const position of positions) {
+    const depth = depthAlong(position, axes);
+    if (depth > 0) {
+      if (previous && previousDepth <= 0) place(nearPlane(position, depth, previous, previousDepth));
+      place(position);
+    } else if (previous && previousDepth > 0) {
+      place(nearPlane(previous, previousDepth, position, depth));
+      if (run.length > 1) runs.push(run);
+      run = [];
+    }
+    previous = position;
+    previousDepth = depth;
+  }
+
+  if (run.length > 1) runs.push(run);
+  return runs;
+}
+
+/** Where the step from a point in front of the camera to one behind it crosses. */
+function nearPlane(
+  front: EnuPosition,
+  frontDepth: number,
+  behind: EnuPosition,
+  behindDepth: number
+): EnuPosition {
+  const share = (frontDepth / (frontDepth - behindDepth)) * (1 - NEAR_PLANE_BACKOFF);
+  return {
+    east: front.east + (behind.east - front.east) * share,
+    north: front.north + (behind.north - front.north) * share,
+    up: front.up + (behind.up - front.up) * share
+  };
+}
