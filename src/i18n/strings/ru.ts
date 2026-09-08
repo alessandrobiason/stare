@@ -88,6 +88,7 @@ export const ru: Strings = {
     close: "Закрыть сведения",
     holdsStation: "СТОИТ НА МЕСТЕ",
     openSite: "Открыть {site}",
+    photo: "Фотография: {name}",
     missing: "Этого спутника больше нет в каталоге.",
     facts: {
       distance: "Расстояние",

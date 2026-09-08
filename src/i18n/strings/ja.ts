@@ -79,6 +79,7 @@ export const ja: Strings = {
     close: "衛星の詳細を閉じる",
     holdsStation: "静止中",
     openSite: "{site} を開く",
+    photo: "{name} の写真",
     missing: "この衛星はカタログから外れました。",
     facts: {
       distance: "距離",

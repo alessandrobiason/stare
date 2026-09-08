@@ -86,6 +86,7 @@ export const ar: Strings = {
     close: "إغلاق التفاصيل",
     holdsStation: "ثابت في مكانه",
     openSite: "فتح {site}",
+    photo: "صورة {name}",
     missing: "لم يعد هذا القمر في الفهرس.",
     facts: {
       distance: "المسافة",

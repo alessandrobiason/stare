@@ -78,6 +78,7 @@ export const zh: Strings = {
     close: "关闭卫星详情",
     holdsStation: "定点不动",
     openSite: "打开 {site}",
+    photo: "{name} 的照片",
     missing: "这颗卫星已不在目录中。",
     facts: {
       distance: "距离",

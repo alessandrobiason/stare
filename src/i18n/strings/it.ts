@@ -90,6 +90,7 @@ export const it: Strings = {
     close: "Chiudi i dettagli",
     holdsStation: "RESTA FERMO",
     openSite: "Apri {site}",
+    photo: "Fotografia: {name}",
     missing: "Questo satellite non è più nel catalogo.",
     facts: {
       distance: "Distanza",

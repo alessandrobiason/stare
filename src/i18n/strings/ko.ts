@@ -79,6 +79,7 @@ export const ko: Strings = {
     close: "위성 정보 닫기",
     holdsStation: "정지 중",
     openSite: "{site} 열기",
+    photo: "{name} 사진",
     missing: "이 위성은 목록에서 빠졌습니다.",
     facts: {
       distance: "거리",

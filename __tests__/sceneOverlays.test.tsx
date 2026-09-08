@@ -6,6 +6,10 @@ import { DebugToggle } from "../src/components/DebugToggle";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SceneStatus } from "../src/components/SceneStatus";
+import {
+  clearLandmarkPhotosForTesting,
+  loadLandmarkPhoto
+} from "../src/satellite/landmarkPhotos";
 import { BREAKDOWN_ROWS, tallyFleets } from "../src/satellite/fleets";
 import { allCategories } from "../src/satellite/categories";
 import { SatelliteDetail } from "../src/types";
@@ -407,6 +411,70 @@ describe("the tapped satellite's card", () => {
     expect(renderToStaticMarkup(card({ "STARLINK-1234": detail() }))).toContain(
       'aria-label="Close satellite details"'
     );
+  });
+
+  describe("the photograph", () => {
+    /** The article's lead image, as Wikimedia would answer for it. */
+    const SUMMARY = JSON.stringify({
+      thumbnail: {
+        source:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ISS-56.jpg/320px-ISS-56.jpg"
+      },
+      originalimage: { width: 4000 }
+    });
+
+    beforeEach(() => clearLandmarkPhotosForTesting());
+    afterEach(() => jest.restoreAllMocks());
+
+    /**
+     * Renders with the picture already resolved.
+     *
+     * The fetch is what the card starts on mount, and `renderToStaticMarkup`
+     * runs no effects — so the lookup is done here, which is also the case that
+     * matters most on a phone: a card reopened on an object whose picture is
+     * already in hand draws it on the first frame.
+     */
+    async function withPhotoResolved(): Promise<void> {
+      jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(SUMMARY, { status: 200 }));
+      await loadLandmarkPhoto("International Space Station");
+    }
+
+    test("a landmark is shown, not only described", async () => {
+      await withPhotoResolved();
+
+      const markup = renderToStaticMarkup(
+        card({ ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" }) })
+      );
+
+      // What is on screen is a picture, so what is asserted is what a screen
+      // reader is told it is: react-native-web paints the file itself as a
+      // background once it has loaded, and renders nothing of it server-side.
+      expect(markup).toContain('aria-label="Photograph of ISS"');
+      expect(markup).toContain('role="img"');
+      // And the credit: the file's own page on Commons, which carries the
+      // author and the licence the picture is used under.
+      expect(markup).toContain('aria-label="Open commons.wikimedia.org"');
+    });
+
+    test("the rest of the catalogue keeps its card the size it was", async () => {
+      await withPhotoResolved();
+
+      const markup = renderToStaticMarkup(card({ "STARLINK-1234": detail() }));
+
+      expect(markup).not.toContain('role="img"');
+      expect(markup).not.toContain("commons.wikimedia.org");
+    });
+
+    test("a card whose picture never arrives reads exactly as it did before", () => {
+      // No lookup has resolved, which is every card's first frame and every
+      // card's only frame on a phone with no signal.
+      const text = textOf(
+        card({ ISS: detail({ name: "ISS", noradId: 25544, category: "LANDMARK" }) })
+      );
+
+      expect(text).toContain("International Space Station");
+      expect(text).not.toContain("commons.wikimedia.org");
+    });
   });
 
   test("says so when the catalog no longer carries what was tapped", () => {

@@ -90,6 +90,7 @@ export const nl: Strings = {
     close: "Gegevens sluiten",
     holdsStation: "STAAT STIL",
     openSite: "{site} openen",
+    photo: "Foto van {name}",
     missing: "Deze satelliet staat niet meer in de catalogus.",
     facts: {
       distance: "Afstand",
