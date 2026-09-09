@@ -7,8 +7,8 @@ export type Intro = {
   /**
    * Whether this launch began with the intro — fixed for the life of the app,
    * where `pending` goes false the moment it is read through. What it decides
-   * is the boot screen behind it: someone who has just had the app's name on
-   * three pages does not need it a fourth time.
+   * is the boot screen behind it: someone who has just come through the intro,
+   * which opens on the app's name, does not need it again.
    */
   firstRun: boolean;
   /** Accepts the intro: remembers it, and lets boot start. */

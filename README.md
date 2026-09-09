@@ -40,22 +40,21 @@ has taken a picture of NuSTAR since it left the rocket.
 They are not bundled. Nineteen pictures worth looking at is several megabytes of
 app download for a panel most launches never open, and they would then be frozen
 at the version shipped, so each is fetched the first time somebody taps that
-object and left to the platform's own HTTP cache after that. Each is a named file
-on Wikimedia Commons, looked at before it was written down — the article's lead
-image was the first attempt and two of the twelve observatories lead with the
-mission's *logo* — and checked at the size the card draws it, which is a strip,
-and which is what ruled out a picture of CHEOPS that was perfectly good and,
-cropped to a strip, an abstract. The URL is asked for rather than assembled:
-Wikimedia serves thumbnails only at sizes it has decided on, so the width is a
-request and the answer is a rendition it will actually serve.
+object and left to the platform's own HTTP cache after that. Each is a named
+file on Wikimedia Commons, looked at before it was written down — the article's
+lead image was the first attempt, and two of the observatories lead with the
+mission's *logo* — and checked at the size the card draws it, which is a strip:
+that is what ruled out a picture of CHEOPS that was perfectly good and, cropped,
+an abstract. The URL is asked for rather than assembled, because Wikimedia
+serves thumbnails only at sizes it has decided on.
 
-Existing on Commons is the licence check — that is what says a picture is free to
-show — and the caption is the author and the licence out of the file's own
-metadata, over a link to the page carrying both in full. Two thirds of them are
-NASA's and in the public domain; the rest are CC BY, CC BY-SA or CC0, which ask
-to be credited. Nothing about it is load-bearing: no network, no file, a file
-whose licence has changed, or a picture the phone will not decode all end as the
-card that was there before (`src/satellite/landmarkPhotos.ts`).
+Existing on Commons is the licence check — that is what says a picture is free
+to show — and the caption is the author and the licence out of the file's own
+metadata, over a link to the page carrying both in full. Two thirds are NASA's
+and in the public domain; the rest are CC BY, CC BY-SA or CC0, which ask to be
+credited. Nothing about it is load-bearing: no network, no file, a licence that
+has changed, or a picture the phone will not decode all end as the card that was
+there before (`src/satellite/landmarkPhotos.ts`).
 
 A fingertip covers a good deal more sky than an eight-pixel marker, so the
 target is the finger's size rather than the mark's, and a tap that covers
@@ -123,11 +122,14 @@ sky, takes the name off it and says what went wrong.
 Boot asks for the camera and then for a GPS fix within a second of the app
 opening — two system prompts, back to back, over a screen that has explained
 nothing, each of them fatal to the view if refused. So a device that has not seen
-the app before opens on three pages instead: what it does, how to hold it, and
-what it is about to ask for and why. Two prompts, not three: the motion sensors
-the view is aimed by are read without one — iOS gates the pedometer behind
-"Motion & Fitness", not `CMMotionManager` — and asking anyway meant a phone with
-that setting off refused to aim at all (`src/device/deviceOrientation.ts`).
+the app before opens on four pages instead: what it does, how to hold it, what
+the panels around the sky are — each named beside a copy of the badge it wears,
+since a bare `12` in the corner of a photograph says nothing about what it
+counts — and what it is about to ask for and why. Two prompts, not three: the
+motion sensors the view is aimed by are read without one — iOS gates the
+pedometer behind "Motion & Fitness", not `CMMotionManager` — and asking anyway
+meant a phone with that setting off refused to aim at all
+(`src/device/deviceOrientation.ts`).
 Nothing boots until the last page is accepted, which is why `src/App.tsx` mounts
 the app proper only then. A flag in the document directory keeps it to
 that one launch, alongside the catalog cache and through the same storage
@@ -386,27 +388,20 @@ Development happens in a **Docker container under WSL2**. `docker/Dockerfile`
 is the only image definition: Node, the build deps some native modules need at
 install time, and a system Chromium for the e2e suite. VS Code picks it up as a
 devcontainer (`.devcontainer/devcontainer.json`), which adds mounts and editor
-wiring on top of it -- `--network=host`, port 8081 forwarded -- and sets no
-environment of its own.
-
-The image copies no source in; both ways of running it mount `/app` instead:
+wiring on top and sets no environment of its own. The image copies no source in;
+both ways of running it mount `/app` instead:
 
 ```bash
 docker build -f docker/Dockerfile -t stare:dev .
 docker run --rm -it -p 8081:8081 -v "$PWD":/app -w /app stare:dev
 ```
 
-Two named volumes carry state across a rebuild. `stare-node-modules` holds
-`node_modules`, and `stare-home` holds the container's home directory, which is
-where everything a rebuild would otherwise discard lives:
-the Playwright browser cache, the npm cache, the VS Code server, `~/.gitconfig`
-and `~/.ssh/known_hosts`. Deleting either volume is the way to force a clean
-one; a plain rebuild keeps both.
-
-The base is Debian 12 (bookworm). Bullseye's LTS ended in August 2026, and its
-packages move to `archive.debian.org` after that, which takes `apt-get install
-chromium` with them -- `docker build --build-arg BASE_IMAGE=...` pins a
-different base without editing the file.
+Two named volumes carry state across a rebuild — `stare-node-modules` and
+`stare-home`, the latter holding the logins and caches a rebuild would otherwise
+discard — so deleting one is how you force a clean one.
+[`docs/dev-environment.md`](docs/dev-environment.md) has the rest: the base
+image, and the two dev-client failure modes that report themselves as something
+other than what they are.
 
 Outside a container, `npm install --legacy-peer-deps` — the onnxruntime and
 react 19 peer ranges need it.
@@ -437,37 +432,12 @@ them:
   directly. The binary is built the same way and carries the same native
   modules; only the JavaScript comes from this checkout, which is what makes it
   worth the setup — a change to the overlay is a reload rather than a release.
+  When either of them fails, it is usually one of the two things in
+  [`docs/dev-environment.md`](docs/dev-environment.md).
 
 **Expo Go cannot run this app**, whichever of those is running: its binary
 carries none of the native modules the view is built on (camera, location,
 motion sensors, ONNX Runtime).
-
-Two things about the dev-client path are not obvious, and both report themselves
-as something other than what they are:
-
-- **React Native DevTools is an Electron app, and Electron refuses to run as
-  root without `--no-sandbox`.** Its install probe runs the binary with
-  `--version`, which is fatal under root, and `expo start` reports it as "An
-  unknown error occurred while installing React Native DevTools" with a `FATAL`
-  from `electron_main_delegate.cc` underneath. `ELECTRON_DISABLE_SANDBOX=1` is
-  the answer; the image sets it, and the `start` and `tunnel` scripts set it
-  again so the commands also work in a shell that did not inherit it.
-- **`--tunnel` runs on Expo's ngrok account, not on one of yours.** `@expo/cli`
-  carries a token and the `exp.direct` domain and writes them to
-  `~/.expo/ngrok.yml`, so the address is
-  `<randomness>-<user>-<port>.exp.direct` and there is nothing to sign up for.
-  Which means `failed to start tunnel` followed by `remote gone away` is not a
-  credential and, despite the message the CLI prints with it, usually not an
-  ngrok outage either: that is the 2.3.41 agent saying the server closed its
-  session. The two things that do it are another agent still holding the
-  session from an `expo start` that never exited — free ngrok is one session at
-  a time — and a subdomain collision on that shared account, which the CLI
-  retries three times with fresh randomness before it gives up. So
-  `pgrep -af ngrok` before retrying, and `EXPO_TUNNEL_SUBDOMAIN=<unique>` if a
-  collision keeps happening. If ngrok is genuinely unreachable, forward 8081 by
-  other means (VS Code's Ports panel will) and point the phone at that address
-  with `EXPO_PACKAGER_PROXY_URL=https://<host> npm run start` — `UrlCreator`
-  reads it and rewrites every URL handed to the device.
 
 ## Testing
 
@@ -475,14 +445,12 @@ There is no sky to point a container at, so the app is exercised through the
 **replay harness** in `testing/replay/`: the app's own view, fed a recorded
 iPhone stream instead of a live camera. The recording's video becomes the
 background and its playback position drives the clock, GPS, ARKit pose and IMU
-together, so the projection can be checked against a known ground truth. It runs
-in a browser — that is what the web build is for, and the whole of it.
+together, so the projection can be checked against a known ground truth.
 
-The harness substitutes only what a phone would otherwise supply (picture,
-clock, observer, attitude, frame pixels, the ONNX runtime). The overlay,
-markers, segmentation pipeline, filters, fusion, catalog, boot and debug panel
-are the app's own code imported from `src/`, which is what makes a result here
-worth anything. [`testing/README.md`](testing/README.md) has the full table.
+The harness substitutes only what a phone would otherwise supply — picture,
+clock, observer, attitude, frame pixels, the ONNX runtime. Everything else is
+the app's own code imported from `src/`, which is what makes a result here worth
+anything. [`testing/README.md`](testing/README.md) has the full table.
 
 The jest suites run in that same web build: `react-native` maps to
 `react-native-web`, and `.web.tsx`/`.web.ts`/`.web.js` win the file-extension

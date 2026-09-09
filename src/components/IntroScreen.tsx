@@ -26,7 +26,7 @@ type Props = {
 /**
  * The screen the app opens on the very first time, and never again.
  *
- * Three pages over the same turning sky the boot screen shows, so the intro and
+ * Four pages over the same turning sky the boot screen shows, so the intro and
  * the launch after it are one continuous thing rather than two designs. What is
  * said is in `introPages.ts`; this lays it out and nothing else.
  *
