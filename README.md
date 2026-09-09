@@ -525,7 +525,11 @@ one is present and skip otherwise, so a fresh checkout still passes.
 `testing/fixtures/active.tle` is a committed snapshot (16,063 TLEs, downloaded
 2026-08-23) and `npm run mock-celestrak` serves it over a compatible `gp.php`
 endpoint on :8787 without rate limits — for testing, not as a production
-provider.
+provider. The date is the point: the epochs in that file do not move, so
+positions propagated from it are wrong by kilometres and grow worse the longer
+ago 2026-08-23 was, and objects launched or decayed since are respectively
+missing and still there. `testing/fixtures/README.md` covers where it came
+from, what may be done with it, and how to refresh it.
 
 ```bash
 EXPO_PUBLIC_TLE_URL='http://localhost:8787/NORAD/elements/gp.php?GROUP=active&FORMAT=tle' npm run web
@@ -580,3 +584,60 @@ running harness.
   estimating the compass *bias* as a state and carrying it, which is a real
   extension and a riskier one: a remembered bias is wrong the moment the
   magnetic case comes off.
+
+## Licence and attribution
+
+The code in this repository is MIT licensed — see [`LICENSE`](LICENSE). That
+covers what is written here and nothing else: the catalog the app downloads, the
+photographs it fetches and the model it runs are other people's work, carrying
+their own terms, and the notes below say whose and which. None of them is
+vendored, so a fork inherits the code freely and the obligations separately.
+
+### The catalog
+
+Orbital elements come from **[CelesTrak](https://celestrak.org)**, which
+publishes the general-perturbations catalog maintained by the United States
+Space Force's 18th/19th Space Defense Squadron. The underlying data is a work of
+the US federal government and carries no copyright in the United States;
+CelesTrak, which serves it, asks to be credited and asks not to be hammered. The
+app honours both: attribution here, and a two-hour cache that is the rate limit
+written down (`src/satellite/`). `testing/fixtures/active.tle` is a dated
+snapshot for tests only — see [`testing/fixtures/README.md`](testing/fixtures/README.md).
+
+### The sky model
+
+Occlusion uses **[SkyWater-Seg](https://huggingface.co/Realcat/skywater_seg)**, a
+SegFormer MiT-B2 fine-tuned on ADE20K for sky, water and person, published under
+the MIT licence. The weights are not in this repository: they are fetched at
+first run from a pinned HuggingFace revision named in
+`src/vision/skyModelSource.ts`, so the 95 MB never enters the git history and the
+file a build gets is the file that was tested. Point
+`EXPO_PUBLIC_SKYWATER_MODEL_URL` at a mirror to self-host it.
+
+### The photographs
+
+The nineteen landmark pictures are named files on **[Wikimedia Commons](https://commons.wikimedia.org)**,
+fetched on demand rather than bundled (`src/satellite/landmarkPhotos.ts`). Each
+carries its own licence — about two thirds are NASA's and in the public domain,
+the rest are CC BY, CC BY-SA or CC0 — and the app credits every one of them in
+place: the caption is the author and the licence read out of the file's own
+metadata, over a link to the Commons page carrying both in full. That crediting
+is not decoration; for the CC BY and CC BY-SA files it is the licence condition,
+so if you reuse this code and keep the photo card, keep the caption with it.
+
+### The libraries
+
+Runtime work rests on **[satellite.js](https://github.com/shashwatak/satellite-js)**
+(SGP4 propagation), **astronomy-engine** (solar and lunar positions), **Expo**
+and **React Native**, **@shopify/react-native-skia** (the overlay is drawn on a
+Skia canvas) and **onnxruntime** (the model runs on it, natively and on the
+web). Of the direct dependencies all are MIT except **jpeg-js**, which is
+BSD-3-Clause; per-package terms are recorded in `package-lock.json` and in each
+package's own tree.
+
+`patches/expo-camera+57.0.4.patch` is a local modification of expo-camera, MIT
+like its original, applied by patch-package at install. It is a fix to capture
+and session handling that has not been upstreamed; the workflow in
+`.github/workflows/ios-build.yml` verifies it actually reached `node_modules`
+before spending a macOS runner on a build, because a patch that silently failed
+to apply produces a binary indistinguishable from one where the fix did not work.
