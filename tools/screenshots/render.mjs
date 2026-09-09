@@ -435,7 +435,8 @@ async function render() {
     SCENE.markers,
     box,
     SCENE.palette,
-    SCENE.selected ?? null
+    SCENE.selected ?? null,
+    SCENE.paths ?? []
   );
 
   const labels = document.getElementById("labels");
@@ -447,6 +448,9 @@ async function render() {
     span.style.top = label.y + label.offsetY + "px";
     span.style.color = scene.palette.label;
     span.style.textShadow = "0 1px 3px " + shadow;
+    // A rise carries the time on a second line and fades with its own path;
+    // a marker's name is one line at full strength, as in MarkerLabels.
+    span.style.opacity = label.alpha ?? 1;
     labels.appendChild(span);
   }
 

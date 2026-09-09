@@ -52,6 +52,44 @@ function starlinkTrain({ from, to, count, rangeKm = 820, headingDeg = 28, travel
   return train;
 }
 
+/**
+ * The camera's own shape, which is what turns a heading into a direction on the
+ * frame: a step of one percent across is not a step of one percent down.
+ */
+const CAMERA_ASPECT = 1080 / 1440;
+
+/**
+ * The arc a landmark is on, as the app draws it (`src/satellite/orbitPath.ts`).
+ *
+ * Taken from the object rather than typed beside it, so a path cannot end up
+ * pointing somewhere its own marker is not going: the line runs along the
+ * marker's heading, from the marker itself, for `runPct` of the frame's width —
+ * and the marks along it are one minute apart, which is five of the twelve
+ * seconds its tail already stands for.
+ *
+ * Only ahead of the object, because that is all the app draws: the ground it
+ * has already covered is the tail's business. A pass that has not begun has no
+ * marker at all, so it is given a `from` of its own — the point it will come up
+ * at — and the clock time to write under it.
+ */
+function pathAhead(object, { runPct, lead = 0, rise, from, tickOffsetPct }) {
+  const radians = (object.headingDeg ?? 90) * (Math.PI / 180);
+  const start = from ?? { left: object.left, top: object.top };
+  return {
+    name: object.name,
+    category: object.category ?? "LANDMARK",
+    from: start,
+    to: {
+      left: start.left + Math.cos(radians) * runPct,
+      top: start.top - Math.sin(radians) * runPct * CAMERA_ASPECT
+    },
+    tickPct: (object.travelPct ?? 0) * 5,
+    tickOffsetPct,
+    lead,
+    rise
+  };
+}
+
 const NIGHT_CITY = {
   mode: "night",
   seed: 11,
@@ -65,6 +103,110 @@ const NIGHT_CITY = {
   ]
 };
 
+/*
+ * The landmarks, one per frame, named so that each one's path can be taken from
+ * the marker itself rather than typed twice (`pathAhead`).
+ */
+
+const ISS_TONIGHT = {
+  left: 63,
+  top: 27,
+  rangeKm: 470,
+  category: "LANDMARK",
+  name: "ISS",
+  labelled: true,
+  headingDeg: 22,
+  travelPct: 13
+};
+
+const ISS_TAPPED = {
+  left: 57,
+  top: 26,
+  rangeKm: 612,
+  category: "LANDMARK",
+  name: "ISS",
+  labelled: true,
+  headingDeg: 41,
+  travelPct: 11.5
+};
+
+/**
+ * Hubble on the occlusion frame, climbing away from the tower rather than over
+ * it.
+ *
+ * The app would draw its path across the building if that were where the pass
+ * went — a path is where to point rather than a claim that something can be
+ * seen, and it is deliberately not the mask's business — but this frame is
+ * about the marks stopping at the roof line, and a line carrying on over it is
+ * a second thing to explain in a picture that has one thing to say.
+ */
+const HUBBLE_CLEAR_OF_THE_TOWER = {
+  // Far enough in from the frame's left edge for its name to be read: the
+  // picture covers the screen, so the sides of the frame are cropped and a
+  // label out there is cut in half. See `frameBoxFor`.
+  left: 28,
+  top: 43,
+  rangeKm: 520,
+  category: "LANDMARK",
+  name: "Hubble",
+  labelled: true,
+  headingDeg: 70,
+  travelPct: 12
+};
+
+const TIANGONG_BY_DAY = {
+  left: 30,
+  top: 22,
+  rangeKm: 505,
+  category: "LANDMARK",
+  name: "Tiangong",
+  labelled: true,
+  headingDeg: 335,
+  travelPct: 12.5
+};
+
+const ISS_IN_VIEW = {
+  left: 46,
+  top: 47,
+  rangeKm: 690,
+  category: "LANDMARK",
+  name: "ISS",
+  labelled: true,
+  headingDeg: 200,
+  travelPct: 11
+};
+
+/**
+ * The two on the forecast frame: one landmark crossing now, and one that has
+ * not come up yet.
+ *
+ * CHEOPS is at 700 km and covers a quarter of a degree a second, so its minute
+ * marks fall about fifteen degrees apart — the closest the app will place them
+ * (`tickSeparationDeg`). The station is three times quicker and gets one mark
+ * where CHEOPS gets two, which is the cadence choosing itself rather than being
+ * chosen.
+ */
+const CHEOPS_OVERHEAD = {
+  left: 30,
+  top: 24,
+  rangeKm: 700,
+  category: "LANDMARK",
+  name: "CHEOPS",
+  labelled: true,
+  headingDeg: 10,
+  travelPct: 5.6
+};
+
+/** No marker: it is still under the horizon, and the arc is the whole of it. */
+const ISS_NEXT_PASS = {
+  left: 30,
+  top: 71,
+  category: "LANDMARK",
+  name: "ISS",
+  headingDeg: 32,
+  travelPct: 11
+};
+
 const scenes = [
   {
     id: "01-sky",
@@ -75,19 +217,16 @@ const scenes = [
     sky: NIGHT_CITY,
     palette: "night",
     panels: { filter: "closed", status: "closed" },
+    // The station's own arc, running on ahead of it: the same line the marker
+    // is travelling along, with the next minute marked on it.
+    // A minute of the station is most of the frame's width, so where the next
+    // one falls decides whether a mark is on the screen at all: this pass rose
+    // on the turn of one, and the mark is a quarter of a minute along.
+    paths: [pathAhead(ISS_TONIGHT, { runPct: 48, tickOffsetPct: 14 })],
     markers: [
       ...geostationaryBelt({ top: 58, from: 6, to: 94, count: 8, seed: 3 }),
       ...starlinkTrain({ from: { left: 20, top: 33 }, to: { left: 47, top: 17 }, count: 5 }),
-      {
-        left: 63,
-        top: 27,
-        rangeKm: 470,
-        category: "LANDMARK",
-        name: "ISS",
-        labelled: true,
-        headingDeg: 22,
-        travelPct: 13
-      },
+      ISS_TONIGHT,
       { left: 16, top: 51, rangeKm: 20200, category: "NAVIGATION", headingDeg: 300, travelPct: 1.4 },
       { left: 81, top: 43, rangeKm: 21500, category: "NAVIGATION", headingDeg: 118, travelPct: 1.4 },
       { left: 35, top: 64, rangeKm: 23100, category: "NAVIGATION", headingDeg: 260, travelPct: 1.3 },
@@ -136,18 +275,12 @@ const scenes = [
         ["Orbit", "93 min"]
       ]
     },
+    // The same arc as the card is describing: the tapped object is on it, and
+    // the figures on the card are figures about a point along it.
+    paths: [pathAhead(ISS_TAPPED, { runPct: 45 })],
     markers: [
       ...geostationaryBelt({ top: 61, from: 4, to: 96, count: 8, seed: 9 }),
-      {
-        left: 57,
-        top: 26,
-        rangeKm: 612,
-        category: "LANDMARK",
-        name: "ISS",
-        labelled: true,
-        headingDeg: 41,
-        travelPct: 11.5
-      },
+      ISS_TAPPED,
       // Docked, so they share the station's patch of sky — which is why the
       // card carries a strip of names rather than one.
       { left: 60.6, top: 22.9, rangeKm: 613, category: "OTHER", name: "CREW DRAGON 9", headingDeg: 41, travelPct: 11.5 },
@@ -185,6 +318,9 @@ const scenes = [
     },
     palette: "night",
     panels: { filter: "closed", status: "closed" },
+    // Steeply up and out of the top of the frame, well clear of the tower: the
+    // one thing this frame is for is the marks stopping at the roof line.
+    paths: [pathAhead(HUBBLE_CLEAR_OF_THE_TOWER, { runPct: 70 })],
     markers: [
       // The train runs down towards the tower, and stops on its edge: the last
       // mark is mid-fade at the corner of the roof, and the two that would be
@@ -192,19 +328,7 @@ const scenes = [
       // what says they are missing.
       ...starlinkTrain({ from: { left: 10, top: 9 }, to: { left: 45, top: 26 }, count: 5, headingDeg: -26 }),
       { left: 53.5, top: 30.5, rangeKm: 950, category: "COMMS", headingDeg: -26, travelPct: 5.4, opacity: 0.3 },
-      {
-        // Far enough in from the frame's left edge for its name to be read: the
-        // picture covers the screen, so the sides of the frame are cropped and
-        // a label out there is cut in half. See `frameBoxFor`.
-        left: 28,
-        top: 43,
-        rangeKm: 520,
-        category: "LANDMARK",
-        name: "Hubble",
-        labelled: true,
-        headingDeg: 340,
-        travelPct: 12
-      },
+      HUBBLE_CLEAR_OF_THE_TOWER,
       ...geostationaryBelt({ top: 24, from: 6, to: 44, count: 4, seed: 5 }),
       { left: 71, top: 14, rangeKm: 20600, category: "NAVIGATION", headingDeg: 286, travelPct: 1.4 },
       { left: 90, top: 33, rangeKm: 22400, category: "NAVIGATION", headingDeg: 108, travelPct: 1.3 },
@@ -241,18 +365,12 @@ const scenes = [
     },
     palette: "daylight",
     panels: { filter: "open", status: "closed" },
+    // The daylight ink runs the other way round, and the path runs with it: on
+    // a bright sky the landmark tier is near-black, line and all.
+    paths: [pathAhead(TIANGONG_BY_DAY, { runPct: 80 })],
     markers: [
       ...geostationaryBelt({ top: 62, from: 5, to: 60, count: 5, seed: 13 }),
-      {
-        left: 30,
-        top: 22,
-        rangeKm: 505,
-        category: "LANDMARK",
-        name: "Tiangong",
-        labelled: true,
-        headingDeg: 155,
-        travelPct: 12.5
-      },
+      TIANGONG_BY_DAY,
       ...starlinkTrain({ from: { left: 8, top: 40 }, to: { left: 33, top: 50 }, count: 4, headingDeg: -22 }),
       { left: 14, top: 9, rangeKm: 20400, category: "NAVIGATION", headingDeg: 296, travelPct: 1.4 },
       { left: 44, top: 12, rangeKm: 22100, category: "NAVIGATION", headingDeg: 104, travelPct: 1.3 },
@@ -286,19 +404,11 @@ const scenes = [
         ["ISS", 1]
       ]
     },
+    paths: [pathAhead(ISS_IN_VIEW, { runPct: 55 })],
     markers: [
       ...geostationaryBelt({ top: 57, from: 8, to: 96, count: 7, seed: 17 }),
       ...starlinkTrain({ from: { left: 26, top: 36 }, to: { left: 62, top: 16 }, count: 6 }),
-      {
-        left: 46,
-        top: 47,
-        rangeKm: 690,
-        category: "LANDMARK",
-        name: "ISS",
-        labelled: true,
-        headingDeg: 200,
-        travelPct: 11
-      },
+      ISS_IN_VIEW,
       { left: 13, top: 18, rangeKm: 20500, category: "NAVIGATION", headingDeg: 298, travelPct: 1.4 },
       { left: 34, top: 8, rangeKm: 21800, category: "NAVIGATION", headingDeg: 110, travelPct: 1.3 },
       { left: 87, top: 30, rangeKm: 23400, category: "NAVIGATION", headingDeg: 258, travelPct: 1.3 },
@@ -313,6 +423,39 @@ const scenes = [
       { left: 66, top: 56, rangeKm: 4400, category: "OTHER", headingDeg: 332, travelPct: 2.3 },
       { left: 5, top: 70, rangeKm: 1050, category: "OTHER", headingDeg: 96, travelPct: 5.1 },
       { left: 50, top: 6, rangeKm: 2200, category: "COMMS", headingDeg: 126, travelPct: 3.3 }
+    ]
+  },
+
+  {
+    id: "06-pass",
+    caption: {
+      title: "Know when to look up",
+      body: "Each landmark carries the arc it will cross, marked minute by minute, and the time it comes up."
+    },
+    sky: { ...NIGHT_CITY, seed: 53 },
+    palette: "night",
+    panels: { filter: "closed", status: "closed" },
+    // Two passes, which is what the frame is about. One is under way and is
+    // drawn at full strength from the object itself; the other has not begun,
+    // so it has no marker at all — only the line, faded by how far off it is,
+    // and its name and the clock time under the point it will come up at.
+    paths: [
+      pathAhead(CHEOPS_OVERHEAD, { runPct: 90 }),
+      pathAhead(ISS_NEXT_PASS, { runPct: 85, lead: 0.55, rise: "22:41" })
+    ],
+    markers: [
+      CHEOPS_OVERHEAD,
+      ...geostationaryBelt({ top: 55, from: 8, to: 92, count: 6, seed: 29 }),
+      { left: 68, top: 22, rangeKm: 20700, category: "NAVIGATION", headingDeg: 288, travelPct: 1.4 },
+      { left: 15, top: 40, rangeKm: 22800, category: "NAVIGATION", headingDeg: 96, travelPct: 1.3 },
+      { left: 86, top: 8, rangeKm: 940, category: "EARTH", headingDeg: 66, travelPct: 5.5 },
+      { left: 44, top: 34, rangeKm: 1380, category: "EARTH", headingDeg: 204, travelPct: 4.2 },
+      { left: 9, top: 12, rangeKm: 1650, category: "OTHER", headingDeg: 46, travelPct: 3.9 },
+      { left: 58, top: 63, rangeKm: 2900, category: "OTHER", headingDeg: 318, travelPct: 2.8 },
+      { left: 90, top: 70, rangeKm: 1450, category: "OTHER", headingDeg: 148, travelPct: 4.1 },
+      { left: 20, top: 78, rangeKm: 4300, category: "OTHER", headingDeg: 254, travelPct: 2.3 },
+      { left: 74, top: 46, rangeKm: 1120, category: "COMMS", headingDeg: 36, travelPct: 5 },
+      { left: 37, top: 12, rangeKm: 1280, category: "COMMS", headingDeg: 118, travelPct: 4.6 }
     ]
   }
 ];

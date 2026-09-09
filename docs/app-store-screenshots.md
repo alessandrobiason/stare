@@ -1,6 +1,6 @@
 # App Store screenshots
 
-Five frames for the iPhone listing, and the generator that draws them:
+Six frames for the iPhone listing, and the generator that draws them:
 `docs/app-store/*.png`, from `tools/screenshots/`.
 
     node tools/screenshots/render.mjs
@@ -13,11 +13,13 @@ cannot have — `supportsTablet` is false.
 **The camera picture in these frames is drawn, not photographed.** Everything
 laid over it is the app: the panels are the app's own styles at the app's own
 sizes, and the markers come from a transcription of `markerScene.ts`, so a mark
-is the size, shape, colour and rim the phone would give an object at that range.
-What no machine here can produce is a photograph of the sky with a building in
-it. See [What is still needed](#what-is-still-needed).
+is the size, shape, colour and rim the phone would give an object at that range,
+and a landmark's path is the line, the weight and the minute marks the app would
+draw along the arc that object is on. What no machine here can produce is a
+photograph of the sky with a building in it. See
+[What is still needed](#what-is-still-needed).
 
-## The five, and why they are these five
+## The six, and why they are these six
 
 The order is the one the store shows them in, and the first two carry the
 listing: most people see one and a half frames.
@@ -29,12 +31,20 @@ listing: most people see one and a half frames.
 | 3 | `03-occlusion.png` | A tower up the right of the frame. The Starlink train runs down to its corner, one mark mid-fade on the edge, and nothing over the building. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
 | 4 | `04-legend.png` | The same app at midday, filter open: the five categories, the parked ring, and the daylight palette on a bright sky. | **Colour is what it is for** — Size is how far away. A ring holds station over the equator. Day or night, the sky decides the ink. |
 | 5 | `05-inview.png` | The count opened into the breakdown behind it: Starlink 6, SES 3, Galileo 2, GPS 2, ISS 1, six others. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
+| 6 | `06-pass.png` | Two landmark paths: CHEOPS crossing now, at full strength with its minute marks, and the station's next pass — no marker, since it has not risen — faded by how far off it is, named and timed where it will come up. | **Know when to look up** — Each landmark carries the arc it will cross, marked minute by minute, and the time it comes up. |
 
 Frames 3 and 4 are the two that are hard to copy and are the reason to keep
 them: hiding satellites behind buildings is the thing no other sky app does,
 and a legible daylit sky is the thing every other one gets wrong. Frame 5
 answers the question the count provokes, and is the only place the size of the
-catalogue is claimed.
+catalogue is claimed. Frame 6 is the one that answers "so when do I go
+outside" — the other five all show a sky someone is already standing under,
+and this is the only one that is about a sky that has not arrived yet.
+
+**Frame 6 is last and does not have to be.** The order here is the listing's
+rather than the app's, and a benefit frame this plain would carry earlier — third,
+say, after the tap — at the cost of renumbering the files. Left where it is
+because moving it is a marketing decision rather than a technical one.
 
 The captions describe what is in the frame under them rather than the app in
 general, and none of them promises anything the app does not do. Two words are
@@ -72,6 +82,13 @@ are easy to get wrong by eye:
   `src/components/markerScene.ts` — 17 points across at 400 km down to 8 at
   40,000, a rim at 0.16 of the diameter, a tail of the ground covered in twelve
   seconds, a ring instead of a body for anything parked over the equator.
+- A landmark's path runs along that object's own heading, from the object
+  forward, because that is all the app draws — the ground already covered is the
+  tail's business. Its marks are one minute apart, which is five of the twelve
+  seconds the tail stands for, and its weight says how far ahead the pass is:
+  full strength for one under way, a quarter for one three hours out. Where the
+  first mark falls inside that minute is a choice, since the app puts them on
+  round clock minutes and nothing rises on one.
 
 Where the numbers come from, if a frame has to be argued about:
 
@@ -80,6 +97,7 @@ Where the numbers come from, if a frame has to be argued about:
 | The picture's box, and how much of it is on screen | `frameBoxFor`, `viewportOf` in `src/components/markerGeometry.ts` |
 | The safe area the panels are inset by | `src/components/SafeAreaLayer.tsx` |
 | Marker sizes, rims, tails, rings, halos | `src/components/markerScene.ts`, `SATELLITE_MARKERS` in `src/constants.ts` |
+| The landmarks' paths, their marks and their fade | `src/satellite/orbitPath.ts`, `LANDMARK_PATHS` in `src/constants.ts` |
 | Marker colours, night and daylight | `src/satellite/categories.ts`, `src/components/palette.ts` |
 | Panels, card, console pill | `SceneStatus`, `CategoryLegend`, `SatelliteCard`, `DebugToggle`, `theme.ts` |
 | Every word on screen | `src/i18n/strings/en.ts` |
@@ -88,13 +106,15 @@ Where the numbers come from, if a frame has to be argued about:
 ## Editing them
 
 - **The story**: `tools/screenshots/scenes.mjs` — one entry per frame, holding
-  the caption, the sky, the markers on it and which panels are open. Marker
-  positions are percentages of the camera frame, as the projection hands them
-  to the overlay.
+  the caption, the sky, the markers on it, the landmark paths across it and
+  which panels are open. Marker positions are percentages of the camera frame,
+  as the projection hands them to the overlay; a path is taken from its own
+  object rather than typed beside it (`pathAhead`), so it cannot end up pointing
+  somewhere its marker is not going.
 - **The sky**: `tools/screenshots/page/sky.js` — grade, stars, skyline, grain.
 - **The overlay**: `tools/screenshots/page/markers.js` — keep this in step with
-  `markerScene.ts`; if a mark changes in the app it has to change here, or the
-  store is showing a different app.
+  `markerScene.ts` and the canvas backend beside it; if a mark or a path changes
+  in the app it has to change here, or the store is showing a different app.
 - **The panels**: `tools/screenshots/page/screen.css`, which mirrors the React
   Native styles a value at a time.
 
@@ -102,17 +122,18 @@ Where the numbers come from, if a frame has to be argued about:
 
 Ranked by what each is worth.
 
-1. **Real camera captures behind the markers.** Five stills from the phone the
+1. **Real camera captures behind the markers.** Six stills from the phone the
    app is built for, one per frame: a night sky over a street, the same with a
    tall building crossing the upper half (frame 3 lives or dies on this), a
-   bright daylit sky with a roof line at the bottom (frame 4), and two more
-   night skies. Portrait, from the rear wide camera, and framed as the app
+   bright daylit sky with a roof line at the bottom (frame 4), and three more
+   night skies — one of them with the horizon low enough to put a rise point
+   over the rooftops (frame 6). Portrait, from the rear wide camera, and framed as the app
    frames it — mostly sky, the horizon in the bottom quarter. Only the middle
    third of the width is on screen, so whatever the frame is about belongs
    there. Drop them in
    `tools/screenshots/backgrounds/` named after the scene (`03-occlusion.jpg`)
    and they replace the drawn sky with nothing else changed.
-2. **Or, better, five real screenshots.** A TestFlight build on a phone, the
+2. **Or, better, six real screenshots.** A TestFlight build on a phone, the
    sky in front of it, and the volume-down + side-button capture: then the
    frames are the app rather than a drawing of it, and the generator only lays
    the caption around them. That needs a build on a device and a clear evening;
@@ -125,7 +146,7 @@ Ranked by what each is worth.
    subtitle and the keywords, which are the other half of the same page.
 4. **Localised captions.** The app ships in twelve languages and the App Store
    takes a screenshot set per storefront. The captions here are English; the
-   five titles and five bodies are the whole of what needs translating, and
+   six titles and six bodies are the whole of what needs translating, and
    they should be translated by whoever wrote `src/i18n/strings/*.ts` rather
    than machine-translated, since they are written in that voice.
 5. **The rest of the listing**, which these frames do not cover: the 30-second

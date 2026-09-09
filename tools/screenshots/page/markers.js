@@ -29,6 +29,25 @@ const HALO_MARGIN_PX = 6;
 const SELECTION_GAP_PX = 4;
 const SELECTION_WIDTH_PX = 3;
 const LABEL_GAP_PX = 5;
+const RISE_LABEL_GAP_PX = 10;
+
+/**
+ * The landmarks' paths, as `LANDMARK_PATHS` has them: a thin rimmed line for
+ * the arc an object is about to cross, marked at every round clock minute, and
+ * fading with how far ahead its pass is.
+ *
+ * The app works the arc out by propagating the orbit and projecting it
+ * (`src/satellite/orbitPath.ts`); a scene here quotes the two ends of it, which
+ * is the same line in the form a human can place. Over the sixty degrees one
+ * frame spans it is straight either way: a rectilinear projection maps a great
+ * circle to a straight line, and a pass is one to well inside a pixel.
+ */
+const LANDMARK_PATHS = {
+  widthPx: 2,
+  tickLengthPx: 9,
+  nearOpacity: 0.8,
+  farOpacity: 0.25
+};
 
 const CATEGORY_COLORS = {
   LANDMARK: "#fdfdfd",
@@ -102,8 +121,64 @@ function tailFor(x, y, reach, width) {
   };
 }
 
+/**
+ * `pathShapeFor`: one landmark's arc as the lines that draw it.
+ *
+ * The marks along it are placed by distance rather than by clock, which is the
+ * same thing at this scale: a scene says how much of the frame the object
+ * covers in a minute (`tickPct`), exactly as a marker says how much it covers
+ * in the twelve seconds of its tail. The first one falls part of the way in,
+ * because the app puts them on round minutes and the object does not rise on
+ * one.
+ */
+function pathShapeFor(path, box, scale, palette) {
+  const from = { x: (path.from.left / 100) * box.width, y: (path.from.top / 100) * box.height };
+  const to = { x: (path.to.left / 100) * box.width, y: (path.to.top / 100) * box.height };
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  const width = LANDMARK_PATHS.widthPx * scale;
+  const across = (LANDMARK_PATHS.tickLengthPx * scale) / 2;
+  const ticks = [];
+
+  if (length > 0 && path.tickPct) {
+    // Along the line and across it, both in pixels: the frame is not square, so
+    // a mark laid out in percent would sit square to the line only where the
+    // line happened to be level.
+    const alongX = dx / length;
+    const alongY = dy / length;
+    const step = (path.tickPct / 100) * box.width;
+    const offset = (path.tickOffsetPct ?? path.tickPct * 0.45) / 100 * box.width;
+    for (let at = offset; at <= length && step > 0; at += step) {
+      const x = from.x + alongX * at;
+      const y = from.y + alongY * at;
+      ticks.push([
+        x + alongY * across,
+        y - alongX * across,
+        x - alongY * across,
+        y + alongX * across
+      ]);
+    }
+  }
+
+  return {
+    lines: [[from.x, from.y, to.x, to.y]],
+    ticks,
+    color: palette.categories[path.category ?? "LANDMARK"],
+    alpha: pathOpacity(path.lead ?? 0),
+    width,
+    rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO)
+  };
+}
+
+/** `pathOpacity`: nought is the pass under way, one the far end of the window. */
+function pathOpacity(lead) {
+  const { nearOpacity, farOpacity } = LANDMARK_PATHS;
+  return nearOpacity + (farOpacity - nearOpacity) * lead;
+}
+
 /** `buildMarkerScene`, over markers already placed on the frame. */
-function buildMarkerScene(markers, box, palette, selectedName) {
+function buildMarkerScene(markers, box, palette, selectedName, paths) {
   const scale = box.width / DESIGN_FRAME_WIDTH_PX;
   const glyphs = [];
   const labels = [];
@@ -156,7 +231,28 @@ function buildMarkerScene(markers, box, palette, selectedName) {
     }
   }
 
-  return { glyphs, selection, labels, palette };
+  // A pass that has not begun is named where it will begin, on two lines: the
+  // object, and the clock time it gets there. The app decides which names it
+  // can fit (`labellablePoints`); a scene here says so by hand, as it does for
+  // the markers' own.
+  for (const path of paths ?? []) {
+    if (!path.rise) continue;
+    labels.push({
+      name: `${path.name}\n${path.rise}`,
+      x: (path.from.left / 100) * box.width,
+      y: (path.from.top / 100) * box.height,
+      offsetY: RISE_LABEL_GAP_PX * scale,
+      alpha: pathOpacity(path.lead ?? 0)
+    });
+  }
+
+  return {
+    paths: (paths ?? []).map((path) => pathShapeFor(path, box, scale, palette)),
+    glyphs,
+    selection,
+    labels,
+    palette
+  };
 }
 
 const TWO_PI = Math.PI * 2;
@@ -209,6 +305,33 @@ function drawGlyph(context, glyph, palette) {
   circle(glyph.core, glyph.color, glyph.alpha);
 }
 
+/**
+ * One landmark's path: the arc, and the clock minutes on it.
+ *
+ * Rims for the whole shape first and colour afterwards, as the app draws it —
+ * a time mark crosses the line it belongs to, so drawn in pairs each mark's own
+ * rim would cut a dark notch through the arc it is measuring.
+ */
+function drawPath(context, shape, palette) {
+  const draw = (points, color, alpha, width) => {
+    context.beginPath();
+    context.moveTo(points[0], points[1]);
+    for (let index = 2; index < points.length; index += 2) {
+      context.lineTo(points[index], points[index + 1]);
+    }
+    context.globalAlpha = alpha;
+    context.strokeStyle = color;
+    context.lineWidth = width;
+    context.stroke();
+  };
+
+  const ink = palette.outline;
+  for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const tick of shape.ticks) draw(tick, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
+  for (const tick of shape.ticks) draw(tick, shape.color, shape.alpha, shape.width);
+}
+
 function drawSelection(context, ring) {
   const band = (color, alpha, width) => {
     context.globalAlpha = alpha;
@@ -223,11 +346,13 @@ function drawSelection(context, ring) {
 }
 
 /** Draws one frame of markers, and returns the scene so the labels can be laid out. */
-function drawMarkers(context, markers, box, paletteName, selectedName) {
-  const scene = buildMarkerScene(markers, box, paletteFor(paletteName), selectedName ?? null);
+function drawMarkers(context, markers, box, paletteName, selectedName, paths) {
+  const scene = buildMarkerScene(markers, box, paletteFor(paletteName), selectedName ?? null, paths);
   context.save();
   context.lineJoin = "round";
   context.lineCap = "round";
+  // Under the marks, and first: a path is what the marks are read against.
+  for (const path of scene.paths) drawPath(context, path, scene.palette);
   for (const glyph of scene.glyphs) drawGlyph(context, glyph, scene.palette);
   if (scene.selection) drawSelection(context, scene.selection);
   context.restore();

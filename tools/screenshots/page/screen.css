@@ -148,7 +148,11 @@ body {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.6px;
-  white-space: nowrap;
+  /* `pre` rather than `nowrap`: a rise carries the object's name and the clock
+     time it gets there on a line each, which is how the app sets it — the two
+     on one line do not fit the box a label is drawn in (`MarkerLabels`). */
+  white-space: pre;
+  text-align: center;
   transform: translateX(-50%);
 }
 
