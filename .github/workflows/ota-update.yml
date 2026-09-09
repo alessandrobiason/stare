@@ -1,10 +1,10 @@
 # Publishes a JavaScript-only fix to phones that already have the app.
 #
 # The third workflow, and the cheap one. ios-build.yml asks whether the project
-# still compiles; ios-testflight.yml produces an installable binary and costs
-# roughly 250 of the 2,000 free monthly minutes because macOS bills at 10x.
-# This one runs entirely on Linux at 1x, takes about two minutes, and reaches
-# an installed build without going near Apple.
+# still compiles; ios-testflight.yml produces an installable binary and spends
+# 20-30 minutes on a macOS runner, which bills at 10x on a private fork. This
+# one runs entirely on Linux at 1x, takes about two minutes, and reaches an
+# installed build without going near Apple.
 #
 # What it cannot do is change native code. Everything under ios/ is compiled
 # into the binary on the phone: a new dependency, a config plugin, a permission

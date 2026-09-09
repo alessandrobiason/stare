@@ -1,5 +1,7 @@
 # Stare — Watch the Satellites
 
+*Vibe coded, with a manual touch.*
+
 An iOS app that draws the live satellite catalog over the iPhone's rear camera.
 Point the phone at the sky and the ~16,000 objects CelesTrak tracks are placed
 on the picture where they actually are — positioned by GPS, aimed by the phone's
@@ -374,7 +376,8 @@ testing/      nothing here ships - see testing/README.md
   replay/ e2e/ tools/ fixtures/     harness, Playwright, staging + mocks, TLEs
 
 __tests__/    jest suites for both trees
-tools/        iOS release helpers (distribution cert, icon and update checks)
+tools/        iOS release helpers (distribution cert, icon and update checks),
+              plus the logo and App Store screenshot generators
 ```
 
 Dependencies point one way: `testing/` imports `src/`, never the reverse. The

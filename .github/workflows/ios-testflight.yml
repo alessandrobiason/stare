@@ -1,12 +1,12 @@
 # Builds a signed device .ipa and uploads it to TestFlight.
 #
 # This is the sibling of ios-build.yml. That one answers "does this still
-# compile for iOS" against the simulator with signing off, costs nothing in
-# Apple credentials, and runs on native-input pushes. This one produces an
-# installable build, needs a paid Apple Developer account, and is manual only:
-# a Release archive plus the export and upload runs 20-30 minutes on a macOS
-# runner, which bills at 10x, so roughly 250 of the free 2,000 monthly minutes
-# per release. Do not put it on a push trigger.
+# compile for iOS" against the simulator with signing off and costs nothing in
+# Apple credentials. This one produces an installable build and needs a paid
+# Apple Developer account. Both are manual only: a Release archive plus the
+# export and upload runs 20-30 minutes on a macOS runner, which on a private
+# fork bills at 10x — roughly 250 of the free 2,000 monthly minutes per
+# release. Do not put either on a push trigger.
 #
 # The Linux gate from ios-build.yml is repeated here rather than shared, so a
 # broken app.json or a transparent icon fails at the 1x rate before any of that

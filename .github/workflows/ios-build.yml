@@ -1,15 +1,20 @@
 # Compiles the app the way an iPhone build does, on GitHub's runners.
 #
-# Budget notes — this repo is private, so Actions minutes come out of the free
-# 2,000/month allowance, and macOS runners bill at a 10x multiplier. One full
-# build of this project costs roughly 15 minutes of wall clock, i.e. ~150
-# billed minutes, so the month holds about a dozen of them. Everything below
-# is arranged to keep that count down:
+# Budget notes — this repo is public, so standard GitHub-hosted runners are
+# not billed to anyone here, and the 10x macOS multiplier named throughout
+# these files costs nothing at the moment. It is still written down, because
+# it is what a fork pays the moment one goes private, and because the ratio is
+# the honest measure of what a macOS job costs relative to a Linux one.
+#
+# What is spent either way is wall clock: one full build of this project runs
+# roughly 15 minutes, and a macOS runner can wait in a queue before it starts
+# where a Linux one does not. Everything below is arranged around that, and
+# holds whoever is paying:
 #
 #   * the workflow only ever runs when someone presses "Run workflow"; there
 #     is no push or schedule trigger, so no commit can start a macOS run;
 #   * a Linux job at the 1x rate regenerates the native project first, so a
-#     broken app.json or config plugin fails in ~1 minute instead of ~150;
+#     broken app.json or config plugin fails in ~1 minute instead of ~15;
 #   * concurrency cancels superseded runs, and timeouts cap a hung build.
 #
 # The build targets the simulator with signing off, so it needs no Apple
@@ -32,7 +37,7 @@ permissions:
   contents: read
 
 # A newer manual run on the same ref makes the running build irrelevant; stop
-# paying for it.
+# spending a runner on it.
 concurrency:
   group: ios-build-${{ github.ref }}
   cancel-in-progress: true
@@ -107,7 +112,7 @@ jobs:
     # macos-latest: that alias migrates between images over a 1-2 month window,
     # and an unannounced toolchain change is the last thing a 10x job needs.
     runs-on: macos-26
-    # Hard stop: a wedged build must not quietly eat the monthly allowance.
+    # Hard stop: a wedged build must not sit on a macOS runner for hours.
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5

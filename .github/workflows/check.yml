@@ -1,0 +1,66 @@
+# Typecheck, lint and the jest suites, on every push and pull request.
+#
+# The fourth workflow, and the only one that is not about shipping an iOS
+# binary. The other three are manual because they cost macOS minutes or touch
+# Apple; this one runs on Linux in about two minutes and is the only automatic
+# trigger in the repo. It exists because a public repo takes pull requests from
+# people who cannot run a phone build, and `npm run check` is the whole of what
+# this project can verify without one.
+#
+# It runs exactly the command a contributor runs locally -- typecheck, then
+# lint, then jest -- so a green tick here means the same thing as a green
+# terminal there, and there is no CI-only incantation to keep in sync.
+#
+# `npm ci` runs the postinstall hook, so patch-package applies patches/ with
+# --error-on-fail: a patch that has gone stale against a bumped expo-camera
+# fails the install rather than this suite, which is the clearer error.
+#
+# What is NOT covered here, and cannot be:
+#
+#   * the Playwright suite (`npm run e2e`). It drives the replay harness, which
+#     needs a recorded iPhone stream -- video plus seven sensor CSVs -- and no
+#     recording ships with the repo (see "Test data" in README.md). There is
+#     nothing for a runner to stage.
+#   * anything that needs a camera, a compass, a GPS fix or a real sky. The
+#     known limits in README.md say which of those are still unmeasured.
+#   * whether the app compiles for iOS. That is ios-build.yml, on demand.
+
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run's answer stale.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+
+jobs:
+  check:
+    name: typecheck + lint + jest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      # --legacy-peer-deps matches .devcontainer/devcontainer.json and the
+      # other workflows; the onnxruntime and react 19 peer ranges do not
+      # resolve without it.
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Check
+        run: npm run check

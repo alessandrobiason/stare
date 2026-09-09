@@ -22,8 +22,10 @@ portrait-only orientation (the projection assumes an upright phone), the camera
 and when-in-use location strings, and `UIRequiredDeviceCapabilities` for
 gyroscope, magnetometer and location services.
 
-Both workflows are `workflow_dispatch` only — no push or schedule trigger —
-because macOS runners bill at 10x:
+Both of the build workflows are `workflow_dispatch` only — no push or schedule
+trigger — because a macOS runner is 20-30 minutes of wall clock and bills at
+10x on a private fork. (`check.yml`, which is Linux and runs typecheck, lint
+and jest, is the one workflow here that does run on push.)
 
 - **`.github/workflows/ios-build.yml`** — a Linux job regenerates the native
   project first (so a broken `app.json` fails fast at the 1x rate), then a
@@ -33,8 +35,9 @@ because macOS runners bill at 10x:
 - **`.github/workflows/ios-testflight.yml`** — a signed archive uploaded
   to App Store Connect, from which TestFlight installs it on a phone. Needs a
   paid Apple Developer account (99 EUR/year) and the seven secrets below. A run
-  takes 20–30 minutes, plus a further 5–15 while Apple processes the build, and
-  costs roughly 250 of the free 2,000 monthly Actions minutes. Its
+  takes 20–30 minutes, plus a further 5–15 while Apple processes the build.
+  Standard runners are free on a public repo; on a private fork that is roughly
+  250 of the free 2,000 monthly Actions minutes, because macOS bills at 10x. Its
   `configuration` input picks between the shipping app (`Release`) and a
   development build (`Debug`) — see below.
 
@@ -276,11 +279,11 @@ drop it.
 
 ## Shipping a fix without a rebuild
 
-A release costs 20-30 minutes of macOS runner, roughly an eighth of the free
-monthly allowance, and another 5-15 minutes of Apple processing before the
-build is installable. That is the right price for a change to the native app.
-It is a ridiculous price for a changed constant in `src/constants.ts`, which is
-most of what this project actually changes.
+A release costs 20-30 minutes of macOS runner — free on a public repo, roughly
+an eighth of the monthly allowance on a private fork — and another 5-15 minutes
+of Apple processing before the build is installable. That is the right price
+for a change to the native app. It is a ridiculous price for a changed constant
+in `src/constants.ts`, which is most of what this project actually changes.
 
 `expo-updates` splits the two apart. The binary on the phone contains the
 compiled native code and a copy of the JavaScript bundle; on every launch it
