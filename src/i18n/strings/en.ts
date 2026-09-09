@@ -20,7 +20,9 @@ export const en: Strings = {
       body:
         "Every mark is one object: its colour says what the satellite is for, its size " +
         "how far away it is. Anything behind a building or a tree is left out rather " +
-        "than drawn over it."
+        "than drawn over it. The few worth going outside for also carry the line they " +
+        "are about to follow: an arrowhead for every minute along it, and the time it " +
+        "comes up if it has not risen yet."
     },
     screen: {
       title: "What is on screen",

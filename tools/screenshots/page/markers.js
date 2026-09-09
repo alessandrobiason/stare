@@ -29,7 +29,7 @@ const HALO_MARGIN_PX = 6;
 const SELECTION_GAP_PX = 4;
 const SELECTION_WIDTH_PX = 3;
 const LABEL_GAP_PX = 5;
-const RISE_LABEL_GAP_PX = 10;
+const ARC_LABEL_GAP_PX = 10;
 
 /**
  * The landmarks' paths, as `LANDMARK_PATHS` has them: a thin rimmed line for
@@ -44,7 +44,8 @@ const RISE_LABEL_GAP_PX = 10;
  */
 const LANDMARK_PATHS = {
   widthPx: 2,
-  tickLengthPx: 9,
+  arrowLengthPx: 9,
+  arrowSpreadPx: 6,
   nearOpacity: 0.8,
   farOpacity: 0.25
 };
@@ -130,6 +131,10 @@ function tailFor(x, y, reach, width) {
  * in the twelve seconds of its tail. The first one falls part of the way in,
  * because the app puts them on round minutes and the object does not rise on
  * one.
+ *
+ * Each is an arrowhead whose point is on the minute and whose arms sweep back
+ * from it, so a mark says both when the object is there and which way it is
+ * heading.
  */
 function pathShapeFor(path, box, scale, palette) {
   const from = { x: (path.from.left / 100) * box.width, y: (path.from.top / 100) * box.height };
@@ -138,8 +143,9 @@ function pathShapeFor(path, box, scale, palette) {
   const dy = to.y - from.y;
   const length = Math.hypot(dx, dy);
   const width = LANDMARK_PATHS.widthPx * scale;
-  const across = (LANDMARK_PATHS.tickLengthPx * scale) / 2;
-  const ticks = [];
+  const along = LANDMARK_PATHS.arrowLengthPx * scale;
+  const across = LANDMARK_PATHS.arrowSpreadPx * scale;
+  const arrows = [];
 
   if (length > 0 && path.tickPct) {
     // Along the line and across it, both in pixels: the frame is not square, so
@@ -152,18 +158,22 @@ function pathShapeFor(path, box, scale, palette) {
     for (let at = offset; at <= length && step > 0; at += step) {
       const x = from.x + alongX * at;
       const y = from.y + alongY * at;
-      ticks.push([
-        x + alongY * across,
-        y - alongX * across,
-        x - alongY * across,
-        y + alongX * across
+      const backX = x - alongX * along;
+      const backY = y - alongY * along;
+      arrows.push([
+        backX + alongY * across,
+        backY - alongX * across,
+        x,
+        y,
+        backX - alongY * across,
+        backY + alongX * across
       ]);
     }
   }
 
   return {
     lines: [[from.x, from.y, to.x, to.y]],
-    ticks,
+    arrows,
     color: palette.categories[path.category ?? "LANDMARK"],
     alpha: pathOpacity(path.lead ?? 0),
     width,
@@ -231,17 +241,19 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
     }
   }
 
-  // A pass that has not begun is named where it will begin, on two lines: the
-  // object, and the clock time it gets there. The app decides which names it
-  // can fit (`labellablePoints`); a scene here says so by hand, as it does for
-  // the markers' own.
+  // Every arc says whose it is, at a point on the line itself — the app anchors
+  // that to one of the arc's own samples and holds it there (`anchorFor`); a
+  // scene says where by hand. A pass that has not begun carries the clock time
+  // it does, on a second line. Not while the object's own marker is on the
+  // frame carrying the name a few pixels away, which is the app's rule too.
   for (const path of paths ?? []) {
-    if (!path.rise) continue;
+    const anchor = path.labelAt;
+    if (!anchor || markers.some((marker) => marker.name === path.name && marker.labelled)) continue;
     labels.push({
-      name: `${path.name}\n${path.rise}`,
-      x: (path.from.left / 100) * box.width,
-      y: (path.from.top / 100) * box.height,
-      offsetY: RISE_LABEL_GAP_PX * scale,
+      name: path.rise ? `${path.name}\n${path.rise}` : path.name,
+      x: (anchor.left / 100) * box.width,
+      y: (anchor.top / 100) * box.height,
+      offsetY: ARC_LABEL_GAP_PX * scale,
       alpha: pathOpacity(path.lead ?? 0)
     });
   }
@@ -327,9 +339,9 @@ function drawPath(context, shape, palette) {
 
   const ink = palette.outline;
   for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
-  for (const tick of shape.ticks) draw(tick, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const arrow of shape.arrows) draw(arrow, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
   for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
-  for (const tick of shape.ticks) draw(tick, shape.color, shape.alpha, shape.width);
+  for (const arrow of shape.arrows) draw(arrow, shape.color, shape.alpha, shape.width);
 }
 
 function drawSelection(context, ring) {

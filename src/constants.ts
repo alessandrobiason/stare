@@ -397,11 +397,17 @@ export const LANDMARK_PATHS = {
    * keeps two marks a hand's width apart would be unreadable on one and the
    * finest would be a smear on the other. The first cadence whose marks clear
    * twelve degrees wins.
+   *
+   * An object slower than the coarsest of them still gets one mark, in the
+   * middle of its arc. It is the only thing on a path that says which way the
+   * object is going, and a line that does not say that is a line someone has to
+   * guess at — which is exactly what a fifteen-degree arc of Chandra looked
+   * like before it had one.
    */
   tickMinutes: [1, 2, 5, 10, 15, 30, 60],
   tickSeparationDeg: 12,
   /**
-   * Line width and time-mark length, in frame pixels at `DESIGN_FRAME_WIDTH_PX`.
+   * Line width, in frame pixels at `DESIGN_FRAME_WIDTH_PX`.
    *
    * Thinner than anything else the overlay draws. A path is the longest shape
    * on the frame by two orders of magnitude — a marker is seventeen pixels and
@@ -410,7 +416,25 @@ export const LANDMARK_PATHS = {
    * on a photograph of the sky.
    */
   widthPx: 2,
-  tickLengthPx: 9,
+  /**
+   * The time mark itself: an arrowhead, this long along the path and this far
+   * across it, at the design width.
+   *
+   * A chevron rather than the cross-stroke this was, because a stroke across a
+   * line answers "when" and leaves "which way" to be guessed — and which way is
+   * the first thing anyone asks of a line drawn across the sky. A satellite
+   * with an arc through it could be going either way along it, and the marker's
+   * own tail is a dozen pixels of tell at the one end of it.
+   *
+   * Two strokes meeting at a point, with the point *on* the round minute rather
+   * than centred over it: what the mark says is that the object is there at that
+   * time, heading that way. Nine by six is a 34-degree half-angle, which is the
+   * shallowest that still reads as an arrowhead at the five or six pixels a
+   * phone actually draws it at; wider looks like a bird, narrower like a kink in
+   * the line.
+   */
+  arrowLengthPx: 9,
+  arrowSpreadPx: 6,
   /**
    * How solid the line is at each end of the window: the pass under way, and
    * one three hours out.

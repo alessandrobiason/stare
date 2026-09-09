@@ -71,6 +71,10 @@ const CAMERA_ASPECT = 1080 / 1440;
  * has already covered is the tail's business. A pass that has not begun has no
  * marker at all, so it is given a `from` of its own — the point it will come up
  * at — and the clock time to write under it.
+ *
+ * The name goes at the start of the line, which is where the app puts it when
+ * that point is in view (`anchorFor`) — and nowhere at all when the object's
+ * own marker is on the frame carrying it already.
  */
 function pathAhead(object, { runPct, lead = 0, rise, from, tickOffsetPct }) {
   const radians = (object.headingDeg ?? 90) * (Math.PI / 180);
@@ -85,6 +89,7 @@ function pathAhead(object, { runPct, lead = 0, rise, from, tickOffsetPct }) {
     },
     tickPct: (object.travelPct ?? 0) * 5,
     tickOffsetPct,
+    labelAt: start,
     lead,
     rise
   };
@@ -430,7 +435,7 @@ const scenes = [
     id: "06-pass",
     caption: {
       title: "Know when to look up",
-      body: "Each landmark carries the arc it will cross, marked minute by minute, and the time it comes up."
+      body: "Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up."
     },
     sky: { ...NIGHT_CITY, seed: 53 },
     palette: "night",

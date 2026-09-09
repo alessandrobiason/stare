@@ -292,9 +292,20 @@ is the whole of what is worth saying about sixteen thousand satellites and much
 too little to say about the dozen anyone would go outside for. The question
 about the station is not where it is — most of the time it is under the floor,
 and no marker can be drawn for that — but *when* it comes over and *where* to
-stand. So a landmark is drawn with the arc it will trace across the sky:
-rise to set, for every pass in the next three hours, with round clock minutes
-marked along it and the time the next one begins written where it starts.
+stand. So a landmark is drawn with the arc it will trace across the sky: rise to
+set, for every pass in the next three hours, with an arrowhead at each round
+clock minute and the object's name written on the line itself.
+
+Both of those are the second draft. The marks were strokes *across* the line,
+which answer "when" and leave "which way" to be guessed — the one thing a line
+cannot say by itself, and the first thing anyone asks of one. And the name was
+written only where the object comes up, which is a fixed piece of sky and the
+right place for it, except that most of the time it is not on the frame: an arc
+whose object is behind a roof was an anonymous streak. It is now written at one
+of the arc's own sample points, four degrees apart, and stays on that point
+until it leaves the view — so the name is pinned to the sky like everything else
+here rather than hovering near the middle of the screen while the world turns
+under it.
 
 The plan is a few thousand propagations, made once a minute off the frame
 thread in slices (`src/timeSlice.ts`) and trimmed to the present on every frame,

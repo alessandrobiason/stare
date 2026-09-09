@@ -153,7 +153,7 @@ function drawGlyph(
  * One landmark's path: the arc it will travel, and the clock minutes on it.
  *
  * Rims first for the whole shape and colour afterwards, rather than rim and
- * colour a run at a time. A time mark crosses the line it belongs to, so drawn
+ * colour a run at a time. An arrowhead sits on the line it belongs to, so drawn
  * in pairs the mark's own rim is laid over the line's colour and every mark
  * cuts a dark notch through the arc it is measuring.
  */
@@ -172,9 +172,9 @@ function drawPath(
 
   const ink = palette.outline;
   for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
-  for (const tick of shape.ticks) draw(tick, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const arrow of shape.arrows) draw(arrow, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
   for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
-  for (const tick of shape.ticks) draw(tick, shape.color, shape.alpha, shape.width);
+  for (const arrow of shape.arrows) draw(arrow, shape.color, shape.alpha, shape.width);
 }
 
 /** The ring that says which satellite the info card is describing. */

@@ -12,7 +12,9 @@ export const nl: Strings = {
       body:
         "Elke stip is één object: de kleur zegt waar de satelliet voor dient, de grootte " +
         "hoe ver hij weg is. Wat achter een gebouw of een boom zit wordt weggelaten in " +
-        "plaats van eroverheen getekend."
+        "plaats van eroverheen getekend. De paar waarvoor je naar buiten loopt, dragen " +
+        "ook de baan die ze zo gaan volgen: een pijlpunt per minuut, en de tijd waarop " +
+        "ze opkomen als dat nog moet gebeuren."
     },
     screen: {
       title: "Wat er op het scherm staat",

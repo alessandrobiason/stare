@@ -49,7 +49,7 @@ export type SkySample = {
  * A round clock minute, marked on the path.
  *
  * Carries the path a little further on as well as the point itself, because the
- * mark is drawn *across* the line and a single point has no direction. Two
+ * mark is an arrowhead and an arrowhead is nothing without a direction. Two
  * positions rather than an angle for the same reason the markers' trails are
  * two points: the frame is not square, so a direction is only a direction once
  * both ends have been projected into pixels.
@@ -229,9 +229,11 @@ function ticksAlong(samples: SkySample[]): SkyTick[] {
     (candidate) => degPerMinute * candidate >= LANDMARK_PATHS.tickSeparationDeg
   );
   // An object so slow that even an hour of it does not clear the separation —
-  // the science orbits, which barely move against the sky — carries no marks at
-  // all rather than one mark nothing can be read from.
-  if (cadence === undefined) return [];
+  // the science orbits, which barely move against the sky — carries one mark in
+  // the middle of its arc rather than a row of them on top of each other. Not a
+  // clock minute, and not pretending to be one: what it is there for is the
+  // direction, which is the one thing a line cannot say by itself.
+  if (cadence === undefined) return [middleOf(samples)];
 
   const stepMs = cadence * MS_PER_MINUTE;
   const ticks: SkyTick[] = [];
@@ -254,6 +256,16 @@ function ticksAlong(samples: SkySample[]): SkyTick[] {
     });
   }
   return ticks;
+}
+
+/** The middle of an arc, as the one mark a slow object gets. */
+function middleOf(samples: SkySample[]): SkyTick {
+  const at = Math.floor((samples.length - 1) / 2);
+  return {
+    position: samples[at].position,
+    ahead: samples[at + 1].position,
+    atMs: samples[at].atMs
+  };
 }
 
 /**

@@ -12,7 +12,9 @@ export const pt: Strings = {
       body:
         "Cada marca é um objeto: a cor diz para que serve o satélite, o tamanho a que " +
         "distância está. O que fica atrás de um prédio ou de uma árvore é omitido em vez " +
-        "de ser desenhado por cima."
+        "de ser desenhado por cima. Os poucos por que vale a pena sair levam também a " +
+        "linha que estão prestes a percorrer: uma seta por cada minuto e, se ainda não " +
+        "nasceram, a hora a que aparecem."
     },
     screen: {
       title: "O que há na tela",

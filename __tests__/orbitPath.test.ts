@@ -167,13 +167,20 @@ test("marks round clock minutes along the path", () => {
   expect(new Set(gaps).size).toBe(1);
 });
 
-test("leaves an object that barely crawls across the sky unmarked", () => {
+test("gives an object that barely crawls across the sky a single mark", () => {
   // Chandra covers a few degrees an hour, so every cadence on offer would put
-  // its marks on top of each other. A line with no marks is the honest answer:
-  // the object is up, and it is not going anywhere in the next few minutes.
+  // its marks on top of each other. It gets one, in the middle of the arc —
+  // not a clock minute and not pretending to be one. What it is there for is
+  // the direction, which is the one thing a line cannot say by itself.
   const [pass] = passesFor(landmark(25867), MIDNIGHT, observer);
   expect(pass.endsAtMs - pass.startsAtMs).toBeGreaterThan(60 * 60_000);
-  expect(pass.ticks).toEqual([]);
+  expect(pass.ticks).toHaveLength(1);
+
+  const [mark] = pass.ticks;
+  expect(mark.atMs).toBeGreaterThan(pass.startsAtMs);
+  expect(mark.atMs).toBeLessThan(pass.endsAtMs);
+  // And it carries a direction to be drawn along, like every other mark.
+  expect(separationDeg(mark.position, mark.ahead)).toBeGreaterThan(0);
 });
 
 test("drops a pass that never clears the roofline", () => {
@@ -318,18 +325,93 @@ describe("a planned pass on the frame", () => {
     expect(drawn.lines[0][0].top).toBeCloseTo(head!.top, 1);
   });
 
-  test("names the rise while it is still to come, and not after it", () => {
+  test("counts a pass as still to come until it has begun", () => {
     const pass = upcoming();
     const axes = aimedAt(pass.samples[0].position);
 
     const before = projectPaths([pass], MIDNIGHT, axes, DEVICE_LENS)[0];
-    expect(before.start).not.toBeNull();
+    expect(before.upcoming).toBe(true);
     expect(before.startsAtMs).toBe(pass.startsAtMs);
 
-    // A minute into the pass — as stale as a plan is ever allowed to be — the
-    // rise has happened, and a label naming it would be naming the past.
+    // A minute in — as stale as a plan is ever allowed to be — the rise has
+    // happened, and a name carrying the time of it would be naming the past.
     const after = projectPaths([pass], pass.startsAtMs + 60_000, axes, DEVICE_LENS)[0];
-    expect(after.start).toBeNull();
+    expect(after.upcoming).toBe(false);
+  });
+
+  describe("where the name is written", () => {
+    test("takes the point the object comes up at when that is in view", () => {
+      const pass = upcoming();
+      const axes = aimedAt(pass.samples[0].position);
+      const [drawn] = projectPaths([pass], MIDNIGHT, axes, DEVICE_LENS);
+
+      const rise = projectWithAxes(pass.samples[0].position, axes, DEVICE_LENS);
+      expect(drawn.anchor?.left).toBeCloseTo(rise!.left, 6);
+      expect(drawn.anchor?.top).toBeCloseTo(rise!.top, 6);
+    });
+
+    test("takes a point on the line where the object itself is elsewhere", () => {
+      // The case it exists for: the camera is on a piece of the arc nowhere
+      // near either end of it, and the line still has to say whose it is.
+      const pass = upcoming();
+      const middle = pass.samples[Math.floor(pass.samples.length / 2)];
+      const [drawn] = projectPaths([pass], MIDNIGHT, aimedAt(middle.position), DEVICE_LENS);
+
+      expect(drawn.anchor).not.toBeNull();
+      expect(pointOnFrame(drawn.anchor!)).toBe(true);
+    });
+
+    test("holds the same piece of sky while the phone turns", () => {
+      // A name that re-picked its point every frame would slide along the line
+      // as the phone moved, which is the one thing in this app that is not
+      // pinned to the sky.
+      const pass = upcoming();
+      const middle = pass.samples[Math.floor(pass.samples.length / 2)];
+      const anchors = new Map<string, number>();
+
+      const first = projectPaths([pass], MIDNIGHT, aimedAt(middle.position), DEVICE_LENS, anchors);
+      const held = [...anchors.values()][0];
+
+      // Turned by a couple of degrees, which moves the whole sky across the
+      // frame without taking the anchor off it.
+      const turned = axesFromAttitude({
+        headingDeg: wrapDegrees360(azimuthDeg(middle.position) + 2),
+        pitchDeg: elevationDeg(middle.position),
+        rollDeg: 0
+      });
+      const second = projectPaths([pass], MIDNIGHT, turned, DEVICE_LENS, anchors);
+
+      expect([...anchors.values()][0]).toBe(held);
+      // The point moved with the sky rather than staying under the camera.
+      expect(second[0].anchor!.left).not.toBeCloseTo(first[0].anchor!.left, 1);
+      expect(second[0].anchor!.left).toBeCloseTo(
+        projectWithAxes(pass.samples[held].position, turned, DEVICE_LENS)!.left,
+        6
+      );
+    });
+
+    test("picks another only once the one it was on has left the view", () => {
+      const pass = upcoming();
+      const anchors = new Map<string, number>();
+      projectPaths([pass], MIDNIGHT, aimedAt(pass.samples[0].position), DEVICE_LENS, anchors);
+      expect([...anchors.values()][0]).toBe(0);
+
+      const far = pass.samples[pass.samples.length - 2];
+      const [drawn] = projectPaths([pass], MIDNIGHT, aimedAt(far.position), DEVICE_LENS, anchors);
+      expect([...anchors.values()][0]).toBeGreaterThan(0);
+      expect(pointOnFrame(drawn.anchor!)).toBe(true);
+    });
+
+    test("forgets a path that is no longer planned", () => {
+      const pass = upcoming();
+      const anchors = new Map<string, number>();
+      projectPaths([pass], MIDNIGHT, aimedAt(pass.samples[0].position), DEVICE_LENS, anchors);
+      expect(anchors.size).toBe(1);
+
+      // The plan is replaced every minute and its keys go with it.
+      projectPaths([], MIDNIGHT, aimedAt(pass.samples[0].position), DEVICE_LENS, anchors);
+      expect(anchors.size).toBe(0);
+    });
   });
 
   test("fades with how far ahead the pass is", () => {

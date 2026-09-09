@@ -12,7 +12,9 @@ export const it: Strings = {
       body:
         "Ogni segno è un oggetto: il colore dice a cosa serve il satellite, la " +
         "dimensione quanto è lontano. Quello che finisce dietro un palazzo o un albero " +
-        "viene tolto, non disegnato sopra."
+        "viene tolto, non disegnato sopra. I pochi per cui vale la pena uscire portano " +
+        "anche la linea che stanno per percorrere: una punta di freccia per ogni " +
+        "minuto, e l'ora in cui sorgono se non sono ancora sorti."
     },
     screen: {
       title: "Cosa c'è sullo schermo",

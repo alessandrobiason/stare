@@ -31,7 +31,7 @@ listing: most people see one and a half frames.
 | 3 | `03-occlusion.png` | A tower up the right of the frame. The Starlink train runs down to its corner, one mark mid-fade on the edge, and nothing over the building. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
 | 4 | `04-legend.png` | The same app at midday, filter open: the five categories, the parked ring, and the daylight palette on a bright sky. | **Colour is what it is for** — Size is how far away. A ring holds station over the equator. Day or night, the sky decides the ink. |
 | 5 | `05-inview.png` | The count opened into the breakdown behind it: Starlink 6, SES 3, Galileo 2, GPS 2, ISS 1, six others. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
-| 6 | `06-pass.png` | Two landmark paths: CHEOPS crossing now, at full strength with its minute marks, and the station's next pass — no marker, since it has not risen — faded by how far off it is, named and timed where it will come up. | **Know when to look up** — Each landmark carries the arc it will cross, marked minute by minute, and the time it comes up. |
+| 6 | `06-pass.png` | Two landmark paths: CHEOPS crossing now, at full strength with an arrowhead on each of its minutes, and the station's next pass — no marker, since it has not risen — faded by how far off it is, named and timed where it will come up. | **Know when to look up** — Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up. |
 
 Frames 3 and 4 are the two that are hard to copy and are the reason to keep
 them: hiding satellites behind buildings is the thing no other sky app does,
@@ -84,11 +84,15 @@ are easy to get wrong by eye:
   seconds, a ring instead of a body for anything parked over the equator.
 - A landmark's path runs along that object's own heading, from the object
   forward, because that is all the app draws — the ground already covered is the
-  tail's business. Its marks are one minute apart, which is five of the twelve
-  seconds the tail stands for, and its weight says how far ahead the pass is:
-  full strength for one under way, a quarter for one three hours out. Where the
-  first mark falls inside that minute is a choice, since the app puts them on
+  tail's business. Its arrowheads are one minute apart, which is five of the
+  twelve seconds the tail stands for, and its weight says how far ahead the pass
+  is: full strength for one under way, a quarter for one three hours out. Where
+  the first mark falls inside that minute is a choice, since the app puts them on
   round clock minutes and nothing rises on one.
+- An arc carries its object's name unless the object's own marker is on the frame
+  carrying it already, which is the app's rule (`anchorFor`) and the reason only
+  the last frame shows one: everywhere else the landmark is on screen with its
+  name under it.
 
 Where the numbers come from, if a frame has to be argued about:
 

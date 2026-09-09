@@ -12,7 +12,9 @@ export const de: Strings = {
       body:
         "Jede Markierung ist ein Objekt: die Farbe sagt, wofür der Satellit da ist, die " +
         "Größe, wie weit er weg ist. Was hinter einem Haus oder einem Baum steht, wird " +
-        "weggelassen statt darübergezeichnet."
+        "weggelassen statt darübergezeichnet. Die wenigen, für die man vor die Tür geht, " +
+        "tragen außerdem die Bahn, die sie gleich ziehen: eine Pfeilspitze je Minute, " +
+        "und die Uhrzeit des Aufgangs, solange sie noch nicht aufgegangen sind."
     },
     screen: {
       title: "Was auf dem Bildschirm ist",

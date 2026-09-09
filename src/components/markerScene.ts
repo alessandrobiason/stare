@@ -191,11 +191,13 @@ export type SelectionRing = {
  * while crossing a photograph without becoming the subject of it. So it is thin,
  * even, and rimmed like everything else the overlay draws.
  *
- * The time marks are what make it a timetable rather than a curve: each is a
- * short stroke *across* the line, at a round clock minute, at a cadence the
- * pass chooses for itself (`ticksAlong`). Across rather than along, and a
- * stroke rather than a dot, because a dot on a line is a satellite in this
- * overlay's vocabulary and the marks are not objects.
+ * The marks along it are what make it a timetable rather than a curve: an
+ * arrowhead at each round clock minute, at a cadence the pass chooses for
+ * itself (`ticksAlong`). An arrowhead rather than the stroke across the line
+ * this began as, because a cross-stroke answers "when" and leaves "which way"
+ * to be guessed — and which way is the first thing anyone asks of a line drawn
+ * across the sky. Not a dot, either: a dot on a line is a satellite in this
+ * overlay's vocabulary, and the marks are not objects.
  */
 export type PathShape = {
   /**
@@ -203,8 +205,12 @@ export type PathShape = {
    * the path leaves the view and comes back into it.
    */
   lines: number[][];
-  /** The time marks: each a stroke, as the flat pair `x, y, x, y`. */
-  ticks: number[][];
+  /**
+   * The marks: each an arrowhead, as the three points of an open chevron —
+   * `x, y` for one arm, the point itself, then the other arm. Stroked like the
+   * line, so a mark is the same line turning a corner rather than a new shape.
+   */
+  arrows: number[][];
   /** The category colour, which for a landmark path is the landmark colour. */
   color: string;
   /** How solid the line is, which says how far ahead the pass is. */
@@ -262,17 +268,26 @@ export function buildMarkerScene(
   const landmarks = frame.markers.filter(
     (marker) => marker.category === "LANDMARK" && pointOnFrame(marker.point)
   );
-  // A path that has not started yet is named too, at the point where its object
-  // will come over the horizon — which is the one thing on the frame that says
-  // *when* as well as where. Those names compete with the marks' for the same
-  // clear space, and the marks win: a name over something someone can look at
-  // now outranks one over a place something will be in an hour.
-  const rises = frame.paths.flatMap((path) => (path.start ? [{ path, point: path.start }] : []));
-  const allowed = labellablePoints(
-    [...landmarks.map((marker) => marker.point), ...rises.map((rise) => rise.point)],
-    box
+  const marks = landmarks.map((marker) => marker.point);
+  const named = new Set(
+    landmarks.filter((_, index) => labellablePoints(marks, box)[index]).map((one) => one.name)
   );
-  const named = new Set(landmarks.filter((_, index) => allowed[index]).map((one) => one.name));
+  // Every arc says which object it belongs to as well, at a point on the line
+  // itself (`MarkerPath.anchor`). Without it a landmark hidden behind a roof —
+  // which is a landmark with no marker at all — leaves an anonymous line across
+  // the sky, and the one question anyone has about a line is whose it is.
+  //
+  // Not while its own marker is carrying the name a few pixels away, though:
+  // that is the same word twice on one frame, and the marker's is the better
+  // placed of the two.
+  const arcs = frame.paths.flatMap((path) =>
+    path.anchor && !named.has(path.name) ? [{ path, point: path.anchor }] : []
+  );
+  // Both kinds compete for the same clear space, and the marks win: a name over
+  // something someone can look at now outranks one over a line. Run again over
+  // the two together rather than kept from above, so an arc's name is placed
+  // against the marks' names as well as against the other arcs'.
+  const allowed = labellablePoints([...marks, ...arcs.map((arc) => arc.point)], box);
   const labels: LabelPlacement[] = [];
   let selection: SelectionRing | null = null;
 
@@ -336,25 +351,27 @@ export function buildMarkerScene(
     }
   }
 
-  rises.forEach((rise, index) => {
-    if (!allowed[landmarks.length + index]) return;
-    const alpha = pathOpacity(rise.path.lead);
+  arcs.forEach((arc, index) => {
+    if (!allowed[marks.length + index]) return;
     labels.push({
-      key: rise.path.key,
-      // The name and the clock time it gets there, which is the whole answer to
-      // "when do I go outside". A time rather than a countdown because that is
-      // what someone reads once and remembers; the line itself is what says how
-      // long the pass lasts, in the marks along it.
+      key: arc.path.key,
+      // A pass still to come carries the clock time it begins as well, which is
+      // the whole answer to "when do I go outside". A time rather than a
+      // countdown because that is what someone reads once and remembers; the
+      // line itself is what says how long the pass lasts, in the marks along it.
+      // One already under way needs no time — its object is up there now.
       //
       // On two lines, because a name and a time on one do not fit the box a
       // label is set in — `SOYUZ-MS 33 22:13` is half again as wide as it — and
       // the half that would be cut is the time. Broken here rather than left to
       // wrap, so where it breaks is not a question about a typeface.
-      name: `${rise.path.name}\n${clockTime(new Date(rise.path.startsAtMs))}`,
-      x: (rise.point.left / 100) * box.width,
-      y: (rise.point.top / 100) * box.height,
-      offsetY: RISE_LABEL_GAP_PX * scale,
-      alpha
+      name: arc.path.upcoming
+        ? `${arc.path.name}\n${clockTime(new Date(arc.path.startsAtMs))}`
+        : arc.path.name,
+      x: (arc.point.left / 100) * box.width,
+      y: (arc.point.top / 100) * box.height,
+      offsetY: ARC_LABEL_GAP_PX * scale,
+      alpha: pathOpacity(arc.path.lead)
     });
   });
 
@@ -383,8 +400,9 @@ function pathShapeFor(
   palette: MarkerPalette
 ): PathShape {
   const width = LANDMARK_PATHS.widthPx * scale;
-  const across = (LANDMARK_PATHS.tickLengthPx * scale) / 2;
-  const ticks: number[][] = [];
+  const along = LANDMARK_PATHS.arrowLengthPx * scale;
+  const across = LANDMARK_PATHS.arrowSpreadPx * scale;
+  const arrows: number[][] = [];
 
   for (const tick of path.ticks) {
     const x = (tick.at.left / 100) * box.width;
@@ -397,11 +415,17 @@ function pathShapeFor(
     const dy = ((tick.ahead.top - tick.at.top) / 100) * box.height;
     const length = Math.hypot(dx, dy);
     if (!(length > 0)) continue;
-    ticks.push([
-      x + (dy / length) * across,
-      y - (dx / length) * across,
-      x - (dy / length) * across,
-      y + (dx / length) * across
+    // The point sits on the minute and the arms sweep back from it, so the mark
+    // reads as the object being *there* at that time and heading on.
+    const backX = x - (dx / length) * along;
+    const backY = y - (dy / length) * along;
+    arrows.push([
+      backX + (dy / length) * across,
+      backY - (dx / length) * across,
+      x,
+      y,
+      backX - (dy / length) * across,
+      backY + (dx / length) * across
     ]);
   }
 
@@ -409,7 +433,7 @@ function pathShapeFor(
     lines: path.lines.map((line) =>
       line.flatMap((point) => [(point.left / 100) * box.width, (point.top / 100) * box.height])
     ),
-    ticks,
+    arrows,
     color: palette.categories[path.category],
     alpha: pathOpacity(path.lead),
     width,
@@ -499,11 +523,10 @@ const SELECTION_WIDTH_PX = 3;
 export const LABEL_BOX_PX = SATELLITE_MARKERS.labelClearancePx.x * 2;
 const LABEL_GAP_PX = 5;
 /**
- * How far below a rise point its name is set, in pixels at the design width.
+ * How far below its anchor an arc's name is set, in pixels at the design width.
  *
  * Further than a marker's own name sits below its mark, because there is no
  * mark here: what the name is placed under is a point on a line, and set as
- * close as a marker's it reads as a label on the line rather than on the place
- * the line begins.
+ * close as a marker's it reads as writing *on* the line rather than about it.
  */
-const RISE_LABEL_GAP_PX = 10;
+const ARC_LABEL_GAP_PX = 10;

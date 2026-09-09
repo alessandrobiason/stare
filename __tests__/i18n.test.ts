@@ -294,13 +294,18 @@ test("the console is the one thing that stays in English", () => {
 });
 
 /**
- * How tall the intro's third page comes out, per language.
+ * How tall the intro's pages come out, per language.
  *
- * The one page in the app whose height is not bounded by its own design: it
- * is a title, a paragraph and four explained badges, and every one of those is
- * a translated string that can run a line longer than the English it replaced.
- * The card is bottom-aligned and grows upwards into the sky, so a page that
- * outgrows the screen does not scroll — it walks off the top.
+ * The pages in the app whose height is not bounded by their own design: a
+ * title, a paragraph and — on the page that keys the screen — four explained
+ * badges, every one of which is a translated string that can run a line longer
+ * than the English it replaced. The card is bottom-aligned and grows upwards
+ * into the sky, so a page that outgrows the screen does not scroll — it walks
+ * off the top.
+ *
+ * The page about the sky is measured too, and not only the one about the
+ * panels: it is prose with nothing to hold it in check, and it gained the
+ * paragraph about the landmarks' paths.
  *
  * The figures are read off `IntroScreen`'s stylesheet. The card now scrolls if
  * it has to (see `styles.card`), so overrunning this is a degraded page rather
@@ -332,17 +337,20 @@ describe("the page that explains the screen fits the screen", () => {
 
   test.each(LOCALES)("%s", (locale) => {
     setLocaleForTesting(locale);
-    const page = introPages()[2];
+    // Every page that is title and prose, which is all of them but the last:
+    // the permissions page lists what the system will ask for, and that list is
+    // two names and two reasons whatever the language.
+    for (const page of introPages().filter((one) => !one.access)) {
+      let height = 20 * 2; // The card's own padding.
+      height += blockHeight(page.title ?? "", 19, 23, CARD_COLUMN);
+      height += 10 + blockHeight(page.body, 13, 19, CARD_COLUMN);
+      for (const element of page.elements ?? []) {
+        height += 12 + blockHeight(element.where, 10, 13, ELEMENT_COLUMN);
+        height += 2 + blockHeight(element.meaning, 11.5, 16, ELEMENT_COLUMN);
+      }
 
-    let height = 20 * 2; // The card's own padding.
-    height += blockHeight(page.title ?? "", 19, 23, CARD_COLUMN);
-    height += 10 + blockHeight(page.body, 13, 19, CARD_COLUMN);
-    for (const element of page.elements ?? []) {
-      height += 12 + blockHeight(element.where, 10, 13, ELEMENT_COLUMN);
-      height += 2 + blockHeight(element.meaning, 11.5, 16, ELEMENT_COLUMN);
+      expect(height).toBeLessThan(PAGER_HEIGHT);
     }
-
-    expect(height).toBeLessThan(PAGER_HEIGHT);
   });
 });
 

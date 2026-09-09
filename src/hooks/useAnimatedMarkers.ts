@@ -69,13 +69,20 @@ export type MarkerPath = {
   /** Round clock minutes along it, each with the path just ahead of it. */
   ticks: { at: FramePoint; ahead: FramePoint }[];
   /**
-   * Where the object joins the path, for a pass it has not joined yet — which
-   * is the one point on a path worth naming, since it is where and when to look.
-   * `null` for the pass under way, whose marker is already on the frame.
+   * Where to write the object's name, or `null` when no part of the arc is on
+   * the frame to write it on.
+   *
+   * A point on the path rather than a place on the screen, and one that stays
+   * put while the phone does: see `anchorFor`. Every drawn arc gets one,
+   * because the question a line across the sky asks is whose it is — and the
+   * object that would have answered it is often not on the frame at all, being
+   * behind a roof, below the horizon, or an hour away.
    */
-  start: FramePoint | null;
-  /** When it gets there, for the label under that point. */
+  anchor: FramePoint | null;
+  /** When the object joins the path, for the name to carry when it has not yet. */
   startsAtMs: number;
+  /** Whether it has yet to: a pass under way needs no time under its name. */
+  upcoming: boolean;
   /** How far ahead the pass is, in `[0, 1]` across the planning window. */
   lead: number;
 };
@@ -261,15 +268,22 @@ const PATH_BOX: FrameViewport = { left: -100, top: -100, right: 200, bottom: 200
  * Exported for the tests rather than for other callers: it is the one step of
  * the loop that turns a plan into geometry, and the only one whose answer can
  * be checked against a pass whose sky positions are known.
+ *
+ * `anchors` is the one thing here that remembers anything between frames — the
+ * sample each arc's name is currently written at, so that the name stays on a
+ * fixed piece of sky rather than sliding along the line as the phone turns.
+ * See `anchorFor`.
  */
 export function projectPaths(
   passes: readonly SkyPass[],
   atMs: number,
   axes: CameraAxes,
-  lens: FrameLens
+  lens: FrameLens,
+  anchors: Map<string, number> = new Map()
 ): MarkerPath[] {
   const windowMs = LANDMARK_PATHS.windowHours * 60 * 60 * 1000;
   const drawn: MarkerPath[] = [];
+  const seen = new Set<string>();
 
   for (const pass of passes) {
     const ahead = pathFrom(pass, atMs);
@@ -293,27 +307,102 @@ export function projectPaths(
       if (next) ticks.push({ at, ahead: next });
     }
 
-    // Where the object joins the path, while it still has to. Asked of the
-    // clock rather than of the plan's own `started`, which was true a minute
-    // ago at most: a pass that has begun since then would otherwise carry a
-    // label naming a rise time that has already gone by.
-    const start =
-      pass.startsAtMs > atMs ? projectWithAxes(pass.samples[0].position, axes, lens) : null;
+    const key = `${pass.noradId}@${pass.startsAtMs}`;
+    seen.add(key);
     drawn.push({
       name: pass.name,
-      key: `${pass.noradId}@${pass.startsAtMs}`,
+      key,
       category: pass.category,
       lines,
       ticks,
-      start: start && pointOnFrame(start) ? start : null,
+      anchor: anchorFor(pass, key, atMs, axes, lens, anchors),
       startsAtMs: pass.startsAtMs,
+      // Asked of the clock rather than of the plan's own `started`, which was
+      // true a minute ago at most: a pass that has begun since then would
+      // otherwise carry a name with a rise time that has already gone by.
+      upcoming: pass.startsAtMs > atMs,
       // Nought while the object is on the path, one at the far end of the
       // planning window: what the line's own weight is read off (`nearOpacity`).
       lead: clamp((pass.startsAtMs - atMs) / windowMs, 0, 1)
     });
   }
 
+  // Plans are replaced every minute and their keys go with them, so what is
+  // remembered is pruned to what is drawn rather than growing all session.
+  for (const key of anchors.keys()) if (!seen.has(key)) anchors.delete(key);
   return drawn;
+}
+
+/**
+ * Where to write an arc's name: a point on the path, held still until it leaves
+ * the view.
+ *
+ * The name has to be visible whenever the line is, or a landmark behind a roof
+ * leaves an unlabelled streak across the sky. But the obvious way to do that —
+ * put it wherever the line is nearest the middle of the screen — makes the one
+ * thing in this app that is *not* pinned to the sky: pan the phone and the name
+ * hovers near the centre while the world slides under it, which is exactly the
+ * jumping about it is meant to avoid.
+ *
+ * So the name is pinned to one of the arc's own samples, four degrees apart,
+ * and stays on it while that sample is on the frame — no motion at all with the
+ * phone still, and none beyond the sky's own while it turns. Another is chosen
+ * only when the anchor leaves the view, and the choice prefers the point the
+ * object comes up at, since that is the piece of sky someone would stand and
+ * watch. Failing that it takes the sample nearest the middle of the frame,
+ * measured in percent rather than in pixels — this is choosing between points
+ * four degrees apart, and the frame's shape cannot change which of them is
+ * nearest by enough to matter.
+ */
+function anchorFor(
+  pass: SkyPass,
+  key: string,
+  atMs: number,
+  axes: CameraAxes,
+  lens: FrameLens,
+  anchors: Map<string, number>
+): FramePoint | null {
+  const at = (index: number): FramePoint | null => {
+    const sample = pass.samples[index];
+    // Only the part of the arc still to come: the samples behind the object are
+    // not drawn, and a name floating off the end of the line is worse than no
+    // name at all.
+    if (!sample || sample.atMs < atMs) return null;
+    const point = projectWithAxes(sample.position, axes, lens);
+    return point && pointOnFrame(point) ? point : null;
+  };
+
+  const remembered = anchors.get(key);
+  if (remembered !== undefined) {
+    const held = at(remembered);
+    if (held) return held;
+  }
+
+  const rise = at(0);
+  if (rise) {
+    anchors.set(key, 0);
+    return rise;
+  }
+
+  let best: FramePoint | null = null;
+  let bestIndex = -1;
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < pass.samples.length; index += 1) {
+    const point = at(index);
+    if (!point) continue;
+    const distance = Math.hypot(point.left - 50, point.top - 50);
+    if (distance >= nearest) continue;
+    nearest = distance;
+    best = point;
+    bestIndex = index;
+  }
+
+  if (!best) {
+    anchors.delete(key);
+    return null;
+  }
+  anchors.set(key, bestIndex);
+  return best;
 }
 
 type AnimatedMarkerOptions = {
@@ -416,6 +505,8 @@ export function useAnimatedMarkers({
     paths: 0
   });
   const visibilityRef = useRef(new MarkerVisibilityFilter());
+  /** Which sample each arc's name is written at. See `anchorFor`. */
+  const pathAnchorsRef = useRef(new Map<string, number>());
   const frameRateRef = useRef(0);
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
   const listenersRef = useRef(new Set<(frame: MarkerFrame) => void>());
@@ -473,7 +564,7 @@ export function useAnimatedMarkers({
       // worth drawing over the roof the object will come out from behind. Its
       // marker still waits for the mask, as every marker does.
       const paths = categories.has("LANDMARK")
-        ? projectPaths(pathsRef.current, time.getTime(), axes, lens)
+        ? projectPaths(pathsRef.current, time.getTime(), axes, lens, pathAnchorsRef.current)
         : [];
 
       // No mask, no markers. Drawing them anyway — which is what happens the
@@ -669,6 +760,9 @@ export function useAnimatedMarkers({
 
   const reset = useCallback(() => {
     visibilityRef.current.reset();
+    // The sky jumps, so the piece of it each name was written on is no longer
+    // the piece of it in front of the camera.
+    pathAnchorsRef.current.clear();
     skyMemory.reset();
   }, [skyMemory]);
 

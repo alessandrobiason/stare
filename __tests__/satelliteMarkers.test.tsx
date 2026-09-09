@@ -321,8 +321,9 @@ describe("a landmark's path across the sky", () => {
         ]
       ],
       ticks: [{ at: { left: 50, top: 50 }, ahead: { left: 60, top: 50 } }],
-      start: null,
+      anchor: null,
       startsAtMs: Date.UTC(2026, 7, 29, 20, 37, 0),
+      upcoming: false,
       lead: 0,
       ...overrides
     };
@@ -361,64 +362,97 @@ describe("a landmark's path across the sky", () => {
     expect(later.alpha).toBeLessThan(now.alpha);
   });
 
-  test("lays a time mark across the path rather than along it", () => {
+  test("marks the minutes with an arrowhead pointing the way the object goes", () => {
     const [shape] = scene([], 0, FRAME, [path()]).paths;
-    expect(shape.ticks).toHaveLength(1);
+    expect(shape.arrows).toHaveLength(1);
 
-    const [x1, y1, x2, y2] = shape.ticks[0];
-    // The path here runs left to right, so its marks run up and down — and are
-    // as long as the mark is quoted at, measured in pixels rather than percent.
-    expect(x1).toBeCloseTo(360, 6);
-    expect(x2).toBeCloseTo(360, 6);
-    expect(Math.hypot(x2 - x1, y2 - y1)).toBeCloseTo(LANDMARK_PATHS.tickLengthPx, 6);
-    expect((y1 + y2) / 2).toBeCloseTo(640, 6);
+    // Three points, and the middle one is the minute itself: the arms sweep
+    // back from it, so the mark says the object is there and heading on.
+    const [armX, armY, pointX, pointY, otherX, otherY] = shape.arrows[0];
+    expect(pointX).toBeCloseTo(360, 6);
+    expect(pointY).toBeCloseTo(640, 6);
+    // The path here runs left to right, so the arms are back and to each side.
+    expect(armX).toBeCloseTo(360 - LANDMARK_PATHS.arrowLengthPx, 6);
+    expect(otherX).toBeCloseTo(360 - LANDMARK_PATHS.arrowLengthPx, 6);
+    expect(armY).toBeCloseTo(640 - LANDMARK_PATHS.arrowSpreadPx, 6);
+    expect(otherY).toBeCloseTo(640 + LANDMARK_PATHS.arrowSpreadPx, 6);
+  });
+
+  test("turns the arrowhead with the path rather than with the frame", () => {
+    // Straight down the frame: the arms are now level with each other, and the
+    // point is below both. A mark laid out in percent would sit askew here,
+    // since the frame is not square.
+    const down = path({
+      ticks: [{ at: { left: 50, top: 50 }, ahead: { left: 50, top: 60 } }]
+    });
+    const [armX, armY, pointX, pointY, otherX] = scene([], 0, FRAME, [down]).paths[0].arrows[0];
+
+    expect(pointX).toBeCloseTo(360, 6);
+    expect(pointY).toBeCloseTo(640, 6);
+    expect(armY).toBeCloseTo(640 - LANDMARK_PATHS.arrowLengthPx, 6);
+    expect(armX).toBeCloseTo(360 + LANDMARK_PATHS.arrowSpreadPx, 6);
+    expect(otherX).toBeCloseTo(360 - LANDMARK_PATHS.arrowSpreadPx, 6);
   });
 
   test("drops a mark whose direction is a single point", () => {
-    // Nothing to draw across: two identical positions carry no direction, and
+    // Nothing to point along: two identical positions carry no direction, and
     // normalising the difference between them is a division by zero.
     const degenerate = path({
       ticks: [{ at: { left: 50, top: 50 }, ahead: { left: 50, top: 50 } }]
     });
-    expect(scene([], 0, FRAME, [degenerate]).paths[0].ticks).toEqual([]);
+    expect(scene([], 0, FRAME, [degenerate]).paths[0].arrows).toEqual([]);
   });
 
-  test("names a pass that has not begun with the time it begins", () => {
-    const rise = path({ start: { left: 30, top: 70 } });
-    const { labels } = scene([], 0, FRAME, [rise]);
+  test("names the arc at its anchor, wherever its object is", () => {
+    const named = path({ anchor: { left: 30, top: 70 } });
+    const { labels } = scene([], 0, FRAME, [named]);
 
     expect(labels).toHaveLength(1);
-    // The name and the time it rises at, a line each: the two together are
-    // wider than the box a label is set in.
-    expect(labels[0].name).toMatch(/^ISS\n\d{1,2}[:.]\d{2}/);
-    // Under the point where the object comes over the horizon, which is where
-    // someone would stand to watch it.
+    expect(labels[0].name).toBe("ISS");
+    // Under the anchor, which is a point on the line rather than a place on the
+    // screen. See `anchorFor`.
     expect(labels[0].x).toBeCloseTo(216, 6);
     expect(labels[0].y).toBeCloseTo(896, 6);
     expect(labels[0].offsetY).toBeGreaterThan(0);
   });
 
-  test("says nothing about a pass that is already under way", () => {
-    // Its object is on the frame with its own name under it; a second label
-    // saying when it rose is a label about the past.
-    expect(scene([], 0, FRAME, [path({ start: null })]).labels).toEqual([]);
+  test("adds the time to the name of a pass that has not begun", () => {
+    const upcoming = path({ anchor: { left: 30, top: 70 }, upcoming: true });
+    const { labels } = scene([], 0, FRAME, [upcoming]);
+
+    // The name and the time it rises at, a line each: the two together are
+    // wider than the box a label is set in.
+    expect(labels[0].name).toMatch(/^ISS\n\d{1,2}[:.]\d{2}/);
   });
 
-  test("gives way to a marker's own name where the two would collide", () => {
-    const landmark = marker({ name: "ISS", category: "LANDMARK", point: { left: 30, top: 70 } });
-    const rise = path({ start: { left: 30, top: 70 } });
-    const { labels } = scene([landmark], 0, FRAME, [rise]);
+  test("says nothing where no part of the arc is on the frame", () => {
+    expect(scene([], 0, FRAME, [path({ anchor: null })]).labels).toEqual([]);
+  });
+
+  test("leaves the naming to the marker where the object is on the frame", () => {
+    // The same word twice on one frame, and the marker's is the better placed
+    // of the two: it is on the object rather than on the line it is following.
+    const landmark = marker({ name: "ISS", category: "LANDMARK", point: { left: 70, top: 20 } });
+    const { labels } = scene([landmark], 0, FRAME, [path({ anchor: { left: 30, top: 70 } })]);
 
     expect(labels).toHaveLength(1);
     expect(labels[0].name).toBe("ISS");
+    expect(labels[0].key).toBe("ISS");
   });
 
-  test("keys a rise apart from the mark it is named after", () => {
-    // Both are the same object on one frame, and two views under one key is one
-    // view: the marker's name would take the rise's place, or the other way on.
-    const landmark = marker({ name: "ISS", category: "LANDMARK" });
-    const rise = path({ start: { left: 10, top: 90 } });
-    const keys = scene([landmark], 0, FRAME, [rise]).labels.map((label) => label.key);
+  test("names the arc when its object has been left out for terrain", () => {
+    // The case the naming exists for: nothing on the frame is the landmark, so
+    // without this the line is an anonymous streak across the sky.
+    const { labels } = scene([], 0, FRAME, [path({ anchor: { left: 30, top: 70 } })]);
+    expect(labels.map((label) => label.name)).toEqual(["ISS"]);
+  });
+
+  test("keys an arc's name apart from a marker's", () => {
+    // A landmark can be named twice on one frame — once on its own mark, once
+    // on another of its passes — and two views under one key is one view.
+    const landmark = marker({ name: "Hubble", category: "LANDMARK" });
+    const named = path({ anchor: { left: 10, top: 90 } });
+    const keys = scene([landmark], 0, FRAME, [named]).labels.map((label) => label.key);
 
     expect(keys).toHaveLength(2);
     expect(new Set(keys).size).toBe(2);

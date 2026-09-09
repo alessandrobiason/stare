@@ -103,9 +103,9 @@ function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
 /**
  * One landmark's path: the arc it will travel, and the clock minutes on it.
  *
- * Rims for the whole shape first and colour afterwards, as on the phone: a time
- * mark crosses the line it belongs to, and drawn in pairs each mark's rim would
- * cut a dark notch through the arc it is measuring.
+ * Rims for the whole shape first and colour afterwards, as on the phone: an
+ * arrowhead sits on the line it belongs to, and drawn in pairs each mark's rim
+ * would cut a dark notch through the arc it is measuring.
  */
 function drawPath(
   context: CanvasRenderingContext2D,
@@ -122,9 +122,9 @@ function drawPath(
 
   const ink = palette.outline;
   for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
-  for (const tick of shape.ticks) draw(tick, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  for (const arrow of shape.arrows) draw(arrow, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
   for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
-  for (const tick of shape.ticks) draw(tick, shape.color, shape.alpha, shape.width);
+  for (const arrow of shape.arrows) draw(arrow, shape.color, shape.alpha, shape.width);
 }
 
 /** The ring that says which satellite the info card is describing. */
