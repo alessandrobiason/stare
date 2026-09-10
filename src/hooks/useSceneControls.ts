@@ -5,6 +5,17 @@ import { SkySummary } from "./useAnimatedMarkers";
 export type SceneControls = {
   enabledCategories: Set<SatelliteCategory>;
   toggleCategory: (category: SatelliteCategory) => void;
+  /**
+   * Whether Starlink is drawn. Its own switch rather than a sixth category,
+   * because it is not a sixth purpose — see `isStarlink`.
+   *
+   * On, because the default view is the sky as it is rather than an edited one,
+   * and a constellation missing from a sky nobody has filtered is a bug from
+   * where the person holding the phone is standing.
+   */
+  starlink: boolean;
+  toggleStarlink: () => void;
+  /** Everything back on: the five categories and Starlink with them. */
   enableAllCategories: () => void;
   /**
    * What the last frame put on screen, and whether any of it can be seen.
@@ -67,6 +78,7 @@ const NO_SKY: SkySummary = {
 export function useSceneControls(): SceneControls {
   const [enabledCategories, setEnabledCategories] =
     useState<Set<SatelliteCategory>>(allCategories);
+  const [starlink, setStarlink] = useState(true);
   const [sky, setSky] = useState<SkySummary>(NO_SKY);
   const [debug, setDebug] = useState(false);
   const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
@@ -80,7 +92,12 @@ export function useSceneControls(): SceneControls {
     });
   }, []);
 
-  const enableAllCategories = useCallback(() => setEnabledCategories(allCategories()), []);
+  const toggleStarlink = useCallback(() => setStarlink((on) => !on), []);
+
+  const enableAllCategories = useCallback(() => {
+    setEnabledCategories(allCategories());
+    setStarlink(true);
+  }, []);
   const toggleDebug = useCallback(() => setDebug((on) => !on), []);
   const toggleSkyMaskFiltering = useCallback(() => setSkyMaskFiltering((on) => !on), []);
   const toggleCelestialAlignment = useCallback(() => setCelestialAlignment((on) => !on), []);
@@ -88,6 +105,8 @@ export function useSceneControls(): SceneControls {
   return {
     enabledCategories,
     toggleCategory,
+    starlink,
+    toggleStarlink,
     enableAllCategories,
     sky,
     setSky,

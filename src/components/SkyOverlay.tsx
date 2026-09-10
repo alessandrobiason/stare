@@ -117,6 +117,9 @@ type Props = {
   attitude: AttitudeSource;
   enabledCategories: Set<SatelliteCategory>;
   onToggleCategory: (category: SatelliteCategory) => void;
+  /** Whether Starlink is drawn, which is its own switch. See `isStarlink`. */
+  starlink: boolean;
+  onToggleStarlink: () => void;
   onEnableAll: () => void;
   /**
    * Told what is drawn, what it is, and whether any of it can be seen from
@@ -214,6 +217,8 @@ export const SkyOverlay: React.FC<Props> = ({
   attitude,
   enabledCategories,
   onToggleCategory,
+  starlink,
+  onToggleStarlink,
   onEnableAll,
   onSkyChange,
   onMaskStatusChange,
@@ -304,6 +309,7 @@ export const SkyOverlay: React.FC<Props> = ({
     mask: segmentation.mask,
     maskFiltering: skyMaskFiltering,
     enabledCategories,
+    starlink,
     viewport,
     onSkyChange
   });
@@ -453,6 +459,8 @@ export const SkyOverlay: React.FC<Props> = ({
         <CategoryLegend
           enabledCategories={enabledCategories}
           onToggleCategory={onToggleCategory}
+          starlink={starlink}
+          onToggleStarlink={onToggleStarlink}
           onEnableAll={onEnableAll}
           palette={palette}
         />

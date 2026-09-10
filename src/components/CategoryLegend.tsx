@@ -10,6 +10,12 @@ import { Toggle } from "./Toggle";
 type Props = {
   enabledCategories: Set<SatelliteCategory>;
   onToggleCategory: (category: SatelliteCategory) => void;
+  /**
+   * Whether Starlink is drawn. Its own row under communications rather than a
+   * category of its own — see `isStarlink` for why it is singled out at all.
+   */
+  starlink: boolean;
+  onToggleStarlink: () => void;
   onEnableAll: () => void;
   /**
    * The colours the sky is currently drawn in. The swatches are markers rather
@@ -22,6 +28,28 @@ type Props = {
 
 const DIMMED_SWATCH_OPACITY = 0.25;
 const DIMMED_TEXT_OPACITY = 0.45;
+
+/** The category Starlink's row hangs off, because that is what Starlink is. */
+const STARLINK_PARENT: SatelliteCategory = "COMMS";
+
+/**
+ * The one row in this panel whose label is not translated.
+ *
+ * It is the name its operator gave it, and there is no Italian for "Starlink"
+ * — the same reason the fleet names in the breakdown are not in `src/i18n`
+ * either (see `src/satellite/fleets.ts`). Upper-cased to sit in the same
+ * column as the category labels, which are written that way in every language.
+ */
+const STARLINK_LABEL = "STARLINK";
+
+/**
+ * How many switches the panel carries: the five categories, and Starlink.
+ *
+ * The count beside the closed title is out of this rather than out of the
+ * taxonomy, because what it answers is "is this panel hiding anything", and
+ * Starlink switched off hides about half the sky.
+ */
+const FILTER_ROWS = SATELLITE_CATEGORIES.length + 1;
 
 /**
  * Per-category visibility filter, and the key to the two marker shapes.
@@ -45,6 +73,8 @@ const DIMMED_TEXT_OPACITY = 0.45;
 export const CategoryLegend: React.FC<Props> = React.memo(({
   enabledCategories,
   onToggleCategory,
+  starlink,
+  onToggleStarlink,
   onEnableAll,
   palette
 }) => {
@@ -54,10 +84,18 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
   useLocale();
   const t = strings().filter;
   const [expanded, setExpanded] = useState(false);
-  const enabledCount = SATELLITE_CATEGORIES.filter((category) =>
-    enabledCategories.has(category)
-  ).length;
-  const filtering = enabledCount < SATELLITE_CATEGORIES.length;
+  // Rows rather than categories: Starlink has a switch of its own in the list,
+  // so it is one of the things the count is counting. Off with everything else
+  // on, the closed pill has to say the sky is being edited — which is the whole
+  // job of this figure.
+  //
+  // Counted only while its category is on, because that is when its switch is
+  // the thing deciding anything: with communications off, Starlink is off
+  // whatever its own row says, and the row is drawn dimmed to match.
+  const enabledCount =
+    SATELLITE_CATEGORIES.filter((category) => enabledCategories.has(category)).length +
+    (starlink && enabledCategories.has(STARLINK_PARENT) ? 1 : 0);
+  const filtering = enabledCount < FILTER_ROWS;
 
   return (
     <View style={[panelStyles.panel, styles.position, !expanded && styles.closed]}>
@@ -72,7 +110,7 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
         <Text style={[panelStyles.title, styles.headerTitle]}>{t.title}</Text>
         {filtering && (
           <Text style={styles.count}>
-            {enabledCount}/{SATELLITE_CATEGORIES.length}
+            {enabledCount}/{FILTER_ROWS}
           </Text>
         )}
         <Text style={styles.chevron}>{expanded ? "▴" : "▾"}</Text>
@@ -82,27 +120,59 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
         <>
           {SATELLITE_CATEGORIES.map((category) => {
             const enabled = enabledCategories.has(category);
+            // Starlink is drawn only where its own switch and its category's
+            // both say so, so its row reads as off under either.
+            const starlinkDrawn = enabled && starlink;
             return (
-              <Pressable
-                key={category}
-                style={styles.row}
-                onPress={() => onToggleCategory(category)}
-              >
-                <View
-                  style={[
-                    styles.swatch,
-                    {
-                      backgroundColor: palette.categories[category],
-                      borderColor: cssColor(palette.outline),
-                      opacity: enabled ? 1 : DIMMED_SWATCH_OPACITY
-                    }
-                  ]}
-                />
-                <Text style={[styles.label, { opacity: enabled ? 1 : DIMMED_TEXT_OPACITY }]}>
-                  {t.categories[category]}
-                </Text>
-                <Toggle on={enabled} />
-              </Pressable>
+              <React.Fragment key={category}>
+                <Pressable style={styles.row} onPress={() => onToggleCategory(category)}>
+                  <View
+                    style={[
+                      styles.swatch,
+                      {
+                        backgroundColor: palette.categories[category],
+                        borderColor: cssColor(palette.outline),
+                        opacity: enabled ? 1 : DIMMED_SWATCH_OPACITY
+                      }
+                    ]}
+                  />
+                  <Text style={[styles.label, { opacity: enabled ? 1 : DIMMED_TEXT_OPACITY }]}>
+                    {t.categories[category]}
+                  </Text>
+                  <Toggle on={enabled} />
+                </Pressable>
+
+                {/* Indented under communications rather than listed beside it,
+                    because it is not a sixth alternative to the five: it is one
+                    operator inside one of them, and the row says so by sitting
+                    under its parent in its parent's colour. Its own switch all
+                    the same — see `isStarlink`. */}
+                {category === STARLINK_PARENT && (
+                  <Pressable style={[styles.row, styles.subRow]} onPress={onToggleStarlink}>
+                    <View
+                      style={[
+                        styles.swatch,
+                        styles.subSwatch,
+                        {
+                          backgroundColor: palette.categories[STARLINK_PARENT],
+                          borderColor: cssColor(palette.outline),
+                          opacity: starlinkDrawn ? 1 : DIMMED_SWATCH_OPACITY
+                        }
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.label,
+                        styles.subLabel,
+                        { opacity: starlinkDrawn ? 1 : DIMMED_TEXT_OPACITY }
+                      ]}
+                    >
+                      {STARLINK_LABEL}
+                    </Text>
+                    <Toggle on={starlink} />
+                  </Pressable>
+                )}
+              </React.Fragment>
             );
           })}
           <View style={styles.keyRow}>
@@ -126,6 +196,7 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
 CategoryLegend.displayName = "CategoryLegend";
 
 const SWATCH_SIZE = 10;
+const SUB_SWATCH_SIZE = 7;
 
 const styles = StyleSheet.create({
   position: {
@@ -175,6 +246,26 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     flexDirection: "row",
     alignItems: "center"
+  },
+  subRow: {
+    // Stepped in under its parent, and tightened up against it: the pair is one
+    // block of the list rather than two entries that happen to be adjacent.
+    marginTop: -3,
+    paddingLeft: 12,
+    minHeight: 22
+  },
+  subSwatch: {
+    // Smaller than a category's, which is the other half of saying it sits
+    // inside one rather than beside it.
+    width: SUB_SWATCH_SIZE,
+    height: SUB_SWATCH_SIZE,
+    borderRadius: SUB_SWATCH_SIZE / 2,
+    borderWidth: 1,
+    marginRight: 7 + (SWATCH_SIZE - SUB_SWATCH_SIZE) / 2
+  },
+  subLabel: {
+    fontSize: 9,
+    color: theme.color.textDim
   },
   swatch: {
     width: SWATCH_SIZE,

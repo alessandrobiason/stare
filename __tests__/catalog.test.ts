@@ -4,6 +4,7 @@ import {
   classifySatellite,
   isDuplicateEntry,
   isParked,
+  isStarlink,
   noradId
 } from "../src/satellite/categories";
 import { Tle } from "../src/types";
@@ -75,6 +76,19 @@ test("classifies satellites by purpose, falling back to the residual", () => {
   expect(classifySatellite("STARLINK-1234")).toBe("COMMS");
   expect(classifySatellite("IRIDIUM 106")).toBe("COMMS");
   expect(classifySatellite("SOMETHING ELSE")).toBe("OTHER");
+});
+
+test("singles Starlink out without moving it out of communications", () => {
+  // The filter's one special case: still comms, still that colour, but with a
+  // switch of its own because it is about half of what is over any given head.
+  expect(classifySatellite("STARLINK-1234")).toBe("COMMS");
+  expect(isStarlink("STARLINK-1234")).toBe(true);
+  expect(isStarlink("Starlink-1234")).toBe(true);
+
+  // Anchored, so it is the fleet rather than anything with the word in it.
+  expect(isStarlink("STARLINER")).toBe(false);
+  expect(isStarlink("ONEWEB-0012")).toBe(false);
+  expect(isStarlink("SOME STARLINK LOOKALIKE")).toBe(false);
 });
 
 test("treats an unrecognised parked object as communications", () => {

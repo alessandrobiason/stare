@@ -198,6 +198,33 @@ const EARTH_NAME =
 const COMMS_NAME =
   /STARLINK|ONEWEB|KUIPER|QIANFAN|HULIANWANG|GUOWANG|TELESAT|IRIDIUM|GLOBALSTAR|ORBCOMM|SES-|O3B|INMARSAT|THURAYA|ASTROCAST|SWARM|KINEIS|GONETS|LYNK|BLUEBIRD|CONNECTA|TIANQI|EUTELSAT|INTELSAT|ASTRA|HOTBIRD|VIASAT|ECHOSTAR|DIRECTV|YAMAL|EXPRESS-|CHINASAT|APSTAR|MEASAT|NILESAT|ARABSAT|TURKSAT|HISPASAT|AMOS-|BADR|SKYNET|WGS|MUOS|SICRAL|SYRACUSE|GSAT|JCSAT|OPTUS|NSS-|TELSTAR|GALAXY|ANIK|BSAT|SUPERBIRD|KOREASAT|THAICOM|VINASAT|PALAPA|BELINTERSAT|ABS-|AZERSPACE|ANGOSAT|NIGCOMSAT|RASCOM/;
 
+/**
+ * Starlink, which is a filter of its own rather than a category.
+ *
+ * It is communications and it is coloured as communications, because that is
+ * what it is for and the taxonomy above is about purpose. But it is also
+ * something no other name in that table is: a single operator holding a good
+ * half of the active catalogue, and therefore a good half of the marks on any
+ * given sky. Filtered only through `COMMS`, the two useful views are "most of
+ * the sky is one constellation" and "no communications satellites at all", and
+ * neither of those is the view someone wants when they ask what else is up
+ * there.
+ *
+ * So it gets a switch beside the five, and nothing else about it changes: same
+ * colour, same category on the card, same row in the breakdown. `^` anchored
+ * because the name is the fleet's — `STARLINK-1007` — and an unanchored test
+ * would be a substring match on a catalogue nobody controls the names in. Case
+ * insensitive rather than upper-casing the name first: this is asked per
+ * satellite per frame, and an anchored test costs nothing where a new string
+ * does.
+ */
+const STARLINK_NAME = /^STARLINK/i;
+
+/** Whether an entry belongs to the constellation the filter singles out. */
+export function isStarlink(name: string): boolean {
+  return STARLINK_NAME.test(name);
+}
+
 /** Mean motion (revolutions per day) occupies columns 53-63 of TLE line 2. */
 const MEAN_MOTION_COLUMNS: [number, number] = [52, 63];
 /** The catalogue number occupies columns 3-7 of either element line. */

@@ -25,11 +25,13 @@ function textOf(element: React.ReactElement): string {
     .trim();
 }
 
-function legend(enabled = allCategories()) {
+function legend(enabled = allCategories(), starlink = true) {
   return (
     <CategoryLegend
       enabledCategories={enabled}
       onToggleCategory={() => undefined}
+      starlink={starlink}
+      onToggleStarlink={() => undefined}
       onEnableAll={() => undefined}
       palette={NIGHT_PALETTE}
     />
@@ -52,9 +54,17 @@ describe("the category filter", () => {
     some.delete("COMMS");
     some.delete("OTHER");
 
-    expect(textOf(legend(some))).toContain("3/5");
+    // Six switches, not five: Starlink has one of its own in the list.
+    expect(textOf(legend(some))).toContain("3/6");
     // Nothing to report while everything is drawn.
-    expect(textOf(legend())).not.toContain("5/5");
+    expect(textOf(legend())).not.toContain("6/6");
+  });
+
+  test("counts Starlink among what it is hiding, since it is half the sky", () => {
+    // The whole point of the switch: a sky with every category on but Starlink
+    // off is still an edited sky, and the closed pill has to say so or the
+    // missing half looks like a bug rather than a setting.
+    expect(textOf(legend(allCategories(), false))).toContain("5/6");
   });
 
   test("the title is the control that opens it", () => {
