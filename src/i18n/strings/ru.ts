@@ -130,7 +130,8 @@ export const ru: Strings = {
       daylight: "Здесь ещё светло — на орбите пока ничего не видно",
       unknown: "На солнце, но его яркость не записана",
       magnitude: "звёздная величина {value}",
-      aboutMagnitude: "звёздная величина около {value}"
+      aboutMagnitude: "звёздная величина около {value}",
+      onPass: "Во время пролёта, в {time}: {verdict}"
     },
     facts: {
       distance: "Расстояние",

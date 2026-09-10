@@ -27,6 +27,7 @@ import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrie
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
+import { UpcomingPass } from "../satellite/upcomingPasses";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
@@ -491,6 +492,7 @@ export const SkyOverlay: React.FC<Props> = ({
             onSelect={(name) => setSelection({ names: selection.names, selected: name })}
             onClose={() => setSelection(null)}
             describeRef={describeRef}
+            pass={passAhead(upcoming, selection.selected)}
             palette={palette}
           />
         )}
@@ -501,6 +503,25 @@ export const SkyOverlay: React.FC<Props> = ({
     </View>
   );
 };
+
+/**
+ * The pass this object still has ahead of it, if it has one.
+ *
+ * What the card needs it for is the tense of its seeing line, so a pass already
+ * under way is not one: its object is on the frame, the figures beside the line
+ * are about that object now, and "when it comes over" is a clause about
+ * something that has happened. The list is soonest first, so the first match is
+ * the next one.
+ *
+ * Answered from the plan the sky is already drawing rather than by asking for
+ * one, which is why a name with no line on the sky — anything outside the
+ * landmark tier — gets `null` and the card's present tense. That is the right
+ * answer for those: nothing plans their passes, and the card would have nothing
+ * to name a time from.
+ */
+function passAhead(passes: readonly UpcomingPass[], name: string): UpcomingPass | null {
+  return passes.find((pass) => pass.name === name && !pass.started) ?? null;
+}
 
 /** One line saying what the sky mask is doing, for the scenes' status panels. */
 function describeMask(anchored: AnchoredSkyMask | null, error: string | null): string {

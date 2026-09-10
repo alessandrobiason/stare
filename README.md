@@ -463,6 +463,22 @@ can be seen. A row is a target like the names written along the paths: it opens
 the same card the object's own mark would, which for a pass that has not begun
 is the card saying how far below the horizon it still is.
 
+**And the card answers in the pass's own tense.** Everything `SkyTracker.describe`
+returns is resolved at the instant it is read, which is right for an object on
+the frame and wrong for one that is under the floor until this evening — and
+between now and a pass three hours out, the sun is what moves most. A card
+opened from the list at two in the afternoon was saying *the sun is still up
+here* about a pass at half past nine, which is true of the moment it was asked
+and false of the thing it was asked about. So a card for a pass that has not
+begun says *When it comes over at 21:31: visible to the eye · magnitude -2.2*
+instead: the verdict `upcomingPasses` already took at that pass's own high
+point, with the clock time that makes the tense readable rather than merely
+correct. The figures under the line stay about now, because that is what they
+are. What decides which tense is the object's own elevation rather than the
+existence of a plan — a station crossing the sky has a next pass too, and its
+mark is on the picture — and it is re-read on the card's own timer, so a card
+left open through a rise switches at the moment the marker appears.
+
 The rows carry a verdict because **a countdown is a promise**. Told "ISS,
 14 min" and sent outside, somebody who finds an empty sky has been given a worse
 answer than no answer — and for most of the day that is the answer the geometry

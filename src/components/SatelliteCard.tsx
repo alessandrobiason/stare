@@ -1,7 +1,15 @@
 import React, { MutableRefObject, useEffect, useState } from "react";
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import { fill, strings } from "../i18n";
-import { kilometres, lookDirection, orbitPeriod, seeing, speed } from "../i18n/format";
+import {
+  kilometres,
+  lookDirection,
+  orbitPeriod,
+  seeing,
+  seeingOnPass,
+  speed
+} from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
 import {
   cachedLandmarkPhoto,
@@ -9,6 +17,7 @@ import {
   loadLandmarkPhoto,
   LandmarkPhoto
 } from "../satellite/landmarkPhotos";
+import { UpcomingPass } from "../satellite/upcomingPasses";
 import { SatelliteDetail } from "../types";
 import { cssColor, MarkerPalette } from "./palette";
 import { theme } from "./theme";
@@ -31,6 +40,18 @@ type Props = {
    * what an epoch is. Returns `null` for a name the catalog no longer carries.
    */
   describeRef: MutableRefObject<(name: string) => SatelliteDetail | null>;
+  /**
+   * The pass this object is about to make, when it has one still ahead of it.
+   *
+   * What it changes is the tense of one line. Everything `describeRef` returns
+   * is resolved at the instant it is read — the right answer for an object on
+   * the frame, and the wrong one for an object that is under the horizon until
+   * this evening, because "can it be seen" is a question about the sky at the
+   * moment it comes over rather than about the sky now. `null` for an object
+   * already up, for one with no planned pass, and for every scene that does not
+   * plan them. See `seeingOnPass`.
+   */
+  pass?: UpcomingPass | null;
   /** The colours the sky is drawn in, so the swatch is the mark on the frame. */
   palette: MarkerPalette;
 };
@@ -92,6 +113,7 @@ export const SatelliteCard: React.FC<Props> = ({
   onSelect,
   onClose,
   describeRef,
+  pass = null,
   palette
 }) => {
   const t = strings();
@@ -196,8 +218,17 @@ export const SatelliteCard: React.FC<Props> = ({
 
       {/* Between what the thing is and where it is, because that is the order
           somebody who has just tapped a mark asks in: what is that, can I see
-          it, where do I look. See `seeing`. */}
-      {detail && <Text style={styles.seeing}>{seeing(detail)}</Text>}
+          it, where do I look.
+
+          In the future tense for an object that has not risen yet: the figures
+          under this line are all about where it is now, and this one alone is
+          about a sky three hours from now, so it names the clock time it
+          answers for. See `seeingOnPass`. */}
+      {detail && (
+        <Text style={styles.seeing}>
+          {answersForPass(detail, pass) ? seeingOnPass(pass) : seeing(detail)}
+        </Text>
+      )}
 
       {detail ? (
         <View style={styles.facts}>
@@ -330,6 +361,28 @@ const Fact: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     </Text>
   </View>
 );
+
+/**
+ * Whether the seeing line is about the pass ahead rather than about now.
+ *
+ * Two things have to be true, and the second is not implied by the first. There
+ * has to be a pass to talk about — and the object has to be somewhere nobody
+ * can look at it yet, which is what makes the present tense the wrong answer.
+ *
+ * An object can have both: the plan carries a landmark's *next* pass even while
+ * it is crossing the sky, so a station on the frame with another turn of the
+ * orbit ahead of it would otherwise be described by the pass in ninety minutes
+ * while its own mark sits on the picture. The elevation decides it, and it is
+ * re-read on this card's own timer -- so a card left open through a rise stops
+ * talking about the evening at the moment the object clears the floor and the
+ * marker appears, rather than at the next replan a minute later.
+ */
+function answersForPass(
+  detail: SatelliteDetail,
+  pass: UpcomingPass | null
+): pass is UpcomingPass {
+  return pass !== null && detail.elevationDeg <= MINIMUM_SATELLITE_ELEVATION_DEG;
+}
 
 const SWATCH_SIZE = 10;
 

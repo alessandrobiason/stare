@@ -132,7 +132,8 @@ export const fr: Strings = {
       daylight: "Ici le Soleil est encore levé — rien en orbite n'est encore visible",
       unknown: "Au soleil, mais sa brillance n'est pas répertoriée",
       magnitude: "magnitude {value}",
-      aboutMagnitude: "magnitude {value} environ"
+      aboutMagnitude: "magnitude {value} environ",
+      onPass: "À son passage, à {time} : {verdict}"
     },
     facts: {
       distance: "Distance",

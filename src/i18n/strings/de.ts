@@ -131,7 +131,8 @@ export const de: Strings = {
       daylight: "Hier steht die Sonne noch — im Orbit ist noch nichts zu sehen",
       unknown: "Im Sonnenlicht; wie hell es leuchtet, ist nicht verzeichnet",
       magnitude: "Magnitude {value}",
-      aboutMagnitude: "Magnitude etwa {value}"
+      aboutMagnitude: "Magnitude etwa {value}",
+      onPass: "Beim Überflug um {time}: {verdict}"
     },
     facts: {
       distance: "Entfernung",

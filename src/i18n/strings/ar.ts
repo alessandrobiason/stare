@@ -128,7 +128,8 @@ export const ar: Strings = {
       daylight: "الشمس ما زالت مرتفعة هنا — لا يُرى شيء في المدار بعد",
       unknown: "في ضوء الشمس، لكن مقدار لمعانه غير مسجَّل",
       magnitude: "القدر الظاهري {value}",
-      aboutMagnitude: "القدر الظاهري نحو {value}"
+      aboutMagnitude: "القدر الظاهري نحو {value}",
+      onPass: "عند مروره في {time}: {verdict}"
     },
     facts: {
       distance: "المسافة",

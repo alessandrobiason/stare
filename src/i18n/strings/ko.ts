@@ -119,7 +119,8 @@ export const ko: Strings = {
       daylight: "여기는 아직 해가 떠 있어 궤도의 물체는 보이지 않습니다",
       unknown: "햇빛을 받고 있지만 밝기는 기록되어 있지 않습니다",
       magnitude: "등급 {value}",
-      aboutMagnitude: "등급 약 {value}"
+      aboutMagnitude: "등급 약 {value}",
+      onPass: "{time}에 지나갈 때: {verdict}"
     },
     facts: {
       distance: "거리",

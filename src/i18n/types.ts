@@ -179,6 +179,23 @@ export type Strings = {
        * `src/satellite/standardMagnitude.ts` for which objects get which.
        */
       aboutMagnitude: string;
+      /**
+       * The same question about a pass that has not begun. `{time}`, `{verdict}`.
+       *
+       * Every other line on the card is resolved at the instant it is drawn,
+       * which is the right tense for an object on the frame and the wrong one
+       * for an object still under the horizon — and between now and a pass
+       * three hours out, the sun is what moves most. So a card opened from the
+       * upcoming-passes list answers about the pass instead, and names the
+       * clock time it is answering about, which is what makes the tense
+       * readable rather than merely correct.
+       *
+       * `{verdict}` is filled from `scene.passes.seeing` — those are fragments
+       * with no tense of their own, which is exactly what a clause about half
+       * past nine needs. The card's own six above are present-tense sentences
+       * and cannot go here. See `seeingOnPass`.
+       */
+      onPass: string;
     };
     facts: {
       distance: string;

@@ -377,7 +377,8 @@ describe("the tapped satellite's card", () => {
   function card(
     details: Record<string, SatelliteDetail | null>,
     names = Object.keys(details),
-    selected = names[0]
+    selected = names[0],
+    pass: UpcomingPass | null = null
   ) {
     const describeRef = { current: (name: string) => details[name] ?? null };
     return (
@@ -387,10 +388,89 @@ describe("the tapped satellite's card", () => {
         onSelect={() => undefined}
         onClose={() => undefined}
         describeRef={describeRef}
+        pass={pass}
         palette={NIGHT_PALETTE}
       />
     );
   }
+
+  describe("a pass that has not begun", () => {
+    /** The station, under the horizon now and crossing a dark sky this evening. */
+    const tonight: UpcomingPass = {
+      name: "ISS",
+      noradId: 25544,
+      category: "LANDMARK",
+      startsAtMs: Date.UTC(2026, 7, 29, 19, 24, 0),
+      endsAtMs: Date.UTC(2026, 7, 29, 19, 34, 0),
+      peakAtMs: Date.UTC(2026, 7, 29, 19, 31, 0),
+      peakElevationDeg: 68,
+      riseAzimuthDeg: 247,
+      setAzimuthDeg: 51,
+      started: false,
+      nakedEye: "visible",
+      apparentMagnitude: -2.2,
+      magnitudeMeasured: true
+    };
+
+    /** The same object as the tracker sees it now: down, and in daylight. */
+    const rightNow = detail({
+      name: "ISS",
+      noradId: 25544,
+      category: "LANDMARK",
+      elevationDeg: -32.5,
+      nakedEye: "daylight",
+      sunAltitudeDeg: 24
+    });
+
+    test("is answered for the sky it will cross, not the sky overhead now", () => {
+      // The bug: a card opened from the list in the afternoon reported the sun
+      // that was up while it was being read, about a pass hours later. The
+      // figures below the line are still about now — this line alone is not.
+      const text = textOf(card({ ISS: rightNow }, ["ISS"], "ISS", tonight));
+
+      expect(text).toContain("visible to the eye");
+      expect(text).toContain("magnitude -2.2");
+      expect(text).not.toContain("The sun is still up here");
+    });
+
+    test("names the time, so which sky it means is not left to be inferred", () => {
+      const text = textOf(card({ ISS: rightNow }, ["ISS"], "ISS", tonight));
+
+      expect(text).toMatch(/When it comes over at \d{1,2}:31/);
+    });
+
+    test("but not for an object that is on the frame right now", () => {
+      // The plan carries a landmark's next pass even while it is crossing the
+      // sky, so the station overhead has one ninety minutes out. Its mark is on
+      // the picture and its figures are live: the question a tap is asking
+      // there is about now, and the evening's pass is not the answer.
+      const overhead = detail({
+        name: "ISS",
+        noradId: 25544,
+        category: "LANDMARK",
+        elevationDeg: 41.2,
+        nakedEye: "visible",
+        apparentMagnitude: -2.4,
+        magnitudeMeasured: true,
+        sunAltitudeDeg: -14
+      });
+      const later = { ...tonight, startsAtMs: tonight.startsAtMs + 90 * 60_000 };
+      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", later));
+
+      expect(text).toContain("Bright enough to see now");
+      expect(text).not.toContain("When it comes over");
+    });
+
+    test("without one, the card is about the sky right now as it always was", () => {
+      // A tap on a mark that is on the frame, or on anything the landmark tier
+      // does not plan a path for: nothing to name a time from, and the object
+      // is up, so the present tense is the correct one.
+      const text = textOf(card({ ISS: rightNow }, ["ISS"], "ISS", null));
+
+      expect(text).toContain("The sun is still up here");
+      expect(text).not.toContain("When it comes over");
+    });
+  });
 
   test("says what the satellite is, where it is and where to look for it", () => {
     const text = textOf(card({ "STARLINK-1234": detail() }));

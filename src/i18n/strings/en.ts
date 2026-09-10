@@ -140,7 +140,8 @@ export const en: Strings = {
       daylight: "The sun is still up here — nothing in orbit can be seen yet",
       unknown: "In sunlight, though how brightly it shines is not recorded",
       magnitude: "magnitude {value}",
-      aboutMagnitude: "around magnitude {value}"
+      aboutMagnitude: "around magnitude {value}",
+      onPass: "When it comes over at {time}: {verdict}"
     },
     facts: {
       distance: "Distance",

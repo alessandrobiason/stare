@@ -131,7 +131,8 @@ export const pt: Strings = {
       daylight: "Aqui o Sol ainda está alto — ainda não se vê nada em órbita",
       unknown: "Ao sol, embora não esteja registado quanto reflete",
       magnitude: "magnitude {value}",
-      aboutMagnitude: "magnitude cerca de {value}"
+      aboutMagnitude: "magnitude cerca de {value}",
+      onPass: "Quando passar, às {time}: {verdict}"
     },
     facts: {
       distance: "Distância",

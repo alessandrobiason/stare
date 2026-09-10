@@ -132,7 +132,8 @@ export const nl: Strings = {
       daylight: "Hier staat de zon nog — in een baan is nog niets te zien",
       unknown: "In het zonlicht, al is niet vastgelegd hoe helder het is",
       magnitude: "magnitude {value}",
-      aboutMagnitude: "magnitude ongeveer {value}"
+      aboutMagnitude: "magnitude ongeveer {value}",
+      onPass: "Bij de overkomst om {time}: {verdict}"
     },
     facts: {
       distance: "Afstand",

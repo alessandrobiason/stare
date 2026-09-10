@@ -169,8 +169,63 @@ export function seeing(look: {
   apparentMagnitude: number | null;
   magnitudeMeasured: boolean;
 }): string {
+  return withMagnitude(strings().card.seeing[look.nakedEye], look);
+}
+
+/**
+ * The same question about a pass that has not begun: not whether it can be seen
+ * now, but whether it can be seen *when it comes over*.
+ *
+ * The one the card was getting wrong. Everything `SkyTracker.describe` returns
+ * is resolved at the current instant, which is the right tense for an object
+ * that is on the frame and the wrong one for an object that is under the floor
+ * for another three hours — and the sun moves further in those three hours than
+ * anything else in the answer. A card opened from the upcoming-passes list at
+ * two in the afternoon was saying "the sun is still up here" about a pass at
+ * half past nine in the evening, which is true of the moment it was asked and
+ * false of the thing it was asked about.
+ *
+ * Nothing is recomputed here. `upcomingPasses` already decides each pass at its
+ * own high point, which is where the verdict is honest and the moment worth
+ * being outside for; this only says it in the card's own words, with the clock
+ * time that makes the tense unambiguous. That time is the high point rather
+ * than the rise for the same reason — it is the instant the verdict belongs to,
+ * and "comes over" is what an object at its highest is doing.
+ */
+export function seeingOnPass(pass: {
+  nakedEye: NakedEyeVerdict;
+  apparentMagnitude: number | null;
+  magnitudeMeasured: boolean;
+  peakAtMs: number;
+}): string {
+  return fill(strings().card.seeing.onPass, {
+    time: clockTime(new Date(pass.peakAtMs)),
+    // The list's own short verdict rather than the card's sentence: the card's
+    // are present tense ("Bright enough to see now"), and a present-tense
+    // sentence inside a clause about half past nine is the bug this fixes.
+    verdict: withMagnitude(passSeeing(pass.nakedEye), pass)
+  });
+}
+
+/**
+ * A verdict with the brightness it rests on, where there is one and it is what
+ * is being judged.
+ *
+ * An object in the Earth's shadow has no magnitude worth printing — it is
+ * reflecting nothing, and the arithmetic says so by running off to infinity —
+ * and in daylight the sky rules out every object overhead whatever its own
+ * brightness, so a figure there would be a number offered in support of a
+ * sentence that does not rest on it.
+ */
+function withMagnitude(
+  verdict: string,
+  look: {
+    nakedEye: NakedEyeVerdict;
+    apparentMagnitude: number | null;
+    magnitudeMeasured: boolean;
+  }
+): string {
   const t = strings().card.seeing;
-  const verdict = t[look.nakedEye];
   const magnitude = look.apparentMagnitude;
   if (!JUDGED_ON_BRIGHTNESS.has(look.nakedEye)) return verdict;
   if (magnitude === null || !Number.isFinite(magnitude)) return verdict;

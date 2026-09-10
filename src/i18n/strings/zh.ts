@@ -118,7 +118,8 @@ export const zh: Strings = {
       daylight: "这里太阳还没落 — 轨道上还什么都看不到",
       unknown: "在阳光下，但它有多亮没有记录",
       magnitude: "星等 {value}",
-      aboutMagnitude: "星等约 {value}"
+      aboutMagnitude: "星等约 {value}",
+      onPass: "{time} 经过时：{verdict}"
     },
     facts: {
       distance: "距离",

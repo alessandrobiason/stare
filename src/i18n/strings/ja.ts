@@ -119,7 +119,8 @@ export const ja: Strings = {
       daylight: "ここはまだ日が高く、軌道上のものは見えません",
       unknown: "陽が当たっていますが、明るさは記録されていません",
       magnitude: "等級 {value}",
-      aboutMagnitude: "等級 約 {value}"
+      aboutMagnitude: "等級 約 {value}",
+      onPass: "{time} に通過するとき: {verdict}"
     },
     facts: {
       distance: "距離",

@@ -11,6 +11,7 @@ import {
   passDirection,
   passSeeing,
   seeing,
+  seeingOnPass,
   speed,
   sunlightSummary,
   timeUntil
@@ -200,6 +201,24 @@ describe("and says it in the space it is given", () => {
     }
   });
 
+  test.each(LOCALES)("%s fits the pass line on the card", (locale) => {
+    setLocaleForTesting(locale);
+    // The same column the card's own seeing line keeps, and the same bound: it
+    // is prose over a photograph, so what is checked is that it wraps to two
+    // lines rather than that it fits on one. This one is the longer of the two
+    // shapes — a clause, a clock time, a verdict and a magnitude.
+    const CARD_COLUMN = 375 - 8 * 2 - 1 * 2 - 10 * 2;
+    for (const verdict of ["visible", "binoculars", "tooFaint"] as const) {
+      const line = seeingOnPass({
+        nakedEye: verdict,
+        apparentMagnitude: -2.24,
+        magnitudeMeasured: false,
+        peakAtMs: Date.UTC(2026, 7, 29, 19, 31, 0)
+      });
+      expect(width(line, 11.5)).toBeLessThan(2 * CARD_COLUMN);
+    }
+  });
+
   test.each(LOCALES)("%s fits the seeing line on the card", (locale) => {
     // The verdict and, where there is one, the magnitude after it. The card
     // runs from `left: 8` to `right: 8`, so on the narrowest phone this ships
@@ -355,6 +374,83 @@ describe("the figures follow the reader's conventions", () => {
     for (const verdict of ["visible", "binoculars", "tooFaint"] as const) {
       expect(passSeeing(verdict)).not.toMatch(/magnitude/i);
     }
+  });
+
+  test("a pass that has not begun is answered in the future tense", () => {
+    setLocaleForTesting("en");
+    // The bug this exists for: the card resolved everything at the instant it
+    // was drawn, so a pass at half past nine in the evening was answered with
+    // the sky at two in the afternoon — "the sun is still up here", about an
+    // object that would be crossing a dark sky.
+    const evening = Date.UTC(2026, 7, 29, 19, 31, 0);
+    const line = seeingOnPass({
+      nakedEye: "visible",
+      apparentMagnitude: -2.2,
+      magnitudeMeasured: true,
+      peakAtMs: evening
+    });
+
+    // The clock time is what makes the tense readable rather than merely
+    // correct: it says which sky is being talked about.
+    expect(line).toMatch(/^When it comes over at \d{1,2}:31/);
+    expect(line).toContain("visible to the eye");
+    expect(line).toContain("magnitude -2.2");
+    // And none of the card's own present-tense sentences, which are what was
+    // wrong with the line before.
+    expect(line).not.toContain("now");
+    expect(line).not.toContain("still up here");
+  });
+
+  test("and carries a figure only where the answer rests on one", () => {
+    setLocaleForTesting("en");
+    const atMs = Date.UTC(2026, 7, 29, 19, 31, 0);
+    // In the Earth's shadow it is reflecting nothing, so the magnitude runs off
+    // to infinity and there is no figure to print — as on the card's own line.
+    const eclipsed = seeingOnPass({
+      nakedEye: "eclipsed",
+      apparentMagnitude: Number.POSITIVE_INFINITY,
+      magnitudeMeasured: true,
+      peakAtMs: atMs
+    });
+    expect(eclipsed).toContain("in the Earth's shadow");
+    expect(eclipsed).not.toMatch(/magnitude/i);
+
+    // A pass that is still in daylight when it comes over says so, which is the
+    // other half of the fix: the answer can be "no" for the pass's own sky.
+    const daylight = seeingOnPass({
+      nakedEye: "daylight",
+      apparentMagnitude: -1.8,
+      magnitudeMeasured: true,
+      peakAtMs: atMs
+    });
+    expect(daylight).toContain("daylight — nothing to see");
+    expect(daylight).not.toMatch(/magnitude/i);
+
+    // Hedged where the brightness is an estimate rather than an observation.
+    expect(
+      seeingOnPass({
+        nakedEye: "binoculars",
+        apparentMagnitude: 5.24,
+        magnitudeMeasured: false,
+        peakAtMs: atMs
+      })
+    ).toContain("around magnitude 5.2");
+  });
+
+  test("the pass line follows the reader's clock and conventions", () => {
+    const atMs = Date.UTC(2026, 7, 29, 19, 31, 0);
+    const pass = {
+      nakedEye: "visible",
+      apparentMagnitude: -2.24,
+      magnitudeMeasured: true,
+      peakAtMs: atMs
+    } as const;
+
+    setLocaleForTesting("de");
+    // A 24-hour clock, a comma for the decimal, and the German short verdict.
+    expect(seeingOnPass(pass)).toContain("Beim Überflug um");
+    expect(seeingOnPass(pass)).toContain("mit bloßem Auge sichtbar");
+    expect(seeingOnPass(pass)).toContain("Magnitude -2,2");
   });
 
   test("the panel says what the count cannot", () => {
