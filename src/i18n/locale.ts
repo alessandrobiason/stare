@@ -148,7 +148,11 @@ type Attempt = { source: LocaleSource; tags: string[] };
  */
 const SOURCES: readonly (() => Attempt)[] = [
   // The web build, and nothing else: React Native defines a `navigator` with
-  // no languages on it, which falls through to the next source.
+  // no languages on it, which falls through to the next source. Node also
+  // defines a global `navigator` (since Node 21) with a real `.languages`,
+  // which would otherwise win here in every Jest run and any other Node
+  // context this module is evaluated in — `document` is what tells the two
+  // apart, since only an actual browser ever defines it.
   () => ({ source: "navigator", tags: navigatorLanguages() }),
   () => ({ source: "settingsManager", tags: appleLanguages() }),
   () => ({ source: "i18nManager", tags: androidLocale() }),
@@ -156,6 +160,7 @@ const SOURCES: readonly (() => Attempt)[] = [
 ];
 
 function navigatorLanguages(): string[] {
+  if (typeof document === "undefined") return [];
   const navigator = (globalThis as { navigator?: Navigator }).navigator;
   if (!navigator) return [];
   if (Array.isArray(navigator.languages) && navigator.languages.length > 0) {
