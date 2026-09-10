@@ -178,19 +178,20 @@ function useEpochSeconds(epochRef: MutableRefObject<OrbitEpoch>): number {
 
 const styles = StyleSheet.create({
   position: {
-    // The row above the bottom edge, not the edge itself: that row is spoken
-    // for in both scenes — the console toggle on the right, the compass notice
-    // across the left, the harness's transport in its place. `bottom: 58` is
-    // the line the satellite card opens from, and this is the same left corner
-    // of it. The card covers this whole band, which is why the overlay does not
-    // draw the panel while one is open, and the compass notice grows upwards
-    // into it, which is why it does not draw it while that is up either.
-    bottom: 58,
+    // The bottom-left corner, level with the console toggle in the opposite
+    // one — the same `bottom: 12` every panel in this row keeps, so the two
+    // sides read as one row rather than one of them floating above it. The
+    // compass notice shares this exact corner; the overlay does not draw this
+    // panel while that is up, or while a card covers the row instead.
+    bottom: 12,
     left: 12,
     // The padding is the header's, so the whole pill is the tap target rather
     // than a line of text with dead margin around it — as the two above it.
-    padding: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)"
+    padding: 0
+    // Background left to `panelStyles.panel`, which is `theme.color.panel` —
+    // the same tone the console toggle and the filter panel are drawn in.
+    // This used to override it with a lighter, more transparent black, which
+    // read as a different (and unintentional) design from its neighbours.
   },
   header: {
     flexDirection: "row",

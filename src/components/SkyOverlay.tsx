@@ -457,13 +457,14 @@ export const SkyOverlay: React.FC<Props> = ({
           palette={palette}
         />
 
-        {/* What is coming, above the bottom row. Not while a card is open: the
-            card is the width of the screen and opens from this same line, and
-            it is the answer to the row that was tapped anyway. Not while the
-            compass notice is up, which stands under this and grows into it —
-            and which says the bearings this panel is about to give are tens of
-            degrees out. Not under the debug overlays either, for the reason the
-            card is not: the picture there is the mask's. */}
+        {/* What is coming, bottom left — level with the console toggle in the
+            opposite corner. Not while a card is open: the card is the width of
+            the screen and opens from just above this row, and it is the answer
+            to the row that was tapped anyway. Not while the compass notice is
+            up, which takes this exact corner and says the bearings this panel
+            is about to give are tens of degrees out. Not under the debug
+            overlays either, for the reason the card is not: the picture there
+            is the mask's. */}
         {!debug && !selection && !compassWarning && (
           <UpcomingPasses
             passes={upcoming}
