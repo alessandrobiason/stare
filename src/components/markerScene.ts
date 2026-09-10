@@ -1,5 +1,5 @@
 import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../constants";
-import { MarkerFrame, MarkerPath } from "../hooks/useAnimatedMarkers";
+import { MarkerFrame, MarkerPath, SatelliteMarker } from "../hooks/useAnimatedMarkers";
 import { clockTime } from "../i18n/format";
 import {
   FrameSize,
@@ -61,6 +61,11 @@ import { Ink, MarkerPalette } from "./palette";
  * - **Size** is distance, on a log scale.
  * - **A label** is spent only on the landmarks, and only where two of them do
  *   not collide.
+ *
+ * And one that is new, and is not about where the object is at all: **how
+ * strongly the mark is drawn** says whether the sun is on it. An object in the
+ * Earth's shadow has nothing to reflect and cannot be seen however clear the
+ * sky is, so it is drawn at half strength — see `sunlightAlpha`.
  *
  * Every mark is a coloured core inside a contrasting rim, because the
  * background is a photograph of the sky and so is either much brighter or much
@@ -320,7 +325,7 @@ export function buildMarkerScene(
           : { radius: (size - ring) / 2, width: ring },
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
       color,
-      alpha: marker.opacity
+      alpha: marker.opacity * sunlightAlpha(marker)
     });
 
     if (marker.name === selectedName) {
@@ -492,6 +497,47 @@ function tailFor(x: number, y: number, reach: TrailReach, width: number): TailSh
 /** Width the marker sizes in `constants.ts` are quoted in. */
 export const DESIGN_FRAME_WIDTH_PX = 720;
 /**
+ * How far to fade a marker for want of sunlight, as a factor on its opacity.
+ *
+ * **A mark at full strength means the sun is on it.** Half of every orbit is
+ * spent inside the Earth's shadow, and an object in there is reflecting
+ * nothing: the marker is over a piece of sky with nothing in it to see. Until
+ * the shadow was worked out (`src/satellite/illumination.ts`) the overlay drew
+ * those exactly as it drew the lit ones, which on a clear evening is half the
+ * marks on the frame pointing at nothing — and no way to tell which half.
+ *
+ * Opacity is the channel it costs, and it is the only one going spare. The four
+ * the overlay already carries are all in use at rest — hue for what the object
+ * is for, fill and shape for whether it holds station, size for range, a name
+ * for the landmarks — and spending any of them would be trading one fact for
+ * another. Opacity is not: at rest a marker is either faded fully in or has
+ * been dropped, and everything in between belongs to the crossfade the terrain
+ * mask arbitrates (`MarkerVisibilityFilter`), which is a transition rather than
+ * something to read. A marker held permanently at half strength is a state
+ * nothing else produces.
+ *
+ * It is also the channel that means the right thing. An object in the Earth's
+ * shadow *is* dimmer — infinitely so — and a fainter mark for a fainter object
+ * needs no key to be guessed at. Applied here rather than on the marker itself
+ * so it lands after the loop has decided what is worth drawing at all: this is
+ * how a satellite looks, not whether it is on the frame.
+ *
+ * A factor rather than a replacement, so an eclipsed marker still fades in and
+ * out behind a roof like any other — the two compound, which is honest, since
+ * such a marker really is both.
+ *
+ * The mark and nothing else. A landmark's name and the ring around a tapped
+ * object are the app's own annotations rather than light coming off a
+ * satellite, and both stay at full strength: somebody wants to read `ISS` and
+ * to see which mark they have selected exactly as much when the thing is in the
+ * Earth's shadow — arguably more, since that is the case they are going to ask
+ * a question about.
+ */
+function sunlightAlpha(marker: SatelliteMarker): number {
+  return marker.sunlit === "eclipsed" ? SHADOW_ALPHA : 1;
+}
+
+/**
  * Trail width where it meets the body, as a fraction of the marker's diameter.
  *
  * The icon's own proportion: its trail is a little under half the radius of the
@@ -505,6 +551,17 @@ const MIN_OUTLINE_PX = 1;
 /** Thickness of the parked ring, as a fraction of its diameter. */
 const RING_RATIO = 0.17;
 const MIN_RING_PX = 1;
+/**
+ * What is left of a marker with no sun on it. See `sunlightAlpha`.
+ *
+ * Half, which is far enough to read as a different kind of mark at a glance and
+ * not so far that the object is lost: it is still there, it still has a colour,
+ * a size and a heading, and all three are how somebody finds it again when it
+ * comes back into the sunlight a few minutes later. Fading it to near nothing
+ * would be the overlay deciding on somebody's behalf that an object it can
+ * place exactly is not worth showing them.
+ */
+const SHADOW_ALPHA = 0.5;
 const HALO_MARGIN_PX = 6;
 /** Clear sky left between a mark and the ring saying it is selected. */
 const SELECTION_GAP_PX = 4;

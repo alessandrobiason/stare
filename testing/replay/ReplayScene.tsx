@@ -122,7 +122,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         enabledCategories={controls.enabledCategories}
         onToggleCategory={controls.toggleCategory}
         onEnableAll={controls.enableAllCategories}
-        onVisibleSatelliteCountChange={controls.setMarkerCount}
+        onSkyChange={controls.setSky}
         onMaskStatusChange={setMaskStatus}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
@@ -162,7 +162,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
           layout as well as its view. A browser window has no notch, so what
           it insets here is nothing at all. See `SafeAreaLayer`. */}
       <SafeAreaLayer>
-        <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
+        <SceneStatus sky={controls.sky} />
 
         {/* After the overlay, so the transport is over the tap target the scene
             lays across the picture rather than under it. */}

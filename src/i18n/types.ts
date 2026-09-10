@@ -38,6 +38,27 @@ export type Strings = {
       /** The last row: fleets with no name worth printing, and the long tail. */
       other: string;
     };
+    /**
+     * Whether any of what is drawn can actually be seen, which is the thing a
+     * count of markers cannot say on its own.
+     *
+     * A satellite is sunlight bounced off metal, so it needs the sun on it and
+     * darkness underneath it. A sky drawn full of marks at noon has nothing in
+     * it to look at, and so does a night sky whose objects are all in the
+     * Earth's shadow — and until this panel said one of these, the number in
+     * the corner was the same in both cases as on a clear evening with the
+     * station coming over. See `src/satellite/illumination.ts`.
+     */
+    sunlight: {
+      /** The sun is up here, so nothing overhead can be picked out of the sky. */
+      daylight: string;
+      /** Dark here, but every mark on the frame is in the Earth's shadow. */
+      none: string;
+      /** Dark here, and some of them are lit. `{count}`. */
+      some: string;
+      /** Dark here, and all of them are lit. */
+      all: string;
+    };
   };
   filter: {
     /** The panel's own title, closed and open. Short: it is a pill over the sky. */
@@ -47,6 +68,16 @@ export type Strings = {
     showAll: string;
     /** Why a quarter of a southward sky is rings that never move. */
     ringKey: string;
+    /**
+     * And why half the marks on a clear night are drawn faintly.
+     *
+     * The only channel a mark spends on something other than where the object
+     * is. An object in the Earth's shadow has no sunlight to throw back and
+     * cannot be seen however clear the sky is, so it is drawn at half strength;
+     * without this line that is a difference somebody can see and not account
+     * for. See `src/components/markerScene.ts`.
+     */
+    shadowKey: string;
     categories: Record<SatelliteCategory, string>;
   };
   card: {
@@ -67,6 +98,44 @@ export type Strings = {
     photo: string;
     /** The catalog is reloaded underneath an open card, and objects leave it. */
     missing: string;
+    /**
+     * Whether this object can be seen from here, right now.
+     *
+     * The question the card exists to lead up to, and the one the overlay could
+     * not answer at all until the sun was brought into it. It sits between what
+     * the thing *is* and where it is, because that is the order somebody who
+     * has just tapped a mark asks in: what is that, can I see it, where do I
+     * look. See `src/satellite/nakedEye.ts` for what decides which of these is
+     * shown.
+     */
+    seeing: {
+      /** Lit, dark here, and bright enough to find by eye. */
+      visible: string;
+      /** Lit and dark here, but past what an unaided eye picks up. */
+      binoculars: string;
+      /** Lit and dark here, and far below anything but a telescope. */
+      tooFaint: string;
+      /** In the Earth's shadow: no sunlight on it, so nothing to see. */
+      eclipsed: string;
+      /** The sun is up here, which rules out the whole sky rather than this one object. */
+      daylight: string;
+      /** Lit, but nobody has recorded how reflective this object is. */
+      unknown: string;
+      /**
+       * The brightness itself, appended to the three cases that have one.
+       * `{value}`, and smaller means brighter — the scale runs backwards.
+       */
+      magnitude: string;
+      /**
+       * The same where the figure is inferred from the size and class of the
+       * spacecraft rather than measured. `{value}`.
+       *
+       * A separate string rather than a word bolted onto the one above, because
+       * hedging a number is not a prefix in every language. See
+       * `src/satellite/standardMagnitude.ts` for which objects get which.
+       */
+      aboutMagnitude: string;
+    };
     facts: {
       distance: string;
       altitude: string;

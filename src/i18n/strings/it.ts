@@ -72,6 +72,12 @@ export const it: Strings = {
       title: "IN VISTA",
       empty: "Niente in vista",
       other: "Altri"
+    },
+    sunlight: {
+      daylight: "È giorno — nessuno di questi è ancora visibile",
+      none: "Sono tutti nell'ombra della Terra",
+      some: "{count} di questi sono illuminati dal Sole",
+      all: "Sono tutti illuminati dal Sole"
     }
   },
   filter: {
@@ -79,6 +85,7 @@ export const it: Strings = {
     open: "Filtro per categoria",
     showAll: "MOSTRA TUTTI",
     ringKey: "ANELLO = FERMO SULL'EQUATORE",
+    shadowKey: "SBIADITO = NELL'OMBRA DELLA TERRA",
     categories: {
       LANDMARK: "DA NON PERDERE",
       NAVIGATION: "NAVIGAZIONE",
@@ -94,6 +101,16 @@ export const it: Strings = {
     openSite: "Apri {site}",
     photo: "Fotografia: {name}",
     missing: "Questo satellite non è più nel catalogo.",
+    seeing: {
+      visible: "Abbastanza luminoso da vedersi adesso",
+      binoculars: "Illuminato dal Sole, ma servirebbe un binocolo",
+      tooFaint: "Illuminato dal Sole, ma troppo debole per vederlo",
+      eclipsed: "Nell'ombra della Terra: non c'è luce da riflettere",
+      daylight: "Qui il Sole è ancora alto — non si vede ancora nulla in orbita",
+      unknown: "Illuminato dal Sole, ma non è registrato quanto rifletta",
+      magnitude: "magnitudine {value}",
+      aboutMagnitude: "magnitudine circa {value}"
+    },
     facts: {
       distance: "Distanza",
       altitude: "Quota",

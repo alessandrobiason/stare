@@ -80,6 +80,12 @@ export const en: Strings = {
       title: "IN VIEW",
       empty: "Nothing in view",
       other: "Others"
+    },
+    sunlight: {
+      daylight: "Daylight — none of these can be seen yet",
+      none: "All of these are in the Earth's shadow",
+      some: "{count} of these are in sunlight",
+      all: "All of these are in sunlight"
     }
   },
   filter: {
@@ -87,6 +93,7 @@ export const en: Strings = {
     open: "Category filter",
     showAll: "SHOW ALL",
     ringKey: "RING = PARKED OVER THE EQUATOR",
+    shadowKey: "FAINT = IN THE EARTH'S SHADOW",
     categories: {
       LANDMARK: "LANDMARKS",
       NAVIGATION: "NAVIGATION",
@@ -102,6 +109,16 @@ export const en: Strings = {
     openSite: "Open {site}",
     photo: "Photograph of {name}",
     missing: "This satellite has left the catalog.",
+    seeing: {
+      visible: "Bright enough to see now",
+      binoculars: "In sunlight, but you would want binoculars",
+      tooFaint: "In sunlight, and far too faint to see",
+      eclipsed: "In the Earth's shadow, with no sunlight on it to see",
+      daylight: "The sun is still up here — nothing in orbit can be seen yet",
+      unknown: "In sunlight, though how brightly it shines is not recorded",
+      magnitude: "magnitude {value}",
+      aboutMagnitude: "around magnitude {value}"
+    },
     facts: {
       distance: "Distance",
       altitude: "Altitude",

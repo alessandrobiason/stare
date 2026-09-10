@@ -1,4 +1,14 @@
-import { sunAltitudeDeg } from "../src/coordinates/sunAltitude";
+import { Body, Equator, Observer } from "astronomy-engine";
+import { celestialPosition } from "../src/coordinates/celestialBodies";
+import { sunAltitudeDeg, sunEciKm } from "../src/coordinates/sunAltitude";
+import {
+  azimuthDeg,
+  createObserverFrame,
+  eciToEnuInFrame,
+  elevationDeg,
+  gmstAt
+} from "../src/coordinates/transform";
+import { wrapDegrees360 } from "../src/math/angles";
 import { ObserverLocation } from "../src/types";
 
 const GREENWICH: ObserverLocation = { latitudeDeg: 51.4778, longitudeDeg: -0.0015, heightM: 0 };
@@ -60,4 +70,86 @@ test("keeps the sun down all day inside the Arctic circle in December", () => {
     const when = new Date(Date.UTC(2026, 11, 21, hour));
     expect(sunAltitudeDeg(SVALBARD, when)).toBeLessThan(-6);
   }
+});
+
+/**
+ * The same series, read as a vector rather than as an altitude.
+ *
+ * `sunEciKm` is what casts the Earth's shadow (`src/satellite/illumination.ts`),
+ * and a shadow pointed the wrong way is not a thing anybody would notice by
+ * looking at the app: every satellite would simply be lit at the wrong times of
+ * night. So it is checked twice — once against the altitude the same file
+ * computes by a different route, and once against Astronomy Engine, which is
+ * built on VSOP87 and shares no arithmetic with it at all.
+ */
+describe("the sun as a direction", () => {
+  /** Where the vector puts the sun, seen from `observer`. */
+  function horizon(observer: ObserverLocation, when: Date) {
+    const enu = eciToEnuInFrame(
+      sunEciKm(when),
+      gmstAt(when),
+      createObserverFrame(observer)
+    );
+    return { azimuthDeg: wrapDegrees360(azimuthDeg(enu)), altitudeDeg: elevationDeg(enu) };
+  }
+
+  test("agrees with the altitude the same series computes directly", () => {
+    // Two routes out of one set of coordinates: this one assembles a vector and
+    // rotates it into the observer's frame, `sunAltitudeDeg` solves the
+    // spherical triangle. They must land on the same sun, or one of the two is
+    // assembling its axes wrongly — which no amount of looking at the app finds.
+    //
+    // They do not land on it exactly, and the gap is the one thing that
+    // separates them: this route subtracts the observer's own position from the
+    // sun's, and the triangle does not. That difference is solar parallax —
+    // standing on the surface rather than at the centre moves the sun by the
+    // Earth's radius over an astronomical unit, which is 8.8 arcseconds at its
+    // largest. Anything wider than that is not parallax and is a fault.
+    const PARALLAX_DEG = 6378.137 / 149_597_870.7 * (180 / Math.PI);
+
+    for (const when of ["2026-03-20T09:00:00Z", "2026-06-21T18:30:00Z", "2026-12-21T12:00:00Z"]) {
+      const at = new Date(when);
+      for (const observer of [GREENWICH, SVALBARD, EQUATOR]) {
+        const gap = Math.abs(horizon(observer, at).altitudeDeg - sunAltitudeDeg(observer, at));
+        expect(gap).toBeLessThanOrEqual(PARALLAX_DEG);
+      }
+    }
+  });
+
+  test("and with Astronomy Engine, to the tenth of a degree the series claims", () => {
+    // The independent check. Azimuth rather than altitude for the tight one,
+    // because `celestialPosition` refracts what it returns and this does not —
+    // refraction lifts a body near the horizon by up to half a degree and
+    // leaves its bearing alone. See `celestialBodies.ts`.
+    const at = new Date("2026-09-10T13:00:00Z");
+    const mine = horizon(GREENWICH, at);
+    const theirs = celestialPosition("sun", GREENWICH, at);
+
+    expect(mine.azimuthDeg).toBeCloseTo(theirs.azimuthDeg, 1);
+    // High enough that refraction is a hundredth of a degree rather than half of
+    // one, so the two are comparable without correcting for it.
+    expect(theirs.altitudeDeg).toBeGreaterThan(30);
+    expect(mine.altitudeDeg).toBeCloseTo(theirs.altitudeDeg, 1);
+  });
+
+  test("carries the distance the shadow's cones are shaped by", () => {
+    // The Earth's orbit is an ellipse, so the sun is 3.3% nearer in January than
+    // in July — which is what makes the umbra a converging cone of a particular
+    // length rather than a cylinder. Checked against Astronomy Engine's own
+    // figure in astronomical units.
+    for (const when of ["2026-01-03T00:00:00Z", "2026-07-05T00:00:00Z"]) {
+      const at = new Date(when);
+      const site = new Observer(GREENWICH.latitudeDeg, GREENWICH.longitudeDeg, 0);
+      const theirs = Equator(Body.Sun, at, site, true, true).dist * 149_597_870.7;
+      const sun = sunEciKm(at);
+
+      expect(Math.hypot(sun.x, sun.y, sun.z) / theirs).toBeCloseTo(1, 3);
+    }
+
+    const perihelion = sunEciKm(new Date("2026-01-03T00:00:00Z"));
+    const aphelion = sunEciKm(new Date("2026-07-05T00:00:00Z"));
+    expect(Math.hypot(perihelion.x, perihelion.y, perihelion.z)).toBeLessThan(
+      Math.hypot(aphelion.x, aphelion.y, aphelion.z)
+    );
+  });
 });

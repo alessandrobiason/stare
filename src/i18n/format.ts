@@ -1,3 +1,4 @@
+import { NakedEyeVerdict, SkyDarkness } from "../satellite/nakedEye";
 import { fill, strings } from "./index";
 import { activeLocale, Locale, LocaleReport, localeReport } from "./locale";
 
@@ -146,6 +147,69 @@ function timeFormat(tags: readonly string[]): Intl.DateTimeFormat | null {
     return null;
   }
 }
+
+/**
+ * Whether this object can be seen from here, right now, in one line.
+ *
+ * The question the whole card leads up to, and the one the overlay had no way
+ * of answering: a satellite is sunlight bounced off metal, so it needs the sun
+ * on it and darkness underneath it, and for most of the day neither the marker
+ * nor any figure beside it said which of those was missing.
+ *
+ * The brightness is appended only where there is one to append and it is the
+ * thing being judged. An object in the Earth's shadow has no magnitude worth
+ * printing — it is reflecting nothing, and the arithmetic says so by running
+ * off to infinity — and in daylight the sky rules out every object overhead
+ * whatever its own brightness, so a figure there would be a number offered in
+ * support of a sentence that does not rest on it. See
+ * `src/satellite/nakedEye.ts`.
+ */
+export function seeing(look: {
+  nakedEye: NakedEyeVerdict;
+  apparentMagnitude: number | null;
+  magnitudeMeasured: boolean;
+}): string {
+  const t = strings().card.seeing;
+  const verdict = t[look.nakedEye];
+  const magnitude = look.apparentMagnitude;
+  if (!JUDGED_ON_BRIGHTNESS.has(look.nakedEye)) return verdict;
+  if (magnitude === null || !Number.isFinite(magnitude)) return verdict;
+
+  // Hedged where the standard magnitude behind it is an estimate from the size
+  // and class of the spacecraft rather than somebody's observation.
+  const figure = fill(look.magnitudeMeasured ? t.magnitude : t.aboutMagnitude, {
+    value: oneDecimal(magnitude)
+  });
+  return `${verdict} · ${figure}`;
+}
+
+/**
+ * Whether any of what is drawn can actually be seen, in one line.
+ *
+ * The count in the corner is a fact about the overlay: this many marks are on
+ * the picture. That is not the same fact as "this many satellites are up there
+ * to look at", and for most of the day the two are as far apart as they get —
+ * at noon the frame carries seventy marks and the sky above it is empty to the
+ * eye, because a satellite is sunlight bounced off metal and the sun is
+ * drowning all of it.
+ *
+ * So the panel that opens to say *what* the marks are says this first, in the
+ * order the two questions matter: is it dark enough here to see anything at
+ * all, and are the objects themselves in the sunlight. See `SceneStatus`.
+ */
+export function sunlightSummary(sky: {
+  count: number;
+  sunlit: number;
+  darkness: SkyDarkness;
+}): string {
+  const t = strings().scene.sunlight;
+  if (sky.darkness === "daylight") return t.daylight;
+  if (sky.sunlit === 0) return t.none;
+  return sky.sunlit === sky.count ? t.all : fill(t.some, { count: sky.sunlit });
+}
+
+/** The verdicts that rest on a magnitude, and so are worth printing one beside. */
+const JUDGED_ON_BRIGHTNESS = new Set<NakedEyeVerdict>(["visible", "binoculars", "tooFaint"]);
 
 /** The eight-point compass direction a bearing falls in, in the local compass. */
 export function compassPoint(azimuthDeg: number): string {

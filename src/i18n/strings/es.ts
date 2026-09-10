@@ -72,6 +72,12 @@ export const es: Strings = {
       title: "A LA VISTA",
       empty: "Nada a la vista",
       other: "Otros"
+    },
+    sunlight: {
+      daylight: "Es de día — todavía no se ve ninguno",
+      none: "Todos están en la sombra de la Tierra",
+      some: "{count} de ellos están iluminados por el Sol",
+      all: "Todos están iluminados por el Sol"
     }
   },
   filter: {
@@ -79,6 +85,7 @@ export const es: Strings = {
     open: "Filtro por categoría",
     showAll: "MOSTRAR TODO",
     ringKey: "ANILLO = FIJO SOBRE EL ECUADOR",
+    shadowKey: "TENUE = EN LA SOMBRA DE LA TIERRA",
     categories: {
       LANDMARK: "IMPRESCINDIBLES",
       NAVIGATION: "NAVEGACIÓN",
@@ -94,6 +101,16 @@ export const es: Strings = {
     openSite: "Abrir {site}",
     photo: "Fotografía: {name}",
     missing: "Este satélite ya no está en el catálogo.",
+    seeing: {
+      visible: "Lo bastante brillante para verlo ahora",
+      binoculars: "Iluminado por el Sol, pero harían falta prismáticos",
+      tooFaint: "Iluminado por el Sol, pero demasiado débil para verlo",
+      eclipsed: "En la sombra de la Tierra: no hay luz que reflejar",
+      daylight: "Aquí el Sol sigue alto — todavía no se ve nada en órbita",
+      unknown: "Iluminado por el Sol, aunque no está registrado cuánto refleja",
+      magnitude: "magnitud {value}",
+      aboutMagnitude: "magnitud en torno a {value}"
+    },
     facts: {
       distance: "Distancia",
       altitude: "Altitud",

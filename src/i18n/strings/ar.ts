@@ -68,6 +68,12 @@ export const ar: Strings = {
       title: "في المشهد",
       empty: "لا شيء في المشهد",
       other: "أخرى"
+    },
+    sunlight: {
+      daylight: "النهار — لا يمكن رؤية أي منها بعد",
+      none: "جميعها في ظل الأرض",
+      some: "{count} منها في ضوء الشمس",
+      all: "جميعها في ضوء الشمس"
     }
   },
   filter: {
@@ -75,6 +81,7 @@ export const ar: Strings = {
     open: "تصفية حسب الفئة",
     showAll: "إظهار الكل",
     ringKey: "الحلقة = ثابت فوق خط الاستواء",
+    shadowKey: "باهت = في ظل الأرض",
     categories: {
       LANDMARK: "معالم بارزة",
       NAVIGATION: "ملاحة",
@@ -90,6 +97,16 @@ export const ar: Strings = {
     openSite: "فتح {site}",
     photo: "صورة {name}",
     missing: "لم يعد هذا القمر في الفهرس.",
+    seeing: {
+      visible: "ساطع بما يكفي لرؤيته الآن",
+      binoculars: "في ضوء الشمس، لكنك ستحتاج منظاراً",
+      tooFaint: "في ضوء الشمس، لكنه خافت جداً على الرؤية",
+      eclipsed: "في ظل الأرض، فلا ضوء يعكسه",
+      daylight: "الشمس ما زالت مرتفعة هنا — لا يُرى شيء في المدار بعد",
+      unknown: "في ضوء الشمس، لكن مقدار لمعانه غير مسجَّل",
+      magnitude: "القدر الظاهري {value}",
+      aboutMagnitude: "القدر الظاهري نحو {value}"
+    },
     facts: {
       distance: "المسافة",
       altitude: "الارتفاع",

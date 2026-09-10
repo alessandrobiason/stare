@@ -60,6 +60,12 @@ export const ja: Strings = {
       title: "表示中",
       empty: "表示中の衛星はありません",
       other: "その他"
+    },
+    sunlight: {
+      daylight: "昼間 — まだどれも見えません",
+      none: "すべて地球の影の中です",
+      some: "このうち {count} 個が太陽に照らされています",
+      all: "すべて太陽に照らされています"
     }
   },
   filter: {
@@ -67,6 +73,7 @@ export const ja: Strings = {
     open: "カテゴリのフィルタ",
     showAll: "すべて表示",
     ringKey: "リング = 赤道上で静止",
+    shadowKey: "淡い印 = 地球の影の中",
     categories: {
       LANDMARK: "注目の天体",
       NAVIGATION: "測位",
@@ -82,6 +89,16 @@ export const ja: Strings = {
     openSite: "{site} を開く",
     photo: "{name} の写真",
     missing: "この衛星はカタログから外れました。",
+    seeing: {
+      visible: "いま見えるだけの明るさです",
+      binoculars: "陽が当たっていますが、双眼鏡が要ります",
+      tooFaint: "陽が当たっていますが、暗すぎて見えません",
+      eclipsed: "地球の影の中で、反射する光がありません",
+      daylight: "ここはまだ日が高く、軌道上のものは見えません",
+      unknown: "陽が当たっていますが、明るさは記録されていません",
+      magnitude: "等級 {value}",
+      aboutMagnitude: "等級 約 {value}"
+    },
     facts: {
       distance: "距離",
       altitude: "高度",

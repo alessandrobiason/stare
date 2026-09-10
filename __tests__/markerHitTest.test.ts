@@ -16,6 +16,7 @@ function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
     rangeKm: 1200,
     next: null,
     opacity: 1,
+    sunlit: "sunlit",
     ...overrides
   };
 }

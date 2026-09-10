@@ -19,6 +19,7 @@ import {
   setLocale
 } from "../i18n/locale";
 import { CelestialAlignmentStats } from "../hooks/useCelestialAlignment";
+import { sunAltitudeDeg } from "../coordinates/sunAltitude";
 import { CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
@@ -26,6 +27,7 @@ import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
 import { MarkerStats } from "../hooks/useAnimatedMarkers";
 import { SkySegmentationStats } from "../hooks/useSkySegmentation";
 import { wrapDegrees360 } from "../math/angles";
+import { skyDarknessAt } from "../satellite/nakedEye";
 import { SkyTrackerStats } from "../satellite/skyTracker";
 import { ObserverLocation } from "../types";
 import { AnchoredSkyMask, maskOffsetDeg } from "../vision/anchoredMask";
@@ -389,6 +391,13 @@ export function skySection({ tracker, markers, memory, epoch }: SkyDebugInput): 
       { label: `Above ${MINIMUM_SATELLITE_ELEVATION_DEG}°`, value: `${markers.drawn + markers.occluded}` },
       { label: "Drawn", value: `${markers.drawn}` },
       { label: "Behind terrain", value: `${markers.occluded}` },
+      // Of the drawn ones, how many the sun is actually on. A clear night sky
+      // with nothing to see is an ordinary thing rather than a fault — half of
+      // every orbit is spent inside the Earth's shadow — and these two rows are
+      // what tell that apart from a shadow cast against the wrong sun, which
+      // would look identical on the frame. See `src/satellite/illumination.ts`.
+      { label: "In sunlight", value: `${markers.drawn - markers.eclipsed}` },
+      { label: "In Earth's shadow", value: `${markers.eclipsed}` },
       // Not behind anything as far as anyone knows: nothing has been aimed at
       // that sky yet, and an unlooked-at direction is not drawn.
       { label: "Sky not yet seen", value: `${markers.unmapped}` },
@@ -408,6 +417,16 @@ export function skySection({ tracker, markers, memory, epoch }: SkyDebugInput): 
         value: `${SATELLITE_TRACKING.sweepPeriodSeconds.toFixed(0)} s · ${Math.round(
           tracker.sweepProgress * 100
         )}%${tracker.primed ? "" : " priming"}`
+      },
+      // The other half of whether anything can be seen, and the half that is
+      // about the observer rather than the objects: a sunlit satellite over a
+      // sunlit sky is still nothing anybody can pick out. See `nakedEye.ts`.
+      {
+        label: "Sun here",
+        value: `${sunAltitudeDeg(epoch.observer, epoch.time).toFixed(1)}° · ${skyDarknessAt(
+          epoch.observer,
+          epoch.time
+        )}`
       },
       { label: "Epoch", value: clockTime(epoch.time) },
       { label: "Observer", value: position(epoch.observer) },

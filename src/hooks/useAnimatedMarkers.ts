@@ -16,6 +16,8 @@ import { clamp } from "../math/angles";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
 import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
+import { SunlitState } from "../satellite/illumination";
+import { SkyDarkness, skyDarknessAt } from "../satellite/nakedEye";
 import { pathFrom, SkyPass } from "../satellite/orbitPath";
 import { OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
@@ -45,6 +47,16 @@ export type SatelliteMarker = {
    * between the two answers instead of blinking. See `MarkerVisibilityFilter`.
    */
   opacity: number;
+  /**
+   * Whether the sun is on it, which decides how strongly the mark is drawn.
+   *
+   * The overlay's other channels are all about *where* the object is. This one
+   * is about whether there is anything there to see: half of every orbit is
+   * spent in the Earth's shadow, and a mark for an unlit object over a clear
+   * night sky is the overlay pointing at nothing. See `illumination.ts` for the
+   * geometry and `markerScene.ts` for what is done with it.
+   */
+  sunlit: SunlitState;
 };
 
 /**
@@ -131,6 +143,28 @@ function drawOrder(marker: SatelliteMarker): number {
   return marker.category === "LANDMARK" ? Number.POSITIVE_INFINITY : -marker.rangeKm;
 }
 
+/**
+ * What is on the sky, as the corner panel reports it.
+ *
+ * The count is what it always was — the marks inside the visible window — and
+ * the two figures beside it are what that count leaves unsaid. A sky drawn full
+ * of marks is not a sky with anything in it to look at: the objects may be in
+ * the Earth's shadow, or the sun may still be up here, and in either case the
+ * honest answer to "what can I see" is none of them. Published together because
+ * they are read together, and because a count without them was the one figure
+ * on the screen that could be true and misleading at the same time.
+ */
+export type SkySummary = {
+  /** Marks inside the visible window: the number the corner shows. */
+  count: number;
+  /** What they are, largest fleet first. */
+  fleets: FleetBreakdown;
+  /** How many of those marks are lit by the sun rather than in the Earth's shadow. */
+  sunlit: number;
+  /** And whether it is dark enough here for a lit one to be picked out. */
+  darkness: SkyDarkness;
+};
+
 /** What the last drawn frame did with the satellites it was handed. */
 export type MarkerStats = {
   /**
@@ -157,6 +191,17 @@ export type MarkerStats = {
    * counts is markers that would have been undrawable until the next pass.
    */
   remembered: number;
+  /**
+   * Drawn markers with no sun on them: objects that are up there, are not
+   * behind anything, and still cannot be seen.
+   *
+   * The figure that separates an empty-looking sky the app is right about from
+   * one it is wrong about. A clear night with nothing visible is an ordinary
+   * thing — half of every orbit is spent in the Earth's shadow — and without
+   * this there was no way to tell that apart from a shadow computed against the
+   * wrong sun, which would look exactly the same on the frame.
+   */
+  eclipsed: number;
   /**
    * Landmark paths crossing the frame, out of the handful planned.
    *
@@ -448,10 +493,10 @@ type AnimatedMarkerOptions = {
    */
   viewport?: FrameViewport;
   /**
-   * Told how many markers are on screen and what they are: on a change, and no
-   * more often than `VISIBLE_COUNT_INTERVAL_MS`.
+   * Told what is on screen and whether any of it can be seen: on a change, and
+   * no more often than `VISIBLE_COUNT_INTERVAL_MS`.
    */
-  onVisibleCountChange: (count: number, breakdown: FleetBreakdown) => void;
+  onSkyChange: (summary: SkySummary) => void;
 };
 
 /**
@@ -483,7 +528,7 @@ export function useAnimatedMarkers({
   maskFiltering,
   enabledCategories,
   viewport = WHOLE_FRAME,
-  onVisibleCountChange
+  onSkyChange
 }: AnimatedMarkerOptions): AnimatedMarkers {
   const tracker = useMemo(
     () => new SkyTracker(catalog, MINIMUM_SATELLITE_ELEVATION_DEG),
@@ -506,13 +551,14 @@ export function useAnimatedMarkers({
   // being dragged — and the loop must not be torn down and rebuilt for one.
   const viewportRef = useLatestRef(viewport);
   const enabledCategoriesRef = useLatestRef(enabledCategories);
-  const onVisibleCountChangeRef = useLatestRef(onVisibleCountChange);
+  const onSkyChangeRef = useLatestRef(onSkyChange);
   const previousFrameRef = useRef<number | null>(null);
   const markerStatsRef = useRef<MarkerStats>({
     drawn: 0,
     occluded: 0,
     unmapped: 0,
     remembered: 0,
+    eclipsed: 0,
     paths: 0
   });
   const visibilityRef = useRef(new MarkerVisibilityFilter());
@@ -522,7 +568,7 @@ export function useAnimatedMarkers({
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
   const listenersRef = useRef(new Set<(frame: MarkerFrame) => void>());
   const latestFrameRef = useRef<MarkerFrame>(EMPTY_FRAME);
-  /** What was last handed to `onVisibleCountChange`, and when. */
+  /** What was last handed to `onSkyChange`, and when. */
   const publishedRef = useRef<string | null>(null);
   const publishedAtRef = useRef(0);
 
@@ -561,6 +607,7 @@ export function useAnimatedMarkers({
       let occluded = 0;
       let unmapped = 0;
       let remembered = 0;
+      let eclipsed = 0;
 
       // Six trigonometric calls, and one attitude for the whole frame. Built
       // per satellite — which is what `projectToFrame` does — they were most of
@@ -691,6 +738,10 @@ export function useAnimatedMarkers({
             continue;
           }
 
+          // Counted alongside the others rather than walked for afterwards: a
+          // second pass over the drawn markers is an array a frame, sixty times
+          // a second, for a figure only the debug page reads.
+          if (fix.sunlit === "eclipsed") eclipsed += 1;
           visible.push({
             name: fix.name,
             category: fix.category,
@@ -698,6 +749,7 @@ export function useAnimatedMarkers({
             point,
             rangeKm: rangeKm(fix.position),
             opacity,
+            sunlit: fix.sunlit,
             // Allowed off-frame: a trail about to leave the view is the one
             // whose direction says the most.
             next
@@ -716,6 +768,7 @@ export function useAnimatedMarkers({
         occluded,
         unmapped,
         remembered,
+        eclipsed,
         paths: paths.length
       };
 
@@ -744,11 +797,20 @@ export function useAnimatedMarkers({
         const onScreen = visible.filter((marker) =>
           pointInViewport(marker.point, viewportRef.current)
         );
-        const breakdown = tallyFleets(onScreen);
-        const published = `${onScreen.length}|${breakdownSignature(breakdown)}`;
+        const fleets = tallyFleets(onScreen);
+        // Counted over the same marks as the fleets, so the panel's two claims
+        // are about one set of objects: "nine of these twelve are in sunlight"
+        // is only true if both figures were taken from the same frame and the
+        // same window.
+        const sunlit = onScreen.filter((marker) => marker.sunlit !== "eclipsed").length;
+        // Where the observer is, not where the satellites are — and the reason
+        // the panel can say something useful at noon, when every mark on the
+        // frame is in full sun and not one of them can be seen.
+        const darkness = skyDarknessAt(observer, time);
+        const published = `${onScreen.length}|${sunlit}|${darkness}|${breakdownSignature(fleets)}`;
         if (published !== publishedRef.current) {
           publishedRef.current = published;
-          onVisibleCountChangeRef.current(onScreen.length, breakdown);
+          onSkyChangeRef.current({ count: onScreen.length, fleets, sunlit, darkness });
         }
       }
       handle = requestAnimationFrame(animate);
@@ -761,7 +823,7 @@ export function useAnimatedMarkers({
     lens,
     maskFilteringRef,
     maskRef,
-    onVisibleCountChangeRef,
+    onSkyChangeRef,
     orientationFilterRef,
     pathsRef,
     skyMemory,

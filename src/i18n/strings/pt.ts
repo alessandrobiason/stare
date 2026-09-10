@@ -71,6 +71,12 @@ export const pt: Strings = {
       title: "À VISTA",
       empty: "Nada à vista",
       other: "Outros"
+    },
+    sunlight: {
+      daylight: "É dia — ainda não se vê nenhum",
+      none: "Estão todos na sombra da Terra",
+      some: "{count} destes estão iluminados pelo Sol",
+      all: "Estão todos iluminados pelo Sol"
     }
   },
   filter: {
@@ -78,6 +84,7 @@ export const pt: Strings = {
     open: "Filtro por categoria",
     showAll: "MOSTRAR TUDO",
     ringKey: "ANEL = PARADO SOBRE O EQUADOR",
+    shadowKey: "ESBATIDO = NA SOMBRA DA TERRA",
     categories: {
       LANDMARK: "IMPERDÍVEIS",
       NAVIGATION: "NAVEGAÇÃO",
@@ -93,6 +100,16 @@ export const pt: Strings = {
     openSite: "Abrir {site}",
     photo: "Fotografia: {name}",
     missing: "Este satélite já não está no catálogo.",
+    seeing: {
+      visible: "Brilhante o suficiente para se ver agora",
+      binoculars: "Ao sol, mas seriam precisos binóculos",
+      tooFaint: "Ao sol, mas demasiado ténue para se ver",
+      eclipsed: "Na sombra da Terra: não há luz para refletir",
+      daylight: "Aqui o Sol ainda está alto — ainda não se vê nada em órbita",
+      unknown: "Ao sol, embora não esteja registado quanto reflete",
+      magnitude: "magnitude {value}",
+      aboutMagnitude: "magnitude cerca de {value}"
+    },
     facts: {
       distance: "Distância",
       altitude: "Altitude",

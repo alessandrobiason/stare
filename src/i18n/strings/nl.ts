@@ -72,6 +72,12 @@ export const nl: Strings = {
       title: "IN BEELD",
       empty: "Niets in beeld",
       other: "Overige"
+    },
+    sunlight: {
+      daylight: "Het is dag — nog geen ervan is te zien",
+      none: "Ze staan allemaal in de schaduw van de aarde",
+      some: "{count} hiervan staan in het zonlicht",
+      all: "Ze staan allemaal in het zonlicht"
     }
   },
   filter: {
@@ -79,6 +85,7 @@ export const nl: Strings = {
     open: "Categoriefilter",
     showAll: "ALLES TONEN",
     ringKey: "RING = STAAT BOVEN DE EVENAAR",
+    shadowKey: "VAAG = IN DE SCHADUW VAN DE AARDE",
     categories: {
       LANDMARK: "HOOGTEPUNTEN",
       NAVIGATION: "NAVIGATIE",
@@ -94,6 +101,16 @@ export const nl: Strings = {
     openSite: "{site} openen",
     photo: "Foto van {name}",
     missing: "Deze satelliet staat niet meer in de catalogus.",
+    seeing: {
+      visible: "Helder genoeg om nu te zien",
+      binoculars: "In het zonlicht, maar je hebt een verrekijker nodig",
+      tooFaint: "In het zonlicht, maar veel te zwak om te zien",
+      eclipsed: "In de schaduw van de aarde: geen zonlicht om te weerkaatsen",
+      daylight: "Hier staat de zon nog — in een baan is nog niets te zien",
+      unknown: "In het zonlicht, al is niet vastgelegd hoe helder het is",
+      magnitude: "magnitude {value}",
+      aboutMagnitude: "magnitude ongeveer {value}"
+    },
     facts: {
       distance: "Afstand",
       altitude: "Hoogte",

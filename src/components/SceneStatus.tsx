@@ -1,17 +1,17 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SkySummary } from "../hooks/useAnimatedMarkers";
 import { useLocale } from "../hooks/useLocale";
 import { fill, strings } from "../i18n";
-import { FleetBreakdown } from "../satellite/fleets";
+import { sunlightSummary } from "../i18n/format";
 import { panelStyles, theme } from "./theme";
 
 type Props = {
-  markerCount: number;
   /**
-   * What those markers are, largest fleet first. The count answers "how many";
-   * this is the answer to the question anyone asks straight afterwards.
+   * What the last frame put on screen: how many marks, what they are, and
+   * whether any of them can be seen from where the phone is standing.
    */
-  fleets: FleetBreakdown;
+  sky: SkySummary;
 };
 
 /**
@@ -43,12 +43,13 @@ type Props = {
  * `DebugToggle` — since that is the control that opens the STATUS page saying
  * what was degraded, and this number is about the sky rather than the phone.
  */
-export const SceneStatus: React.FC<Props> = ({ markerCount, fleets }) => {
+export const SceneStatus: React.FC<Props> = ({ sky }) => {
   // Nothing in this component's props changes when the console's picker changes
   // the language, and the words in the open panel all do. See `useLocale`.
   useLocale();
   const t = strings().scene;
   const [expanded, setExpanded] = useState(false);
+  const { count: markerCount, fleets } = sky;
   const empty = fleets.rows.length === 0 && fleets.other === 0;
 
   return (
@@ -71,7 +72,11 @@ export const SceneStatus: React.FC<Props> = ({ markerCount, fleets }) => {
       {expanded && (
         <View style={styles.breakdown}>
           <Text style={[panelStyles.title, styles.breakdownTitle]}>{t.breakdown.title}</Text>
-          {empty && <Text style={styles.emptyLabel}>{t.breakdown.empty}</Text>}
+          {empty ? (
+            <Text style={styles.emptyLabel}>{t.breakdown.empty}</Text>
+          ) : (
+            <Text style={styles.sunlight}>{sunlightSummary(sky)}</Text>
+          )}
           {fleets.rows.map((fleet) => (
             <View key={fleet.name} style={styles.row}>
               <Text style={styles.label}>{fleet.name}</Text>
@@ -136,6 +141,20 @@ const styles = StyleSheet.create({
   },
   breakdownTitle: {
     marginBottom: 6
+  },
+  sunlight: {
+    // The width the rows below it keep, so the sentence wraps inside the panel
+    // rather than widening it — this is the longest run of words the overlay
+    // puts over the sky, and the panel is a pill over a photograph.
+    maxWidth: 150,
+    marginBottom: 6,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.divider,
+    color: theme.color.text,
+    fontSize: 10,
+    fontWeight: "600",
+    lineHeight: 14
   },
   row: {
     // Wide enough for a fleet name and its figure, and no wider: this sits over

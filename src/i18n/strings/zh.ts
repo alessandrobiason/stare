@@ -59,6 +59,12 @@ export const zh: Strings = {
       title: "视野内",
       empty: "视野内没有卫星",
       other: "其他"
+    },
+    sunlight: {
+      daylight: "白天 — 目前一颗也看不到",
+      none: "它们都在地球的阴影里",
+      some: "其中 {count} 颗被阳光照到",
+      all: "它们都被阳光照到"
     }
   },
   filter: {
@@ -66,6 +72,7 @@ export const zh: Strings = {
     open: "按类别筛选",
     showAll: "全部显示",
     ringKey: "圆环 = 定点在赤道上方",
+    shadowKey: "淡色 = 在地球的阴影里",
     categories: {
       LANDMARK: "地标天体",
       NAVIGATION: "导航",
@@ -81,6 +88,16 @@ export const zh: Strings = {
     openSite: "打开 {site}",
     photo: "{name} 的照片",
     missing: "这颗卫星已不在目录中。",
+    seeing: {
+      visible: "现在够亮，可以看到",
+      binoculars: "在阳光下，但需要双筒望远镜",
+      tooFaint: "在阳光下，但太暗，看不到",
+      eclipsed: "在地球的阴影里，没有阳光可反射",
+      daylight: "这里太阳还没落 — 轨道上还什么都看不到",
+      unknown: "在阳光下，但它有多亮没有记录",
+      magnitude: "星等 {value}",
+      aboutMagnitude: "星等约 {value}"
+    },
     facts: {
       distance: "距离",
       altitude: "高度",

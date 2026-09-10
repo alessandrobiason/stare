@@ -10,7 +10,8 @@ import {
   clearLandmarkPhotosForTesting,
   loadLandmarkPhoto
 } from "../src/satellite/landmarkPhotos";
-import { BREAKDOWN_ROWS, tallyFleets } from "../src/satellite/fleets";
+import { SkySummary } from "../src/hooks/useAnimatedMarkers";
+import { BREAKDOWN_ROWS, FleetBreakdown, tallyFleets } from "../src/satellite/fleets";
 import { allCategories } from "../src/satellite/categories";
 import { SatelliteDetail } from "../src/types";
 
@@ -62,6 +63,13 @@ describe("the category filter", () => {
   });
 });
 
+/** A sky of `count` marks, all lit, under a dark sky unless told otherwise. */
+const sky = (
+  count: number,
+  fleets: FleetBreakdown = { rows: [], other: 0 },
+  over: Partial<SkySummary> = {}
+): SkySummary => ({ count, fleets, sunlit: count, darkness: "dark", ...over });
+
 describe("the marker count", () => {
   const NOTHING = { rows: [], other: 0 };
   const SKY = {
@@ -72,10 +80,19 @@ describe("the marker count", () => {
     other: 6
   };
 
+  /** A sky of `count` marks, all lit, under a dark sky unless told otherwise. */
+  const sky = (count: number, fleets = SKY, over: Partial<SkySummary> = {}): SkySummary => ({
+    count,
+    fleets,
+    sunlit: count,
+    darkness: "dark",
+    ...over
+  });
+
   test("is the number, and the chevron that says it opens", () => {
     // Everything else is behind the tap: the panel sits over a photograph of
     // the sky, and closed it is worth exactly the space a two-digit number takes.
-    const text = textOf(<SceneStatus markerCount={17} fleets={SKY} />);
+    const text = textOf(<SceneStatus sky={sky(17)} />);
 
     expect(text).toContain("17");
     expect(text).not.toContain("Starlink");
@@ -85,10 +102,10 @@ describe("the marker count", () => {
   test("still says what it counts, for anyone not reading the screen", () => {
     // And on the control rather than the panel, so the label the replay suite
     // waits on is still the thing that announces itself.
-    expect(renderToStaticMarkup(<SceneStatus markerCount={17} fleets={NOTHING} />)).toContain(
+    expect(renderToStaticMarkup(<SceneStatus sky={sky(17, NOTHING)} />)).toContain(
       'aria-label="17 visible satellites"'
     );
-    expect(renderToStaticMarkup(<SceneStatus markerCount={17} fleets={NOTHING} />)).toContain(
+    expect(renderToStaticMarkup(<SceneStatus sky={sky(17, NOTHING)} />)).toContain(
       'aria-expanded="false"'
     );
   });
@@ -167,10 +184,7 @@ describe("what the count breaks down into", () => {
 
   test("the panel opens onto the same style as the filter opposite it", () => {
     const open = renderToStaticMarkup(
-      <SceneStatus
-        markerCount={17}
-        fleets={{ rows: [{ name: "Starlink", count: 10 }], other: 7 }}
-      />
+      <SceneStatus sky={sky(17, { rows: [{ name: "Starlink", count: 10 }], other: 7 })} />
     );
 
     // Rendered shut, since that is how it lands on the screen: what the markup
@@ -251,6 +265,11 @@ describe("the tapped satellite's card", () => {
       azimuthDeg: 143.2,
       elevationDeg: 27.4,
       orbitPeriodMinutes: 95.6,
+      sunlit: "sunlit",
+      apparentMagnitude: 4.6,
+      magnitudeMeasured: false,
+      nakedEye: "binoculars",
+      sunAltitudeDeg: -20,
       ...overrides
     };
   }

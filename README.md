@@ -11,17 +11,29 @@ The view opens in **normal** mode: the camera picture, the markers, a marker
 count and a collapsed category filter. **A marker is the app's own logo**: the
 body and tapered trail of `assets/icon.svg`, a couple of dozen pixels across,
 the same shape the boot screen turns five of — both drawn by `tools/make-logo.mjs`
-from the geometry in `src/components/bootSky.ts`. It carries four channels at once —
+from the geometry in `src/components/bootSky.ts`. It carries five channels at once —
 colour for purpose (five categories), shape for whether the object holds station
 (a geostationary ring, or a body trailing the 12 seconds of ground track it has
-just covered), size for range on a log scale from 400 km to 40,000 km, and a
-label, spent only on a couple of dozen landmarks.
+just covered), size for range on a log scale from 400 km to 40,000 km, a
+label, spent only on a couple of dozen landmarks, and **strength for whether the
+sun is on it**.
+
+That last one is the only channel that is not about where the object is, and it
+is the one the app was missing for longest. A satellite is not a light: it is a
+few square metres of foil and solar cell reflecting the sun, and half of every
+orbit is spent inside the Earth's shadow with nothing to reflect. Drawn the same
+as the rest, half the marks on a clear night sky point at nothing — and there
+was no way to tell which half. A mark at full strength is in sunlight; one at
+half strength is in the Earth's shadow, and the legend says so under the ring
+key. Whether *you* can then see it is the other half of the question, and the
+sky behind it decides that: see **Whether it can be seen** below.
 
 **Tap a marker and it says what it is.** The overlay's channels answer "what is
 it for" and "how far away", and for a couple of dozen landmarks "what is it
 called"; a tap fills in the rest for the one object asked about — what it is and
-who flies it, a link to the operator's own page, then purpose, distance,
-altitude, speed, where to look for it, and how long its orbit takes.
+who flies it, a link to the operator's own page, then purpose, whether it can be
+seen from here right now, distance, altitude, speed, where to look for it, and
+how long its orbit takes.
 
 The description comes first, above the figures, because someone who has just
 tapped a light in the sky is asking what it is rather than how many kilometres
@@ -107,6 +119,7 @@ satellites → screen positions → markers, composited over the camera picture.
 | Drawn at display rate, every marker in one canvas | `src/components/markerScene.ts`, `SatelliteMarkers` |
 | Where the landmarks will be for the next few hours | `src/satellite/orbitPath.ts`, `src/hooks/useOrbitPaths.ts` |
 | Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
+| Whether the sun is on it, and whether it can be seen from here | `src/satellite/illumination.ts`, `src/satellite/nakedEye.ts` |
 | A tap back into the sky: which markers, and what they are | `src/components/markerHitTest.ts`, `SkyTracker.describe`, `src/satellite/briefing.ts`, `src/satellite/landmarkPhotos.ts` |
 
 **Boot is all-or-nothing** (`src/boot/`). Before the view opens it must have the
@@ -270,6 +283,84 @@ The first run downloads a 95 MB model and caches it;
 `EXPO_PUBLIC_SKYWATER_MODEL_URL` and `EXPO_PUBLIC_ONNX_WASM_URL` point at
 mirrors.
 
+**Whether it can be seen** (`src/satellite/illumination.ts`,
+`src/satellite/nakedEye.ts`). Everything above answers *where* a satellite is
+and whether anything is standing in front of it. Neither of those is the
+question somebody holding a phone at the sky actually has, which is whether
+there is anything up there to look at — and for most of the day the honest
+answer for all sixteen thousand objects is no. Point the app at a blue midday
+sky and it drew seventy marks over a sky that was empty to the eye, with nothing
+on the screen saying so. It was not wrong. It was answering a different question
+from the one being asked of it.
+
+Three things have to hold at once, and only the third is an estimate.
+
+- **The satellite is in sunlight.** Geometry, exact, and known for every object
+  in the catalogue without knowing anything about any of them. The Earth casts
+  an umbra — a converging cone about 1.4 million kilometres long, since the sun
+  is the larger body — inside a diverging penumbra where part of the disc still
+  shows, and a satellite's position against those two cones is a dot product and
+  a hypotenuse. The shadow is cast at the equatorial radius plus eighty
+  kilometres of atmosphere, because sunlight grazing the top of the mesosphere
+  is scattered out of the beam rather than arriving to be reflected: it moves
+  eclipse by about ten seconds on a low orbit, which is the difference between a
+  station that visibly reddens and fades on its way in — as everyone who has
+  watched one has seen it do — and one the app would have called fully lit until
+  it went out. Worked out once per frame and asked of every marker, it costs far
+  less than the rotation that placed the marker.
+- **The observer is not.** The single largest filter, and the one nobody
+  expects: a sunlit satellite against a sunlit sky is a fifth-magnitude object
+  on a background thousands of times brighter, which is why nobody has ever seen
+  the station at noon. The sun's altitude here already exists — the palette
+  turns on it — so this costs nothing new. Above civil twilight the answer for
+  the whole sky is none, with no partial credit; below it the limiting magnitude
+  walks from the first-magnitude stars (which is what the end of civil twilight
+  *means*) down to whatever a suburban sky gives up. That interpolation is what
+  makes the order right: the station clears the bar the moment the sun is down,
+  and a Starlink does not clear it until the sky is genuinely dark.
+- **What it reflects is enough.** A magnitude, from the range and how much of
+  the lit side is turned this way, against a **standard magnitude** — what the
+  object shows at a thousand kilometres with half its disc lit, which is the
+  convention the observing catalogues record against. This is the one figure
+  geometry cannot supply, it is measured by people watching satellites, and
+  there is no such measurement for most of this catalogue anywhere.
+
+So `standardMagnitude.ts` is deliberately short and **what is not in it returns
+`null` rather than a default**. A default is a number the rest of the app cannot
+tell apart from a measurement, and the honest thing to do with an object nobody
+has recorded is to say the brightness is unknown — the card then talks about
+where it is and whether the sun is on it, which are both facts, and stops. What
+is listed is the twelve landmarks, by catalogue number, and the large
+constellations by name; between them about three quarters of the catalogue by
+object count has a figure. Of those only the station, Tiangong and Hubble are
+recorded observations, and the card hedges the rest ("around magnitude 5.2")
+rather than stating them. The suite holds the landmark list here and the one in
+`categories.ts` together, so a landmark added without a brightness fails rather
+than shrugging on the card.
+
+Which channel to spend was the one real design question, and the answer came
+from what is in use *at rest*. Hue, fill, shape and size are all carrying
+something permanently, so any of them would have traded one fact for another —
+and fill in particular is already the difference between a parked ring and an
+ordinary dot, which is why an unlit mark cannot be a hollow one: the legend
+would have had two rings in it meaning different things. Opacity is not spent:
+at rest a marker is either faded fully in or has been dropped, and everything in
+between belongs to the terrain crossfade, which is a transition rather than
+something to read. It also happens to mean the right thing — an object in the
+Earth's shadow *is* fainter — so a mark at half strength needs no key to be
+guessed at, and gets one anyway.
+
+Four places say it. The **marks** are drawn at half strength, with the
+**legend** carrying the key under the one for the geostationary ring. The
+**count panel** opens onto a line before the fleet list — the
+count is a fact about the overlay and this is the fact about the sky, and at
+noon those two are as far apart as they get. And the **card** answers outright
+for the one object asked about: *bright enough to see now · magnitude -1.8*, or
+*in the Earth's shadow*, or *the sun is still up here*. The debug console's SKY
+page carries the same split as figures, which is what tells a sky with nothing
+in it apart from a shadow cast against the wrong sun — the two look identical on
+the frame.
+
 **What gets drawn** (`src/components/`, `src/hooks/`). The overlay is the one
 tree in the app under real time pressure, and it is not a tree any more. A busy
 frame is some seventy markers, each of which was a mark, a rim, a halo, two
@@ -386,7 +477,8 @@ App.tsx / App.web.tsx   app entry / harness entry (bundler picks by platform)
 src/          the product, and nothing else
   constants.ts  tuning knobs, each with the measurement behind it
   math/ camera/ coordinates/        quaternions, ENU -> frame, ECI -> ECEF, sun and moon
-  satellite/ data/                  TLE parsing, SGP4 sweep, CelesTrak cache
+  satellite/ data/                  TLE parsing, SGP4 sweep, CelesTrak cache,
+                                    the Earth's shadow and what can be seen
   device/ fusion/                   sensors, GPS, declination, attitude filter, sky fix
   vision/                           sky mask, segmentation loop, filters, bright bodies
   boot/ debug/ hooks/ components/   startup gate, debug panel, glue, scene

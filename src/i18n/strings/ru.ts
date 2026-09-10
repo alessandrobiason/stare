@@ -70,6 +70,12 @@ export const ru: Strings = {
       title: "В КАДРЕ",
       empty: "Пока ничего",
       other: "Другие"
+    },
+    sunlight: {
+      daylight: "День — пока не видно ни одного",
+      none: "Все они в тени Земли",
+      some: "{count} из них освещены Солнцем",
+      all: "Все они освещены Солнцем"
     }
   },
   filter: {
@@ -77,6 +83,7 @@ export const ru: Strings = {
     open: "Фильтр по категориям",
     showAll: "ПОКАЗАТЬ ВСЁ",
     ringKey: "КОЛЬЦО = СТОИТ НАД ЭКВАТОРОМ",
+    shadowKey: "ТУСКЛЫЙ = В ТЕНИ ЗЕМЛИ",
     categories: {
       LANDMARK: "ГЛАВНОЕ",
       NAVIGATION: "НАВИГАЦИЯ",
@@ -92,6 +99,16 @@ export const ru: Strings = {
     openSite: "Открыть {site}",
     photo: "Фотография: {name}",
     missing: "Этого спутника больше нет в каталоге.",
+    seeing: {
+      visible: "Достаточно ярок, чтобы увидеть сейчас",
+      binoculars: "На солнце, но понадобится бинокль",
+      tooFaint: "На солнце, но слишком тусклый, чтобы разглядеть",
+      eclipsed: "В тени Земли — отражать нечего",
+      daylight: "Здесь ещё светло — на орбите пока ничего не видно",
+      unknown: "На солнце, но его яркость не записана",
+      magnitude: "звёздная величина {value}",
+      aboutMagnitude: "звёздная величина около {value}"
+    },
     facts: {
       distance: "Расстояние",
       altitude: "Высота",

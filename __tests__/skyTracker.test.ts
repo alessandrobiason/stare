@@ -12,6 +12,7 @@ import { parseTleCatalog } from "../src/data/tleCatalog";
 import { SatelliteCatalog } from "../src/satellite/catalog";
 import * as propagator from "../src/satellite/propagator";
 import { SkyTracker } from "../src/satellite/skyTracker";
+import { standardMagnitudeFor } from "../src/satellite/standardMagnitude";
 import { EnuPosition, ObserverLocation } from "../src/types";
 
 const observer: ObserverLocation = { latitudeDeg: 60.1699, longitudeDeg: 24.9384, heightM: 20 };
@@ -314,5 +315,142 @@ describe("describing one tapped satellite", () => {
     const detail = tracker.describe(below.name, WHEN, observer)!;
 
     expect(detail.elevationDeg).toBeLessThan(0);
+  });
+});
+
+/**
+ * Whether the sun is on the objects it places, which is the difference between
+ * a marker somebody can go and look at and a marker over empty sky.
+ *
+ * The geometry itself is checked in `illumination.test.ts` against a sun put
+ * where the test wants it. What is checked here is that the tracker asks the
+ * question at all, asks it of the real sun, and gets the same answer on both of
+ * the paths a satellite can reach the screen by.
+ */
+describe("whether what it places is in sunlight", () => {
+  test("every fix says one way or the other", () => {
+    const fixes = primedTracker().fixesAt(WHEN, observer);
+
+    expect(fixes.length).toBeGreaterThan(0);
+    for (const fix of fixes) {
+      expect(["sunlit", "penumbra", "eclipsed"]).toContain(fix.sunlit);
+    }
+  });
+
+  test("a night sky carries both answers", () => {
+    // Late August at sixty north, an hour or so after sunset. Most of what this
+    // fixture holds above twenty degrees is high orbit — the geostationary belt
+    // and the navigation shells — which the Earth's shadow barely reaches, so
+    // the lit share is the large one. What matters is that it is not all of it:
+    // a run that is all one answer is a shadow that is not being computed.
+    const fixes = primedTracker().fixesAt(WHEN, observer);
+    const lit = fixes.filter((fix) => fix.sunlit === "sunlit");
+
+    expect(lit.length).toBeGreaterThan(0);
+    expect(lit.length).toBeLessThan(fixes.length);
+  });
+
+  test("and midwinter puts far more of them out than late summer does", () => {
+    // The shadow is a fixed cone and what changes is how deeply the night side
+    // of the Earth is turned into it. At sixty north in August the sun is a few
+    // degrees down at midnight and the objects overhead stay lit — which is why
+    // the northern summer is the season people see satellites in. At the
+    // solstice it is fifty degrees down and the same sky is largely dark.
+    const midwinter = new Date("2026-12-22T00:00:00Z");
+    const winter = new SkyTracker(catalog, MASK_DEG);
+    winter.sweep(midwinter, observer, 0);
+
+    const eclipsedShare = (fixes: { sunlit: string }[]) =>
+      fixes.filter((fix) => fix.sunlit === "eclipsed").length / fixes.length;
+
+    expect(eclipsedShare(winter.fixesAt(midwinter, observer))).toBeGreaterThan(
+      3 * eclipsedShare(primedTracker().fixesAt(WHEN, observer))
+    );
+  });
+
+  test("at local noon everything above the horizon is on the day side", () => {
+    // Not a coincidence and not worth a special case: standing under the sun
+    // means the sky you can see is the sky the sun is shining on. It is the
+    // observer who is in the wrong place to see any of it, which is why the
+    // shadow alone was never going to answer this question — see `nakedEye.ts`.
+    const noon = new Date("2026-08-30T10:00:00Z");
+    const tracker = new SkyTracker(catalog, MASK_DEG);
+    tracker.sweep(noon, observer, 0);
+    const fixes = tracker.fixesAt(noon, observer);
+
+    expect(fixes.length).toBeGreaterThan(0);
+    expect(fixes.every((fix) => fix.sunlit === "sunlit")).toBe(true);
+  });
+
+  test("the card and the marker agree about the same object", () => {
+    // Two different paths to the same fact: the frame loop carries a state it
+    // has extrapolated forward, and `describe` propagates the object exactly.
+    // They must not disagree about whether the sun is on it, or a mark drawn
+    // hollow opens a card saying it is lit.
+    const tracker = primedTracker();
+    for (const fix of tracker.fixesAt(WHEN, observer).slice(0, 40)) {
+      expect(tracker.describe(fix.name, WHEN, observer)?.sunlit).toBe(fix.sunlit);
+    }
+  });
+});
+
+describe("what the card is told about seeing it", () => {
+  /** A lit satellite on this sky whose reflectivity is on record, and one whose is not. */
+  const litFixes = () =>
+    primedTracker()
+      .fixesAt(WHEN, observer)
+      .filter((fix) => fix.sunlit === "sunlit");
+  const recorded = () =>
+    litFixes().find((fix) => standardMagnitudeFor(noradOf(fix.name), fix.name) !== null);
+  const unrecorded = () =>
+    litFixes().find((fix) => standardMagnitudeFor(noradOf(fix.name), fix.name) === null);
+
+  /** The fixture is a real catalogue slice, so say what is missing rather than crash. */
+  function named(fix: { name: string } | undefined): string {
+    if (!fix) throw new Error("this sky holds no satellite of that kind");
+    return fix.name;
+  }
+
+  /** The catalogue number behind a placed marker's name. */
+  function noradOf(name: string): number {
+    const entry = catalog.entries.find((candidate) => candidate.name === name);
+    if (!entry) throw new Error(`${name} is not in the fixture`);
+    return entry.noradId;
+  }
+
+  test("an object with a recorded brightness is judged on it", () => {
+    const tracker = primedTracker();
+    const detail = tracker.describe(named(recorded()), WHEN, observer)!;
+
+    expect(detail.apparentMagnitude).not.toBeNull();
+    expect(Number.isFinite(detail.apparentMagnitude!)).toBe(true);
+    expect(["visible", "binoculars", "tooFaint"]).toContain(detail.nakedEye);
+  });
+
+  test("one nobody has recorded a brightness for says so instead of guessing", () => {
+    // Most of the catalogue, and the honest answer for it: the app knows where
+    // the object is and knows the sun is on it, and stops there.
+    const tracker = primedTracker();
+    const detail = tracker.describe(named(unrecorded()), WHEN, observer)!;
+
+    expect(detail.apparentMagnitude).toBeNull();
+    expect(detail.magnitudeMeasured).toBe(false);
+    expect(detail.nakedEye).toBe("unknown");
+  });
+
+  test("and at noon the sky rules out everything, whatever is overhead", () => {
+    // The sun's altitude travels with the detail so the card can say which of
+    // the two things is missing — the light on the object, or the dark here.
+    const noon = new Date("2026-08-30T10:00:00Z");
+    const tracker = new SkyTracker(catalog, MASK_DEG);
+    tracker.sweep(noon, observer, 0);
+    const fixes = tracker.fixesAt(noon, observer);
+
+    expect(fixes.length).toBeGreaterThan(0);
+    for (const fix of fixes.slice(0, 30)) {
+      const detail = tracker.describe(fix.name, noon, observer)!;
+      expect(detail.sunAltitudeDeg).toBeGreaterThan(0);
+      expect(detail.nakedEye).toBe("daylight");
+    }
   });
 });

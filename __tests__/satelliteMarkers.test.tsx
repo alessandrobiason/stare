@@ -19,6 +19,7 @@ function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
     rangeKm: 1200,
     next: { left: 58, top: 44 },
     opacity: 1,
+    sunlit: "sunlit",
     ...overrides
   };
 }
@@ -103,6 +104,61 @@ test("haloes the landmarks, and only them", () => {
   expect(glyphs[0].halo).toBeGreaterThan(glyphs[0].rim.radius);
   expect(glyphs[1].halo).toBeNull();
   expect(NIGHT_PALETTE.halo.alpha).toBeLessThan(0.5);
+});
+
+describe("a satellite with no sun on it", () => {
+  test("is drawn at half strength, because there is nothing there to see", () => {
+    // Half of every orbit is spent inside the Earth's shadow, and an object in
+    // there is reflecting nothing. A fainter mark for a fainter object, which
+    // is the one thing it can mean. See `sunlightAlpha`.
+    const lit = scene([marker({ sunlit: "sunlit" })]).glyphs[0];
+    const dark = scene([marker({ sunlit: "eclipsed" })]).glyphs[0];
+
+    expect(lit.alpha).toBe(1);
+    expect(dark.alpha).toBeLessThan(lit.alpha);
+    expect(dark.alpha).toBeGreaterThan(0.2);
+  });
+
+  test("keeps every channel it was already spending", () => {
+    // Colour, shape, size and heading are all still true of an object nobody
+    // can see, and all four are how it is found again when it comes back into
+    // the sunlight. Only the opacity, which nothing else uses at rest, moves.
+    const lit = scene([marker({ sunlit: "sunlit" })]).glyphs[0];
+    const dark = scene([marker({ sunlit: "eclipsed" })]).glyphs[0];
+
+    expect(dark.color).toBe(lit.color);
+    expect(dark.core).toEqual(lit.core);
+    expect(dark.rim).toEqual(lit.rim);
+    expect(dark.tail).toEqual(lit.tail);
+  });
+
+  test("does not take the parked ring's shape away from it", () => {
+    // The collision that ruled fill out as the channel: a parked object is
+    // already a ring, so drawing an unlit one hollow would have said two things
+    // with one mark and neither of them clearly.
+    const parked = marker({ parked: true, next: null, rangeKm: 39000 });
+    const lit = scene([{ ...parked, sunlit: "sunlit" }]).glyphs[0];
+    const dark = scene([{ ...parked, sunlit: "eclipsed" }]).glyphs[0];
+
+    expect(dark.core.width).toBe(lit.core.width);
+    expect(dark.alpha).toBeLessThan(lit.alpha);
+  });
+
+  test("fades behind terrain on top of that, rather than instead of it", () => {
+    // The two compound, which is honest: such a marker really is both in the
+    // Earth's shadow and on its way behind a roof.
+    const fading = scene([marker({ sunlit: "eclipsed", opacity: 0.4 })]).glyphs[0];
+    const settled = scene([marker({ sunlit: "eclipsed", opacity: 1 })]).glyphs[0];
+
+    expect(fading.alpha).toBeLessThan(settled.alpha);
+    expect(fading.alpha).toBeCloseTo(settled.alpha * 0.4, 6);
+  });
+
+  test("a penumbra is still counted as lit, since it still is", () => {
+    // It is on its way into the shadow rather than in it, and how far through
+    // that it is has already been paid for in the magnitude the card shows.
+    expect(scene([marker({ sunlit: "penumbra" })]).glyphs[0].alpha).toBe(1);
+  });
 });
 
 test("rims a parked ring outwards, without eating into its colour", () => {

@@ -186,7 +186,7 @@ test("the sky page separates what is drawn from what the mask is hiding", () => 
   const rows = values(
     skySection({
       tracker: { entries: 16000, candidates: 240, sweepProgress: 0.5, primed: true },
-      markers: { drawn: 12, occluded: 30, unmapped: 4, remembered: 5, paths: 2 },
+      markers: { drawn: 12, occluded: 30, unmapped: 4, remembered: 5, eclipsed: 5, paths: 2 },
       memory: { cells: 4500, capacity: 32400, coverage: 0.125 },
       epoch: { time: new Date("2026-08-30T21:00:00.500Z"), observer }
     }).rows
@@ -203,6 +203,13 @@ test("the sky page separates what is drawn from what the mask is hiding", () => 
   expect(rows[`Above ${MINIMUM_SATELLITE_ELEVATION_DEG}°`]).toBe("42");
   expect(rows.Drawn).toBe("12");
   expect(rows["Behind terrain"]).toBe("30");
+  // The two rows that separate a sky with nothing in it to see from a shadow
+  // computed against the wrong sun — which would look the same on the frame.
+  expect(rows["In sunlight"]).toBe("7");
+  expect(rows["In Earth's shadow"]).toBe("5");
+  // And the observer's own half of it: at 21:00 UTC in late August, this
+  // observer is in the dark and whatever is overhead is not.
+  expect(rows["Sun here"]).toContain("dark");
   // The landmarks' arcs are counted apart from the marks: they are drawn
   // whether or not the mask has anything to say about the sky they cross.
   expect(rows["Landmark paths"]).toBe("2");
@@ -214,7 +221,7 @@ test("the sky page says when the opening pass has not finished", () => {
   const rows = values(
     skySection({
       tracker: { entries: 10, candidates: 0, sweepProgress: 0.25, primed: false },
-      markers: { drawn: 0, occluded: 0, unmapped: 0, remembered: 0, paths: 0 },
+      markers: { drawn: 0, occluded: 0, unmapped: 0, remembered: 0, eclipsed: 0, paths: 0 },
       memory: { cells: 0, capacity: 32400, coverage: 0 },
       epoch: { time: new Date("2026-08-30T21:00:00Z"), observer }
     }).rows

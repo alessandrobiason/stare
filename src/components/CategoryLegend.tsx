@@ -109,6 +109,12 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
             <View style={[styles.swatch, styles.ringSwatch]} />
             <Text style={styles.keyLabel}>{t.ringKey}</Text>
           </View>
+          {/* The other thing a mark says that its colour does not. Drawn at the
+              same strength the sky draws it at, so the swatch is the mark. */}
+          <View style={styles.keyRow}>
+            <View style={[styles.swatch, styles.shadowSwatch]} />
+            <Text style={styles.keyLabel}>{t.shadowKey}</Text>
+          </View>
           <Pressable onPress={onEnableAll} style={styles.showAll}>
             <Text style={styles.showAllText}>{t.showAll}</Text>
           </Pressable>
@@ -181,6 +187,12 @@ const styles = StyleSheet.create({
   ringSwatch: {
     backgroundColor: "transparent",
     borderWidth: 2,
+    borderColor: theme.color.textDim
+  },
+  shadowSwatch: {
+    // `SHADOW_ALPHA` in `markerScene.ts`, which is what the sky draws these at.
+    opacity: 0.5,
+    backgroundColor: theme.color.textDim,
     borderColor: theme.color.textDim
   },
   label: {

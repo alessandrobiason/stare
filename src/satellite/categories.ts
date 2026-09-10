@@ -105,8 +105,13 @@ export function allCategories(): Set<SatelliteCategory> {
  * nothing in its name to tie it to the ISS. There are only a couple of dozen
  * objects in this tier, they outlive their names, and their catalogue numbers
  * do not change, so they are listed.
+ *
+ * Exported because it is not the only list of these objects: `standardMagnitude.ts`
+ * records how bright each one is, and a landmark added here without a brightness
+ * there is one the card cannot answer "can I see it?" for. The suite holds the
+ * two together.
  */
-const LANDMARK_NORAD_IDS = new Set([
+export const LANDMARK_NORAD_IDS = new Set([
   25544, // ISS (ZARYA) — the International Space Station
   48274, // CSS (TIANHE) — the Chinese Space Station
   20580, // HST — Hubble

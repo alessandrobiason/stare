@@ -1,4 +1,6 @@
 import type { SatelliteCategory } from "./satellite/categories";
+import type { SunlitState } from "./satellite/illumination";
+import type { NakedEyeVerdict } from "./satellite/nakedEye";
 
 export type { SatelliteCategory };
 
@@ -73,6 +75,17 @@ export type SatelliteFix = {
    * resolved against one attitude cancel the camera out and leave the motion.
    */
   nextPosition: EnuPosition;
+  /**
+   * Whether the sun is on it, which is whether there is anything to see.
+   *
+   * On the frame path rather than left to the card, because unlike every other
+   * figure a tap reveals this one is *drawn*: a satellite in the Earth's shadow
+   * is a mark for something nobody can see, and the overlay says so by drawing
+   * it at half strength (`markerScene.ts`). It costs a dot product and a hypotenuse
+   * against a shadow worked out once for the whole frame — far less than the
+   * rotation that placed the marker. See `illumination.ts`.
+   */
+  sunlit: SunlitState;
 };
 
 /**
@@ -111,6 +124,33 @@ export type SatelliteDetail = {
   elevationDeg: number;
   /** How long one orbit takes, in minutes. */
   orbitPeriodMinutes: number;
+  /** Whether the sun is on it, in the Earth's shadow, or part way between. */
+  sunlit: SunlitState;
+  /**
+   * How bright it looks from here, as a visual magnitude — smaller is
+   * brighter — or `null` for an object whose reflectivity nobody has recorded.
+   *
+   * `null` is a real answer and is carried as one all the way to the card,
+   * which then says where the object is and whether it is lit and stops there.
+   * See `standardMagnitude.ts` for why most of the catalogue gets it.
+   */
+  apparentMagnitude: number | null;
+  /**
+   * Whether that magnitude rests on somebody's observation or on the size and
+   * class of the spacecraft. Decides how firmly the card is allowed to put it.
+   */
+  magnitudeMeasured: boolean;
+  /** What all of that comes to for somebody standing outside looking up. */
+  nakedEye: NakedEyeVerdict;
+  /**
+   * How high the sun is where the observer is standing, in degrees.
+   *
+   * The other half of the verdict, and the half that is about the sky rather
+   * than the satellite: it is what makes the answer "not until this evening"
+   * rather than "no". Carried so the card can say which of the two it is
+   * without working the sun out a second time.
+   */
+  sunAltitudeDeg: number;
 };
 
 /**

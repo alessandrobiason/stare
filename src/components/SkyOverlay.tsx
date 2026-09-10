@@ -18,7 +18,7 @@ import {
   skySection,
   viewSection
 } from "../debug/sections";
-import { useAnimatedMarkers } from "../hooks/useAnimatedMarkers";
+import { SkySummary, useAnimatedMarkers } from "../hooks/useAnimatedMarkers";
 import { useCelestialAlignment } from "../hooks/useCelestialAlignment";
 import { useLatestRef } from "../hooks/useLatestRef";
 import { useSkyPalette } from "../hooks/useSkyPalette";
@@ -27,7 +27,6 @@ import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrie
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
-import { FleetBreakdown } from "../satellite/fleets";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
@@ -118,8 +117,11 @@ type Props = {
   enabledCategories: Set<SatelliteCategory>;
   onToggleCategory: (category: SatelliteCategory) => void;
   onEnableAll: () => void;
-  /** Told how many markers are drawn, and what they are: see `SceneStatus`. */
-  onVisibleSatelliteCountChange: (count: number, fleets: FleetBreakdown) => void;
+  /**
+   * Told what is drawn, what it is, and whether any of it can be seen from
+   * here: see `SceneStatus` and `SkySummary`.
+   */
+  onSkyChange: (summary: SkySummary) => void;
   /** Told what the sky mask is doing, so a scene can show it. */
   onMaskStatusChange?: (status: string) => void;
   /**
@@ -199,7 +201,7 @@ export const SkyOverlay: React.FC<Props> = ({
   enabledCategories,
   onToggleCategory,
   onEnableAll,
-  onVisibleSatelliteCountChange,
+  onSkyChange,
   onMaskStatusChange,
   onSkyFixChange,
   debug,
@@ -287,7 +289,7 @@ export const SkyOverlay: React.FC<Props> = ({
     maskFiltering: skyMaskFiltering,
     enabledCategories,
     viewport,
-    onVisibleCountChange: onVisibleSatelliteCountChange
+    onSkyChange
   });
 
   // What the tapped satellite is, resolved on the card's own slow timer against

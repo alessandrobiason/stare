@@ -3,10 +3,19 @@ import path from "node:path";
 import appJson from "../app.json";
 import { BRIEFING_IDS, briefingFor } from "../src/satellite/briefing";
 import { BRIEFING_TEXTS } from "../src/i18n/briefings";
-import { clockTime, kilometres, lookDirection, orbitPeriod, speed } from "../src/i18n/format";
+import {
+  clockTime,
+  kilometres,
+  lookDirection,
+  orbitPeriod,
+  seeing,
+  speed,
+  sunlightSummary
+} from "../src/i18n/format";
 import { introPages } from "../src/onboarding/introPages";
 import {
   FALLBACK_LOCALE,
+  fill,
   Locale,
   LOCALES,
   resolveLocale,
@@ -135,6 +144,9 @@ describe("and says it in the space it is given", () => {
     expect(width(t.showAll, 9, 1)).toBeLessThan(130);
     // Wraps to a second line if it has to, so this is two lines of the panel.
     expect(width(t.ringKey, 8, 0.4)).toBeLessThan(260);
+    // The other key row, the same size and in the same column: why half the
+    // marks on a clear night sky are drawn faintly.
+    expect(width(t.shadowKey, 8, 0.4)).toBeLessThan(260);
   });
 
   test.each(LOCALES)("%s fits the satellite card", (locale) => {
@@ -149,6 +161,35 @@ describe("and says it in the space it is given", () => {
     // button on a 375pt screen.
     const purpose = `${stringsFor(locale).filter.categories.COMMS} · ${t.holdsStation}`;
     expect(width(purpose, 9, 0.6)).toBeLessThan(290);
+  });
+
+  test.each(LOCALES)("%s fits the sunlight line in the count panel", (locale) => {
+    // The longest run of words the overlay puts over the sky. It wraps inside
+    // the 150pt column the fleet rows below it keep, so what is checked is that
+    // it wraps rather than that it fits on one line — three lines of that
+    // column, past which the pill has become the thing on screen.
+    for (const line of Object.values(stringsFor(locale).scene.sunlight)) {
+      expect(width(line.replace("{count}", "12"), 10)).toBeLessThan(3 * 150);
+    }
+  });
+
+  test.each(LOCALES)("%s fits the seeing line on the card", (locale) => {
+    // The verdict and, where there is one, the magnitude after it. The card
+    // runs from `left: 8` to `right: 8`, so on the narrowest phone this ships
+    // to it is 359 wide, less its own border and the 10pt margins this line
+    // keeps — and it is prose, so what is checked is that it wraps to two lines
+    // rather than that it fits on one.
+    const CARD_COLUMN = 375 - 8 * 2 - 1 * 2 - 10 * 2;
+    const t = stringsFor(locale).card.seeing;
+    const magnitude = fill(t.aboutMagnitude, { value: "-1.8" });
+    // Only the three verdicts that rest on a brightness carry one; the other
+    // three are the whole line on their own. See `seeing`.
+    for (const verdict of [t.visible, t.binoculars, t.tooFaint]) {
+      expect(width(`${verdict} · ${magnitude}`, 11.5)).toBeLessThan(2 * CARD_COLUMN);
+    }
+    for (const verdict of [t.eclipsed, t.daylight, t.unknown]) {
+      expect(width(verdict, 11.5)).toBeLessThan(2 * CARD_COLUMN);
+    }
   });
 
   test.each(LOCALES)("%s fits the buttons", (locale) => {
@@ -206,6 +247,68 @@ describe("the figures follow the reader's conventions", () => {
     setLocaleForTesting("de");
     expect(kilometres(35786)).toBe("35.786 km");
     expect(speed(7.58)).toBe("7,6 km/s");
+  });
+
+  test("whether it can be seen is said before how bright it is", () => {
+    setLocaleForTesting("en");
+    // The verdict first, because that is the answer; the figure after it, as
+    // the thing the answer rests on.
+    expect(
+      seeing({ nakedEye: "visible", apparentMagnitude: -1.83, magnitudeMeasured: true })
+    ).toBe("Bright enough to see now · magnitude -1.8");
+    // Hedged where the standard magnitude behind it is an estimate rather than
+    // an observation. See `standardMagnitude.ts`.
+    expect(
+      seeing({ nakedEye: "binoculars", apparentMagnitude: 5.24, magnitudeMeasured: false })
+    ).toBe("In sunlight, but you would want binoculars · around magnitude 5.2");
+  });
+
+  test("and no figure is offered where the answer does not rest on one", () => {
+    setLocaleForTesting("en");
+    // An object in the Earth's shadow is reflecting nothing, so its magnitude
+    // runs off to infinity and there is nothing to print. In daylight the sky
+    // rules out every object overhead whatever its own brightness.
+    expect(
+      seeing({
+        nakedEye: "eclipsed",
+        apparentMagnitude: Number.POSITIVE_INFINITY,
+        magnitudeMeasured: true
+      })
+    ).toBe("In the Earth's shadow, with no sunlight on it to see");
+    expect(
+      seeing({ nakedEye: "daylight", apparentMagnitude: -1.8, magnitudeMeasured: true })
+    ).toBe("The sun is still up here — nothing in orbit can be seen yet");
+    expect(
+      seeing({ nakedEye: "unknown", apparentMagnitude: null, magnitudeMeasured: false })
+    ).toBe("In sunlight, though how brightly it shines is not recorded");
+  });
+
+  test("the panel says what the count cannot", () => {
+    setLocaleForTesting("en");
+    // Daylight first, because it is the answer for the whole sky rather than
+    // for any of the objects in it.
+    expect(sunlightSummary({ count: 70, sunlit: 70, darkness: "daylight" })).toBe(
+      "Daylight — none of these can be seen yet"
+    );
+    expect(sunlightSummary({ count: 12, sunlit: 0, darkness: "dark" })).toBe(
+      "All of these are in the Earth's shadow"
+    );
+    expect(sunlightSummary({ count: 12, sunlit: 9, darkness: "twilight" })).toBe(
+      "9 of these are in sunlight"
+    );
+    // "All" rather than "12 of these", which reads as a subset of itself.
+    expect(sunlightSummary({ count: 12, sunlit: 12, darkness: "dark" })).toBe(
+      "All of these are in sunlight"
+    );
+  });
+
+  test("the magnitude follows the reader's decimal convention", () => {
+    // Minus one point eight to an English reader, minus one comma eight to a
+    // German one — the same argument as the speeds and distances above.
+    setLocaleForTesting("de");
+    expect(
+      seeing({ nakedEye: "visible", apparentMagnitude: -1.83, magnitudeMeasured: true })
+    ).toContain("Magnitude -1,8");
   });
 
   test("the compass is the one that language uses", () => {

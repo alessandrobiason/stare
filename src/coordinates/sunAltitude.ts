@@ -1,5 +1,5 @@
 import { clamp, toDegrees, toRadians } from "../math/angles";
-import { ObserverLocation } from "../types";
+import { EciPosition, ObserverLocation } from "../types";
 import { gmstAt } from "./transform";
 
 /**
@@ -35,6 +35,62 @@ const MS_PER_DAY = 86_400_000;
  * this a statement about geometry rather than about the weather.
  */
 export function sunAltitudeDeg(observer: ObserverLocation, when: Date): number {
+  const { rightAscension, declination } = solarCoordinates(when);
+
+  // How far the Earth has turned the observer past the sun, and what that
+  // leaves of it above the horizon.
+  const hourAngle = gmstAt(when) + toRadians(observer.longitudeDeg) - rightAscension;
+  const latitude = toRadians(observer.latitudeDeg);
+  const sine =
+    Math.sin(latitude) * Math.sin(declination) +
+    Math.cos(latitude) * Math.cos(declination) * Math.cos(hourAngle);
+
+  return toDegrees(Math.asin(clamp(sine, -1, 1)));
+}
+
+/**
+ * Where the sun is around the Earth, in the frame the satellites are in.
+ *
+ * The other half of the same series, and the reason it was worth factoring out
+ * of `sunAltitudeDeg`: the palette asks how high the sun is *here*, and the
+ * shadow test (`src/satellite/illumination.ts`) asks which way it lies from the
+ * centre of the Earth. Those are one calculation read two ways.
+ *
+ * The frame is the one SGP4 delivers satellites in — TEME, the true equator and
+ * mean equinox of date — because the only thing this vector is ever used for is
+ * an angle against a satellite's own position, and an angle is only a fact when
+ * both sides of it are in the same frame. What this series actually produces is
+ * the *mean* equinox of date, which differs from TEME by the equation of the
+ * equinoxes: at most about 16 arcseconds, or a two-hundredth of a degree. That
+ * is a fiftieth of the series' own error and four orders below the width of the
+ * shadow it goes to draw, so no nutation term is carried for it.
+ *
+ * The distance is carried because the shadow is a cone rather than a cylinder,
+ * and how sharply it converges is set by how far away the light is. It swings
+ * by 3.3% over a year — perihelion in January, aphelion in July — which moves
+ * the umbra's reach by a couple of hundred thousand kilometres and is well
+ * inside the orbit of everything this is asked about.
+ */
+export function sunEciKm(when: Date): EciPosition {
+  const { rightAscension, declination, distanceKm } = solarCoordinates(when);
+  const cosDeclination = Math.cos(declination);
+
+  return {
+    x: distanceKm * cosDeclination * Math.cos(rightAscension),
+    y: distanceKm * cosDeclination * Math.sin(rightAscension),
+    z: distanceKm * Math.sin(declination)
+  };
+}
+
+/** Astronomical unit, in kilometres: what the distance series is scaled by. */
+const KM_PER_AU = 149_597_870.7;
+
+/** Where the sun is, as the series has it: equatorial, of date. */
+function solarCoordinates(when: Date): {
+  rightAscension: number;
+  declination: number;
+  distanceKm: number;
+} {
   const days = (when.getTime() - J2000_EPOCH_MS) / MS_PER_DAY;
 
   // The sun along the ecliptic: its mean position, then the correction for the
@@ -54,13 +110,12 @@ export function sunAltitudeDeg(observer: ObserverLocation, when: Date): number {
   );
   const declination = Math.asin(Math.sin(obliquity) * Math.sin(eclipticLongitude));
 
-  // How far the Earth has turned the observer past the sun, and what that
-  // leaves of it above the horizon.
-  const hourAngle = gmstAt(when) + toRadians(observer.longitudeDeg) - rightAscension;
-  const latitude = toRadians(observer.latitudeDeg);
-  const sine =
-    Math.sin(latitude) * Math.sin(declination) +
-    Math.cos(latitude) * Math.cos(declination) * Math.cos(hourAngle);
+  // The Earth's distance from the sun over one orbit, to five decimal places of
+  // an astronomical unit — the same two harmonics of the mean anomaly the
+  // longitude above is corrected by, which is the whole of the eccentricity at
+  // this precision.
+  const distanceAu =
+    1.00014 - 0.01671 * Math.cos(meanAnomaly) - 0.00014 * Math.cos(2 * meanAnomaly);
 
-  return toDegrees(Math.asin(clamp(sine, -1, 1)));
+  return { rightAscension, declination, distanceKm: distanceAu * KM_PER_AU };
 }

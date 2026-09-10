@@ -60,6 +60,12 @@ export const ko: Strings = {
       title: "보이는 위성",
       empty: "보이는 위성이 없습니다",
       other: "기타"
+    },
+    sunlight: {
+      daylight: "낮 — 아직 아무것도 보이지 않습니다",
+      none: "모두 지구 그림자 속에 있습니다",
+      some: "이 중 {count}개가 햇빛을 받고 있습니다",
+      all: "모두 햇빛을 받고 있습니다"
     }
   },
   filter: {
@@ -67,6 +73,7 @@ export const ko: Strings = {
     open: "분류 필터",
     showAll: "전체 보기",
     ringKey: "고리 = 적도 위 정지",
+    shadowKey: "흐림 = 지구 그림자 속",
     categories: {
       LANDMARK: "주요 천체",
       NAVIGATION: "위성항법",
@@ -82,6 +89,16 @@ export const ko: Strings = {
     openSite: "{site} 열기",
     photo: "{name} 사진",
     missing: "이 위성은 목록에서 빠졌습니다.",
+    seeing: {
+      visible: "지금 볼 수 있을 만큼 밝습니다",
+      binoculars: "햇빛을 받고 있지만 쌍안경이 필요합니다",
+      tooFaint: "햇빛을 받고 있지만 너무 어두워 보이지 않습니다",
+      eclipsed: "지구 그림자 속이라 반사할 햇빛이 없습니다",
+      daylight: "여기는 아직 해가 떠 있어 궤도의 물체는 보이지 않습니다",
+      unknown: "햇빛을 받고 있지만 밝기는 기록되어 있지 않습니다",
+      magnitude: "등급 {value}",
+      aboutMagnitude: "등급 약 {value}"
+    },
     facts: {
       distance: "거리",
       altitude: "고도",

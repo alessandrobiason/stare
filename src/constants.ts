@@ -159,6 +159,112 @@ export const DEVICE_CAMERA_FIELD_OF_VIEW = {
 export const MINIMUM_SATELLITE_ELEVATION_DEG = 5;
 
 /**
+ * The Earth's shadow, as `src/satellite/illumination.ts` casts it.
+ *
+ * One knob, because the rest of that geometry is not a choice: the radii of the
+ * Earth and the sun and the distance between them are measured quantities, and
+ * where the cones they define fall is arithmetic.
+ */
+export const EARTH_SHADOW = {
+  /**
+   * How much atmosphere the shadow is grown by, in kilometres.
+   *
+   * The solid Earth is not what stops the light. Sunlight passing within the
+   * first tens of kilometres of air is scattered and absorbed out of the beam
+   * long before it grazes the ground, so the shadow a satellite actually enters
+   * is wider than the one the globe casts — and it enters it earlier.
+   *
+   * Eighty kilometres is the top of the mesosphere, above which there is not
+   * enough air left to matter and below which there is very little else. On a
+   * four-hundred-kilometre orbit it moves the moment of eclipse by about ten
+   * seconds, which is the difference between a station that visibly reddens and
+   * fades on its way into the Earth's shadow — as everyone watching one has
+   * seen it do — and one that this app would have claimed was in full sun until
+   * it went out.
+   *
+   * What it does not model is the light bent *into* the shadow by that same
+   * air: the coppery light that falls on an eclipsed moon. It reaches the umbra
+   * here too, and it is some ten magnitudes down on sunlight — far below
+   * anything reflected by a few square metres of satellite could be seen at.
+   */
+  atmosphereKm: 80
+} as const;
+
+/**
+ * When a sunlit satellite can actually be seen from the ground.
+ *
+ * A satellite is not a light of its own, so two conditions have to hold at
+ * once and only one of them is about the satellite. The other is about the sky
+ * behind it, which has to be dark enough for a faint moving point to stand out
+ * of — and that is the sun's altitude *here*, which the app already works out
+ * once a minute for the palette (`sunAltitudeDeg`).
+ */
+export const SKY_VISIBILITY = {
+  /**
+   * Sun altitude above which nothing at all is visible, in degrees.
+   *
+   * Civil twilight's own boundary. Above it the sky is bright enough to read a
+   * newspaper by and only the moon and the brightest planets are in it; a
+   * satellite at magnitude minus two would be somewhere in the region of a
+   * thousand times fainter than the background it would have to be picked out
+   * of. There is no partial credit here and the app should not imply any: with
+   * the sun this high, the honest count of visible satellites is zero.
+   */
+  daylightAboveDeg: -6,
+  /**
+   * And the altitude below which the sky is as dark as it is going to get.
+   *
+   * Astronomical twilight. Between the two the sky is draining and the limit
+   * climbs with it, which is exactly the window that makes satellite watching
+   * an evening activity rather than a middle-of-the-night one: the observer is
+   * already in the dark while the objects a few hundred kilometres overhead are
+   * still in full sun.
+   */
+  darkBelowDeg: -18,
+  /**
+   * The faintest an object can be and still be found by eye, as a magnitude.
+   *
+   * The textbook figure for a dark sky is 6, and it is the wrong one to use:
+   * this app is pointed at the sky above wherever the phone is standing, and
+   * that is a street with lights on it far more often than it is a moor. Four
+   * is roughly what a suburban sky gives up, and a satellite is harder than a
+   * star of the same magnitude besides — it is moving, and the eye is being
+   * asked to catch it rather than to stare at a known place.
+   *
+   * Deliberately the pessimistic end. The cost of setting it too faint is the
+   * app telling somebody to go outside and look at nothing, which is the one
+   * promise it cannot afford to break; the cost of setting it too bright is a
+   * card that says a borderline object may be hard to see, which is true.
+   */
+  nakedEyeMagnitude: 4,
+  /**
+   * And the same limit at the bright end of twilight, in magnitudes.
+   *
+   * Not a second guess so much as the definition of the boundary above it:
+   * civil twilight is reckoned to end at the point where the first-magnitude
+   * stars come out, which is the same as saying the sky's limit is about 1
+   * there. Between that altitude and `darkBelowDeg` the limit is interpolated,
+   * so the sky darkens through the evening the way it actually does.
+   *
+   * This is the window satellite watching happens in, and the interpolation is
+   * what makes it behave: the station at magnitude minus two clears the bar the
+   * moment the sun is down, and a Starlink at magnitude five does not clear it
+   * until the sky behind it is genuinely dark — which is exactly the order in
+   * which the two become findable to somebody standing outside.
+   */
+  twilightNakedEyeMagnitude: 1,
+  /**
+   * How much fainter an object may be and still be worth mentioning.
+   *
+   * Between the naked-eye limit and this, an object is really there but wants
+   * help: binoculars, or a darker sky, or knowing exactly where to look. Past
+   * it there is nothing to say to somebody standing outside, and the app says
+   * so rather than leaving them to find out.
+   */
+  binocularMagnitude: 8
+} as const;
+
+/**
  * Tuning for the satellite tracker (`src/satellite/skyTracker.ts`).
  *
  * A full propagation of the active catalog costs ~100 ms, so no cadence runs

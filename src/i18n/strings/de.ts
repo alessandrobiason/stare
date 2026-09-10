@@ -71,6 +71,12 @@ export const de: Strings = {
       title: "IM BILD",
       empty: "Nichts im Bild",
       other: "Andere"
+    },
+    sunlight: {
+      daylight: "Tageslicht — noch ist keiner davon zu sehen",
+      none: "Alle stehen im Erdschatten",
+      some: "{count} davon stehen im Sonnenlicht",
+      all: "Alle stehen im Sonnenlicht"
     }
   },
   filter: {
@@ -78,6 +84,7 @@ export const de: Strings = {
     open: "Kategoriefilter",
     showAll: "ALLE ZEIGEN",
     ringKey: "RING = STEHT ÜBER DEM ÄQUATOR",
+    shadowKey: "BLASS = IM ERDSCHATTEN",
     categories: {
       LANDMARK: "HIGHLIGHTS",
       NAVIGATION: "NAVIGATION",
@@ -93,6 +100,16 @@ export const de: Strings = {
     openSite: "{site} öffnen",
     photo: "Foto von {name}",
     missing: "Dieser Satellit steht nicht mehr im Katalog.",
+    seeing: {
+      visible: "Hell genug, um es jetzt zu sehen",
+      binoculars: "Im Sonnenlicht, aber ein Fernglas wäre nötig",
+      tooFaint: "Im Sonnenlicht, aber viel zu schwach zum Sehen",
+      eclipsed: "Im Erdschatten — kein Sonnenlicht, das es zurückwerfen könnte",
+      daylight: "Hier steht die Sonne noch — im Orbit ist noch nichts zu sehen",
+      unknown: "Im Sonnenlicht; wie hell es leuchtet, ist nicht verzeichnet",
+      magnitude: "Magnitude {value}",
+      aboutMagnitude: "Magnitude etwa {value}"
+    },
     facts: {
       distance: "Entfernung",
       altitude: "Höhe",

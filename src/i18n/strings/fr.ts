@@ -72,6 +72,12 @@ export const fr: Strings = {
       title: "EN VUE",
       empty: "Rien en vue",
       other: "Autres"
+    },
+    sunlight: {
+      daylight: "Il fait jour — aucun n'est encore visible",
+      none: "Tous sont dans l'ombre de la Terre",
+      some: "{count} d'entre eux sont éclairés par le Soleil",
+      all: "Tous sont éclairés par le Soleil"
     }
   },
   filter: {
@@ -79,6 +85,7 @@ export const fr: Strings = {
     open: "Filtre par catégorie",
     showAll: "TOUT AFFICHER",
     ringKey: "ANNEAU = FIXE AU-DESSUS DE L'ÉQUATEUR",
+    shadowKey: "PÂLE = DANS L'OMBRE DE LA TERRE",
     categories: {
       LANDMARK: "À NE PAS MANQUER",
       NAVIGATION: "NAVIGATION",
@@ -94,6 +101,16 @@ export const fr: Strings = {
     openSite: "Ouvrir {site}",
     photo: "Photographie : {name}",
     missing: "Ce satellite ne figure plus au catalogue.",
+    seeing: {
+      visible: "Assez brillant pour être vu maintenant",
+      binoculars: "Au soleil, mais il faudrait des jumelles",
+      tooFaint: "Au soleil, mais bien trop faible pour être vu",
+      eclipsed: "Dans l'ombre de la Terre : aucune lumière à réfléchir",
+      daylight: "Ici le Soleil est encore levé — rien en orbite n'est encore visible",
+      unknown: "Au soleil, mais sa brillance n'est pas répertoriée",
+      magnitude: "magnitude {value}",
+      aboutMagnitude: "magnitude {value} environ"
+    },
     facts: {
       distance: "Distance",
       altitude: "Altitude",

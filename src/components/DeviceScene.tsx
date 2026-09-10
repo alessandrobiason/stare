@@ -164,7 +164,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         enabledCategories={controls.enabledCategories}
         onToggleCategory={controls.toggleCategory}
         onEnableAll={controls.enableAllCategories}
-        onVisibleSatelliteCountChange={controls.setMarkerCount}
+        onSkyChange={controls.setSky}
         onMaskStatusChange={setMaskStatus}
         onSkyFixChange={setSkyFixStanding}
         debug={controls.debug}
@@ -200,7 +200,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
           panels sit in a layer of their own for the same reason, and both
           measure from the same safe corners. See `SafeAreaLayer`. */}
       <SafeAreaLayer>
-        <SceneStatus markerCount={controls.markerCount} fleets={controls.markerFleets} />
+        <SceneStatus sky={controls.sky} />
         <CompassNotice
           accuracy={compass.accuracy}
           declinationKnown={compass.declinationKnown}

@@ -1,4 +1,5 @@
 import { SATELLITE_MARKERS, SATELLITE_TRACKING } from "../constants";
+import { sunAltitudeDeg, sunEciKm } from "../coordinates/sunAltitude";
 import {
   azimuthDeg,
   createObserverFrame,
@@ -17,7 +18,15 @@ import {
   SatelliteFix
 } from "../types";
 import { CatalogEntry, SatelliteCatalog } from "./catalog";
+import {
+  apparentMagnitude,
+  createShadowFrame,
+  illuminationIn,
+  phaseAngleDeg
+} from "./illumination";
+import { nakedEyeVerdict } from "./nakedEye";
 import { orbitPeriodMinutes, propagateStateAt } from "./propagator";
+import { standardMagnitudeFor } from "./standardMagnitude";
 
 /** What the tracker remembers about one catalog entry between propagations. */
 type TrackedEntry = {
@@ -147,6 +156,9 @@ export class SkyTracker {
     // and a geostationary satellite is motionless precisely because the two
     // cancel — held still, it would grow the longest trail on the frame.
     const aheadGmst = gmstAt(new Date(whenMs + SATELLITE_MARKERS.trailSeconds * 1000));
+    // Where the Earth's shadow lies, once for the whole frame. The sun moves a
+    // fortieth of a degree an hour, and this walk is several hundred long.
+    const shadow = createShadowFrame(when);
     const fixes: SatelliteFix[] = [];
 
     for (const tracked of this.tracked) {
@@ -164,7 +176,12 @@ export class SkyTracker {
         category: tracked.entry.category,
         parked: tracked.entry.parked,
         position: enu,
-        nextPosition: eciToEnuInFrame(this.aheadOf(tracked, position), aheadGmst, frame)
+        nextPosition: eciToEnuInFrame(this.aheadOf(tracked, position), aheadGmst, frame),
+        // Asked in the inertial frame, where the question is about the Earth
+        // and the sun rather than about the observer: whether this place is in
+        // the dark is a separate matter, and the overlay asks it once for the
+        // whole sky rather than once per satellite.
+        sunlit: illuminationIn(position, shadow).state
       });
     }
 
@@ -201,22 +218,47 @@ export class SkyTracker {
     if (!state) return null;
 
     const gmst = gmstAt(when);
-    const enu = eciToEnuInFrame(state.position, gmst, createObserverFrame(observer));
+    const frame = createObserverFrame(observer);
+    const enu = eciToEnuInFrame(state.position, gmst, frame);
     const { velocity } = state;
+
+    // Whether it is lit, and how brightly — the slow half of the answer, and
+    // the reason it lives here rather than on the frame path. A magnitude needs
+    // the phase angle, which needs the sun resolved into the observer's own
+    // frame; that is one more rotation, spent twice a second for the single
+    // object somebody has tapped rather than per marker per frame.
+    const illumination = illuminationIn(state.position, createShadowFrame(when));
+    const standard = standardMagnitudeFor(tracked.entry.noradId, tracked.entry.name);
+    const range = rangeKm(enu);
+    const magnitude =
+      standard === null
+        ? null
+        : apparentMagnitude(
+            standard.magnitude,
+            range,
+            phaseAngleDeg(enu, eciToEnuInFrame(sunEciKm(when), gmst, frame)),
+            illumination.litFraction
+          );
+    const sunAltitude = sunAltitudeDeg(observer, when);
 
     return {
       name: tracked.entry.name,
       noradId: tracked.entry.noradId,
       category: tracked.entry.category,
       parked: tracked.entry.parked,
-      rangeKm: rangeKm(enu),
+      rangeKm: range,
       altitudeKm: geodeticAltitudeKm(state.position, gmst),
       speedKmPerSecond: Math.hypot(velocity.x, velocity.y, velocity.z),
       // Wrapped, because a bearing is read off a compass rather than signed:
       // due west is 270 degrees, not minus ninety.
       azimuthDeg: wrapDegrees360(azimuthDeg(enu)),
       elevationDeg: elevationDeg(enu),
-      orbitPeriodMinutes: orbitPeriodMinutes(tracked.entry.satrec)
+      orbitPeriodMinutes: orbitPeriodMinutes(tracked.entry.satrec),
+      sunlit: illumination.state,
+      apparentMagnitude: magnitude,
+      magnitudeMeasured: standard?.measured ?? false,
+      nakedEye: nakedEyeVerdict(illumination.state, magnitude, sunAltitude),
+      sunAltitudeDeg: sunAltitude
     };
   }
 

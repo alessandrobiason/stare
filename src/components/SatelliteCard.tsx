@@ -1,7 +1,7 @@
 import React, { MutableRefObject, useEffect, useState } from "react";
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { fill, strings } from "../i18n";
-import { kilometres, lookDirection, orbitPeriod, speed } from "../i18n/format";
+import { kilometres, lookDirection, orbitPeriod, seeing, speed } from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
 import {
   cachedLandmarkPhoto,
@@ -193,6 +193,11 @@ export const SatelliteCard: React.FC<Props> = ({
           {briefing.url && <OfficialSite url={briefing.url} />}
         </View>
       )}
+
+      {/* Between what the thing is and where it is, because that is the order
+          somebody who has just tapped a mark asks in: what is that, can I see
+          it, where do I look. See `seeing`. */}
+      {detail && <Text style={styles.seeing}>{seeing(detail)}</Text>}
 
       {detail ? (
         <View style={styles.facts}>
@@ -474,6 +479,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.3
+  },
+  seeing: {
+    marginHorizontal: 10,
+    marginTop: 8,
+    paddingTop: 7,
+    // Ruled off above rather than below: what it belongs with is the figures
+    // under it, which are the other things true of this object at this instant,
+    // and what it is being separated from is the paragraph about what the
+    // object is — which is true whatever the sky is doing.
+    borderTopWidth: 1,
+    borderTopColor: theme.color.divider,
+    color: theme.color.textBright,
+    fontSize: 11.5,
+    fontWeight: "600",
+    lineHeight: 16
   },
   facts: {
     paddingHorizontal: 10,
