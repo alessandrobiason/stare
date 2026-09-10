@@ -259,12 +259,24 @@ never ran at all. A build that reaches `pod install` has the patch in the
 sources CocoaPods compiles.
 
 **Which build is on the phone.** The release workflow stamps
-`ios.buildNumber` as `<run_number>.<run_attempt>`, so the build number
-TestFlight shows is the GitHub Actions run number. When a fix appears not to
-have worked, check that first: the number in TestFlight against the number of
-the run that was supposed to carry it. A native fix reaching a phone that is
-still on the previous binary looks exactly like a native fix that does not
-work, and telling those apart by reasoning is not possible.
+`ios.buildNumber` as `<run_number + BUILD_NUMBER_OFFSET>.<run_attempt>`, so the
+build number TestFlight shows is the GitHub Actions run number plus a constant
+set at the top of the `release` job. When a fix appears not to have worked,
+check that first: the number in TestFlight against the number of the run that
+was supposed to carry it (run number, not the stamped build number, if the
+offset has moved since). A native fix reaching a phone that is still on the
+previous binary looks exactly like a native fix that does not work, and
+telling those apart by reasoning is not possible.
+
+The offset exists because `run_number` counts only this workflow's own runs,
+starting at 1 -- it has no memory of builds TestFlight already has from before
+the workflow existed, from a different pipeline, or from a run whose own
+history was later rewritten out from under it (which is exactly how this one
+went stale once already: a run uploaded build 20 while the offset was on
+main, a later rewrite dropped that commit, and the next runs went back to
+`run_number` alone -- 6.1, 7.1 -- both rejected as not higher than 20.1).
+Move it to keep the numbering continuous with whatever TestFlight is actually
+showing, checked there rather than assumed from the git history.
 
 That string doubles as a check on which binary is running: if a phone reports
 the bare "Image could not be captured" with nothing after the colon, it is
@@ -433,10 +445,11 @@ So the release signs manually, with the profile from step 4, and:
 ## Things the workflow handles for you
 
 - **Build numbers.** `CFBundleVersion` must be unique per version string and
-  rising, so it is stamped from `<run_number>.<run_attempt>` into `app.json`
-  before prebuild. Re-running a failed release therefore gets a fresh number
-  rather than colliding with the build it already uploaded. That stamp is also
-  why `fingerprint.config.js` keeps version strings out of the update
+  rising, so it is stamped from `<run_number + BUILD_NUMBER_OFFSET>.<run_attempt>`
+  into `app.json` before prebuild — see "Which build is on the phone" above for
+  what the offset is for. Re-running a failed release therefore gets a fresh
+  number rather than colliding with the build it already uploaded. That stamp
+  is also why `fingerprint.config.js` keeps version strings out of the update
   fingerprint — see "What decides that, and why it cannot be got wrong".
 - **Icon alpha.** App Store Connect rejects an icon carrying an alpha channel
   (ITMS-90717), and the icon Expo falls back on when `app.json` names none is

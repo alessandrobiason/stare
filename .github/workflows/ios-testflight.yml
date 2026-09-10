@@ -232,12 +232,29 @@ jobs:
     # and the export and upload follow it.
     timeout-minutes: 60
     env:
-      # CFBundleVersion has to be unique per CFBundleShortVersionString and
-      # rising. run_number never repeats across runs, and run_attempt
-      # distinguishes a re-run of a failed release, which reuses run_number.
-      BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+      # Shifts `run_number` below to whatever TestFlight build the next run
+      # should land on. TestFlight is already sitting on build 20 (run #5
+      # uploaded 20.1, while this offset was still on main); run_number on its
+      # own restarts from 1 and produced 6.1, then 7.1, both rejected as not
+      # higher than 20.1. 14 clears that for run #7 (21.x, if it is re-run) and
+      # every run after it. Raise it again only to redraw the gap on purpose —
+      # check what TestFlight actually shows first, since a run can succeed
+      # there while still failing a later step this workflow added afterwards.
+      BUILD_NUMBER_OFFSET: 14
     steps:
       - uses: actions/checkout@v5
+
+      # CFBundleVersion has to be unique per CFBundleShortVersionString and
+      # rising. `run_number` never repeats across runs and `run_attempt`
+      # distinguishes a re-run of a failed release, which reuses `run_number`
+      # -- both give uniqueness for free, with nothing to persist between
+      # runs. The addition happens in bash rather than in the `env:` block
+      # above because `${{ }}` expressions have no `+` operator.
+      - name: Compute the build number
+        run: |
+          set -euo pipefail
+          echo "BUILD_NUMBER=$(( ${{ github.run_number }} + BUILD_NUMBER_OFFSET )).${{ github.run_attempt }}" \
+            >> "$GITHUB_ENV"
 
       # Same pin, and the same reasoning, as ios-build.yml: ExpoModulesJSI
       # resolves through SwiftPM against a swift-tools-version 6.2 dependency,
