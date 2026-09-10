@@ -43,7 +43,7 @@ import {
   viewportOf,
   WHOLE_FRAME
 } from "./markerGeometry";
-import { markersUnder } from "./markerHitTest";
+import { namesUnder } from "./markerHitTest";
 import { pressPoint } from "./pressPoint";
 import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SatelliteCard } from "./SatelliteCard";
@@ -187,7 +187,7 @@ type Props = {
  * fill rate rather than the shape count that decides the frame budget.
  *
  * The picture is also the one control the normal view has: a tap on it asks
- * what is under the finger (`markersUnder`) and opens a card about it
+ * what is under the finger (`namesUnder`) and opens a card about it
  * (`SatelliteCard`), and a tap that lands on empty sky puts the card away
  * again.
  */
@@ -298,8 +298,8 @@ export const SkyOverlay: React.FC<Props> = ({
   });
 
   /**
-   * What a tap on the picture means: the satellites under the finger, or
-   * nothing at all.
+   * What a tap on the picture means: the satellites under the finger — marks,
+   * and the names written along the landmarks' paths — or nothing at all.
    *
    * The frame is read from a ref rather than subscribed to, so this view still
    * renders only when something it draws changes rather than sixty times a
@@ -313,8 +313,7 @@ export const SkyOverlay: React.FC<Props> = ({
     const point = pressPoint(event);
     if (!frameStyle || !point) return;
 
-    const hits = markersUnder(latestFrameRef.current, frameStyle, point);
-    const names = hits.map((hit) => hit.name);
+    const names = namesUnder(latestFrameRef.current, frameStyle, point);
     setSelection(names.length === 0 ? null : { names, selected: names[0] });
   };
 

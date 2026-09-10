@@ -307,6 +307,12 @@ describe("the ring around a tapped satellite", () => {
 });
 
 describe("a landmark's path across the sky", () => {
+  /** A name written on the line, and when its object is at that point. */
+  const anchorAt = (left: number, top: number, atMs = Date.UTC(2026, 7, 29, 20, 37, 0)) => ({
+    at: { left, top },
+    atMs
+  });
+
   /** One planned pass, projected: a straight run across the middle of the frame. */
   function path(overrides: Partial<MarkerPath> = {}): MarkerPath {
     return {
@@ -322,8 +328,6 @@ describe("a landmark's path across the sky", () => {
       ],
       ticks: [{ at: { left: 50, top: 50 }, ahead: { left: 60, top: 50 } }],
       anchor: null,
-      startsAtMs: Date.UTC(2026, 7, 29, 20, 37, 0),
-      upcoming: false,
       lead: 0,
       ...overrides
     };
@@ -404,11 +408,11 @@ describe("a landmark's path across the sky", () => {
   });
 
   test("names the arc at its anchor, wherever its object is", () => {
-    const named = path({ anchor: { left: 30, top: 70 } });
+    const named = path({ anchor: anchorAt(30, 70) });
     const { labels } = scene([], 0, FRAME, [named]);
 
     expect(labels).toHaveLength(1);
-    expect(labels[0].name).toBe("ISS");
+    expect(labels[0].name).toMatch(/^ISS\n/);
     // Under the anchor, which is a point on the line rather than a place on the
     // screen. See `anchorFor`.
     expect(labels[0].x).toBeCloseTo(216, 6);
@@ -416,13 +420,17 @@ describe("a landmark's path across the sky", () => {
     expect(labels[0].offsetY).toBeGreaterThan(0);
   });
 
-  test("adds the time to the name of a pass that has not begun", () => {
-    const upcoming = path({ anchor: { left: 30, top: 70 }, upcoming: true });
-    const { labels } = scene([], 0, FRAME, [upcoming]);
+  test("writes the time its object is at that point under the name", () => {
+    // The name and the time, a line each: the two together are wider than the
+    // box a label is set in.
+    const at = Date.UTC(2026, 7, 29, 20, 37, 0);
+    const later = Date.UTC(2026, 7, 29, 20, 43, 0);
+    const named = (atMs: number) => scene([], 0, FRAME, [path({ anchor: anchorAt(30, 70, atMs) })]);
 
-    // The name and the time it rises at, a line each: the two together are
-    // wider than the box a label is set in.
-    expect(labels[0].name).toMatch(/^ISS\n\d{1,2}[:.]\d{2}/);
+    expect(named(at).labels[0].name).toMatch(/^ISS\n\d{1,2}[:.]\d{2}/);
+    // And it is the anchor's own time, so a name written further along the line
+    // says a later minute rather than repeating the one at the rise.
+    expect(named(later).labels[0].name).not.toBe(named(at).labels[0].name);
   });
 
   test("says nothing where no part of the arc is on the frame", () => {
@@ -433,7 +441,7 @@ describe("a landmark's path across the sky", () => {
     // The same word twice on one frame, and the marker's is the better placed
     // of the two: it is on the object rather than on the line it is following.
     const landmark = marker({ name: "ISS", category: "LANDMARK", point: { left: 70, top: 20 } });
-    const { labels } = scene([landmark], 0, FRAME, [path({ anchor: { left: 30, top: 70 } })]);
+    const { labels } = scene([landmark], 0, FRAME, [path({ anchor: anchorAt(30, 70) })]);
 
     expect(labels).toHaveLength(1);
     expect(labels[0].name).toBe("ISS");
@@ -443,15 +451,15 @@ describe("a landmark's path across the sky", () => {
   test("names the arc when its object has been left out for terrain", () => {
     // The case the naming exists for: nothing on the frame is the landmark, so
     // without this the line is an anonymous streak across the sky.
-    const { labels } = scene([], 0, FRAME, [path({ anchor: { left: 30, top: 70 } })]);
-    expect(labels.map((label) => label.name)).toEqual(["ISS"]);
+    const { labels } = scene([], 0, FRAME, [path({ anchor: anchorAt(30, 70) })]);
+    expect(labels.map((label) => label.name.split("\n")[0])).toEqual(["ISS"]);
   });
 
   test("keys an arc's name apart from a marker's", () => {
     // A landmark can be named twice on one frame — once on its own mark, once
     // on another of its passes — and two views under one key is one view.
     const landmark = marker({ name: "Hubble", category: "LANDMARK" });
-    const named = path({ anchor: { left: 10, top: 90 } });
+    const named = path({ anchor: anchorAt(10, 90) });
     const keys = scene([landmark], 0, FRAME, [named]).labels.map((label) => label.key);
 
     expect(keys).toHaveLength(2);

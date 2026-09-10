@@ -56,7 +56,7 @@ export type SatelliteMarker = {
  * only the landmarks get one.
  */
 export type MarkerPath = {
-  /** The object's name, for the label at a rise that has not happened yet. */
+  /** The object's name, which is what the arc is labelled with. */
   name: string;
   /** Unique among the paths on one frame: the object, and which pass this is. */
   key: string;
@@ -69,8 +69,8 @@ export type MarkerPath = {
   /** Round clock minutes along it, each with the path just ahead of it. */
   ticks: { at: FramePoint; ahead: FramePoint }[];
   /**
-   * Where to write the object's name, or `null` when no part of the arc is on
-   * the frame to write it on.
+   * Where to write the object's name, and when it is at that point, or `null`
+   * when no part of the arc is on the frame to write it on.
    *
    * A point on the path rather than a place on the screen, and one that stays
    * put while the phone does: see `anchorFor`. Every drawn arc gets one,
@@ -78,13 +78,25 @@ export type MarkerPath = {
    * object that would have answered it is often not on the frame at all, being
    * behind a roof, below the horizon, or an hour away.
    */
-  anchor: FramePoint | null;
-  /** When the object joins the path, for the name to carry when it has not yet. */
-  startsAtMs: number;
-  /** Whether it has yet to: a pass under way needs no time under its name. */
-  upcoming: boolean;
+  anchor: PathAnchor | null;
   /** How far ahead the pass is, in `[0, 1]` across the planning window. */
   lead: number;
+};
+
+/**
+ * The point an arc's name is written at, and the moment its object is there.
+ *
+ * The time belongs to the point rather than to the pass, and that is the whole
+ * of what the label means: *this* object is at *this* piece of sky at *this*
+ * time. The name used to carry the pass's rise time wherever it happened to be
+ * written, which reads as a time for the point it is set under and is one only
+ * where the name has landed on the rise — so the same minute appeared at both
+ * ends of an arc as the anchor moved along it, saying nothing about either.
+ */
+export type PathAnchor = {
+  at: FramePoint;
+  /** Epoch milliseconds, the clock the whole plan is written in. */
+  atMs: number;
 };
 
 /**
@@ -316,11 +328,6 @@ export function projectPaths(
       lines,
       ticks,
       anchor: anchorFor(pass, key, atMs, axes, lens, anchors),
-      startsAtMs: pass.startsAtMs,
-      // Asked of the clock rather than of the plan's own `started`, which was
-      // true a minute ago at most: a pass that has begun since then would
-      // otherwise carry a name with a rise time that has already gone by.
-      upcoming: pass.startsAtMs > atMs,
       // Nought while the object is on the path, one at the far end of the
       // planning window: what the line's own weight is read off (`nearOpacity`).
       lead: clamp((pass.startsAtMs - atMs) / windowMs, 0, 1)
@@ -335,7 +342,7 @@ export function projectPaths(
 
 /**
  * Where to write an arc's name: a point on the path, held still until it leaves
- * the view.
+ * the view, and the moment the object is at it.
  *
  * The name has to be visible whenever the line is, or a landmark behind a roof
  * leaves an unlabelled streak across the sky. But the obvious way to do that —
@@ -353,6 +360,10 @@ export function projectPaths(
  * measured in percent rather than in pixels — this is choosing between points
  * four degrees apart, and the frame's shape cannot change which of them is
  * nearest by enough to matter.
+ *
+ * A sample rather than an arbitrary point is also what lets the name carry a
+ * time: every sample knows the instant its object is there, and that instant is
+ * what is written under the name. See `PathAnchor`.
  */
 function anchorFor(
   pass: SkyPass,
@@ -361,15 +372,15 @@ function anchorFor(
   axes: CameraAxes,
   lens: FrameLens,
   anchors: Map<string, number>
-): FramePoint | null {
-  const at = (index: number): FramePoint | null => {
+): PathAnchor | null {
+  const at = (index: number): PathAnchor | null => {
     const sample = pass.samples[index];
     // Only the part of the arc still to come: the samples behind the object are
     // not drawn, and a name floating off the end of the line is worse than no
-    // name at all.
+    // name at all — and a time already gone by is worse still.
     if (!sample || sample.atMs < atMs) return null;
     const point = projectWithAxes(sample.position, axes, lens);
-    return point && pointOnFrame(point) ? point : null;
+    return point && pointOnFrame(point) ? { at: point, atMs: sample.atMs } : null;
   };
 
   const remembered = anchors.get(key);
@@ -384,13 +395,13 @@ function anchorFor(
     return rise;
   }
 
-  let best: FramePoint | null = null;
+  let best: PathAnchor | null = null;
   let bestIndex = -1;
   let nearest = Number.POSITIVE_INFINITY;
   for (let index = 1; index < pass.samples.length; index += 1) {
     const point = at(index);
     if (!point) continue;
-    const distance = Math.hypot(point.left - 50, point.top - 50);
+    const distance = Math.hypot(point.at.left - 50, point.at.top - 50);
     if (distance >= nearest) continue;
     nearest = distance;
     best = point;

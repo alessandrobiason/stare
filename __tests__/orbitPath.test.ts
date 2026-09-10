@@ -325,20 +325,6 @@ describe("a planned pass on the frame", () => {
     expect(drawn.lines[0][0].top).toBeCloseTo(head!.top, 1);
   });
 
-  test("counts a pass as still to come until it has begun", () => {
-    const pass = upcoming();
-    const axes = aimedAt(pass.samples[0].position);
-
-    const before = projectPaths([pass], MIDNIGHT, axes, DEVICE_LENS)[0];
-    expect(before.upcoming).toBe(true);
-    expect(before.startsAtMs).toBe(pass.startsAtMs);
-
-    // A minute in — as stale as a plan is ever allowed to be — the rise has
-    // happened, and a name carrying the time of it would be naming the past.
-    const after = projectPaths([pass], pass.startsAtMs + 60_000, axes, DEVICE_LENS)[0];
-    expect(after.upcoming).toBe(false);
-  });
-
   describe("where the name is written", () => {
     test("takes the point the object comes up at when that is in view", () => {
       const pass = upcoming();
@@ -346,8 +332,38 @@ describe("a planned pass on the frame", () => {
       const [drawn] = projectPaths([pass], MIDNIGHT, axes, DEVICE_LENS);
 
       const rise = projectWithAxes(pass.samples[0].position, axes, DEVICE_LENS);
-      expect(drawn.anchor?.left).toBeCloseTo(rise!.left, 6);
-      expect(drawn.anchor?.top).toBeCloseTo(rise!.top, 6);
+      expect(drawn.anchor?.at.left).toBeCloseTo(rise!.left, 6);
+      expect(drawn.anchor?.at.top).toBeCloseTo(rise!.top, 6);
+    });
+
+    test("carries the moment the object is at that point, not the pass's rise", () => {
+      // What the time under a name means: the object is *there* then. Written
+      // at the rise, that is the rise time; written half way along the arc, it
+      // is the time it reaches the half way point — where the pass's own start
+      // would be a minute that has nothing to do with the piece of sky it is
+      // set over.
+      const pass = upcoming();
+      const middle = pass.samples[Math.floor(pass.samples.length / 2)];
+
+      const atRise = projectPaths([pass], MIDNIGHT, aimedAt(pass.samples[0].position), DEVICE_LENS);
+      expect(atRise[0].anchor?.atMs).toBe(pass.startsAtMs);
+
+      const along = projectPaths([pass], MIDNIGHT, aimedAt(middle.position), DEVICE_LENS);
+      expect(along[0].anchor?.atMs).toBeGreaterThan(pass.startsAtMs);
+      // And it is one of the arc's own sample times rather than a figure of
+      // this function's own.
+      expect(pass.samples.map((sample) => sample.atMs)).toContain(along[0].anchor?.atMs);
+    });
+
+    test("never names a time that has already gone by", () => {
+      // A plan is up to a minute old, so the rise it was made before may have
+      // happened. The name goes on the part of the arc still to come, and so
+      // does the time under it.
+      const pass = upcoming();
+      const atMs = pass.startsAtMs + 60_000;
+      const drawn = projectPaths([pass], atMs, aimedAt(pass.samples[0].position), DEVICE_LENS);
+
+      expect(drawn[0].anchor?.atMs).toBeGreaterThanOrEqual(atMs);
     });
 
     test("takes a point on the line where the object itself is elsewhere", () => {
@@ -358,7 +374,7 @@ describe("a planned pass on the frame", () => {
       const [drawn] = projectPaths([pass], MIDNIGHT, aimedAt(middle.position), DEVICE_LENS);
 
       expect(drawn.anchor).not.toBeNull();
-      expect(pointOnFrame(drawn.anchor!)).toBe(true);
+      expect(pointOnFrame(drawn.anchor!.at)).toBe(true);
     });
 
     test("holds the same piece of sky while the phone turns", () => {
@@ -383,8 +399,8 @@ describe("a planned pass on the frame", () => {
 
       expect([...anchors.values()][0]).toBe(held);
       // The point moved with the sky rather than staying under the camera.
-      expect(second[0].anchor!.left).not.toBeCloseTo(first[0].anchor!.left, 1);
-      expect(second[0].anchor!.left).toBeCloseTo(
+      expect(second[0].anchor!.at.left).not.toBeCloseTo(first[0].anchor!.at.left, 1);
+      expect(second[0].anchor!.at.left).toBeCloseTo(
         projectWithAxes(pass.samples[held].position, turned, DEVICE_LENS)!.left,
         6
       );
@@ -399,7 +415,7 @@ describe("a planned pass on the frame", () => {
       const far = pass.samples[pass.samples.length - 2];
       const [drawn] = projectPaths([pass], MIDNIGHT, aimedAt(far.position), DEVICE_LENS, anchors);
       expect([...anchors.values()][0]).toBeGreaterThan(0);
-      expect(pointOnFrame(drawn.anchor!)).toBe(true);
+      expect(pointOnFrame(drawn.anchor!.at)).toBe(true);
     });
 
     test("forgets a path that is no longer planned", () => {

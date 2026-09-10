@@ -473,6 +473,23 @@ export const MARKER_SELECTION = {
    */
   tapRadiusPx: 22,
   /**
+   * The same, for the name written along a landmark's path.
+   *
+   * The reason a name is a target at all is the case the paths exist for: an
+   * object that has not risen has no mark to tap, and its name on the line is
+   * the only thing on the frame that is about it. Someone reading `SOYUZ-MS 33`
+   * off a line running out of the top of the view is asking who that is, and
+   * before this there was nowhere to ask.
+   *
+   * Larger than a mark's, because what is being aimed at is larger: the name is
+   * set below its anchor and runs to two lines (`ARC_LABEL_GAP_PX`), so a target
+   * the size of a marker's would cover the point on the line and none of the
+   * writing under it. A disc rather than the box the name is set in, because a
+   * label turns with the camera roll — a rectangle would be the right target
+   * only with the phone held level, and the sky is read with it tilted.
+   */
+  nameTapRadiusPx: 40,
+  /**
    * How many satellites one tap may offer to choose between.
    *
    * A finger over the geostationary belt covers a dozen markers, and a list

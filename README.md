@@ -311,6 +311,25 @@ until it leaves the view — so the name is pinned to the sky like everything el
 here rather than hovering near the middle of the screen while the world turns
 under it.
 
+Under the name is the clock time its object is at *that point of the line*. The
+anchor is one of the arc's own samples and so knows the instant it is reached,
+which is the whole of what the label means: this object, this piece of sky, this
+minute. It used to be the time the pass began, written wherever the name had
+landed — a time for the point it is set under only where that point is the rise,
+and as the anchor moved along the line the same minute turned up at both ends of
+one arc, saying nothing about either.
+
+And the name is a target (`namesUnder`). A landmark below the horizon or behind
+a roof is a line and a name and nothing else, which makes it the one thing on
+the frame with no way to ask what it is — and the most conspicuous unanswered
+question on the picture, since the line crosses sky that has nothing on it.
+Tapping `SOYUZ-MS 33` where it is written now opens the same card its mark would
+have. The target is a disc around the anchor rather than the box the name is set
+in, because a label turns with the camera roll and a rectangle would be the
+right shape only with the phone held level; the marks under the finger are still
+offered first, since something that is up there now outranks a line running past
+it.
+
 The plan is a few thousand propagations, made once a minute off the frame
 thread in slices (`src/timeSlice.ts`) and trimmed to the present on every frame,
 so the line always starts at the object and never at where it was when the plan

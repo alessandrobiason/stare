@@ -80,8 +80,8 @@ const Label = React.memo(function Label({
       ]}
     >
       <Text
-        // Two, for the rise of a pass that has not started: a name and the
-        // clock time it begins, which is a line each (`markerScene`). A
+        // Two, for a name written on a path: the object, and the clock time it
+        // is at that point of the line, which is a line each (`markerScene`). A
         // marker's own name is one word and takes one of them — unless it is
         // long enough not to fit the box, and `Einstein Probe` is, in which
         // case wrapping it says more than cutting it did.

@@ -1,8 +1,8 @@
 import { markerDiameterPx } from "../src/components/markerGeometry";
-import { markersUnder } from "../src/components/markerHitTest";
+import { markersUnder, namesUnder } from "../src/components/markerHitTest";
 import { DESIGN_FRAME_WIDTH_PX } from "../src/components/markerScene";
 import { MARKER_SELECTION } from "../src/constants";
-import { MarkerFrame, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
+import { MarkerFrame, MarkerPath, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
 
 /** The frame the markers are drawn over, at the size their pixels are quoted at. */
 const FRAME = { width: DESIGN_FRAME_WIDTH_PX, height: 1280 };
@@ -21,8 +21,21 @@ function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
 }
 
 /** A drawn frame, in the painter's order the marker loop publishes it in. */
-function frame(markers: SatelliteMarker[]): MarkerFrame {
-  return { markers, paths: [], rollDeg: 0 };
+function frame(markers: SatelliteMarker[], paths: MarkerPath[] = []): MarkerFrame {
+  return { markers, paths, rollDeg: 0 };
+}
+
+/** One landmark's arc, named at `anchor`. Only the name and that point matter here. */
+function path(name: string, anchor: { left: number; top: number } | null): MarkerPath {
+  return {
+    name,
+    key: `${name}@1`,
+    category: "LANDMARK",
+    lines: [],
+    ticks: [],
+    anchor: anchor && { at: anchor, atMs: Date.UTC(2026, 7, 29, 20, 37, 0) },
+    lead: 0
+  };
 }
 
 /** Frame coordinates for a point at `x, y` layout pixels. */
@@ -145,4 +158,57 @@ test("ignores a marker kept on the frame only for its trail", () => {
   const hits = markersUnder(frame([gone]), FRAME, { x: 360, y: 4 });
 
   expect(hits).toEqual([]);
+});
+
+describe("a tap on the name written along a landmark's path", () => {
+  const { nameTapRadiusPx } = MARKER_SELECTION;
+
+  test("asks about an object that has no mark on the frame at all", () => {
+    // The case the paths exist for: the station is below the horizon or behind
+    // a roof, and its name on the line is the only thing to tap.
+    const sky = frame([], [path("ISS", at(360, 640))]);
+    expect(namesUnder(sky, FRAME, { x: 362, y: 650 })).toEqual(["ISS"]);
+  });
+
+  test("reaches the writing under the anchor, which is where the name is", () => {
+    const sky = frame([], [path("ISS", at(360, 640))]);
+
+    expect(namesUnder(sky, FRAME, { x: 360, y: 640 + nameTapRadiusPx - 1 })).toEqual(["ISS"]);
+    expect(namesUnder(sky, FRAME, { x: 360, y: 640 + nameTapRadiusPx + 1 })).toEqual([]);
+  });
+
+  test("says nothing for an arc with no part of it on the frame", () => {
+    expect(namesUnder(frame([], [path("ISS", null)]), FRAME, { x: 360, y: 640 })).toEqual([]);
+  });
+
+  test("puts the marks under the finger first", () => {
+    // A tap over something that is up there now is asking about that, not about
+    // a line running past it — even where the line's name is the nearer of the
+    // two to the finger.
+    const sky = frame(
+      [marker({ name: "SOYUZ-MS 33", point: at(375, 640) })],
+      [path("ISS", at(362, 640))]
+    );
+    expect(namesUnder(sky, FRAME, { x: 360, y: 640 })).toEqual(["SOYUZ-MS 33", "ISS"]);
+  });
+
+  test("names an object once, whether it is a mark, an arc, or both", () => {
+    const sky = frame([marker({ name: "ISS", point: at(360, 640) })], [path("ISS", at(365, 645))]);
+    expect(namesUnder(sky, FRAME, { x: 360, y: 640 })).toEqual(["ISS"]);
+  });
+
+  test("offers no more than one tap can choose between", () => {
+    const stacked = Array.from({ length: MARKER_SELECTION.maxCandidates + 3 }, (_, index) =>
+      path(`LANDMARK ${index}`, at(360 + index, 640))
+    );
+    expect(namesUnder(frame([], stacked), FRAME, { x: 360, y: 640 })).toHaveLength(
+      MARKER_SELECTION.maxCandidates
+    );
+  });
+
+  test("empty sky is still an empty answer, which is what dismisses the card", () => {
+    const sky = frame([], [path("ISS", at(100, 100))]);
+    expect(namesUnder(sky, FRAME, { x: 600, y: 900 })).toEqual([]);
+    expect(namesUnder(sky, { width: 0, height: 0 }, { x: 0, y: 0 })).toEqual([]);
+  });
 });

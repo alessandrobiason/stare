@@ -89,10 +89,10 @@ export function orbitPeriod(minutes: number): string {
  * A clock time, in the reader's own convention: `21:14` or `9:14 PM`.
  *
  * The one figure written on the sky itself rather than on a card — the moment a
- * landmark's next pass begins, set under the point on its path where it does
- * (`markerScene`). A time rather than a countdown, because it is read once and
- * remembered, and because a countdown on a line redrawn sixty times a second is
- * a number that never stops moving.
+ * landmark reaches the point on its path the name is written at (`markerScene`).
+ * A time rather than a countdown, because it is read once and remembered, and
+ * because a countdown on a line redrawn sixty times a second is a number that
+ * never stops moving.
  *
  * Whether that is a 24-hour clock or a 12-hour one is not something the app's
  * own language can answer. `LOCALES` is one entry per *language* — `en` covers

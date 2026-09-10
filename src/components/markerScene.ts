@@ -281,13 +281,13 @@ export function buildMarkerScene(
   // that is the same word twice on one frame, and the marker's is the better
   // placed of the two.
   const arcs = frame.paths.flatMap((path) =>
-    path.anchor && !named.has(path.name) ? [{ path, point: path.anchor }] : []
+    path.anchor && !named.has(path.name) ? [{ path, anchor: path.anchor }] : []
   );
   // Both kinds compete for the same clear space, and the marks win: a name over
   // something someone can look at now outranks one over a line. Run again over
   // the two together rather than kept from above, so an arc's name is placed
   // against the marks' names as well as against the other arcs'.
-  const allowed = labellablePoints([...marks, ...arcs.map((arc) => arc.point)], box);
+  const allowed = labellablePoints([...marks, ...arcs.map((arc) => arc.anchor.at)], box);
   const labels: LabelPlacement[] = [];
   let selection: SelectionRing | null = null;
 
@@ -355,21 +355,25 @@ export function buildMarkerScene(
     if (!allowed[marks.length + index]) return;
     labels.push({
       key: arc.path.key,
-      // A pass still to come carries the clock time it begins as well, which is
-      // the whole answer to "when do I go outside". A time rather than a
-      // countdown because that is what someone reads once and remembers; the
-      // line itself is what says how long the pass lasts, in the marks along it.
-      // One already under way needs no time — its object is up there now.
+      // The name carries the clock time its object is *at this point on the
+      // line*, which is the whole answer to "when do I go outside, and where do
+      // I stand". The anchor is one of the arc's own samples and knows when its
+      // object is there (`PathAnchor`), so the time moves down the line with the
+      // name instead of being the rise time wherever the name ended up — which
+      // is a time for the point it is written under only where that point is
+      // the rise, and reads as one everywhere else.
+      //
+      // A time rather than a countdown because that is what someone reads once
+      // and remembers; the line itself is what says how long the pass lasts, in
+      // the marks along it.
       //
       // On two lines, because a name and a time on one do not fit the box a
       // label is set in — `SOYUZ-MS 33 22:13` is half again as wide as it — and
       // the half that would be cut is the time. Broken here rather than left to
       // wrap, so where it breaks is not a question about a typeface.
-      name: arc.path.upcoming
-        ? `${arc.path.name}\n${clockTime(new Date(arc.path.startsAtMs))}`
-        : arc.path.name,
-      x: (arc.point.left / 100) * box.width,
-      y: (arc.point.top / 100) * box.height,
+      name: `${arc.path.name}\n${clockTime(new Date(arc.anchor.atMs))}`,
+      x: (arc.anchor.at.left / 100) * box.width,
+      y: (arc.anchor.at.top / 100) * box.height,
       offsetY: ARC_LABEL_GAP_PX * scale,
       alpha: pathOpacity(arc.path.lead)
     });

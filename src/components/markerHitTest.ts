@@ -7,6 +7,52 @@ import { DESIGN_FRAME_WIDTH_PX } from "./markerScene";
 export type TapPoint = { x: number; y: number };
 
 /**
+ * Which objects a tap is asking about, nearest to the tap first: the marks
+ * under the finger, and then the landmark names written along the arcs.
+ *
+ * Names rather than markers, because half of what a tap can now land on has no
+ * marker at all. A landmark below the horizon or behind a roof is drawn as a
+ * line and a name and nothing else (`MarkerPath`), and the name is the only
+ * thing on the frame that answers for it — which is exactly the object someone
+ * is most likely to be asking about, since a line crossing a piece of sky with
+ * nothing on it is the overlay's most conspicuous unanswered question.
+ *
+ * The marks come first whatever the distances say, for the same reason a
+ * marker's name outranks an arc's where the two collide (`buildMarkerScene`): a
+ * tap over something that is up there now is asking about that, not about a
+ * line running past it. Everything downstream works in names — the card looks a
+ * satellite up by one, and the ring finds its mark by one — so a name that is
+ * both a mark and an arc is listed once, as the mark.
+ */
+export function namesUnder(
+  frame: MarkerFrame,
+  box: FrameSize,
+  tap: TapPoint,
+  limit: number = MARKER_SELECTION.maxCandidates
+): string[] {
+  if (!(box.width > 0) || !(box.height > 0)) return [];
+  const names = markersUnder(frame, box, tap, limit).map((marker) => marker.name);
+
+  const arcs: { name: string; distancePx: number }[] = [];
+  for (const path of frame.paths) {
+    // No anchor is an arc with no part of it on the frame, and so no name
+    // written anywhere to have been tapped.
+    if (!path.anchor) continue;
+    const x = (path.anchor.at.left / 100) * box.width;
+    const y = (path.anchor.at.top / 100) * box.height;
+    const distancePx = Math.hypot(x - tap.x, y - tap.y);
+    if (distancePx <= MARKER_SELECTION.nameTapRadiusPx) arcs.push({ name: path.name, distancePx });
+  }
+  arcs.sort((one, other) => one.distancePx - other.distancePx);
+
+  for (const arc of arcs) {
+    if (names.length >= limit) break;
+    if (!names.includes(arc.name)) names.push(arc.name);
+  }
+  return names;
+}
+
+/**
  * Which satellites a tap is asking about, nearest to the tap first.
  *
  * Pure, and the counterpart of `buildMarkerScene`: that turns a drawn frame
