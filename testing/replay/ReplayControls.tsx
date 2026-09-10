@@ -120,7 +120,16 @@ const RANGE_STYLE = {
 
 const styles = StyleSheet.create({
   bar: {
-    left: 12,
+    // Clear of the upcoming-passes panel, which claims this exact corner on
+    // the phone too (`UpcomingPasses`) — 10 of padding, a 110pt name, a
+    // countdown up to `1h 22m` and a chevron is a little over 200pt at its
+    // widest, open or shut. The phone never has both at once (the passes panel
+    // gives way to a compass warning in that corner); the harness has no
+    // compass warning and this bar is permanent, so it is this that has to
+    // give the space rather than the app's own panel losing it in every build.
+    // Without the clearance, the range input painted on top of it swallowed
+    // every click meant for the panel underneath.
+    left: 220,
     bottom: 12,
     // Clear of the console toggle, which owns the bottom-right corner.
     right: 116,
