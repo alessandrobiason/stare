@@ -6,6 +6,8 @@ import { DebugToggle } from "../src/components/DebugToggle";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SceneStatus } from "../src/components/SceneStatus";
+import { UpcomingPasses } from "../src/components/UpcomingPasses";
+import { UpcomingPass } from "../src/satellite/upcomingPasses";
 import {
   clearLandmarkPhotosForTesting,
   loadLandmarkPhoto
@@ -191,6 +193,93 @@ describe("what the count breaks down into", () => {
     // has to carry is the control that opens it and nothing of the list.
     expect(open).toContain('aria-expanded="false"');
     expect(open).not.toContain("Starlink");
+  });
+});
+
+describe("what is coming", () => {
+  const NOW = Date.UTC(2026, 7, 29, 21, 0, 0);
+  const epochRef = {
+    current: {
+      time: new Date(NOW),
+      observer: { latitudeDeg: 60.1699, longitudeDeg: 24.9384, heightM: 20 }
+    }
+  };
+
+  /** One planned pass, described — the shape `upcomingPasses` hands over. */
+  function pass(over: Partial<UpcomingPass> = {}): UpcomingPass {
+    return {
+      name: "ISS",
+      noradId: 25544,
+      category: "LANDMARK",
+      startsAtMs: NOW + 14 * 60_000,
+      endsAtMs: NOW + 20 * 60_000,
+      peakAtMs: NOW + 17 * 60_000,
+      peakElevationDeg: 68,
+      riseAzimuthDeg: 247,
+      setAzimuthDeg: 51,
+      started: false,
+      nakedEye: "visible",
+      apparentMagnitude: -1.8,
+      magnitudeMeasured: true,
+      ...over
+    };
+  }
+
+  function panel(passes: UpcomingPass[], onSelect: (name: string) => void = () => undefined) {
+    return <UpcomingPasses passes={passes} epochRef={epochRef} onSelect={onSelect} />;
+  }
+
+  test("shut, it is the next pass rather than a title", () => {
+    // The difference between this pill and the two above it: a filter has
+    // nothing to report until it is opened, and this has one fact worth more
+    // than its own name.
+    const text = textOf(panel([pass()]));
+
+    expect(text).toContain("ISS");
+    expect(text).toContain("14 min");
+    expect(text).not.toContain("COMING UP");
+  });
+
+  test("and the soonest one, not whichever came first", () => {
+    const text = textOf(
+      panel([
+        pass({ name: "Hubble", startsAtMs: NOW + 5 * 60_000 }),
+        pass({ startsAtMs: NOW + 90 * 60_000 })
+      ])
+    );
+
+    expect(text).toContain("Hubble");
+    expect(text).toContain("5 min");
+  });
+
+  test("a pass already under way has nothing to wait for", () => {
+    // The plan is made once a minute, so a pass that began between plans has a
+    // rise time in the past — counting down to it would count the wrong way.
+    const text = textOf(panel([pass({ startsAtMs: NOW - 30_000, started: true })]));
+
+    expect(text).toContain("now");
+    expect(text).not.toContain("min");
+  });
+
+  test("nothing coming is nothing on screen, rather than a pill saying so", () => {
+    // The landmark tier filtered off, or a sky where nothing clears the
+    // roofline for three hours. A permanent pill over the picture in exchange
+    // for the absence of news is a word too many.
+    expect(renderToStaticMarkup(panel([]))).toBe("");
+  });
+
+  test("the pill is the control that opens it, and the list is behind it", () => {
+    const markup = renderToStaticMarkup(panel([pass(), pass({ name: "Tiangong" })]));
+
+    expect(markup).toContain('aria-label="Upcoming passes"');
+    expect(markup).toContain('aria-expanded="false"');
+    // Rendered shut, since that is how it lands on the screen — as the filter
+    // and the count panel are. The sky behind it is the point of the screen,
+    // and the rest of the plan is a tap away rather than in the way.
+    const text = textOf(panel([pass(), pass({ name: "Tiangong" })]));
+    expect(text).not.toContain("Tiangong");
+    expect(text).not.toContain("68° up");
+    expect(text).not.toContain("visible to the eye");
   });
 });
 

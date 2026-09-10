@@ -18,7 +18,7 @@ export const de: Strings = {
     },
     screen: {
       title: "Was auf dem Bildschirm ist",
-      body: "Vier Dinge liegen um den Himmel herum. Das sind alle.",
+      body: "Fünf Dinge liegen um den Himmel herum. Diese drei sagen, was dort oben ist.",
       count: {
         where: "Oben links",
         meaning:
@@ -26,17 +26,27 @@ export const de: Strings = {
           "unter dem Horizont oder hinter einem Haus steht, zählt nicht. Antippen " +
           "zeigt, welche es sind."
       },
-      filter: {
-        where: "Oben rechts",
+      passes: {
+        where: "Unten links",
         meaning:
-          "Welche Arten gezeichnet werden, und die Farblegende — samt dem Ring für ein " +
-          "über dem Äquator stehendes Objekt."
+          "Das nächste bekannte Objekt, das über dich hinwegzieht, und wie lange es bis " +
+          "zum Aufgang dauert. Antippen zeigt die übrigen und wo du dich hinstellst."
       },
       marker: {
         where: "Am Himmel",
         meaning:
           "Tippe eine Markierung an: was das Objekt ist, wer es betreibt, wie weit weg " +
           "es ist und wo du danach suchst."
+      }
+    },
+    controls: {
+      title: "Und zwei weitere",
+      body: "Das eine entscheidet, was gezeichnet wird. Das andere ist da, falls etwas nicht stimmt.",
+      filter: {
+        where: "Oben rechts",
+        meaning:
+          "Welche Arten gezeichnet werden, und die Farblegende — samt dem Ring für ein " +
+          "über dem Äquator stehendes Objekt."
       },
       console: {
         where: "Unten rechts",
@@ -77,6 +87,19 @@ export const de: Strings = {
       none: "Alle stehen im Erdschatten",
       some: "{count} davon stehen im Sonnenlicht",
       all: "Alle stehen im Sonnenlicht"
+    },
+    passes: {
+      title: "ALS NÄCHSTES",
+      open: "Kommende Überflüge",
+      now: "jetzt",
+      seeing: {
+        visible: "mit bloßem Auge sichtbar",
+        binoculars: "nur mit Fernglas",
+        tooFaint: "zu schwach",
+        eclipsed: "im Erdschatten",
+        daylight: "Tageslicht — nichts zu sehen",
+        unknown: "Helligkeit nicht erfasst"
+      }
     }
   },
   filter: {

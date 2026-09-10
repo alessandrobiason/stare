@@ -18,7 +18,7 @@ export const nl: Strings = {
     },
     screen: {
       title: "Wat er op het scherm staat",
-      body: "Er staan vier dingen om de hemel heen. Dit zijn ze allemaal.",
+      body: "Er staan vijf dingen om de hemel heen. Deze drie zeggen wat er boven je is.",
       count: {
         where: "Linksboven",
         meaning:
@@ -26,17 +26,27 @@ export const nl: Strings = {
           "horizon of achter een gebouw zit, telt niet mee. Tik erop om te zien " +
           "welke."
       },
-      filter: {
-        where: "Rechtsboven",
+      passes: {
+        where: "Linksonder",
         meaning:
-          "Welke soorten getekend worden, en de kleurlegenda — met de ring voor een " +
-          "object boven de evenaar."
+          "Het volgende bekende object dat over je heen komt, en hoe lang het nog duurt " +
+          "voor het opkomt. Tik erop voor de rest en voor waar je moet gaan staan."
       },
       marker: {
         where: "Op de hemel",
         meaning:
           "Tik op een stip: wat het object is, wie het vliegt, hoe ver weg het is en " +
           "waar je moet kijken."
+      }
+    },
+    controls: {
+      title: "En nog twee",
+      body: "De ene bepaalt wat er getekend wordt. De andere is voor als er iets niet klopt.",
+      filter: {
+        where: "Rechtsboven",
+        meaning:
+          "Welke soorten getekend worden, en de kleurlegenda — met de ring voor een " +
+          "object boven de evenaar."
       },
       console: {
         where: "Rechtsonder",
@@ -78,6 +88,19 @@ export const nl: Strings = {
       none: "Ze staan allemaal in de schaduw van de aarde",
       some: "{count} hiervan staan in het zonlicht",
       all: "Ze staan allemaal in het zonlicht"
+    },
+    passes: {
+      title: "OP KOMST",
+      open: "Komende passages",
+      now: "nu",
+      seeing: {
+        visible: "met het blote oog te zien",
+        binoculars: "alleen met verrekijker",
+        tooFaint: "te zwak",
+        eclipsed: "in de schaduw van de aarde",
+        daylight: "het is dag — niets te zien",
+        unknown: "helderheid niet vastgelegd"
+      }
     }
   },
   filter: {

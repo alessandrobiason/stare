@@ -8,7 +8,7 @@ on the picture where they actually are — positioned by GPS, aimed by the phone
 motion sensors, and hidden behind whatever buildings and trees are in the way.
 
 The view opens in **normal** mode: the camera picture, the markers, a marker
-count and a collapsed category filter. **A marker is the app's own logo**: the
+count, a collapsed category filter and the next landmark due over you. **A marker is the app's own logo**: the
 body and tapered trail of `assets/icon.svg`, a couple of dozen pixels across,
 the same shape the boot screen turns five of — both drawn by `tools/make-logo.mjs`
 from the geometry in `src/components/bootSky.ts`. It carries five channels at once —
@@ -118,6 +118,7 @@ satellites → screen positions → markers, composited over the camera picture.
 | Heading checked against the sun or the moon in the same frame | `src/vision/brightBodies.ts`, `src/fusion/celestialNorth.ts` |
 | Drawn at display rate, every marker in one canvas | `src/components/markerScene.ts`, `SatelliteMarkers` |
 | Where the landmarks will be for the next few hours | `src/satellite/orbitPath.ts`, `src/hooks/useOrbitPaths.ts` |
+| The same plan read as a list: what is coming, and when | `src/satellite/upcomingPasses.ts`, `src/components/UpcomingPasses.tsx` |
 | Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
 | Whether the sun is on it, and whether it can be seen from here | `src/satellite/illumination.ts`, `src/satellite/nakedEye.ts` |
 | A tap back into the sky: which markers, and what they are | `src/components/markerHitTest.ts`, `SkyTracker.describe`, `src/satellite/briefing.ts`, `src/satellite/landmarkPhotos.ts` |
@@ -137,10 +138,14 @@ sky, takes the name off it and says what went wrong.
 Boot asks for the camera and then for a GPS fix within a second of the app
 opening — two system prompts, back to back, over a screen that has explained
 nothing, each of them fatal to the view if refused. So a device that has not seen
-the app before opens on four pages instead: what it does, how to hold it, what
-the panels around the sky are — each named beside a copy of the badge it wears,
-since a bare `12` in the corner of a photograph says nothing about what it
-counts — and what it is about to ask for and why. Two prompts, not three: the
+the app before opens on five pages instead: what it does, how to hold it, what
+the screen says about the sky, the two panels that are worked rather than read —
+each of the five named beside a copy of the badge it wears, since a bare `12` in
+the corner of a photograph says nothing about what it counts — and what it is
+about to ask for and why. Two pages of badges rather than one because five
+explained badges is taller than the card at the foot of a 4.7-inch screen, which
+the suite measures in all twelve languages; given a break to make, it is made
+where the panels themselves divide. Two prompts, not three: the
 motion sensors the view is aimed by are read without one — iOS gates the
 pedometer behind "Motion & Fitness", not `CMMotionManager` — and asking anyway
 meant a phone with that setting off refused to aim at all
@@ -439,6 +444,42 @@ it**: the mask decides whether an object can be seen, and a path is not a
 sighting — it is where to point, which is worth drawing across the roof the
 thing is about to come out from behind. The marker itself still waits for the
 mask, exactly as every other marker does.
+
+**And the same plan is read out as a list** (`src/satellite/upcomingPasses.ts`,
+`UpcomingPasses`). A line is an answer to somebody already pointing the phone at
+the piece of sky it crosses, and for most of the three hours it covers that is
+nobody — the plan is the whole sky and the camera holds sixty degrees of it. So
+the question asked *before* the phone goes up at all, and the one the other two
+panels are both in the wrong tense for, had no answer on screen: is anything
+coming, and how long have I got.
+
+It is a third pill, in the corner above the bottom row, and **shut it is the
+next pass rather than a title** — `ISS · 14 min`, which is the whole answer most
+of the times anyone glances at it. That is what separates it from the two above
+it: a filter has nothing to report until it is opened, and this has one fact
+worth more than its own name. Open, it is the rest of the plan, soonest first,
+each pass with the compass point it comes up at, how high it gets and whether it
+can be seen. A row is a target like the names written along the paths: it opens
+the same card the object's own mark would, which for a pass that has not begun
+is the card saying how far below the horizon it still is.
+
+The rows carry a verdict because **a countdown is a promise**. Told "ISS,
+14 min" and sent outside, somebody who finds an empty sky has been given a worse
+answer than no answer — and for most of the day that is the answer the geometry
+alone gives, since the arc is real, the object is really on it, and the sun is
+up. So each pass is judged at its own highest point, with the same arithmetic
+the card uses for the object under the finger (`nakedEye.ts`), and the row says
+*in the Earth's shadow* or *daylight — nothing to see* beside the time. Nothing
+here is planned or propagated twice over: the passes were found for the lines,
+and this is one propagation and one sun position each, on the same background
+job, once a minute.
+
+Nothing at all when there is nothing coming — the tier filtered off, or a sky
+where no landmark clears the roofline for three hours, which at high latitudes
+is most of them most of the time. A permanent pill saying "nothing" is a word
+over the picture in exchange for the absence of news. It also gives way to the
+compass notice, which stands under it and grows into it, and which says the
+bearings this panel is about to give are tens of degrees out.
 
 The picture is the whole screen. The camera keeps its own 4:3 shape, is scaled
 until it covers the display and is clipped where it runs past the edges

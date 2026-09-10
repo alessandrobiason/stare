@@ -14,20 +14,29 @@ export const zh: Strings = {
     },
     screen: {
       title: "屏幕上有什么",
-      body: "天空四周有四样东西，这里全在。",
+      body: "天空四周有五样东西，这三样告诉你上面有什么。",
       count: {
         where: "左上角",
         meaning:
           "此刻画出了多少颗卫星——不是一共有多少颗。在地平线以下、或被建筑挡住的都不计入。" +
           "点一下可以看到分别是哪些。"
       },
-      filter: {
-        where: "右上角",
-        meaning: "选择要画出哪些类别，以及颜色图例——包括标示定点在赤道上方物体的那个圆环。"
+      passes: {
+        where: "左下角",
+        meaning:
+          "下一个将从你头顶经过的知名天体，以及还有多久升起。点一下可以看到其余的，以及该站在哪个方向。"
       },
       marker: {
         where: "天空上",
         meaning: "点一下任意标记：这个物体是什么、由谁运营、离你多远，以及该往哪里看。"
+      }
+    },
+    controls: {
+      title: "还有两样",
+      body: "一样决定画出什么，另一样供出问题时查看。",
+      filter: {
+        where: "右上角",
+        meaning: "选择要画出哪些类别，以及颜色图例——包括标示定点在赤道上方物体的那个圆环。"
       },
       console: {
         where: "右下角",
@@ -65,6 +74,19 @@ export const zh: Strings = {
       none: "它们都在地球的阴影里",
       some: "其中 {count} 颗被阳光照到",
       all: "它们都被阳光照到"
+    },
+    passes: {
+      title: "即将经过",
+      open: "即将到来的过境",
+      now: "现在",
+      seeing: {
+        visible: "肉眼可见",
+        binoculars: "需要双筒望远镜",
+        tooFaint: "太暗看不见",
+        eclipsed: "在地球的阴影里",
+        daylight: "白天 — 看不到",
+        unknown: "亮度未记录"
+      }
     }
   },
   filter: {

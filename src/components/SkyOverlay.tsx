@@ -49,6 +49,7 @@ import { SatelliteCard } from "./SatelliteCard";
 import { SatelliteMarkers } from "./SatelliteMarkers";
 import { SkyMaskOverlay } from "./SkyMaskOverlay";
 import { theme } from "./theme";
+import { UpcomingPasses } from "./UpcomingPasses";
 
 /**
  * The picture the markers are drawn over, and everything that follows from it.
@@ -155,6 +156,19 @@ type Props = {
   celestialAlignment: boolean;
   onToggleCelestialAlignment: () => void;
   /**
+   * Whether the scene is showing the compass notice under this view.
+   *
+   * The notice is the scene's — only the phone knows what its own compass is
+   * worth (`compassNoticeShowing`) — and it stands in the bottom-left corner
+   * and grows upwards as its sentence wraps, into the row the upcoming-passes
+   * panel keeps. So that panel gives way to it, which is the right way round
+   * twice over: a warning about the sky being aimed wrong outranks a list of
+   * what is crossing it, and what the list would be offering while the notice
+   * is up is a set of bearings the notice has just said are tens of degrees
+   * out. Defaults to `false` for a scene with no compass to warn about.
+   */
+  compassWarning?: boolean;
+  /**
    * The scene's own debug pages, shown before the ones the view adds. Each
    * scene has a different answer to "where is this attitude coming from", and
    * that answer is most of what the overlay is for.
@@ -211,6 +225,7 @@ export const SkyOverlay: React.FC<Props> = ({
   onToggleSkyMaskFiltering,
   celestialAlignment,
   onToggleCelestialAlignment,
+  compassWarning = false,
   sceneDebugSections
 }) => {
   const [fatal, setFatal] = useState<Error | null>(null);
@@ -279,7 +294,8 @@ export const SkyOverlay: React.FC<Props> = ({
     markerStatsRef,
     frameRateRef,
     latestFrameRef,
-    reset: resetMarkers
+    reset: resetMarkers,
+    upcoming
   } = useAnimatedMarkers({
     catalog,
     lens: frame.lens,
@@ -440,6 +456,24 @@ export const SkyOverlay: React.FC<Props> = ({
           onEnableAll={onEnableAll}
           palette={palette}
         />
+
+        {/* What is coming, above the bottom row. Not while a card is open: the
+            card is the width of the screen and opens from this same line, and
+            it is the answer to the row that was tapped anyway. Not while the
+            compass notice is up, which stands under this and grows into it —
+            and which says the bearings this panel is about to give are tens of
+            degrees out. Not under the debug overlays either, for the reason the
+            card is not: the picture there is the mask's. */}
+        {!debug && !selection && !compassWarning && (
+          <UpcomingPasses
+            passes={upcoming}
+            epochRef={epochRef}
+            // The same selection a tap on the object's own mark makes, so the
+            // card that opens is the card the sky would have opened. One name
+            // rather than a cluster: a row is one object by construction.
+            onSelect={(name) => setSelection({ names: [name], selected: name })}
+          />
+        )}
 
         {!debug && selection && (
           <SatelliteCard

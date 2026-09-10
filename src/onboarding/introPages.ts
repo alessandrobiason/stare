@@ -1,12 +1,13 @@
-import { strings } from "../i18n";
+import { fill, strings } from "../i18n";
 import type { IntroAccessStrings, IntroElementStrings } from "../i18n/types";
 import { CONSOLE_LABEL } from "../components/consoleLabel";
 
 /**
  * What the app says to someone opening it for the first time, and nothing more.
  *
- * Four pages: what it does, how to hold it, what the panels around the sky
- * are, and what it is about to ask the operating system for.
+ * Five pages: what it does, how to hold it, what the screen says about the
+ * sky, the two panels that are worked rather than read, and what it is about to
+ * ask the operating system for.
  *
  * That last one is the reason this screen exists at all. Boot asks for the
  * camera and then for a fix within a second of the app opening (`bootTasks`,
@@ -22,14 +23,22 @@ import { CONSOLE_LABEL } from "../components/consoleLabel";
  * prompt that is not coming, and the page is only worth having if it matches
  * what happens next.
  *
- * **The third page is the chrome.** Everything around the sky is a badge with
- * no caption — a bare number in one corner, a word in another — because the
- * screen is a camera view and every word on it is a word over the thing
+ * **The middle two pages are the chrome.** Everything around the sky is a badge
+ * with no caption — a bare number in one corner, a word in another — because
+ * the screen is a camera view and every word on it is a word over the thing
  * someone is trying to look at. That is the right trade for a panel someone
  * has been told about once, and the wrong one for a panel nobody has: a `12`
  * in the corner of a photograph of the sky says nothing at all about what it
  * counts. So it is said once, here, beside a copy of each badge as it appears
  * on the real screen.
+ *
+ * Two pages rather than one because there are five of them now, and five
+ * explained badges is taller than the card at the foot of a 4.7-inch screen —
+ * the suite measures exactly that, in every language, and the page it measures
+ * was already within thirty points of the bound with four. Given a break to
+ * make, it is made where the panels themselves divide: the three that *report*
+ * on the sky — how much is up there, what is coming, what any one mark is —
+ * and the two that are worked rather than read.
  *
  * The words are in `src/i18n`, per language; the structure — which pages,
  * in what order, wearing which badges — is here, so that it cannot drift
@@ -77,6 +86,18 @@ const SAMPLE_MARKER_COUNT = "12";
 /** The badge for a marker on the sky — the same filled dot the overlay draws. */
 const MARKER_BADGE = "●";
 
+/**
+ * A sample countdown for the badge on the upcoming-passes row.
+ *
+ * The right half of that pill rather than the whole of it: shut, the panel
+ * reads `ISS · 14 min`, and a badge fixed at 74 points has room for one of
+ * those two in every language. The countdown is the half that generalises — the
+ * name changes with whatever is coming over — and it is built from the
+ * language's own minutes so the badge is a copy rather than a translation of
+ * one. See `UpcomingPasses`.
+ */
+const SAMPLE_COUNTDOWN_MINUTES = "14";
+
 export function introPages(): readonly IntroPage[] {
   const t = strings();
   const intro = t.intro;
@@ -93,13 +114,25 @@ export function introPages(): readonly IntroPage[] {
     {
       title: intro.screen.title,
       body: intro.screen.body,
+      // In the order they are met rather than by corner: how much is up there,
+      // what is coming next, and how to ask about any one of it.
       elements: [
         { badge: SAMPLE_MARKER_COUNT, ...intro.screen.count },
-        { badge: t.filter.title, ...intro.screen.filter },
-        { badge: MARKER_BADGE, ...intro.screen.marker },
+        {
+          badge: fill(t.units.minutes, { value: SAMPLE_COUNTDOWN_MINUTES }),
+          ...intro.screen.passes
+        },
+        { badge: MARKER_BADGE, ...intro.screen.marker }
+      ]
+    },
+    {
+      title: intro.controls.title,
+      body: intro.controls.body,
+      elements: [
+        { badge: t.filter.title, ...intro.controls.filter },
         // Not translated, and said so on the row itself: the console is the
         // one panel that stays in English. See `CONSOLE_LABEL`.
-        { badge: CONSOLE_LABEL, ...intro.screen.console }
+        { badge: CONSOLE_LABEL, ...intro.controls.console }
       ]
     },
     {

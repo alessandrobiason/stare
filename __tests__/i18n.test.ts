@@ -8,9 +8,12 @@ import {
   kilometres,
   lookDirection,
   orbitPeriod,
+  passDirection,
+  passSeeing,
   seeing,
   speed,
-  sunlightSummary
+  sunlightSummary,
+  timeUntil
 } from "../src/i18n/format";
 import { introPages } from "../src/onboarding/introPages";
 import {
@@ -173,6 +176,30 @@ describe("and says it in the space it is given", () => {
     }
   });
 
+  test.each(LOCALES)("%s fits the upcoming-passes panel", (locale) => {
+    setLocaleForTesting(locale);
+    const t = stringsFor(locale).scene.passes;
+
+    // Shut, the pill is one row: 10 of padding, a name capped at 110, a 6pt
+    // gap, the countdown, another gap, the chevron and 10 of padding. The
+    // countdown is the half that grows with the language — `1 Std. 22 Min.` is
+    // half again the English — so what is checked is the whole pill against the
+    // narrowest screen this ships to, less its own 12pt inset either side.
+    const PILL_CHROME = 10 + 110 + 6 + 6 + 8 + 10;
+    for (const countdown of [timeUntil(82 * 60_000), timeUntil(14 * 60_000), t.now]) {
+      expect(PILL_CHROME + width(countdown, 11)).toBeLessThan(375 - 12 * 2);
+    }
+    // Open, the title heads a 170pt column of rows.
+    expect(width(t.title, 10, 1)).toBeLessThan(170);
+    // And the second line of each row: where to stand, how high it gets, and
+    // whether it can be seen. Prose over a photograph, so what is checked is
+    // that it wraps inside that column rather than that it fits on one line.
+    for (const verdict of Object.values(t.seeing)) {
+      const line = `${passDirection({ riseAzimuthDeg: 247, peakElevationDeg: 68 })} · ${verdict}`;
+      expect(width(line, 9)).toBeLessThan(3 * 170);
+    }
+  });
+
   test.each(LOCALES)("%s fits the seeing line on the card", (locale) => {
     // The verdict and, where there is one, the magnitude after it. The card
     // runs from `left: 8` to `right: 8`, so on the narrowest phone this ships
@@ -281,6 +308,53 @@ describe("the figures follow the reader's conventions", () => {
     expect(
       seeing({ nakedEye: "unknown", apparentMagnitude: null, magnitudeMeasured: false })
     ).toBe("In sunlight, though how brightly it shines is not recorded");
+  });
+
+  test("how long there is, in the units someone would wait in", () => {
+    setLocaleForTesting("en");
+    // Minutes up to an hour and hours past it, which is the same split the
+    // orbit period makes: an hour and a half is a wait to plan around and
+    // ninety minutes is arithmetic to do.
+    expect(timeUntil(14 * 60_000)).toBe("14 min");
+    expect(timeUntil(82 * 60_000)).toBe("1h 22m");
+    // A pass already under way. The plan is remade once a minute, so its rise
+    // is up to a minute in the past by the time the panel reads it — and there
+    // is nothing to count down to either way.
+    expect(timeUntil(0)).toBe("now");
+    expect(timeUntil(-45_000)).toBe("now");
+    // Rounded rather than truncated: forty seconds off is closer to a minute.
+    expect(timeUntil(100_000)).toBe("2 min");
+  });
+
+  test("and in the reader's own units", () => {
+    setLocaleForTesting("de");
+    expect(timeUntil(14 * 60_000)).toBe("14 Min.");
+    setLocaleForTesting("ja");
+    expect(timeUntil(14 * 60_000)).toBe("14 分");
+  });
+
+  test("a row about a pass says where to stand before it says anything else", () => {
+    setLocaleForTesting("en");
+    // The rise rather than the peak: the two questions a list answers are when
+    // to be outside and which way to face, and the way to face is the way the
+    // object appears from. The height beside it is what the pass is worth.
+    expect(passDirection({ riseAzimuthDeg: 247, peakElevationDeg: 68 })).toBe("SW · 68° up");
+    // The local compass, as everywhere else: German turns east into O.
+    setLocaleForTesting("de");
+    expect(passDirection({ riseAzimuthDeg: 90, peakElevationDeg: 12 })).toBe("O · 12° hoch");
+  });
+
+  test("the row's verdict is the card's, in the space a row has", () => {
+    setLocaleForTesting("en");
+    // The same six answers `seeing` gives in a sentence, short enough to sit
+    // under a name and a countdown — and no magnitude, because a figure is
+    // worth showing where there is room for what it supports.
+    expect(passSeeing("visible")).toBe("visible to the eye");
+    expect(passSeeing("eclipsed")).toBe("in the Earth's shadow");
+    expect(passSeeing("daylight")).toBe("daylight — nothing to see");
+    for (const verdict of ["visible", "binoculars", "tooFaint"] as const) {
+      expect(passSeeing(verdict)).not.toMatch(/magnitude/i);
+    }
   });
 
   test("the panel says what the count cannot", () => {
@@ -393,7 +467,7 @@ test("the console is the one thing that stays in English", () => {
   // by whoever is diagnosing a phone that is drawing the sky in the wrong
   // place. The intro says as much on the page that keys the panels.
   setLocaleForTesting("ja");
-  expect(strings().intro.screen.console.meaning).toMatch(/英語/);
+  expect(strings().intro.controls.console.meaning).toMatch(/英語/);
 });
 
 /**

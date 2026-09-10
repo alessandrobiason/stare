@@ -14,6 +14,8 @@ import { expect, test } from "@playwright/test";
 // selector written against one of them has to know which.
 const BOOTED = '[aria-label$="visible satellites"]';
 const CONSOLE_TOGGLE = '[aria-label="CONSOLE"]';
+const PASSES = '[aria-label="Upcoming passes"]';
+const CARD = '[aria-label="Satellite details"]';
 
 test.describe("replay overlay", () => {
   test("boots into the scene without React refusing an update cascade", async ({ page }) => {
@@ -163,5 +165,41 @@ test.describe("replay overlay", () => {
     // Running the segmentation model on the main thread froze everything for
     // about a second at a time, so playback time arrived in one-second steps.
     expect(worstJump).toBeLessThan(0.25);
+  });
+});
+
+test.describe("what is coming", () => {
+  /**
+   * The one wire in this panel no unit test can pull.
+   *
+   * The suite renders components statically (`sceneOverlays.test.tsx`), so it
+   * can check that the pill lands shut and that the plan behind it is right,
+   * and it cannot open the pill or press a row. What that leaves unchecked is
+   * the whole point of the panel: a row is a target, and tapping one has to
+   * open the same card the object's own mark would.
+   */
+  test("a row opens the card the object's own mark would", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+    // The plan is made on the first pass of `useOrbitPaths`, a moment after
+    // the scene opens rather than with it.
+    await page.locator(PASSES).waitFor({ timeout: 300000 });
+
+    // Nothing of the list until it is asked for, and no card until a row is.
+    await expect(page.locator(CARD)).toHaveCount(0);
+    await expect(page.locator('[role="list"]')).toHaveCount(0);
+
+    await page.locator(PASSES).click();
+    const row = page.locator('[role="list"] [role="button"]').first();
+    await row.waitFor({ timeout: 30000 });
+    const name = await row.getAttribute("aria-label");
+    await row.click();
+
+    // The card the sky would have opened, about the object the row named.
+    await expect(page.locator(CARD)).toHaveCount(1);
+    await expect(page.locator(CARD)).toContainText(name ?? "");
+    // And the panel gives way to it: they share the bottom of the screen, and
+    // the card is the answer to the row that was tapped.
+    await expect(page.locator(PASSES)).toHaveCount(0);
   });
 });

@@ -21,6 +21,7 @@ import { SkyDarkness, skyDarknessAt } from "../satellite/nakedEye";
 import { pathFrom, SkyPass } from "../satellite/orbitPath";
 import { OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
+import { UpcomingPass } from "../satellite/upcomingPasses";
 import { AnchoredSkyMask, skyProbe } from "../vision/anchoredMask";
 import { MarkerVisibilityFilter } from "../vision/markerVisibility";
 import { SkyMemory } from "../vision/skyMemory";
@@ -246,6 +247,15 @@ export type AnimatedMarkers = {
    * neither does the sky the passes before the jump had mapped.
    */
   reset: () => void;
+  /**
+   * The passes those paths are, as a list: what the panel in the corner says is
+   * coming, soonest first.
+   *
+   * The one value here that is state rather than a ref, and the one read by a
+   * view rather than by the loop. It changes when a plan does — once a minute —
+   * so the render it costs is not on the frame path. See `useOrbitPaths`.
+   */
+  upcoming: UpcomingPass[];
 };
 
 /** Weight of the newest interval in the frame-rate estimate. */
@@ -539,7 +549,7 @@ export function useAnimatedMarkers({
   // The landmarks' upcoming passes, replanned on their own slow schedule off
   // this loop entirely. What the loop does with them is project them, which is
   // a few hundred dot products against the same axes the markers use.
-  const pathsRef = useOrbitPaths({
+  const { pathsRef, upcoming } = useOrbitPaths({
     catalog,
     epochRef,
     enabled: enabledCategories.has("LANDMARK")
@@ -850,7 +860,16 @@ export function useAnimatedMarkers({
     };
   }, []);
 
-  return { markers, tracker, skyMemory, markerStatsRef, frameRateRef, latestFrameRef, reset };
+  return {
+    markers,
+    tracker,
+    skyMemory,
+    markerStatsRef,
+    frameRateRef,
+    latestFrameRef,
+    reset,
+    upcoming
+  };
 }
 
 /**

@@ -208,6 +208,69 @@ export function sunlightSummary(sky: {
   return sky.sunlit === sky.count ? t.all : fill(t.some, { count: sky.sunlit });
 }
 
+/**
+ * How long until a pass begins, in the units that make it readable.
+ *
+ * Minutes up to an hour and hours and minutes past it, which is the same split
+ * `orbitPeriod` makes and for the same reason: an hour and a half is a wait to
+ * plan around and ninety minutes is arithmetic to do. Anything already begun is
+ * `now` — the object is up, and a countdown to a rise in the past would be
+ * counting the wrong way.
+ *
+ * A countdown rather than the clock time the sky itself writes (`clockTime`),
+ * and deliberately the other choice: that label is redrawn sixty times a second
+ * beside a line, where a number that never settles is noise, and it is read
+ * once and remembered. This is a list somebody opens to decide whether to wait,
+ * which is a question about a duration — and the panel it sits in redraws once
+ * a second, not sixty times.
+ */
+export function timeUntil(millisecondsAway: number): string {
+  const t = strings();
+  const minutes = Math.round(millisecondsAway / MS_PER_MINUTE);
+  if (minutes <= 0) return t.scene.passes.now;
+  if (minutes < 60) return fill(t.units.minutes, { value: groupNumber(minutes) });
+  return fill(t.units.hoursMinutes, {
+    hours: groupNumber(Math.floor(minutes / 60)),
+    minutes: (minutes % 60).toString()
+  });
+}
+
+const MS_PER_MINUTE = 60_000;
+
+/**
+ * Whether a pass can be seen, in the few words a row has for it.
+ *
+ * The short form of `seeing` above, and the same verdict: what differs is the
+ * space. That one is prose under a photograph of the object somebody has just
+ * tapped and can run to two lines; this sits under a name and a countdown in a
+ * pill over the sky, and a sentence there is a paragraph over the picture.
+ *
+ * No magnitude, for the same reason. The figure is what the verdict rests on
+ * and it is worth showing where there is room to show what it supports — here
+ * there is room for the answer alone, and the card is one tap away.
+ */
+export function passSeeing(verdict: NakedEyeVerdict): string {
+  return strings().scene.passes.seeing[verdict];
+}
+
+/**
+ * Where to stand for a pass: the point it comes up at, and how high it gets.
+ *
+ * The rise rather than where it is highest, because the two questions a list
+ * answers are when to be outside and which way to face when you get there, and
+ * the way to face is the way the object appears from. How high it gets goes
+ * beside it as what the pass is worth: ten degrees is a gap between roofs and
+ * sixty is most of the sky.
+ */
+export function passDirection(pass: {
+  riseAzimuthDeg: number;
+  peakElevationDeg: number;
+}): string {
+  const point = compassPoint(pass.riseAzimuthDeg);
+  const height = fill(strings().units.up, { degrees: Math.round(pass.peakElevationDeg) });
+  return `${point} · ${height}`;
+}
+
 /** The verdicts that rest on a magnitude, and so are worth printing one beside. */
 const JUDGED_ON_BRIGHTNESS = new Set<NakedEyeVerdict>(["visible", "binoculars", "tooFaint"]);
 

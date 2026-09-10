@@ -14,7 +14,7 @@ import { useSceneControls } from "../hooks/useSceneControls";
 import { AttitudeSource } from "../hooks/useSmoothedOrientation";
 import { cameraFrameGrabber } from "../vision/cameraFrameGrabber";
 import { CameraBackground } from "./CameraBackground";
-import { CompassNotice } from "./CompassNotice";
+import { CompassNotice, compassNoticeShowing } from "./CompassNotice";
 import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SceneStatus } from "./SceneStatus";
 import { SceneFrame, SkyOverlay } from "./SkyOverlay";
@@ -154,6 +154,15 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
     [orientation]
   );
 
+  // One decision, read twice: whether the compass notice is going to be on
+  // screen. The notice draws itself from it, and the overlay keeps the panel
+  // that shares its corner out of the way while it is.
+  const compassWarning = compassNoticeShowing({
+    accuracy: compass.accuracy,
+    declinationKnown: compass.declinationKnown,
+    skyFixStanding
+  });
+
   return (
     <View style={styles.root}>
       <SkyOverlay
@@ -174,6 +183,10 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
         celestialAlignment={controls.celestialAlignment}
         onToggleCelestialAlignment={controls.toggleCelestialAlignment}
+        // Decided here rather than in the overlay, because only the scene has
+        // the compass. The notice below and the passes panel want the same
+        // corner, and the notice wins — see `SkyOverlay`.
+        compassWarning={compassWarning}
         sceneDebugSections={() => [
           deviceSensorSection({
             // Read as the panel draws, since a reading no longer renders this.

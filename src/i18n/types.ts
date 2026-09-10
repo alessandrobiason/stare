@@ -59,6 +59,50 @@ export type Strings = {
       /** Dark here, and all of them are lit. */
       all: string;
     };
+    /**
+     * What is coming: the landmarks about to cross the sky, and when.
+     *
+     * The overlay's other panels are both about the present tense — this many
+     * marks are on the frame, these kinds may be drawn — and neither answers
+     * the question somebody asks before the phone goes up at all: is anything
+     * worth waiting for. The lines on the sky have always known, and for most
+     * of the three hours they cover they are drawn on sky the camera is not
+     * pointed at. See `src/satellite/upcomingPasses.ts`.
+     *
+     * The figures are not here. A countdown is `units.minutes` and
+     * `units.hoursMinutes`, a bearing is a compass point and a height is
+     * `units.up` — all of them already written, and all of them meaning the
+     * same thing in a row about a pass as on the card.
+     */
+    passes: {
+      /** The panel's title, open. Short: it is a pill over the sky. */
+      title: string;
+      /** What the pill is, for a screen reader. */
+      open: string;
+      /**
+       * A pass already under way, in place of a countdown to it.
+       *
+       * The object is up: there is nothing to wait for, and a countdown to a
+       * rise that has happened would be counting the wrong way.
+       */
+      now: string;
+      /**
+       * Whether the pass can be seen, in the few words a row has for it.
+       *
+       * The same six verdicts the card gives in a sentence (`card.seeing`),
+       * said short enough to sit under a name and a time. Both are needed: the
+       * card is prose about the object under the finger and this is a column
+       * in a list, and a sentence set at nine points over a photograph is a
+       * paragraph over the sky.
+       *
+       * They are not decoration. A countdown is a promise, and most of the
+       * passes a plan finds are geometry rather than sightings — the sun is up,
+       * or the object is in the Earth's shadow when it crosses. This is the
+       * line that keeps the panel from sending somebody outside to look at
+       * nothing.
+       */
+      seeing: Record<PassSeeing, string>;
+    };
   };
   filter: {
     /** The panel's own title, closed and open. Short: it is a pill over the sky. */
@@ -193,25 +237,57 @@ export type Strings = {
 
 type Notice = { title: string; detail: string };
 
+/**
+ * The verdicts a row about a pass can carry.
+ *
+ * `NakedEyeVerdict` itself, spelled out here rather than imported, for the same
+ * reason `SatelliteCategory` is imported and this is not: the categories are a
+ * list the app draws from, and this is the app's own answer to one question. A
+ * verdict added there and not here fails to compile, which is the check worth
+ * having either way.
+ */
+type PassSeeing = "visible" | "binoculars" | "tooFaint" | "eclipsed" | "daylight" | "unknown";
+
 export type IntroStrings = {
   /** The first page: the app's name is in the sky above it, so there is no title. */
   what: { body: string };
   /** The second: how to hold the phone, and what a mark on the sky is. */
   holding: { title: string; body: string };
   /**
-   * The third: the panels around the marks.
+   * The third: what the screen says about the sky.
    *
-   * The one page that exists because a number in the corner of a camera view
-   * says nothing about what it counts. Each entry is explained beside a copy of
-   * the badge it wears on the real screen, and `where` names the corner it sits
-   * in, since that is how someone finds it again afterwards.
+   * The first of the two pages that exist because a number in the corner of a
+   * camera view says nothing about what it counts. Each entry is explained
+   * beside a copy of the badge it wears on the real screen, and `where` names
+   * the corner it sits in, since that is how someone finds it again afterwards.
+   *
+   * These three report: how much is up there now, what is coming, and what any
+   * one mark is. The two that are worked rather than read are on the page after
+   * (`controls`). Five explained badges is more than the card at the foot of a
+   * 4.7-inch screen holds — the suite measures that — and given a break to
+   * make, the honest place for it is between what the panels are *for* rather
+   * than wherever the fifth row stopped fitting.
    */
   screen: {
     title: string;
     body: string;
     count: IntroElementStrings;
-    filter: IntroElementStrings;
+    /** The countdown to the next landmark over, in the bottom corner. */
+    passes: IntroElementStrings;
     marker: IntroElementStrings;
+  };
+  /**
+   * The fourth: the two panels that are worked rather than read.
+   *
+   * The filter decides what the sky is allowed to draw and the console is the
+   * readings behind it, for when something looks wrong. Neither says anything
+   * about the sky on its own, which is what separates them from the three on
+   * the page before.
+   */
+  controls: {
+    title: string;
+    body: string;
+    filter: IntroElementStrings;
     console: IntroElementStrings;
   };
   /** The last: what the phone is about to ask the operating system for. */

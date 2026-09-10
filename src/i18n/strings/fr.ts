@@ -18,7 +18,7 @@ export const fr: Strings = {
     },
     screen: {
       title: "Ce qu'il y a à l'écran",
-      body: "Quatre éléments entourent le ciel. Les voici tous.",
+      body: "Cinq éléments entourent le ciel. Ces trois-là disent ce qu'il y a là-haut.",
       count: {
         where: "En haut à gauche",
         meaning:
@@ -26,17 +26,27 @@ export const fr: Strings = {
           "Ce qui est sous l'horizon ou derrière un mur ne compte pas. Touchez-le pour " +
           "voir lesquels."
       },
-      filter: {
-        where: "En haut à droite",
+      passes: {
+        where: "En bas à gauche",
         meaning:
-          "Quels types dessiner, et la légende des couleurs — dont l'anneau qui signale " +
-          "un objet fixe au-dessus de l'équateur."
+          "Le prochain repère à passer au-dessus de vous, et le temps qu'il reste avant " +
+          "son lever. Touchez-le pour les autres et pour savoir où vous placer."
       },
       marker: {
         where: "Sur le ciel",
         meaning:
           "Touchez n'importe quelle marque : ce qu'est l'objet, qui l'exploite, à quelle " +
           "distance il est et où le chercher."
+      }
+    },
+    controls: {
+      title: "Et deux autres",
+      body: "L'un décide de ce qui est dessiné. L'autre sert quand quelque chose cloche.",
+      filter: {
+        where: "En haut à droite",
+        meaning:
+          "Quels types dessiner, et la légende des couleurs — dont l'anneau qui signale " +
+          "un objet fixe au-dessus de l'équateur."
       },
       console: {
         where: "En bas à droite",
@@ -78,6 +88,19 @@ export const fr: Strings = {
       none: "Tous sont dans l'ombre de la Terre",
       some: "{count} d'entre eux sont éclairés par le Soleil",
       all: "Tous sont éclairés par le Soleil"
+    },
+    passes: {
+      title: "À VENIR",
+      open: "Prochains passages",
+      now: "maintenant",
+      seeing: {
+        visible: "visible à l'œil nu",
+        binoculars: "jumelles nécessaires",
+        tooFaint: "trop faible",
+        eclipsed: "dans l'ombre de la Terre",
+        daylight: "il fait jour — rien à voir",
+        unknown: "éclat non répertorié"
+      }
     }
   },
   filter: {

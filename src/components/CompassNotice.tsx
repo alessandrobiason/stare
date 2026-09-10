@@ -50,12 +50,8 @@ type Props = {
  * along. Whichever of the two would have been shown is a question about a
  * quantity nothing on screen is currently using.
  */
-export const CompassNotice: React.FC<Props> = ({
-  accuracy,
-  declinationKnown,
-  skyFixStanding
-}) => {
-  const notice = skyFixStanding ? null : noticeFor(accuracy, declinationKnown);
+export const CompassNotice: React.FC<Props> = (props) => {
+  const notice = noticeFor(props);
   if (!notice) return null;
 
   return (
@@ -68,9 +64,26 @@ export const CompassNotice: React.FC<Props> = ({
 
 type Notice = { title: string; detail: string };
 
-function noticeFor(accuracy: number | undefined, declinationKnown: boolean): Notice | null {
-  // Nothing at all until the compass has reported: silence here is the seconds
-  // before the first heading, not a verdict.
+/**
+ * Whether this notice is going to be on screen, for whoever else wants the
+ * strip it stands in.
+ *
+ * The notice runs the width of the bottom-left corner and grows upwards as its
+ * sentence wraps, so the panel that sits above it — the upcoming passes — has
+ * to know when it is there. Exported as the predicate rather than measured off
+ * the rendered thing, because a scene has to decide what to draw before either
+ * of them has a height. See `SkyOverlay`.
+ */
+export function compassNoticeShowing(props: Props): boolean {
+  return noticeFor(props) !== null;
+}
+
+function noticeFor({ accuracy, declinationKnown, skyFixStanding }: Props): Notice | null {
+  // Nothing at all while the sky is aiming the view: both notices are about the
+  // magnetic bearing, and a sighting of the sun replaces it outright.
+  if (skyFixStanding) return null;
+  // Nothing at all until the compass has reported, either: silence here is the
+  // seconds before the first heading, not a verdict.
   const notices = strings().compassNotice;
   if (accuracy !== undefined && accuracy <= COMPASS_ACCURACY.warnAtOrBelow) {
     return notices.calibrate;

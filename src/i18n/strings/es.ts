@@ -18,7 +18,7 @@ export const es: Strings = {
     },
     screen: {
       title: "Qué hay en pantalla",
-      body: "Alrededor del cielo hay cuatro cosas. Estas son todas.",
+      body: "Alrededor del cielo hay cinco cosas. Estas tres dicen qué hay allá arriba.",
       count: {
         where: "Arriba a la izquierda",
         meaning:
@@ -26,17 +26,27 @@ export const es: Strings = {
           "está bajo el horizonte, o detrás de un edificio, no cuenta. Tócalo para " +
           "ver cuáles son."
       },
-      filter: {
-        where: "Arriba a la derecha",
+      passes: {
+        where: "Abajo a la izquierda",
         meaning:
-          "Qué tipos dibujar, y la clave de los colores — incluido el anillo que marca " +
-          "un objeto fijo sobre el ecuador."
+          "El próximo objeto señalado que pasa sobre ti, y cuánto falta para que salga. " +
+          "Tócalo para ver el resto y hacia dónde ponerte."
       },
       marker: {
         where: "Sobre el cielo",
         meaning:
           "Toca cualquier marca: qué es el objeto, quién lo opera, a qué distancia está " +
           "y hacia dónde mirar."
+      }
+    },
+    controls: {
+      title: "Y dos más",
+      body: "Una decide qué se dibuja. La otra es para cuando algo no cuadra.",
+      filter: {
+        where: "Arriba a la derecha",
+        meaning:
+          "Qué tipos dibujar, y la clave de los colores — incluido el anillo que marca " +
+          "un objeto fijo sobre el ecuador."
       },
       console: {
         where: "Abajo a la derecha",
@@ -78,6 +88,19 @@ export const es: Strings = {
       none: "Todos están en la sombra de la Tierra",
       some: "{count} de ellos están iluminados por el Sol",
       all: "Todos están iluminados por el Sol"
+    },
+    passes: {
+      title: "PRÓXIMOS",
+      open: "Próximos pases",
+      now: "ahora",
+      seeing: {
+        visible: "visible a simple vista",
+        binoculars: "solo con prismáticos",
+        tooFaint: "demasiado débil",
+        eclipsed: "en la sombra de la Tierra",
+        daylight: "es de día — nada que ver",
+        unknown: "brillo no registrado"
+      }
     }
   },
   filter: {

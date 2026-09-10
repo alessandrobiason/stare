@@ -18,7 +18,7 @@ export const it: Strings = {
     },
     screen: {
       title: "Cosa c'è sullo schermo",
-      body: "Attorno al cielo ci sono quattro cose. Sono tutte qui.",
+      body: "Attorno al cielo ci sono cinque cose. Queste tre dicono cosa c'è lassù.",
       count: {
         where: "In alto a sinistra",
         meaning:
@@ -26,17 +26,27 @@ export const it: Strings = {
           "Quelli sotto l'orizzonte, o dietro un edificio, non contano. Toccalo per " +
           "vedere quali sono."
       },
-      filter: {
-        where: "In alto a destra",
+      passes: {
+        where: "In basso a sinistra",
         meaning:
-          "Quali tipi disegnare, e la legenda dei colori — compreso l'anello che segna " +
-          "un oggetto fermo sopra l'equatore."
+          "Il prossimo oggetto di riferimento in arrivo sopra di te, e quanto manca al suo " +
+          "sorgere. Toccalo per gli altri e per sapere dove metterti."
       },
       marker: {
         where: "Sul cielo",
         meaning:
           "Tocca un segno qualsiasi: cos'è l'oggetto, chi lo gestisce, quanto è lontano " +
           "e dove cercarlo."
+      }
+    },
+    controls: {
+      title: "E altre due",
+      body: "Una decide cosa viene disegnato. L'altra serve quando qualcosa non torna.",
+      filter: {
+        where: "In alto a destra",
+        meaning:
+          "Quali tipi disegnare, e la legenda dei colori — compreso l'anello che segna " +
+          "un oggetto fermo sopra l'equatore."
       },
       console: {
         where: "In basso a destra",
@@ -78,6 +88,19 @@ export const it: Strings = {
       none: "Sono tutti nell'ombra della Terra",
       some: "{count} di questi sono illuminati dal Sole",
       all: "Sono tutti illuminati dal Sole"
+    },
+    passes: {
+      title: "IN ARRIVO",
+      open: "Prossimi passaggi",
+      now: "ora",
+      seeing: {
+        visible: "visibile a occhio nudo",
+        binoculars: "solo col binocolo",
+        tooFaint: "troppo debole",
+        eclipsed: "nell'ombra della Terra",
+        daylight: "è giorno — niente da vedere",
+        unknown: "luminosità non registrata"
+      }
     }
   },
   filter: {

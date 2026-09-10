@@ -89,7 +89,7 @@ test("nothing is asked for before the app has said what it is", () => {
     setLocaleForTesting(locale);
     const pages = introPages();
 
-    expect(pages.map((page) => Boolean(page.access))).toEqual([false, false, false, true]);
+    expect(pages.map((page) => Boolean(page.access))).toEqual([false, false, false, false, true]);
     // The first page names the app in the middle of the sky rather than in the
     // card's title — see `wordmark`.
     expect(pages[0].wordmark).toBe(true);
@@ -100,22 +100,47 @@ test("nothing is asked for before the app has said what it is", () => {
   }
 });
 
-test("the third page is the key to the panels, and keys all four of them", () => {
-  // The complaint this page answers: a bare number in the corner of a camera
+test("the middle pages are the key to the panels, and key all five of them", () => {
+  // The complaint these pages answer: a bare number in the corner of a camera
   // view says nothing about what it counts. Every panel that carries a badge
-  // rather than a caption has to be on it — and each row has to show the badge
-  // as the real screen wears it, or it is a description rather than a key.
+  // rather than a caption has to be on one of them — and each row has to show
+  // the badge as the real screen wears it, or it is a description rather than a
+  // key. Five is the number of panels the overlay draws; a sixth added to the
+  // screen and not to these pages is a badge nobody is ever told about.
   for (const locale of LOCALES) {
     setLocaleForTesting(locale);
     const elements = introPages().flatMap((page) => page.elements ?? []);
 
-    expect(elements).toHaveLength(4);
-    expect(elements.map((element) => element.badge)).toEqual(["12", expect.any(String), "●", "CONSOLE"]);
+    expect(elements).toHaveLength(5);
+    // The three that report on the sky, then the two that are worked rather
+    // than read. `any` for the two whose badge is the panel's own translated
+    // word — the filter's title, and the countdown the passes pill carries.
+    expect(elements.map((element) => element.badge)).toEqual([
+      "12",
+      expect.any(String),
+      "●",
+      expect.any(String),
+      "CONSOLE"
+    ]);
     for (const element of elements) {
       expect(element.where.length).toBeGreaterThan(1);
       expect(element.meaning.length).toBeGreaterThan(15);
     }
   }
+});
+
+test("the badges are copies of the panels rather than placeholders", () => {
+  // Each row is a key: the badge has to be what the screen actually wears, in
+  // the language being read, or the page is a description of a panel rather
+  // than a picture of one. The two that come from the string table are the ones
+  // that can silently drift — the filter's own title, and the countdown the
+  // upcoming-passes pill carries.
+  setLocaleForTesting("de");
+  const badges = introPages().flatMap((page) => page.elements ?? []).map((one) => one.badge);
+
+  expect(badges).toContain("FILTER");
+  // `{value} Min.` filled with the sample: the right half of `ISS · 14 Min.`.
+  expect(badges).toContain("14 Min.");
 });
 
 test("the button says what it does: the last page is the one that starts the app", () => {

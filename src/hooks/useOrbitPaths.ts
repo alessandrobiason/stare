@@ -1,8 +1,9 @@
-import { MutableRefObject, useEffect, useRef } from "react";
+import { MutableRefObject, useEffect, useRef, useState } from "react";
 import { LANDMARK_PATHS } from "../constants";
 import { toRadians } from "../math/angles";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { planSkyPaths, SkyPass } from "../satellite/orbitPath";
+import { UpcomingPass, upcomingPasses } from "../satellite/upcomingPasses";
 import { startSlicing } from "../timeSlice";
 import { ObserverLocation, OrbitEpoch } from "../types";
 
@@ -21,27 +22,54 @@ type Options = {
   enabled: boolean;
 };
 
+/** A plan, in the two forms the app reads it in. */
+export type OrbitPaths = {
+  /**
+   * The arcs themselves, for the frame loop to project.
+   *
+   * A ref rather than state, for the reason everything on that path is a ref:
+   * the only thing that reads them is the loop, which is already running at
+   * display rate and does not need React to tell it that a new plan has
+   * landed. Publishing them would re-render the whole scene once a minute to
+   * hand a value to something that reads it sixty times a second anyway.
+   */
+  pathsRef: MutableRefObject<SkyPass[]>;
+  /**
+   * The same passes as a list, for the panel that says what is coming.
+   *
+   * State, because this one is read by a view rather than by the loop, and a
+   * ref nothing re-renders for would leave the panel showing the plan it
+   * mounted with. The cost is the render this hook's owner does when a plan
+   * lands, which is once a minute against the sixty a second the loop is
+   * already doing — and the loop itself is untouched by it, since everything it
+   * reads is a ref. Identity is stable between plans, so a render that changes
+   * nothing else does not reach the panel either. See `upcomingPasses`.
+   */
+  upcoming: UpcomingPass[];
+};
+
 /**
  * The landmarks' upcoming passes, replanned in the background as the hours go
  * by.
- *
- * A ref rather than state, for the reason everything on this path is a ref: the
- * only thing that reads a plan is the frame loop, which is already running at
- * display rate and does not need React to tell it that a new one has landed.
- * Publishing it would re-render the whole scene once a minute to hand a value
- * to something that reads it sixty times a second anyway.
  *
  * Nothing here is on a deadline. The plan in hand goes on being drawn — trimmed
  * to the present on every frame (`pathFrom`) — until its replacement is
  * finished, so the work can take as many slices as it needs and an arrival a
  * second late is invisible.
  */
-export function useOrbitPaths({ catalog, epochRef, enabled }: Options): MutableRefObject<SkyPass[]> {
+export function useOrbitPaths({ catalog, epochRef, enabled }: Options): OrbitPaths {
   const pathsRef = useRef<SkyPass[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingPass[]>(NO_PASSES);
 
   useEffect(() => {
     if (!enabled) {
       pathsRef.current = [];
+      // The tier is filtered off, so there are no lines to point anyone at and
+      // the panel goes with them: a list of passes with nothing drawn for them
+      // is a list of rows that open a card about an object the sky is not
+      // showing. `NO_PASSES` rather than a fresh array, so switching the filter
+      // twice does not render the panel's owner for an unchanged empty list.
+      setUpcoming(NO_PASSES);
       return;
     }
 
@@ -66,6 +94,11 @@ export function useOrbitPaths({ catalog, epochRef, enabled }: Options): MutableR
         .then((passes) => {
           if (dropped) return;
           pathsRef.current = passes;
+          // Described here rather than in the panel, because what it costs is a
+          // propagation and a sun position per pass and this is the one place
+          // that already knows a plan is new. Off the frame thread, on the same
+          // background job, against the observer the plan was made for.
+          setUpcoming(passes.length === 0 ? NO_PASSES : upcomingPasses(passes, catalog, observer));
           plannedAtMs = atMs;
           plannedFrom = observer;
         })
@@ -82,8 +115,19 @@ export function useOrbitPaths({ catalog, epochRef, enabled }: Options): MutableR
     };
   }, [catalog, enabled, epochRef]);
 
-  return pathsRef;
+  return { pathsRef, upcoming };
 }
+
+/**
+ * The empty list, shared.
+ *
+ * A plan with nothing in it happens twice — the landmark tier switched off, and
+ * a sky where nothing rises for three hours, which at high latitudes is most of
+ * the tier most of the time. Handing back the same array both times is what
+ * lets React bail out of the render instead of taking a new empty array as a
+ * change.
+ */
+const NO_PASSES: UpcomingPass[] = [];
 
 /**
  * Whether the plan in hand still describes the sky.

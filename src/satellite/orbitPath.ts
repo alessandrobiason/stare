@@ -75,6 +75,16 @@ export type SkyPass = {
   /** How high it gets, in degrees: what makes a pass worth walking outside for. */
   peakElevationDeg: number;
   /**
+   * When it is highest, in epoch milliseconds.
+   *
+   * The one instant that stands for the whole arc. A pass is minutes long and
+   * the sky changes across it — the station flies into the Earth's shadow
+   * mid-crossing more often than not — so anything said about whether a pass
+   * can be *seen* has to be said at a moment rather than about the pass, and
+   * this is the moment worth being outside for. See `upcomingPasses.ts`.
+   */
+  peakAtMs: number;
+  /**
    * Whether the object was already on this arc when the plan was made.
    *
    * The pass under way is the one whose marker is on the frame, which is why it
@@ -157,7 +167,13 @@ function stepFor(degPerSecond: number): number {
 }
 
 /** What one walk along an arc found, and where the search should resume. */
-type Walk = { samples: SkySample[]; peakElevationDeg: number; resumeMs: number };
+type Walk = {
+  samples: SkySample[];
+  peakElevationDeg: number;
+  /** When that peak is reached, to the sample the arc was walked at. */
+  peakAtMs: number;
+  resumeMs: number;
+};
 
 /**
  * Walks one arc from `startMs` until the object sets or the window ends.
@@ -169,6 +185,7 @@ type Walk = { samples: SkySample[]; peakElevationDeg: number; resumeMs: number }
 function walkArc(satrec: SatRec, frame: ObserverFrame, startMs: number, untilMs: number): Walk {
   const samples: SkySample[] = [];
   let peakElevationDeg = -90;
+  let peakAtMs = startMs;
   let stepMs = LANDMARK_PATHS.initialStepSeconds * 1000;
   let atMs = startMs;
   let previous: SkySample | null = null;
@@ -177,7 +194,7 @@ function walkArc(satrec: SatRec, frame: ObserverFrame, startMs: number, untilMs:
     const position = enuAt(satrec, atMs, frame);
     // Elements SGP4 has stopped being able to place: the arc ends where the
     // last good sample was, rather than being drawn through a gap.
-    if (!position) return { samples, peakElevationDeg, resumeMs: atMs + stepMs };
+    if (!position) return { samples, peakElevationDeg, peakAtMs, resumeMs: atMs + stepMs };
 
     const elevation = elevationDeg(position);
     if (!(elevation > FLOOR_DEG)) {
@@ -188,10 +205,13 @@ function walkArc(satrec: SatRec, frame: ObserverFrame, startMs: number, untilMs:
       }
       // Past the crossing, so the search that resumes here cannot find the same
       // arc a second time.
-      return { samples, peakElevationDeg, resumeMs: atMs };
+      return { samples, peakElevationDeg, peakAtMs, resumeMs: atMs };
     }
 
-    peakElevationDeg = Math.max(peakElevationDeg, elevation);
+    if (elevation > peakElevationDeg) {
+      peakElevationDeg = elevation;
+      peakAtMs = atMs;
+    }
     const sample = { position, atMs };
     samples.push(sample);
     if (previous) {
@@ -202,7 +222,7 @@ function walkArc(satrec: SatRec, frame: ObserverFrame, startMs: number, untilMs:
     atMs += stepMs;
   }
 
-  return { samples, peakElevationDeg, resumeMs: atMs };
+  return { samples, peakElevationDeg, peakAtMs, resumeMs: atMs };
 }
 
 /**
@@ -323,6 +343,7 @@ export function passesFor(
       startsAtMs: walk.samples[0].atMs,
       endsAtMs: walk.samples[walk.samples.length - 1].atMs,
       peakElevationDeg: walk.peakElevationDeg,
+      peakAtMs: walk.peakAtMs,
       started
     });
   }

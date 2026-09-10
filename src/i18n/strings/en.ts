@@ -26,7 +26,7 @@ export const en: Strings = {
     },
     screen: {
       title: "What is on screen",
-      body: "Four things sit around the sky. This is all of them.",
+      body: "Five things sit around the sky. These three say what is up there.",
       count: {
         where: "Top left",
         meaning:
@@ -34,17 +34,27 @@ export const en: Strings = {
           "below the horizon, or behind a building, is not counted. Tap it to see " +
           "what they are."
       },
-      filter: {
-        where: "Top right",
+      passes: {
+        where: "Bottom left",
         meaning:
-          "Which kinds to draw, and the key to the colours — including the ring that " +
-          "marks an object parked over the equator."
+          "The next landmark due over you, and how long until it rises. Tap it for the " +
+          "rest, and for where to stand."
       },
       marker: {
         where: "On the sky",
         meaning:
           "Tap any mark: what the object is, who flies it, how far away it is and " +
           "where to look for it."
+      }
+    },
+    controls: {
+      title: "And two more",
+      body: "One decides what gets drawn. The other is for when something looks wrong.",
+      filter: {
+        where: "Top right",
+        meaning:
+          "Which kinds to draw, and the key to the colours — including the ring that " +
+          "marks an object parked over the equator."
       },
       console: {
         where: "Bottom right",
@@ -86,6 +96,19 @@ export const en: Strings = {
       none: "All of these are in the Earth's shadow",
       some: "{count} of these are in sunlight",
       all: "All of these are in sunlight"
+    },
+    passes: {
+      title: "COMING UP",
+      open: "Upcoming passes",
+      now: "now",
+      seeing: {
+        visible: "visible to the eye",
+        binoculars: "binoculars only",
+        tooFaint: "too faint to see",
+        eclipsed: "in the Earth's shadow",
+        daylight: "daylight — nothing to see",
+        unknown: "brightness not recorded"
+      }
     }
   },
   filter: {

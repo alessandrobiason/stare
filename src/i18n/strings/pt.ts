@@ -18,7 +18,7 @@ export const pt: Strings = {
     },
     screen: {
       title: "O que há na tela",
-      body: "À volta do céu há quatro coisas. São todas estas.",
+      body: "À volta do céu há cinco coisas. Estas três dizem o que está lá em cima.",
       count: {
         where: "Canto superior esquerdo",
         meaning:
@@ -26,17 +26,27 @@ export const pt: Strings = {
           "está abaixo do horizonte, ou atrás de um edifício, não conta. Toque para " +
           "ver quais são."
       },
-      filter: {
-        where: "Canto superior direito",
+      passes: {
+        where: "Canto inferior esquerdo",
         meaning:
-          "Que tipos desenhar, e a legenda das cores — incluindo o anel que assinala um " +
-          "objeto parado sobre o equador."
+          "O próximo objeto assinalado a passar por cima de si, e quanto falta para " +
+          "nascer. Toque para ver os restantes e onde se colocar."
       },
       marker: {
         where: "No céu",
         meaning:
           "Toque em qualquer marca: o que é o objeto, quem o opera, a que distância está " +
           "e para onde olhar."
+      }
+    },
+    controls: {
+      title: "E mais duas",
+      body: "Uma decide o que é desenhado. A outra é para quando algo parece errado.",
+      filter: {
+        where: "Canto superior direito",
+        meaning:
+          "Que tipos desenhar, e a legenda das cores — incluindo o anel que assinala um " +
+          "objeto parado sobre o equador."
       },
       console: {
         where: "Canto inferior direito",
@@ -77,6 +87,19 @@ export const pt: Strings = {
       none: "Estão todos na sombra da Terra",
       some: "{count} destes estão iluminados pelo Sol",
       all: "Estão todos iluminados pelo Sol"
+    },
+    passes: {
+      title: "A CAMINHO",
+      open: "Próximas passagens",
+      now: "agora",
+      seeing: {
+        visible: "visível a olho nu",
+        binoculars: "só com binóculos",
+        tooFaint: "fraco demais",
+        eclipsed: "na sombra da Terra",
+        daylight: "é dia — nada para ver",
+        unknown: "brilho não registado"
+      }
     }
   },
   filter: {
