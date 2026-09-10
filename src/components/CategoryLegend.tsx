@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
 import { SATELLITE_CATEGORIES, SatelliteCategory } from "../satellite/categories";
@@ -118,73 +118,88 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
 
       {expanded && (
         <>
-          {SATELLITE_CATEGORIES.map((category) => {
-            const enabled = enabledCategories.has(category);
-            // Starlink is drawn only where its own switch and its category's
-            // both say so, so its row reads as off under either.
-            const starlinkDrawn = enabled && starlink;
-            return (
-              <React.Fragment key={category}>
-                <Pressable style={styles.row} onPress={() => onToggleCategory(category)}>
-                  <View
-                    style={[
-                      styles.swatch,
-                      {
-                        backgroundColor: palette.categories[category],
-                        borderColor: cssColor(palette.outline),
-                        opacity: enabled ? 1 : DIMMED_SWATCH_OPACITY
-                      }
-                    ]}
-                  />
-                  <Text style={[styles.label, { opacity: enabled ? 1 : DIMMED_TEXT_OPACITY }]}>
-                    {t.categories[category]}
-                  </Text>
-                  <Toggle on={enabled} />
-                </Pressable>
-
-                {/* Indented under communications rather than listed beside it,
-                    because it is not a sixth alternative to the five: it is one
-                    operator inside one of them, and the row says so by sitting
-                    under its parent in its parent's colour. Its own switch all
-                    the same — see `isStarlink`. */}
-                {category === STARLINK_PARENT && (
-                  <Pressable style={[styles.row, styles.subRow]} onPress={onToggleStarlink}>
+          {/* Capped and scrollable rather than left to grow: six rows plus the
+              two key rows is already close to what the smallest screen this
+              ships to has room for below `top: 24`, and a translation running
+              to two lines — or a phone's own larger text size — is exactly the
+              margin that tips it over. Scrolling here is what keeps SHOW ALL
+              below the last row on every phone instead of past the bottom of
+              the screen on some of them, the same fix `DebugPanel` and
+              `LanguagePicker` use for the same reason. */}
+          <ScrollView style={styles.rows} showsVerticalScrollIndicator={false}>
+            {SATELLITE_CATEGORIES.map((category) => {
+              const enabled = enabledCategories.has(category);
+              // Starlink is drawn only where its own switch and its category's
+              // both say so, so its row reads as off under either.
+              const starlinkDrawn = enabled && starlink;
+              return (
+                <React.Fragment key={category}>
+                  <Pressable style={styles.row} onPress={() => onToggleCategory(category)}>
                     <View
                       style={[
                         styles.swatch,
-                        styles.subSwatch,
                         {
-                          backgroundColor: palette.categories[STARLINK_PARENT],
+                          backgroundColor: palette.categories[category],
                           borderColor: cssColor(palette.outline),
-                          opacity: starlinkDrawn ? 1 : DIMMED_SWATCH_OPACITY
+                          opacity: enabled ? 1 : DIMMED_SWATCH_OPACITY
                         }
                       ]}
                     />
-                    <Text
-                      style={[
-                        styles.label,
-                        styles.subLabel,
-                        { opacity: starlinkDrawn ? 1 : DIMMED_TEXT_OPACITY }
-                      ]}
-                    >
-                      {STARLINK_LABEL}
+                    <Text style={[styles.label, { opacity: enabled ? 1 : DIMMED_TEXT_OPACITY }]}>
+                      {t.categories[category]}
                     </Text>
-                    <Toggle on={starlink} />
+                    <Toggle on={enabled} />
                   </Pressable>
-                )}
-              </React.Fragment>
-            );
-          })}
-          <View style={styles.keyRow}>
-            <View style={[styles.swatch, styles.ringSwatch]} />
-            <Text style={styles.keyLabel}>{t.ringKey}</Text>
-          </View>
-          {/* The other thing a mark says that its colour does not. Drawn at the
-              same strength the sky draws it at, so the swatch is the mark. */}
-          <View style={styles.keyRow}>
-            <View style={[styles.swatch, styles.shadowSwatch]} />
-            <Text style={styles.keyLabel}>{t.shadowKey}</Text>
-          </View>
+
+                  {/* Indented under communications rather than listed beside it,
+                      because it is not a sixth alternative to the five: it is one
+                      operator inside one of them, and the row says so by sitting
+                      under its parent in its parent's colour. Its own switch all
+                      the same — see `isStarlink`. */}
+                  {category === STARLINK_PARENT && (
+                    <Pressable style={[styles.row, styles.subRow]} onPress={onToggleStarlink}>
+                      <View
+                        style={[
+                          styles.swatch,
+                          styles.subSwatch,
+                          {
+                            backgroundColor: palette.categories[STARLINK_PARENT],
+                            borderColor: cssColor(palette.outline),
+                            opacity: starlinkDrawn ? 1 : DIMMED_SWATCH_OPACITY
+                          }
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.label,
+                          styles.subLabel,
+                          { opacity: starlinkDrawn ? 1 : DIMMED_TEXT_OPACITY }
+                        ]}
+                      >
+                        {STARLINK_LABEL}
+                      </Text>
+                      <Toggle on={starlink} />
+                    </Pressable>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            <View style={styles.keyRow}>
+              <View style={[styles.swatch, styles.ringSwatch]} />
+              <Text style={styles.keyLabel}>{t.ringKey}</Text>
+            </View>
+            {/* The other thing a mark says that its colour does not. Drawn at the
+                same strength the sky draws it at, so the swatch is the mark. */}
+            <View style={styles.keyRow}>
+              <View style={[styles.swatch, styles.shadowSwatch]} />
+              <Text style={styles.keyLabel}>{t.shadowKey}</Text>
+            </View>
+          </ScrollView>
+
+          {/* Outside the scroll on purpose: the one row here someone is likely
+              to want with the categories already scrolled out of view, so it
+              stays where a tap can reach it rather than scrolling away with
+              them. */}
           <Pressable onPress={onEnableAll} style={styles.showAll}>
             <Text style={styles.showAllText}>{t.showAll}</Text>
           </Pressable>
@@ -237,6 +252,14 @@ const styles = StyleSheet.create({
     color: theme.color.textFaint,
     fontSize: 9,
     fontWeight: "700"
+  },
+  rows: {
+    // The same budget `BootScreen`'s own scrollable panel uses: room for the
+    // whole list on an ordinary render, and a hard ceiling under a two-line
+    // translation or a phone's own larger text size, so growth past that
+    // turns into a scroll rather than into the bottom of the screen.
+    maxHeight: 260,
+    flexGrow: 0
   },
   row: {
     minWidth: 164,
