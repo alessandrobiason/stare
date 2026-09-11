@@ -12,49 +12,68 @@ export const en: Strings = {
   intro: {
     what: {
       body:
-        "Point the phone at the sky. The satellites passing over you are drawn onto " +
-        "the picture where they actually are."
+        "Point the phone at the sky and turn slowly. The satellites passing over you " +
+        "are drawn onto the picture where they really are, and left out wherever a " +
+        "building or a tree is in the way."
     },
-    holding: {
-      title: "Hold it up, turn slowly",
+    marks: {
+      title: "What the marks say",
       body:
-        "Every mark is one object: its colour says what the satellite is for, its size " +
-        "how far away it is. Anything behind a building or a tree is left out rather " +
-        "than drawn over it. The few worth going outside for also carry the line they " +
-        "are about to follow: an arrowhead for every minute along it, and the time it " +
-        "comes up if it has not risen yet."
+        "Every mark is one satellite, drawn where it is right now. Tap one to find out " +
+        "what it is.",
+      moving: {
+        name: "Moving",
+        meaning: "The tail is the way it came. The nearer it is, the bigger the mark."
+      },
+      parked: {
+        name: "Parked",
+        meaning: "A ring never moves: it holds station over the equator."
+      },
+      shadow: {
+        name: "Faint",
+        meaning: "In the Earth's shadow, so there is nothing there to see."
+      },
+      landmark: {
+        name: "Landmarks",
+        meaning: "The space stations and great telescopes: haloed, and named."
+      },
+      colors: "The colour says what it is for:"
     },
-    screen: {
-      title: "What is on screen",
-      body: "Five things sit around the sky. These three say what is up there.",
+    paths: {
+      title: "Where and when to look",
+      body:
+        "The few worth going outside for carry the line they will follow across the " +
+        "sky, even before they rise.",
+      minutes: "An arrowhead for every minute, pointing the way it goes.",
+      time: "Its name, and the time it will be at that point.",
+      follow:
+        "Drawn over roofs and off the edge of the screen too: follow it to where it " +
+        "comes up.",
+      footnote: "Tap the name for everything about it."
+    },
+    passes: {
+      title: "What is coming over",
+      body:
+        "Landmarks spend most of their time below the horizon, so the bottom-left " +
+        "corner keeps track of the next ones due.",
+      shut: "The next one over you, and how long until it rises.",
+      open:
+        "Tap it for the next three hours: where each one comes up, how high it gets and " +
+        "whether you will be able to see it. Tap a pass for its details.",
+      footnote: "When nothing is due in the next three hours, that corner stays empty."
+    },
+    corners: {
+      title: "And in the corners",
+      body: "Three more things sit around the sky.",
       count: {
         where: "Top left",
         meaning:
-          "How many satellites are drawn right now — not how many exist. Anything " +
-          "below the horizon, or behind a building, is not counted. Tap it to see " +
-          "what they are."
+          "How many satellites are drawn right now — not how many exist. Tap it to see " +
+          "which they are, and how many are in sunlight."
       },
-      passes: {
-        where: "Bottom left",
-        meaning:
-          "The next landmark due over you, and how long until it rises. Tap it for the " +
-          "rest, and for where to stand."
-      },
-      marker: {
-        where: "On the sky",
-        meaning:
-          "Tap any mark: what the object is, who flies it, how far away it is and " +
-          "where to look for it."
-      }
-    },
-    controls: {
-      title: "And two more",
-      body: "One decides what gets drawn. The other is for when something looks wrong.",
       filter: {
         where: "Top right",
-        meaning:
-          "Which kinds to draw, and the key to the colours — including the ring that " +
-          "marks an object parked over the equator."
+        meaning: "Which kinds to draw, Starlink included, and the key to the colours."
       },
       console: {
         where: "Bottom right",

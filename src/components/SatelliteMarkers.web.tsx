@@ -22,6 +22,8 @@ type Props = {
   palette: MarkerPalette;
   /** The satellite being read about, ringed on the frame. See `SelectionRing`. */
   selectedName?: string | null;
+  /** Mark sizes against the design width, for a box that is not a camera frame. */
+  scale?: number;
 };
 
 /**
@@ -40,11 +42,12 @@ export const SatelliteMarkers: React.FC<Props> = ({
   markers,
   frame,
   palette,
-  selectedName = null
+  selectedName = null,
+  scale
 }) => {
   const drawn = useMarkerFrames(markers);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const scene = frame ? buildMarkerScene(drawn, frame, palette, selectedName) : null;
+  const scene = frame ? buildMarkerScene(drawn, frame, palette, selectedName, scale) : null;
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;

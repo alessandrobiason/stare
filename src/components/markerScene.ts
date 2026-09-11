@@ -251,14 +251,18 @@ export type LabelPlacement = {
  * satellite looks. Sizes are quoted at `DESIGN_FRAME_WIDTH_PX` and scaled to
  * the frame actually being drawn into, so the overlay is the same picture on a
  * phone and in the replay harness's window.
+ *
+ * `scale` is for a box that is not a camera frame: the intro's pictures of a
+ * mark are a few dozen points across, and scaled to their own width the marks
+ * in them would be a pixel or two. See `introFigures.ts`.
  */
 export function buildMarkerScene(
   frame: MarkerFrame,
   box: FrameSize,
   palette: MarkerPalette,
-  selectedName: string | null = null
+  selectedName: string | null = null,
+  scale: number = box.width / DESIGN_FRAME_WIDTH_PX
 ): MarkerScene {
-  const scale = box.width / DESIGN_FRAME_WIDTH_PX;
   const glyphs: GlyphShape[] = [];
 
   // Which landmarks get to keep their name. Crew and cargo vehicles share a

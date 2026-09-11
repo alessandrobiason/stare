@@ -4,49 +4,68 @@ export const fr: Strings = {
   intro: {
     what: {
       body:
-        "Pointez le téléphone vers le ciel. Les satellites qui passent au-dessus de vous " +
-        "sont dessinés sur l'image, là où ils se trouvent vraiment."
+        "Pointez le téléphone vers le ciel et tournez lentement. Les satellites qui " +
+        "passent au-dessus de vous sont dessinés sur l'image là où ils se trouvent " +
+        "vraiment, et retirés là où un immeuble ou un arbre les cache."
     },
-    holding: {
-      title: "Levez-le, tournez lentement",
+    marks: {
+      title: "Ce que disent les marques",
       body:
-        "Chaque marque est un objet : sa couleur dit à quoi sert le satellite, sa taille " +
-        "à quelle distance il est. Ce qui passe derrière un immeuble ou un arbre est " +
-        "retiré plutôt que dessiné par-dessus. Les quelques-uns qui valent la peine de " +
-        "sortir portent aussi la trajectoire qu'ils vont suivre : une pointe de flèche " +
-        "par minute, et l'heure de leur lever s'ils ne sont pas encore levés."
+        "Chaque marque est un satellite, dessiné là où il est en ce moment. Touchez-en " +
+        "une pour savoir ce que c'est.",
+      moving: {
+        name: "En mouvement",
+        meaning: "La traîne est le chemin parcouru. Plus il est proche, plus la marque est grande."
+      },
+      parked: {
+        name: "Fixe",
+        meaning: "Un anneau ne bouge jamais : il reste fixe au-dessus de l'équateur."
+      },
+      shadow: {
+        name: "Pâle",
+        meaning: "Dans l'ombre de la Terre : il n'y a rien à voir."
+      },
+      landmark: {
+        name: "À ne pas manquer",
+        meaning: "Les stations spatiales et les grands télescopes : avec un halo et leur nom."
+      },
+      colors: "La couleur dit à quoi il sert :"
     },
-    screen: {
-      title: "Ce qu'il y a à l'écran",
-      body: "Cinq éléments entourent le ciel. Ces trois-là disent ce qu'il y a là-haut.",
+    paths: {
+      title: "Où et quand regarder",
+      body:
+        "Les quelques-uns qui valent la peine de sortir portent la trajectoire qu'ils " +
+        "vont suivre dans le ciel, avant même de se lever.",
+      minutes: "Une pointe de flèche par minute, dans le sens où il avance.",
+      time: "Son nom, et l'heure à laquelle il sera à cet endroit.",
+      follow:
+        "Tracée aussi par-dessus les toits et au-delà du bord de l'écran : suivez-la " +
+        "jusqu'à son lever.",
+      footnote: "Touchez le nom pour tout savoir sur lui."
+    },
+    passes: {
+      title: "Ce qui va passer",
+      body:
+        "Ils sont presque toujours sous l'horizon, alors le coin en bas à gauche garde " +
+        "l'œil sur les prochains.",
+      shut: "Le prochain au-dessus de vous, et le temps qu'il reste avant son lever.",
+      open:
+        "Touchez-le pour les trois prochaines heures : où chacun se lève, à quelle " +
+        "hauteur il monte et s'il sera visible. Touchez un passage pour ses détails.",
+      footnote: "Si rien ne passe dans les trois prochaines heures, ce coin reste vide."
+    },
+    corners: {
+      title: "Et dans les coins",
+      body: "Trois autres éléments entourent le ciel.",
       count: {
         where: "En haut à gauche",
         meaning:
           "Combien de satellites sont dessinés en ce moment — pas combien il en existe. " +
-          "Ce qui est sous l'horizon ou derrière un mur ne compte pas. Touchez-le pour " +
-          "voir lesquels."
+          "Touchez-le pour voir lesquels, et combien sont au soleil."
       },
-      passes: {
-        where: "En bas à gauche",
-        meaning:
-          "Le prochain repère à passer au-dessus de vous, et le temps qu'il reste avant " +
-          "son lever. Touchez-le pour les autres et pour savoir où vous placer."
-      },
-      marker: {
-        where: "Sur le ciel",
-        meaning:
-          "Touchez n'importe quelle marque : ce qu'est l'objet, qui l'exploite, à quelle " +
-          "distance il est et où le chercher."
-      }
-    },
-    controls: {
-      title: "Et deux autres",
-      body: "L'un décide de ce qui est dessiné. L'autre sert quand quelque chose cloche.",
       filter: {
         where: "En haut à droite",
-        meaning:
-          "Quels types dessiner, et la légende des couleurs — dont l'anneau qui signale " +
-          "un objet fixe au-dessus de l'équateur."
+        meaning: "Quels types dessiner, Starlink compris, et la légende des couleurs."
       },
       console: {
         where: "En bas à droite",

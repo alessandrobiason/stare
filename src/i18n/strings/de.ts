@@ -4,49 +4,68 @@ export const de: Strings = {
   intro: {
     what: {
       body:
-        "Richte das Telefon zum Himmel. Die Satelliten, die über dich hinwegziehen, " +
-        "werden genau dort ins Bild gezeichnet, wo sie wirklich stehen."
+        "Richte das Telefon zum Himmel und dreh es langsam. Die Satelliten über dir " +
+        "werden genau dort ins Bild gezeichnet, wo sie wirklich stehen — und " +
+        "weggelassen, wo ein Haus oder ein Baum im Weg ist."
     },
-    holding: {
-      title: "Hochhalten, langsam drehen",
+    marks: {
+      title: "Was die Markierungen sagen",
       body:
-        "Jede Markierung ist ein Objekt: die Farbe sagt, wofür der Satellit da ist, die " +
-        "Größe, wie weit er weg ist. Was hinter einem Haus oder einem Baum steht, wird " +
-        "weggelassen statt darübergezeichnet. Die wenigen, für die man vor die Tür geht, " +
-        "tragen außerdem die Bahn, die sie gleich ziehen: eine Pfeilspitze je Minute, " +
-        "und die Uhrzeit des Aufgangs, solange sie noch nicht aufgegangen sind."
+        "Jede Markierung ist ein Satellit, gezeichnet, wo er gerade steht. Tippe eine " +
+        "an, um zu sehen, was es ist.",
+      moving: {
+        name: "In Bewegung",
+        meaning: "Der Schweif zeigt, woher er kommt. Je näher, desto größer die Markierung."
+      },
+      parked: {
+        name: "Steht still",
+        meaning: "Ein Ring bewegt sich nie: er steht über dem Äquator."
+      },
+      shadow: {
+        name: "Blass",
+        meaning: "Im Erdschatten, dort gibt es also nichts zu sehen."
+      },
+      landmark: {
+        name: "Highlights",
+        meaning: "Die Raumstationen und großen Teleskope: mit Schein und Namen."
+      },
+      colors: "Die Farbe sagt, wofür der Satellit da ist:"
     },
-    screen: {
-      title: "Was auf dem Bildschirm ist",
-      body: "Fünf Dinge liegen um den Himmel herum. Diese drei sagen, was dort oben ist.",
+    paths: {
+      title: "Wo und wann hinsehen",
+      body:
+        "Die wenigen, für die man vor die Tür geht, tragen die Bahn, der sie am Himmel " +
+        "folgen werden — schon bevor sie aufgehen.",
+      minutes: "Eine Pfeilspitze je Minute, in die Richtung, in die er zieht.",
+      time: "Der Name, und die Uhrzeit, zu der er an dieser Stelle ist.",
+      follow:
+        "Auch über Dächer und über den Bildschirmrand hinaus gezeichnet: folge ihr bis " +
+        "dorthin, wo er aufgeht.",
+      footnote: "Tippe auf den Namen, um alles darüber zu erfahren."
+    },
+    passes: {
+      title: "Was als Nächstes kommt",
+      body:
+        "Meist stehen sie unter dem Horizont, darum behält die Ecke unten links die " +
+        "nächsten im Blick.",
+      shut: "Der nächste über dir, und wie lange es bis zum Aufgang dauert.",
+      open:
+        "Antippen zeigt die nächsten drei Stunden: wo jeder aufgeht, wie hoch er steigt " +
+        "und ob du ihn sehen kannst. Tippe einen Überflug an für die Details.",
+      footnote: "Kommt in den nächsten drei Stunden nichts, bleibt diese Ecke leer."
+    },
+    corners: {
+      title: "Und in den Ecken",
+      body: "Drei weitere Dinge liegen um den Himmel herum.",
       count: {
         where: "Oben links",
         meaning:
-          "Wie viele Satelliten gerade gezeichnet sind — nicht, wie viele es gibt. Was " +
-          "unter dem Horizont oder hinter einem Haus steht, zählt nicht. Antippen " +
-          "zeigt, welche es sind."
+          "Wie viele Satelliten gerade gezeichnet sind — nicht, wie viele es gibt. " +
+          "Antippen zeigt, welche es sind und wie viele in der Sonne stehen."
       },
-      passes: {
-        where: "Unten links",
-        meaning:
-          "Das nächste bekannte Objekt, das über dich hinwegzieht, und wie lange es bis " +
-          "zum Aufgang dauert. Antippen zeigt die übrigen und wo du dich hinstellst."
-      },
-      marker: {
-        where: "Am Himmel",
-        meaning:
-          "Tippe eine Markierung an: was das Objekt ist, wer es betreibt, wie weit weg " +
-          "es ist und wo du danach suchst."
-      }
-    },
-    controls: {
-      title: "Und zwei weitere",
-      body: "Das eine entscheidet, was gezeichnet wird. Das andere ist da, falls etwas nicht stimmt.",
       filter: {
         where: "Oben rechts",
-        meaning:
-          "Welche Arten gezeichnet werden, und die Farblegende — samt dem Ring für ein " +
-          "über dem Äquator stehendes Objekt."
+        meaning: "Welche Arten gezeichnet werden, Starlink inklusive, und die Farblegende."
       },
       console: {
         where: "Unten rechts",

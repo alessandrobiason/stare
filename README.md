@@ -138,14 +138,15 @@ sky, takes the name off it and says what went wrong.
 Boot asks for the camera and then for a GPS fix within a second of the app
 opening — two system prompts, back to back, over a screen that has explained
 nothing, each of them fatal to the view if refused. So a device that has not seen
-the app before opens on five pages instead: what it does, how to hold it, what
-the screen says about the sky, the two panels that are worked rather than read —
-each of the five named beside a copy of the badge it wears, since a bare `12` in
-the corner of a photograph says nothing about what it counts — and what it is
-about to ask for and why. Two pages of badges rather than one because five
-explained badges is taller than the card at the foot of a 4.7-inch screen, which
-the suite measures in all twelve languages; given a break to make, it is made
-where the panels themselves divide. Two prompts, not three: the
+the app before opens on six pages instead: what it does; what a mark means, each
+kind beside a drawing of it; the line a landmark carries across the sky; what is
+coming over; the three corners, each named beside a copy of the badge it wears,
+since a bare `12` in the corner of a photograph says nothing about what it
+counts; and what it is about to ask for and why. The pictures are drawn by the
+app rather than of it — the sky's own renderer over a made-up frame, and the
+passes panel's own code over a made-up plan (`src/onboarding/introFigures.ts`) —
+so the key cannot drift from what it keys, and the suite measures every page
+against a 4.7-inch screen in all twelve languages. Two prompts, not three: the
 motion sensors the view is aimed by are read without one — iOS gates the
 pedometer behind "Motion & Fitness", not `CMMotionManager` — and asking anyway
 meant a phone with that setting off refused to aim at all

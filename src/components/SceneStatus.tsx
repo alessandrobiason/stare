@@ -35,9 +35,9 @@ type Props = {
  * The same panel as the filter in the opposite corner, deliberately — same
  * pill, same title row, same chevron — because they are the same kind of thing:
  * one says what may be drawn, the other what is. That it opens at all is said
- * once, on the intro's third page, beside a copy of this panel; a caption here
- * would be a permanent word over the sky for the sake of the first thirty
- * seconds of the first launch. See `introPages`.
+ * once, on the intro's page about the corners, beside a copy of this panel; a
+ * caption here would be a permanent word over the sky for the sake of the
+ * first thirty seconds of the first launch. See `introPages`.
  *
  * A degraded boot tints the console toggle rather than this panel — see
  * `DebugToggle` — since that is the control that opens the STATUS page saying

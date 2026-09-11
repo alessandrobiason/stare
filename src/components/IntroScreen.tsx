@@ -13,6 +13,7 @@ import { useLocale } from "../hooks/useLocale";
 import { introButtonLabel, introPages } from "../onboarding/introPages";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
+import { CalloutList, ColorKey, MarkTile, PassesPicture, PathPicture } from "./IntroFigures";
 import { LanguagePicker } from "./LanguagePicker";
 import { FrameSize } from "./markerGeometry";
 import { SafeAreaLayer } from "./SafeAreaLayer";
@@ -26,22 +27,23 @@ type Props = {
 /**
  * The screen the app opens on the very first time, and never again.
  *
- * Four pages over the same turning sky the boot screen shows, so the intro and
+ * Six pages over the same turning sky the boot screen shows, so the intro and
  * the launch after it are one continuous thing rather than two designs. What is
- * said is in `introPages.ts`; this lays it out and nothing else.
+ * said, and what is pictured, is in `introPages.ts`; this lays it out.
  *
  * The copy sits in a card at the foot of the screen rather than over the middle
  * of it. The middle is where the satellites turn, and text there is read against
  * five moving bodies — the card keeps the words on a surface of known colour and
- * leaves the composition above them intact.
+ * leaves the composition above them intact. The pictures in the card are pieces
+ * of night sky of their own (`IntroFigures`), for the same reason.
  *
  * Pages advance by swipe or by the button, which is the same button throughout
  * and only changes what it says on the last page: there it is the one that lets
  * boot — and so the system's own permission prompts — begin.
  *
  * The corner holds the language picker, and this is the screen that most needs
- * one: everything here is a paragraph, and a phone whose language is not its
- * reader's makes all four pages useless at once. See `LanguagePicker`.
+ * one: everything here is to be read, and a phone whose language is not its
+ * reader's makes every page useless at once. See `LanguagePicker`.
  */
 export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   const [frame, setFrame] = useState<FrameSize | null>(null);
@@ -60,7 +62,7 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   // Subscribing rather than reading: nothing here needs to know *which*
   // language it is in, only to be rebuilt from the string table when the
   // corner picker changes it. This screen renders on a swipe, so reading the
-  // four pages again costs nothing worth memoising.
+  // pages again costs nothing worth memoising.
   useLocale();
   const pages = introPages();
 
@@ -132,14 +134,15 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
               >
                 {pages.map((content, index) => (
                   <View key={index} style={[styles.page, { width: safeBox.width }]}>
-                    {/* The card scrolls if it has to. Its height is four
-                        translated paragraphs plus a title, and the longest of
-                        the twelve languages comes within a few points of a
-                        667pt screen — bottom-aligned, a page that outgrew the
-                        screen would walk off the top of it with no way to reach
-                        the rest. `flexShrink` is what caps it at the space
-                        available; with room to spare it still sizes to its own
-                        content and stays a card at the foot of the sky. */}
+                    {/* The card scrolls if it has to. Its height is a title, a
+                        paragraph and a picture's worth of translated rows, and
+                        the longest of the twelve languages comes within a few
+                        lines of a 667pt screen — bottom-aligned, a page that
+                        outgrew the screen would walk off the top of it with no
+                        way to reach the rest. `flexShrink` is what caps it at
+                        the space available; with room to spare it still sizes
+                        to its own content and stays a card at the foot of the
+                        sky. */}
                     <ScrollView
                       style={styles.card}
                       contentContainerStyle={styles.cardContent}
@@ -148,12 +151,46 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
                       {content.title ? <Text style={styles.title}>{content.title}</Text> : null}
                       <Text style={styles.body}>{content.body}</Text>
 
+                      {content.marks?.map((mark) => (
+                        <View key={mark.sample} style={[styles.element, styles.markRow]}>
+                          {/* The mark as the sky draws it, in the column the
+                              badges keep on the corners page, so the two keys
+                              read as one design. */}
+                          <MarkTile sample={mark.sample} />
+                          <View style={styles.elementText}>
+                            <Text style={styles.elementWhere}>{mark.name}</Text>
+                            <Text style={styles.elementMeaning}>{mark.meaning}</Text>
+                          </View>
+                        </View>
+                      ))}
+
+                      {content.colors ? (
+                        <>
+                          <Text style={styles.colorsLabel}>{content.colors.label}</Text>
+                          <ColorKey swatches={content.colors.swatches} />
+                        </>
+                      ) : null}
+
+                      {content.path ? (
+                        <View style={styles.figure}>
+                          <PathPicture />
+                          <CalloutList callouts={content.path.callouts} />
+                        </View>
+                      ) : null}
+
+                      {content.passes ? (
+                        <View style={styles.figure}>
+                          <PassesPicture />
+                          <CalloutList callouts={content.passes.callouts} />
+                        </View>
+                      ) : null}
+
                       {content.elements?.map((element) => (
                         <View key={element.where} style={styles.element}>
                           {/* The badge as the real screen wears it, so the row
                               is a key to the panel rather than a description of
-                              it. Fixed width, so four rows of very different
-                              badges still line their text up. */}
+                              it. Fixed width, so rows of very different badges
+                              still line their text up. */}
                           <View style={styles.badge}>
                             <Text numberOfLines={1} style={styles.badgeLabel}>
                               {element.badge}
@@ -286,13 +323,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start"
   },
+  // A tile is taller than a badge, and a short explanation beside it reads as
+  // belonging to it only when the two share a middle.
+  markRow: {
+    alignItems: "center",
+    gap: 10
+  },
   /**
    * A copy of the panel's own pill, at the panel's own colours.
    *
-   * Fixed width rather than sized to its content: the four badges are a
-   * number, two words of very different length and a dot, and left to
-   * themselves they would step the explanations in and out by thirty points
-   * down the card.
+   * Fixed width rather than sized to its content: the badges are a number and
+   * two words of very different length, and left to themselves they would step
+   * the explanations in and out by thirty points down the card.
    */
   badge: {
     width: 74,
@@ -326,6 +368,15 @@ const styles = StyleSheet.create({
     color: theme.color.textDim,
     fontSize: 11.5,
     lineHeight: 16
+  },
+  colorsLabel: {
+    marginTop: 14,
+    color: theme.color.textDim,
+    fontSize: 11.5,
+    lineHeight: 16
+  },
+  figure: {
+    marginTop: 14
   },
   access: {
     marginTop: 14

@@ -268,42 +268,69 @@ type PassSeeing = "visible" | "binoculars" | "tooFaint" | "eclipsed" | "daylight
 export type IntroStrings = {
   /** The first page: the app's name is in the sky above it, so there is no title. */
   what: { body: string };
-  /** The second: how to hold the phone, and what a mark on the sky is. */
-  holding: { title: string; body: string };
   /**
-   * The third: what the screen says about the sky.
+   * The second: what a mark on the sky says, beside a drawing of each kind.
    *
-   * The first of the two pages that exist because a number in the corner of a
-   * camera view says nothing about what it counts. Each entry is explained
-   * beside a copy of the badge it wears on the real screen, and `where` names
-   * the corner it sits in, since that is how someone finds it again afterwards.
-   *
-   * These three report: how much is up there now, what is coming, and what any
-   * one mark is. The two that are worked rather than read are on the page after
-   * (`controls`). Five explained badges is more than the card at the foot of a
-   * 4.7-inch screen holds — the suite measures that — and given a break to
-   * make, the honest place for it is between what the panels are *for* rather
-   * than wherever the fifth row stopped fitting.
+   * This used to be a paragraph — colour for purpose, size for distance, a
+   * ring, a fainter mark — and five channels in one paragraph is not something
+   * anyone carries to the sky. So each is a row with the mark itself beside it,
+   * drawn by the overlay's own code (`introFigures.ts`), and `name` is the word
+   * for the row rather than a place on the screen.
    */
-  screen: {
+  marks: {
+    title: string;
+    body: string;
+    /** A body and its tail, near and far: which way it goes, and how far off. */
+    moving: IntroKeyStrings;
+    /** The geostationary belt: rings that never move. */
+    parked: IntroKeyStrings;
+    /** The same mark in sunlight and in the Earth's shadow. */
+    shadow: IntroKeyStrings;
+    /** A landmark: the halo, and the name under it. */
+    landmark: IntroKeyStrings;
+    /** Over the colour key, whose names are the filter's own (`filter.categories`). */
+    colors: string;
+  };
+  /**
+   * The third: a landmark's line across the sky, drawn as the overlay draws it.
+   *
+   * The callouts are numbered on the picture in this order: the arrowheads, the
+   * name and time written on the line, and the line coming up from behind the
+   * roofs before its object does.
+   */
+  paths: {
+    title: string;
+    body: string;
+    minutes: string;
+    time: string;
+    follow: string;
+    /** Under the callouts: the name on the line is a target. */
+    footnote: string;
+  };
+  /**
+   * The fourth: what is coming, as the bottom-left panel says it.
+   *
+   * The panel is drawn twice over a made-up plan, shut and then open, numbered
+   * like the line on the page before. `footnote` is the panel's one surprise:
+   * with nothing due it is not on the screen at all. See `UpcomingPasses`.
+   */
+  passes: {
+    title: string;
+    body: string;
+    shut: string;
+    open: string;
+    footnote: string;
+  };
+  /**
+   * The fifth: the three corners left, each beside a copy of the badge it
+   * wears — a bare number in the corner of a camera view says nothing about
+   * what it counts — with `where` naming the corner, since that is how someone
+   * finds it again afterwards.
+   */
+  corners: {
     title: string;
     body: string;
     count: IntroElementStrings;
-    /** The countdown to the next landmark over, in the bottom corner. */
-    passes: IntroElementStrings;
-    marker: IntroElementStrings;
-  };
-  /**
-   * The fourth: the two panels that are worked rather than read.
-   *
-   * The filter decides what the sky is allowed to draw and the console is the
-   * readings behind it, for when something looks wrong. Neither says anything
-   * about the sky on its own, which is what separates them from the three on
-   * the page before.
-   */
-  controls: {
-    title: string;
-    body: string;
     filter: IntroElementStrings;
     console: IntroElementStrings;
   };
@@ -324,6 +351,13 @@ export type IntroElementStrings = {
   /** Where on screen to look for it: "top left", and so on. */
   where: string;
   /** What it is and what it is worth. */
+  meaning: string;
+};
+
+export type IntroKeyStrings = {
+  /** A word or two for the kind of mark. Short: it heads a row beside a drawing. */
+  name: string;
+  /** What that kind of mark means. */
   meaning: string;
 };
 

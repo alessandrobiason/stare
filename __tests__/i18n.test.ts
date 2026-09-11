@@ -16,6 +16,7 @@ import {
   sunlightSummary,
   timeUntil
 } from "../src/i18n/format";
+import { MARK_TILE, PATH_FIGURE_HEIGHT, SAMPLE_PASSES } from "../src/onboarding/introFigures";
 import { introPages } from "../src/onboarding/introPages";
 import {
   FALLBACK_LOCALE,
@@ -563,29 +564,28 @@ test("the console is the one thing that stays in English", () => {
   // by whoever is diagnosing a phone that is drawing the sky in the wrong
   // place. The intro says as much on the page that keys the panels.
   setLocaleForTesting("ja");
-  expect(strings().intro.controls.console.meaning).toMatch(/英語/);
+  expect(strings().intro.corners.console.meaning).toMatch(/英語/);
 });
 
 /**
  * How tall the intro's pages come out, per language.
  *
  * The pages in the app whose height is not bounded by their own design: a
- * title, a paragraph and — on the page that keys the screen — four explained
- * badges, every one of which is a translated string that can run a line longer
- * than the English it replaced. The card is bottom-aligned and grows upwards
- * into the sky, so a page that outgrows the screen does not scroll — it walks
- * off the top.
+ * title, a paragraph, and then rows beside pictures, numbered explanations
+ * under them, or explained badges — every one of which is a translated string
+ * that can run a line longer than the English it replaced. The card is
+ * bottom-aligned and grows upwards into the sky, so a page that outgrows the
+ * screen does not stay a card — it walks off the top.
  *
- * The page about the sky is measured too, and not only the one about the
- * panels: it is prose with nothing to hold it in check, and it gained the
- * paragraph about the landmarks' paths.
+ * The pictures are fixed heights, or the panel's own rows: those are measured
+ * the way the panel's own checks measure them.
  *
  * The figures are read off `IntroScreen`'s stylesheet. The card now scrolls if
  * it has to (see `styles.card`), so overrunning this is a degraded page rather
  * than a broken one — which is why the budget is the *smallest* screen the app
  * ships to rather than the one it is designed on.
  */
-describe("the page that explains the screen fits the screen", () => {
+describe("the intro's pages fit the smallest screen", () => {
   /** Layout points of text, wrapped into a column of `column` points. */
   function blockHeight(text: string, fontSize: number, lineHeight: number, column: number): number {
     return Math.max(1, Math.ceil(width(text, fontSize) / column)) * lineHeight;
@@ -608,19 +608,81 @@ describe("the page that explains the screen fits the screen", () => {
    */
   const PAGER_HEIGHT = 667 - (18 + 6 + 18 + 28 + 13 + 26) - 20;
 
+  /** The callouts' column: the card's, less the 16pt number and the 8 after it. */
+  const CALLOUT_COLUMN = CARD_COLUMN - 16 - 8;
+
+  /** Numbered explanations under a picture, each 8 below the one before. */
+  function calloutsHeight(callouts: readonly string[]): number {
+    return callouts.reduce(
+      (sum, text) => sum + 8 + blockHeight(text, 11.5, 16, CALLOUT_COLUMN),
+      0
+    );
+  }
+
+  /**
+   * The passes picture: 10 of padding around the panel shut and the panel open,
+   * and 10 between them. A panel is its border, a header of 6 above an 11pt
+   * line and 6 below it (2, open) — and open, a row per pass: 12 of rule and
+   * gap, the name, 2, and the line under it wrapped into the rows' 170pt.
+   */
+  function passesPictureHeight(): number {
+    const LINE = 14;
+    const shut = 2 + 6 + LINE + 6;
+    const rows = SAMPLE_PASSES.reduce((sum, pass) => {
+      const meta = `${passDirection(pass)} · ${passSeeing(pass.nakedEye)}`;
+      return sum + 7 + 5 + LINE + 2 + blockHeight(meta, 9, 13, 170);
+    }, 0);
+    const open = 2 + 6 + LINE + 2 + rows + 10;
+    return 10 + shut + 10 + open + 10;
+  }
+
+  /** The colour chips, wrapped into the card's column: 21 tall and 6 apart either way. */
+  function swatchesHeight(names: readonly string[]): number {
+    let rows = 1;
+    let used = 0;
+    for (const name of names) {
+      const chip = 7 + 9 + 5 + width(name, 9, 0.4) + 7;
+      if (used > 0 && used + 6 + chip > CARD_COLUMN) {
+        rows += 1;
+        used = chip;
+      } else {
+        used += (used > 0 ? 6 : 0) + chip;
+      }
+    }
+    return rows * 21 + (rows - 1) * 6;
+  }
+
   test.each(LOCALES)("%s", (locale) => {
     setLocaleForTesting(locale);
-    // Every page that is title and prose, which is all of them but the last:
-    // the permissions page lists what the system will ask for, and that list is
-    // two names and two reasons whatever the language.
+    // Every page but the last: the permissions page lists what the system will
+    // ask for, and that list is two names and two reasons whatever the language.
     for (const page of introPages().filter((one) => !one.access)) {
       let height = 20 * 2; // The card's own padding.
       height += blockHeight(page.title ?? "", 19, 23, CARD_COLUMN);
       height += 10 + blockHeight(page.body, 13, 19, CARD_COLUMN);
+      for (const mark of page.marks ?? []) {
+        // A tile and its words share a middle, so the row is the taller of them.
+        const words =
+          blockHeight(mark.name, 10, 13, ELEMENT_COLUMN) +
+          2 +
+          blockHeight(mark.meaning, 11.5, 16, ELEMENT_COLUMN);
+        height += 12 + Math.max(MARK_TILE.height, words);
+      }
+      if (page.colors) {
+        height += 14 + blockHeight(page.colors.label, 11.5, 16, CARD_COLUMN);
+        height += 6 + swatchesHeight(page.colors.swatches.map((swatch) => swatch.name));
+      }
+      if (page.path) {
+        height += 14 + PATH_FIGURE_HEIGHT + calloutsHeight(page.path.callouts);
+      }
+      if (page.passes) {
+        height += 14 + passesPictureHeight() + calloutsHeight(page.passes.callouts);
+      }
       for (const element of page.elements ?? []) {
         height += 12 + blockHeight(element.where, 10, 13, ELEMENT_COLUMN);
         height += 2 + blockHeight(element.meaning, 11.5, 16, ELEMENT_COLUMN);
       }
+      if (page.footnote) height += 16 + blockHeight(page.footnote, 11, 16, CARD_COLUMN);
 
       expect(height).toBeLessThan(PAGER_HEIGHT);
     }

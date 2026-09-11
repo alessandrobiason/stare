@@ -4,49 +4,68 @@ export const es: Strings = {
   intro: {
     what: {
       body:
-        "Apunta el teléfono al cielo. Los satélites que pasan sobre ti se dibujan en la " +
-        "imagen justo donde están."
+        "Apunta el teléfono al cielo y gira despacio. Los satélites que pasan sobre ti " +
+        "se dibujan en la imagen justo donde están, y se omiten donde un edificio o un " +
+        "árbol se interpone."
     },
-    holding: {
-      title: "Levántalo y gira despacio",
+    marks: {
+      title: "Qué dicen las marcas",
       body:
-        "Cada marca es un objeto: el color dice para qué sirve el satélite, y el tamaño " +
-        "a qué distancia está. Lo que queda detrás de un edificio o de un árbol se " +
-        "omite en lugar de dibujarse encima. Los pocos por los que merece la pena salir " +
-        "llevan además la línea que están a punto de recorrer: una punta de flecha por " +
-        "cada minuto, y la hora a la que salen si aún no han salido."
+        "Cada marca es un satélite, dibujado donde está ahora mismo. Toca una para saber " +
+        "qué es.",
+      moving: {
+        name: "En movimiento",
+        meaning: "La cola es el camino que trae. Cuanto más cerca, más grande la marca."
+      },
+      parked: {
+        name: "Fijo",
+        meaning: "Un anillo nunca se mueve: está fijo sobre el ecuador."
+      },
+      shadow: {
+        name: "Tenue",
+        meaning: "En la sombra de la Tierra, así que ahí no hay nada que ver."
+      },
+      landmark: {
+        name: "Imprescindibles",
+        meaning: "Las estaciones espaciales y los grandes telescopios: con halo y nombre."
+      },
+      colors: "El color dice para qué sirve:"
     },
-    screen: {
-      title: "Qué hay en pantalla",
-      body: "Alrededor del cielo hay cinco cosas. Estas tres dicen qué hay allá arriba.",
+    paths: {
+      title: "Dónde y cuándo mirar",
+      body:
+        "Los pocos por los que merece la pena salir llevan la línea que seguirán por el " +
+        "cielo, incluso antes de salir.",
+      minutes: "Una punta de flecha por cada minuto, en el sentido en que avanza.",
+      time: "Su nombre, y la hora a la que estará en ese punto.",
+      follow:
+        "Se dibuja también sobre los tejados y más allá del borde de la pantalla: síguela " +
+        "hasta donde sale.",
+      footnote: "Toca el nombre para saberlo todo de él."
+    },
+    passes: {
+      title: "Qué está por pasar",
+      body:
+        "Casi siempre están bajo el horizonte, así que la esquina inferior izquierda " +
+        "vigila los próximos.",
+      shut: "El próximo sobre ti, y cuánto falta para que salga.",
+      open:
+        "Tócala para ver las próximas tres horas: por dónde sale cada uno, cuánto sube y " +
+        "si se podrá ver. Toca un pase para ver sus detalles.",
+      footnote: "Si no pasa nada en las próximas tres horas, esa esquina queda vacía."
+    },
+    corners: {
+      title: "Y en las esquinas",
+      body: "Alrededor del cielo hay tres cosas más.",
       count: {
         where: "Arriba a la izquierda",
         meaning:
-          "Cuántos satélites se están dibujando ahora mismo, no cuántos existen. Lo que " +
-          "está bajo el horizonte, o detrás de un edificio, no cuenta. Tócalo para " +
-          "ver cuáles son."
+          "Cuántos satélites se dibujan ahora mismo, no cuántos existen. Tócalo para ver " +
+          "cuáles son y cuántos están al sol."
       },
-      passes: {
-        where: "Abajo a la izquierda",
-        meaning:
-          "El próximo objeto señalado que pasa sobre ti, y cuánto falta para que salga. " +
-          "Tócalo para ver el resto y hacia dónde ponerte."
-      },
-      marker: {
-        where: "Sobre el cielo",
-        meaning:
-          "Toca cualquier marca: qué es el objeto, quién lo opera, a qué distancia está " +
-          "y hacia dónde mirar."
-      }
-    },
-    controls: {
-      title: "Y dos más",
-      body: "Una decide qué se dibuja. La otra es para cuando algo no cuadra.",
       filter: {
         where: "Arriba a la derecha",
-        meaning:
-          "Qué tipos dibujar, y la clave de los colores — incluido el anillo que marca " +
-          "un objeto fijo sobre el ecuador."
+        meaning: "Qué tipos dibujar, Starlink incluido, y la clave de los colores."
       },
       console: {
         where: "Abajo a la derecha",

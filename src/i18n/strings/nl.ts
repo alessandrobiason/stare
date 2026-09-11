@@ -4,49 +4,68 @@ export const nl: Strings = {
   intro: {
     what: {
       body:
-        "Richt de telefoon op de hemel. De satellieten die over je heen trekken worden " +
-        "in het beeld getekend, precies waar ze echt staan."
+        "Richt de telefoon op de hemel en draai langzaam. De satellieten die over je " +
+        "heen trekken worden in het beeld getekend waar ze echt staan, en weggelaten " +
+        "waar een gebouw of een boom in de weg staat."
     },
-    holding: {
-      title: "Omhoog houden, langzaam draaien",
+    marks: {
+      title: "Wat de stippen zeggen",
       body:
-        "Elke stip is één object: de kleur zegt waar de satelliet voor dient, de grootte " +
-        "hoe ver hij weg is. Wat achter een gebouw of een boom zit wordt weggelaten in " +
-        "plaats van eroverheen getekend. De paar waarvoor je naar buiten loopt, dragen " +
-        "ook de baan die ze zo gaan volgen: een pijlpunt per minuut, en de tijd waarop " +
-        "ze opkomen als dat nog moet gebeuren."
+        "Elke stip is één satelliet, getekend waar hij nu staat. Tik erop om te zien wat " +
+        "het is.",
+      moving: {
+        name: "In beweging",
+        meaning: "De staart is de weg die hij kwam. Hoe dichterbij, hoe groter de stip."
+      },
+      parked: {
+        name: "Staat stil",
+        meaning: "Een ring beweegt nooit: hij staat stil boven de evenaar."
+      },
+      shadow: {
+        name: "Vaag",
+        meaning: "In de schaduw van de aarde, dus er is niets te zien."
+      },
+      landmark: {
+        name: "Hoogtepunten",
+        meaning: "De ruimtestations en grote telescopen: met een gloed en een naam."
+      },
+      colors: "De kleur zegt waar hij voor dient:"
     },
-    screen: {
-      title: "Wat er op het scherm staat",
-      body: "Er staan vijf dingen om de hemel heen. Deze drie zeggen wat er boven je is.",
+    paths: {
+      title: "Waar en wanneer kijken",
+      body:
+        "De paar waarvoor je naar buiten loopt, dragen de baan die ze aan de hemel gaan " +
+        "volgen, nog voordat ze opkomen.",
+      minutes: "Een pijlpunt per minuut, in de richting waarin hij gaat.",
+      time: "Zijn naam, en de tijd waarop hij op dat punt is.",
+      follow:
+        "Ook over daken en voorbij de rand van het scherm getekend: volg hem tot waar hij " +
+        "opkomt.",
+      footnote: "Tik op de naam voor alles erover."
+    },
+    passes: {
+      title: "Wat er aankomt",
+      body:
+        "Meestal staan ze onder de horizon, dus houdt de hoek linksonder de volgende in " +
+        "de gaten.",
+      shut: "De volgende boven je, en hoe lang het nog duurt voor hij opkomt.",
+      open:
+        "Tik erop voor de komende drie uur: waar elk opkomt, hoe hoog hij komt en of je " +
+        "hem kunt zien. Tik op een passage voor de details.",
+      footnote: "Komt er de komende drie uur niets, dan blijft die hoek leeg."
+    },
+    corners: {
+      title: "En in de hoeken",
+      body: "Er staan nog drie dingen om de hemel heen.",
       count: {
         where: "Linksboven",
         meaning:
-          "Hoeveel satellieten er nu getekend zijn — niet hoeveel er zijn. Wat onder de " +
-          "horizon of achter een gebouw zit, telt niet mee. Tik erop om te zien " +
-          "welke."
+          "Hoeveel satellieten er nu getekend zijn — niet hoeveel er zijn. Tik erop om te " +
+          "zien welke, en hoeveel er in de zon staan."
       },
-      passes: {
-        where: "Linksonder",
-        meaning:
-          "Het volgende bekende object dat over je heen komt, en hoe lang het nog duurt " +
-          "voor het opkomt. Tik erop voor de rest en voor waar je moet gaan staan."
-      },
-      marker: {
-        where: "Op de hemel",
-        meaning:
-          "Tik op een stip: wat het object is, wie het vliegt, hoe ver weg het is en " +
-          "waar je moet kijken."
-      }
-    },
-    controls: {
-      title: "En nog twee",
-      body: "De ene bepaalt wat er getekend wordt. De andere is voor als er iets niet klopt.",
       filter: {
         where: "Rechtsboven",
-        meaning:
-          "Welke soorten getekend worden, en de kleurlegenda — met de ring voor een " +
-          "object boven de evenaar."
+        meaning: "Welke soorten getekend worden, Starlink inbegrepen, en de kleurlegenda."
       },
       console: {
         where: "Rechtsonder",

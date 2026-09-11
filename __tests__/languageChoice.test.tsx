@@ -102,8 +102,8 @@ describe("the picker in the corner of the intro", () => {
   });
 
   test("is on the intro itself, which is the screen that most needs it", () => {
-    // Four pages of paragraphs, and no way past them but reading one: a
-    // wrongly detected language costs the whole of onboarding at once.
+    // Six pages to be read, and no way past them but reading one: a wrongly
+    // detected language costs the whole of onboarding at once.
     setLocaleForTesting("it");
     const markup = renderToStaticMarkup(onAScreen(<IntroScreen onDone={() => undefined} />));
 

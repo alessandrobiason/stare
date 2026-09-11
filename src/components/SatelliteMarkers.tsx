@@ -32,6 +32,8 @@ type Props = {
   palette: MarkerPalette;
   /** The satellite being read about, ringed on the frame. See `SelectionRing`. */
   selectedName?: string | null;
+  /** Mark sizes against the design width, for a box that is not a camera frame. */
+  scale?: number;
 };
 
 /**
@@ -64,12 +66,13 @@ export const SatelliteMarkers: React.FC<Props> = ({
   markers,
   frame,
   palette,
-  selectedName = null
+  selectedName = null,
+  scale
 }) => {
   const drawn = useMarkerFrames(markers);
   if (!frame) return null;
 
-  const scene = buildMarkerScene(drawn, frame, palette, selectedName);
+  const scene = buildMarkerScene(drawn, frame, palette, selectedName, scale);
   return (
     <>
       <SkiaPictureView

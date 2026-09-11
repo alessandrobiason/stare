@@ -4,49 +4,68 @@ export const pt: Strings = {
   intro: {
     what: {
       body:
-        "Aponte o telefone para o céu. Os satélites que passam por cima de você são " +
-        "desenhados na imagem exatamente onde estão."
+        "Aponte o telefone para o céu e rode devagar. Os satélites que passam por cima " +
+        "de você são desenhados na imagem exatamente onde estão, e omitidos onde um " +
+        "prédio ou uma árvore fica no caminho."
     },
-    holding: {
-      title: "Levante e rode devagar",
+    marks: {
+      title: "O que dizem as marcas",
       body:
-        "Cada marca é um objeto: a cor diz para que serve o satélite, o tamanho a que " +
-        "distância está. O que fica atrás de um prédio ou de uma árvore é omitido em vez " +
-        "de ser desenhado por cima. Os poucos por que vale a pena sair levam também a " +
-        "linha que estão prestes a percorrer: uma seta por cada minuto e, se ainda não " +
-        "nasceram, a hora a que aparecem."
+        "Cada marca é um satélite, desenhado onde está agora. Toque numa para saber o " +
+        "que é.",
+      moving: {
+        name: "Em movimento",
+        meaning: "A cauda é o caminho que fez. Quanto mais perto, maior a marca."
+      },
+      parked: {
+        name: "Parado",
+        meaning: "Um anel nunca se move: fica parado sobre o equador."
+      },
+      shadow: {
+        name: "Esbatido",
+        meaning: "Na sombra da Terra, por isso não há nada para ver."
+      },
+      landmark: {
+        name: "Imperdíveis",
+        meaning: "As estações espaciais e os grandes telescópios: com halo e nome."
+      },
+      colors: "A cor diz para que serve:"
     },
-    screen: {
-      title: "O que há na tela",
-      body: "À volta do céu há cinco coisas. Estas três dizem o que está lá em cima.",
+    paths: {
+      title: "Onde e quando olhar",
+      body:
+        "Os poucos por que vale a pena sair levam a linha que vão seguir pelo céu, mesmo " +
+        "antes de nascerem.",
+      minutes: "Uma seta por cada minuto, no sentido em que avança.",
+      time: "O nome, e a hora a que vai estar nesse ponto.",
+      follow:
+        "Desenhada também por cima dos telhados e além da borda da tela: siga-a até onde " +
+        "nasce.",
+      footnote: "Toque no nome para saber tudo sobre ele."
+    },
+    passes: {
+      title: "O que vai passar",
+      body:
+        "Quase sempre estão abaixo do horizonte, por isso o canto inferior esquerdo fica " +
+        "de olho nos próximos.",
+      shut: "O próximo por cima de você, e quanto falta para nascer.",
+      open:
+        "Toque para ver as próximas três horas: onde nasce cada um, quanto sobe e se vai " +
+        "dar para ver. Toque numa passagem para ver os detalhes.",
+      footnote: "Se nada passar nas próximas três horas, esse canto fica vazio."
+    },
+    corners: {
+      title: "E nos cantos",
+      body: "À volta do céu há mais três coisas.",
       count: {
         where: "Canto superior esquerdo",
         meaning:
-          "Quantos satélites estão desenhados neste momento — não quantos existem. O que " +
-          "está abaixo do horizonte, ou atrás de um edifício, não conta. Toque para " +
-          "ver quais são."
+          "Quantos satélites estão desenhados agora — não quantos existem. Toque para ver " +
+          "quais são e quantos estão ao sol."
       },
-      passes: {
-        where: "Canto inferior esquerdo",
-        meaning:
-          "O próximo objeto assinalado a passar por cima de si, e quanto falta para " +
-          "nascer. Toque para ver os restantes e onde se colocar."
-      },
-      marker: {
-        where: "No céu",
-        meaning:
-          "Toque em qualquer marca: o que é o objeto, quem o opera, a que distância está " +
-          "e para onde olhar."
-      }
-    },
-    controls: {
-      title: "E mais duas",
-      body: "Uma decide o que é desenhado. A outra é para quando algo parece errado.",
       filter: {
         where: "Canto superior direito",
-        meaning:
-          "Que tipos desenhar, e a legenda das cores — incluindo o anel que assinala um " +
-          "objeto parado sobre o equador."
+        meaning: "Que tipos desenhar, Starlink incluído, e a legenda das cores."
       },
       console: {
         where: "Canto inferior direito",

@@ -1,5 +1,5 @@
 import React, { MutableRefObject, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
 import { passDirection, passSeeing, timeUntil } from "../i18n/format";
@@ -67,22 +67,62 @@ export const UpcomingPasses: React.FC<Props> = React.memo(({ passes, epochRef, o
   // Nothing in this component's props changes when the console's picker changes
   // the language, and every word in the panel does. See `useLocale`.
   useLocale();
-  const t = strings().scene.passes;
   const [expanded, setExpanded] = useState(false);
   const nowMs = useEpochSeconds(epochRef);
 
+  return (
+    <PassesPanel
+      passes={passes}
+      nowMs={nowMs}
+      expanded={expanded}
+      onToggle={() => setExpanded((open) => !open)}
+      onSelect={onSelect}
+      style={styles.position}
+    />
+  );
+});
+
+UpcomingPasses.displayName = "UpcomingPasses";
+
+type PanelProps = {
+  passes: readonly UpcomingPass[];
+  /** The clock the countdowns are read against, in epoch milliseconds. */
+  nowMs: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onSelect: (name: string) => void;
+  /** Where it sits: the overlay pins it to a corner, the intro lays it out. */
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * The panel as it is drawn, with nothing of its own to remember or to tick.
+ *
+ * Apart from `UpcomingPasses` for the intro, which shows it shut and open over
+ * a plan made up for the picture (`introFigures.ts`). Drawn by this code rather
+ * than copied, so the page is a picture of the panel and cannot drift from it.
+ */
+export const PassesPanel: React.FC<PanelProps> = ({
+  passes,
+  nowMs,
+  expanded,
+  onToggle,
+  onSelect,
+  style
+}) => {
+  const t = strings().scene.passes;
   const next = passes[0];
   if (!next) return null;
 
   return (
-    <View style={[panelStyles.panel, styles.position]}>
+    <View style={[panelStyles.panel, styles.panel, style]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t.open}
         aria-expanded={expanded}
         style={[styles.header, expanded && styles.headerOpen]}
         hitSlop={{ top: 8, bottom: 8, left: 10, right: 10 }}
-        onPress={() => setExpanded((open) => !open)}
+        onPress={onToggle}
       >
         {expanded ? (
           <Text style={[panelStyles.title, styles.headerTitle]}>{t.title}</Text>
@@ -133,9 +173,7 @@ export const UpcomingPasses: React.FC<Props> = React.memo(({ passes, epochRef, o
       )}
     </View>
   );
-});
-
-UpcomingPasses.displayName = "UpcomingPasses";
+};
 
 /**
  * The verdict's own weight: bright for a pass somebody could go and see, the
@@ -184,7 +222,9 @@ const styles = StyleSheet.create({
     // compass notice shares this exact corner; the overlay does not draw this
     // panel while that is up, or while a card covers the row instead.
     bottom: 12,
-    left: 12,
+    left: 12
+  },
+  panel: {
     // The padding is the header's, so the whole pill is the tap target rather
     // than a line of text with dead margin around it — as the two above it.
     padding: 0

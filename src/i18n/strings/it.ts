@@ -4,49 +4,68 @@ export const it: Strings = {
   intro: {
     what: {
       body:
-        "Punta il telefono verso il cielo. I satelliti che ti passano sopra vengono " +
-        "disegnati sull'immagine esattamente dove si trovano."
+        "Punta il telefono verso il cielo e giralo piano. I satelliti che ti passano " +
+        "sopra vengono disegnati sull'immagine dove si trovano davvero, e tolti dove c'è " +
+        "di mezzo un palazzo o un albero."
     },
-    holding: {
-      title: "Tienilo alzato, gira piano",
+    marks: {
+      title: "Cosa dicono i segni",
       body:
-        "Ogni segno è un oggetto: il colore dice a cosa serve il satellite, la " +
-        "dimensione quanto è lontano. Quello che finisce dietro un palazzo o un albero " +
-        "viene tolto, non disegnato sopra. I pochi per cui vale la pena uscire portano " +
-        "anche la linea che stanno per percorrere: una punta di freccia per ogni " +
-        "minuto, e l'ora in cui sorgono se non sono ancora sorti."
+        "Ogni segno è un satellite, disegnato dove si trova adesso. Toccane uno per " +
+        "sapere cos'è.",
+      moving: {
+        name: "In movimento",
+        meaning: "La scia è la strada appena fatta. Più è vicino, più il segno è grande."
+      },
+      parked: {
+        name: "Fermo",
+        meaning: "Un anello non si muove mai: resta fermo sopra l'equatore."
+      },
+      shadow: {
+        name: "Sbiadito",
+        meaning: "Nell'ombra della Terra, quindi lì non c'è niente da vedere."
+      },
+      landmark: {
+        name: "Da non perdere",
+        meaning: "Le stazioni spaziali e i grandi telescopi: con un alone e il nome."
+      },
+      colors: "Il colore dice a cosa serve:"
     },
-    screen: {
-      title: "Cosa c'è sullo schermo",
-      body: "Attorno al cielo ci sono cinque cose. Queste tre dicono cosa c'è lassù.",
+    paths: {
+      title: "Dove e quando guardare",
+      body:
+        "I pochi per cui vale la pena uscire portano la linea che seguiranno nel cielo, " +
+        "anche prima di sorgere.",
+      minutes: "Una punta di freccia per ogni minuto, nel verso in cui va.",
+      time: "Il nome, e l'ora in cui sarà in quel punto.",
+      follow:
+        "Disegnata anche sopra i tetti e oltre il bordo dello schermo: seguila fino a " +
+        "dove sorge.",
+      footnote: "Tocca il nome per sapere tutto."
+    },
+    passes: {
+      title: "Cosa sta per passare",
+      body:
+        "Quasi sempre sono sotto l'orizzonte, così l'angolo in basso a sinistra tiene " +
+        "d'occhio i prossimi in arrivo.",
+      shut: "Il prossimo sopra di te, e quanto manca al suo sorgere.",
+      open:
+        "Toccalo per le prossime tre ore: da dove sorge ciascuno, quanto sale e se si " +
+        "potrà vedere. Tocca un passaggio per i dettagli.",
+      footnote: "Se nelle prossime tre ore non passa niente, quell'angolo resta vuoto."
+    },
+    corners: {
+      title: "E negli angoli",
+      body: "Attorno al cielo ci sono altre tre cose.",
       count: {
         where: "In alto a sinistra",
         meaning:
-          "Quanti satelliti sono disegnati in questo momento — non quanti ne esistono. " +
-          "Quelli sotto l'orizzonte, o dietro un edificio, non contano. Toccalo per " +
-          "vedere quali sono."
+          "Quanti satelliti sono disegnati adesso, non quanti ne esistono. Toccalo per " +
+          "vedere quali sono e quanti sono illuminati dal sole."
       },
-      passes: {
-        where: "In basso a sinistra",
-        meaning:
-          "Il prossimo oggetto di riferimento in arrivo sopra di te, e quanto manca al suo " +
-          "sorgere. Toccalo per gli altri e per sapere dove metterti."
-      },
-      marker: {
-        where: "Sul cielo",
-        meaning:
-          "Tocca un segno qualsiasi: cos'è l'oggetto, chi lo gestisce, quanto è lontano " +
-          "e dove cercarlo."
-      }
-    },
-    controls: {
-      title: "E altre due",
-      body: "Una decide cosa viene disegnato. L'altra serve quando qualcosa non torna.",
       filter: {
         where: "In alto a destra",
-        meaning:
-          "Quali tipi disegnare, e la legenda dei colori — compreso l'anello che segna " +
-          "un oggetto fermo sopra l'equatore."
+        meaning: "Quali tipi disegnare, Starlink compreso, e la legenda dei colori."
       },
       console: {
         where: "In basso a destra",
