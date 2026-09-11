@@ -1,15 +1,17 @@
 import { strings } from "../i18n";
 import type { IntroAccessStrings, IntroElementStrings, IntroKeyStrings } from "../i18n/types";
 import { CONSOLE_LABEL } from "../components/consoleLabel";
+import { GUIDE_LABEL } from "../components/guideLabel";
 import { SATELLITE_CATEGORIES, SatelliteCategory } from "../satellite/categories";
 import type { MarkSample } from "./introFigures";
 
 /**
- * What the app says to someone opening it for the first time, and nothing more.
+ * What the app says to someone opening it for the first time — and, the pages
+ * of it about the screen, to anyone who asks again.
  *
  * Six pages: what it does, what a mark on the sky means, the lines the
- * landmarks carry, what is coming over, the three corners, and what it is about
- * to ask the operating system for.
+ * landmarks carry, what is coming over, the corners, and what it is about to
+ * ask the operating system for.
  *
  * That last one is the reason this screen exists at all. Boot asks for the
  * camera and then for a fix within a second of the app opening (`bootTasks`,
@@ -43,10 +45,28 @@ import type { MarkSample } from "./introFigures";
  * trade for a panel someone has been told about once, and the wrong one for a
  * panel nobody has, so each is said once here, beside a copy of its badge.
  *
+ * **The middle pages are also the guide.** What a mark means, what a line
+ * means, what the bottom-left panel says and what is in the corners are as true
+ * on the hundredth launch as on the first — and more likely to be wanted on the
+ * hundredth, which is the evening somebody has forgotten what a ring is. So the
+ * `?` in the sky view opens those pages again (`GuideToggle`), and only those:
+ * the first page welcomes somebody to an app that is already open, and the last
+ * explains prompts that have already been answered, under a button that would
+ * now be asking for nothing. Each page says whether it is one of them (`guide`)
+ * rather than the guide working it out from what the pages happen to carry, so
+ * a page added later is put in it, or kept out of it, on purpose.
+ *
  * The words are in `src/i18n`, per language; the structure — which pages, in
  * what order, with which pictures and badges — is here, so that it cannot
  * drift between twelve translations. The pager only has to lay it out.
  */
+
+/**
+ * Which telling of the pages: the first launch, every page and ending on the
+ * permissions, or the guide the sky view's `?` opens — only the pages about the
+ * screen, ending on the way back to it.
+ */
+export type IntroMode = "intro" | "guide";
 
 /** One thing the operating system will ask about, and why the app needs it. */
 export type IntroAccess = IntroAccessStrings;
@@ -76,6 +96,13 @@ export type IntroPage = {
    * `wordmark`). Only the first page says the app's name at all.
    */
   wordmark?: boolean;
+  /**
+   * Read again from the sky view's `?`, as well as on the first launch.
+   *
+   * The pages about reading the screen are; the pages about starting the app —
+   * the welcome and the permissions — are not. See `introPages("guide")`.
+   */
+  guide?: boolean;
   /** The marks page: each kind of mark, drawn as the sky draws it. */
   marks?: readonly IntroMark[];
   /** And under them, what the colours are for, in the filter's own words. */
@@ -100,11 +127,11 @@ export type IntroPage = {
  */
 const SAMPLE_MARKER_COUNT = "12";
 
-export function introPages(): readonly IntroPage[] {
+export function introPages(mode: IntroMode = "intro"): readonly IntroPage[] {
   const t = strings();
   const intro = t.intro;
 
-  return [
+  const pages: IntroPage[] = [
     {
       wordmark: true,
       body: intro.what.body
@@ -112,6 +139,7 @@ export function introPages(): readonly IntroPage[] {
     {
       title: intro.marks.title,
       body: intro.marks.body,
+      guide: true,
       // Shape before strength before the one tier that is named: what every
       // mark says, then what some of them say, then the few worth going out for.
       marks: [
@@ -133,23 +161,29 @@ export function introPages(): readonly IntroPage[] {
     {
       title: intro.paths.title,
       body: intro.paths.body,
+      guide: true,
       path: { callouts: [intro.paths.minutes, intro.paths.time, intro.paths.follow] },
       footnote: intro.paths.footnote
     },
     {
       title: intro.passes.title,
       body: intro.passes.body,
+      guide: true,
       passes: { callouts: [intro.passes.shut, intro.passes.open] },
       footnote: intro.passes.footnote
     },
     {
       title: intro.corners.title,
       body: intro.corners.body,
+      guide: true,
       // Clockwise from the top left, which is the order the eye goes round the
-      // screen in; the bottom left is the passes panel, on the page before.
+      // screen in; the bottom left is the passes panel, on the page before. The
+      // `?` comes before the console because it sits on top of it.
       elements: [
         { badge: SAMPLE_MARKER_COUNT, ...intro.corners.count },
         { badge: t.filter.title, ...intro.corners.filter },
+        // Not translated either, and not a word: see `GUIDE_LABEL`.
+        { badge: GUIDE_LABEL, ...intro.corners.guide },
         // Not translated, and said so on the row itself: the console is the
         // one panel that stays in English. See `CONSOLE_LABEL`.
         { badge: CONSOLE_LABEL, ...intro.corners.console }
@@ -162,10 +196,16 @@ export function introPages(): readonly IntroPage[] {
       footnote: intro.access.footnote
     }
   ];
+
+  return mode === "guide" ? pages.filter((page) => page.guide) : pages;
 }
 
-/** The button under the pager: the last page is the one that starts the app. */
-export function introButtonLabel(page: number): string {
-  const t = strings().intro;
-  return page === introPages().length - 1 ? t.allowAccess : t.next;
+/**
+ * The button under the pager: the last page is the one that starts the app — or,
+ * in the guide, the one that goes back to it.
+ */
+export function introButtonLabel(page: number, mode: IntroMode = "intro"): string {
+  const t = strings();
+  if (page !== introPages(mode).length - 1) return t.intro.next;
+  return mode === "guide" ? t.guide.done : t.intro.allowAccess;
 }

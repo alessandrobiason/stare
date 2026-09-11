@@ -8,7 +8,8 @@ on the picture where they actually are — positioned by GPS, aimed by the phone
 motion sensors, and hidden behind whatever buildings and trees are in the way.
 
 The view opens in **normal** mode: the camera picture, the markers, a marker
-count, a collapsed category filter and the next landmark due over you. **A marker is the app's own logo**: the
+count, a collapsed category filter, the next landmark due over you and a `?` that
+brings back the intro's pages about the screen. **A marker is the app's own logo**: the
 body and tapered trail of `assets/icon.svg`, a couple of dozen pixels across,
 the same shape the boot screen turns five of — both drawn by `tools/make-logo.mjs`
 from the geometry in `src/components/bootSky.ts`. It carries five channels at once —
@@ -140,9 +141,9 @@ opening — two system prompts, back to back, over a screen that has explained
 nothing, each of them fatal to the view if refused. So a device that has not seen
 the app before opens on six pages instead: what it does; what a mark means, each
 kind beside a drawing of it; the line a landmark carries across the sky; what is
-coming over; the three corners, each named beside a copy of the badge it wears,
-since a bare `12` in the corner of a photograph says nothing about what it
-counts; and what it is about to ask for and why. The pictures are drawn by the
+coming over; the three corners and the controls in them, each named beside a copy
+of the badge it wears, since a bare `12` in the corner of a photograph says
+nothing about what it counts; and what it is about to ask for and why. The pictures are drawn by the
 app rather than of it — the sky's own renderer over a made-up frame, and the
 passes panel's own code over a made-up plan (`src/onboarding/introFigures.ts`) —
 so the key cannot drift from what it keys, and the suite measures every page
@@ -155,6 +156,25 @@ Nothing boots until the last page is accepted, which is why `src/App.tsx` mounts
 the app proper only then. A flag in the document directory keeps it to
 that one launch, alongside the catalog cache and through the same storage
 (`src/data/persistentStore.ts`); the launch after it opens straight on the name.
+
+**Four of those pages are read again** (`src/components/GuideToggle.tsx`). What a
+mark means, what a line means, what the bottom-left panel says and what is in the
+corners are as true on the hundredth launch as on the first, and more likely to be
+wanted on the hundredth — the evening somebody has forgotten what a ring is. So a
+`?` above the console toggle opens those four over the running view, dimmed
+rather than replaced. Its panels are put away while it is up, so the only controls
+on screen are the guide's; the camera, the fusion and the mask carry on underneath,
+and closing it lands on a sky that is still aimed. Nothing of the first launch comes
+with them — no welcome, no permissions page, and the last button says BACK TO THE
+SKY where the intro's says ALLOW ACCESS. It is the intro screen in a second mode
+rather than a second screen, so the guide cannot drift from the pages it repeats,
+and which pages those are is marked on each of them (`src/onboarding/introPages.ts`).
+Bottom right, because that corner already holds the one control about the app
+rather than the sky, and above the toggle is the spot the panels leave alone: the
+count and the filter open downwards, the passes panel and the compass notice keep
+to the left, and the only things that ever open over it — the satellite card and
+the console's own panel — are something being read already, so the `?` steps
+aside while either is up.
 
 **Where you are pointing** (`src/fusion/`). The device's Euler angles and the
 magnetic bearing to north are fused in a per-axis Kalman filter whose process

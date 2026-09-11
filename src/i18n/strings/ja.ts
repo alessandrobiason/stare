@@ -43,7 +43,7 @@ export const ja: Strings = {
     },
     corners: {
       title: "画面のすみ",
-      body: "ほかにタップできるものが3つあります。",
+      body: "ほかにタップできるものが4つあります。",
       count: {
         where: "左上",
         meaning: "画面に映っている衛星の数です。タップするとどの衛星かわかります。"
@@ -51,6 +51,10 @@ export const ja: Strings = {
       filter: {
         where: "右上",
         meaning: "表示する衛星の種類をここで選べます。"
+      },
+      guide: {
+        where: "右下",
+        meaning: "これらのページを、いつでももう一度見られます。"
       },
       console: {
         where: "右下",
@@ -72,6 +76,11 @@ export const ja: Strings = {
     },
     next: "次へ",
     allowAccess: "アクセスを許可"
+  },
+  guide: {
+    open: "ヘルプ",
+    close: "ヘルプを閉じる",
+    done: "空に戻る"
   },
   scene: {
     visibleSatellites: "見えている衛星 {count} 個",

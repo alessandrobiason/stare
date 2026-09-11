@@ -43,7 +43,7 @@ export const zh: Strings = {
     },
     corners: {
       title: "屏幕边角",
-      body: "还有三个可以点的地方。",
+      body: "还有四个可以点的地方。",
       count: {
         where: "左上角",
         meaning: "屏幕上现在有多少颗卫星。点一下可查看是哪些。"
@@ -51,6 +51,10 @@ export const zh: Strings = {
       filter: {
         where: "右上角",
         meaning: "在这里选择要显示哪些类型的卫星。"
+      },
+      guide: {
+        where: "右下角",
+        meaning: "需要时，随时可以再打开这几页说明。"
       },
       console: {
         where: "右下角",
@@ -72,6 +76,11 @@ export const zh: Strings = {
     },
     next: "下一步",
     allowAccess: "允许访问"
+  },
+  guide: {
+    open: "帮助",
+    close: "关闭帮助",
+    done: "回到天空"
   },
   scene: {
     visibleSatellites: "可见卫星 {count} 颗",

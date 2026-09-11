@@ -4,6 +4,7 @@ import { statusSection } from "../../src/debug/sections";
 import { useDeviceOrientation } from "../../src/hooks/useDeviceOrientation";
 import { useSceneControls } from "../../src/hooks/useSceneControls";
 import { AttitudeSource } from "../../src/hooks/useSmoothedOrientation";
+import { IntroScreen } from "../../src/components/IntroScreen";
 import { SafeAreaLayer } from "../../src/components/SafeAreaLayer";
 import { SceneStatus } from "../../src/components/SceneStatus";
 import { SceneFrame, SkyOverlay } from "../../src/components/SkyOverlay";
@@ -128,6 +129,8 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onMaskStatusChange={setMaskStatus}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
+        guide={controls.guide}
+        onOpenGuide={controls.openGuide}
         warned={boot.warnings.length > 0}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
@@ -163,13 +166,17 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
       {/* The same layer the app puts its panels in, so the harness is the app's
           layout as well as its view. A browser window has no notch, so what
           it insets here is nothing at all. See `SafeAreaLayer`. */}
-      <SafeAreaLayer>
+      <SafeAreaLayer hidden={controls.guide}>
         <SceneStatus sky={controls.sky} />
 
         {/* After the overlay, so the transport is over the tap target the scene
             lays across the picture rather than under it. */}
         <ReplayControls videoRef={videoRef} />
       </SafeAreaLayer>
+
+      {/* Last, as on the phone: over the transport and every panel, with the
+          recording still playing underneath. */}
+      {controls.guide && <IntroScreen mode="guide" onDone={controls.closeGuide} />}
     </View>
   );
 };

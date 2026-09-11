@@ -16,6 +16,8 @@ const BOOTED = '[aria-label$="visible satellites"]';
 const CONSOLE_TOGGLE = '[aria-label="CONSOLE"]';
 const PASSES = '[aria-label="Upcoming passes"]';
 const CARD = '[aria-label="Satellite details"]';
+const GUIDE_TOGGLE = '[aria-label="Help"]';
+const GUIDE_CLOSE = '[aria-label="Close help"]';
 
 test.describe("replay overlay", () => {
   test("boots into the scene without React refusing an update cascade", async ({ page }) => {
@@ -201,5 +203,43 @@ test.describe("what is coming", () => {
     // And the panel gives way to it: they share the bottom of the screen, and
     // the card is the answer to the row that was tapped.
     await expect(page.locator(PASSES)).toHaveCount(0);
+  });
+});
+
+test.describe("the guide", () => {
+  /**
+   * The wiring no unit test can reach. A static render cannot press the `?`,
+   * and what matters about the guide is what pressing it does to the view
+   * underneath — which is nothing: it opens over a scene that keeps running,
+   * and closes back onto that same scene rather than onto a fresh boot.
+   */
+  test("opens the pages about the screen over the view, and closes back onto it", async ({
+    page
+  }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+
+    await page.locator(GUIDE_TOGGLE).click();
+    // The first of the pages about the screen, and nothing about starting the
+    // app: no button asking for access that was granted long ago.
+    await expect(page.getByText("What you'll see").first()).toBeVisible();
+    await expect(page.getByText("ALLOW ACCESS")).toHaveCount(0);
+
+    await page.locator(GUIDE_CLOSE).click();
+    await expect(page.getByText("What you'll see")).toHaveCount(0);
+    // The same scene, still up.
+    await expect(page.locator(BOOTED).first()).toBeVisible();
+    await expect(page.locator(GUIDE_TOGGLE)).toBeVisible();
+  });
+
+  test("steps aside while the console's panel is open over its spot", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+
+    await expect(page.locator(GUIDE_TOGGLE)).toBeVisible();
+    await page.locator(CONSOLE_TOGGLE).click();
+    await expect(page.locator(GUIDE_TOGGLE)).toHaveCount(0);
+    await page.locator(CONSOLE_TOGGLE).click();
+    await expect(page.locator(GUIDE_TOGGLE)).toBeVisible();
   });
 });

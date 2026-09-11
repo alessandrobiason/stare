@@ -1,6 +1,8 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PassesPicture } from "../src/components/IntroFigures";
+import { IntroScreen } from "../src/components/IntroScreen";
 import { buildMarkerScene } from "../src/components/markerScene";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { PersistentStore } from "../src/data/persistentStore";
@@ -284,7 +286,7 @@ test("and in the reader's language, since it is the panel's own words", () => {
   expect(text).toContain("ALS NÄCHSTES");
 });
 
-test("the corners page keys the three panels the pictures do not show", () => {
+test("the corners page keys the controls the pictures do not show", () => {
   // A bare number in the corner of a camera view says nothing about what it
   // counts. Each badge is the one the real screen wears, in the language being
   // read — the filter's own title — or the page is a description of a panel
@@ -296,6 +298,9 @@ test("the corners page keys the three panels the pictures do not show", () => {
     expect(elements.map((element) => element.badge)).toEqual([
       "12",
       strings().filter.title,
+      // The guide's own button: a glyph in a corner only explains itself to
+      // somebody who has been told once what is behind it.
+      "?",
       "CONSOLE"
     ]);
     for (const element of elements) {
@@ -316,6 +321,70 @@ test("the button says what it does: the last page is the one that starts the app
     const last = introPages().length - 1;
     expect(introButtonLabel(last)).not.toBe(introButtonLabel(0));
   }
+});
+
+describe("the guide the `?` in the sky view opens", () => {
+  test("is the intro's pages about the screen, in the intro's order", () => {
+    // What a mark means, what a line means, what the bottom-left panel says and
+    // what is in the corners: as true on the hundredth launch as on the first.
+    // The same pages rather than a retelling, so the two cannot drift apart.
+    for (const locale of LOCALES) {
+      setLocaleForTesting(locale);
+      expect(introPages("guide")).toEqual(introPages().slice(1, 5));
+    }
+  });
+
+  test("and nothing about starting the app", () => {
+    // The welcome is to an app that is already open, and the permissions page
+    // explains prompts that have already been answered.
+    const guide = introPages("guide");
+
+    expect(guide.some((page) => page.wordmark)).toBe(false);
+    expect(guide.some((page) => page.access)).toBe(false);
+  });
+
+  test("ends by going back to the sky, never by asking for access", () => {
+    expect(introButtonLabel(0, "guide")).toBe("NEXT");
+    expect(introButtonLabel(introPages("guide").length - 1, "guide")).toBe("BACK TO THE SKY");
+
+    for (const locale of LOCALES) {
+      setLocaleForTesting(locale);
+      const last = introPages("guide").length - 1;
+      expect(introButtonLabel(last, "guide")).toBe(strings().guide.done);
+      expect(introButtonLabel(last, "guide")).not.toBe(strings().intro.allowAccess);
+      expect(introButtonLabel(last, "guide")).not.toBe(strings().intro.next);
+    }
+  });
+
+  test("has a way out in the corner where the intro keeps its languages", () => {
+    // The guide can be left from any page, and the language is the console's
+    // to change by the time anyone opens it.
+    const screen = (mode: "intro" | "guide") =>
+      renderToStaticMarkup(
+        React.createElement(
+          SafeAreaProvider,
+          {
+            initialMetrics: {
+              insets: { top: 0, left: 0, right: 0, bottom: 0 },
+              frame: { x: 0, y: 0, width: 390, height: 844 }
+            }
+          },
+          React.createElement(IntroScreen, { mode, onDone: () => undefined })
+        )
+      );
+
+    setLocaleForTesting("en");
+    const guide = screen("guide");
+    expect(guide).toContain('aria-label="Close help"');
+    expect(guide).not.toContain('aria-label="Language: English"');
+    // And it says it is over something, so a screen reader leaves the view
+    // behind it alone.
+    expect(guide).toContain('aria-modal="true"');
+
+    const intro = screen("intro");
+    expect(intro).toContain('aria-label="Language: English"');
+    expect(intro).not.toContain('aria-label="Close help"');
+  });
 });
 
 test("the intro is shown once, and not again after the app is closed", () => {

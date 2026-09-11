@@ -55,7 +55,7 @@ export const en: Strings = {
     },
     corners: {
       title: "Around the edges",
-      body: "Three more things you can tap.",
+      body: "Four more things you can tap.",
       count: {
         where: "Top left",
         meaning: "How many satellites are on screen. Tap to see which ones."
@@ -63,6 +63,10 @@ export const en: Strings = {
       filter: {
         where: "Top right",
         meaning: "Choose which kinds of satellite to show."
+      },
+      guide: {
+        where: "Bottom right",
+        meaning: "Shows these pages again, whenever you need them."
       },
       console: {
         where: "Bottom right",
@@ -84,6 +88,11 @@ export const en: Strings = {
     },
     next: "NEXT",
     allowAccess: "ALLOW ACCESS"
+  },
+  guide: {
+    open: "Help",
+    close: "Close help",
+    done: "BACK TO THE SKY"
   },
   scene: {
     visibleSatellites: "{count} visible satellites",

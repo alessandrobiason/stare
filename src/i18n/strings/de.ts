@@ -47,7 +47,7 @@ export const de: Strings = {
     },
     corners: {
       title: "In den Ecken",
-      body: "Drei weitere Dinge zum Antippen.",
+      body: "Vier weitere Dinge zum Antippen.",
       count: {
         where: "Oben links",
         meaning: "Wie viele Satelliten gerade zu sehen sind. Tippe, um zu sehen, welche."
@@ -55,6 +55,10 @@ export const de: Strings = {
       filter: {
         where: "Oben rechts",
         meaning: "Wähle, welche Arten von Satelliten angezeigt werden."
+      },
+      guide: {
+        where: "Unten rechts",
+        meaning: "Zeigt diese Seiten wieder, wann immer du sie brauchst."
       },
       console: {
         where: "Unten rechts",
@@ -76,6 +80,11 @@ export const de: Strings = {
     },
     next: "WEITER",
     allowAccess: "ZUGRIFF ERLAUBEN"
+  },
+  guide: {
+    open: "Hilfe",
+    close: "Hilfe schließen",
+    done: "ZURÜCK ZUM HIMMEL"
   },
   scene: {
     visibleSatellites: "{count} sichtbare Satelliten",

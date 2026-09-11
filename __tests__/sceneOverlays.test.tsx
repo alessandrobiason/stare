@@ -3,10 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
 import { DebugToggle } from "../src/components/DebugToggle";
+import { GuideToggle } from "../src/components/GuideToggle";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SceneStatus } from "../src/components/SceneStatus";
 import { UpcomingPasses } from "../src/components/UpcomingPasses";
+import { setLocaleForTesting } from "../src/i18n";
 import { UpcomingPass } from "../src/satellite/upcomingPasses";
 import {
   clearLandmarkPhotosForTesting,
@@ -135,6 +137,28 @@ describe("the console toggle", () => {
     expect(warned).not.toBe(
       renderToStaticMarkup(<DebugToggle on={false} onToggle={() => undefined} />)
     );
+  });
+});
+
+describe("the guide button", () => {
+  afterEach(() => setLocaleForTesting(undefined));
+
+  const guide = <GuideToggle onOpen={() => undefined} />;
+
+  test("is a question mark, and nothing more over the sky", () => {
+    // One glyph in every language: a word in that corner would be a second
+    // pill of writing stacked on the console's.
+    expect(textOf(guide)).toBe("?");
+    setLocaleForTesting("ja");
+    expect(textOf(guide)).toBe("?");
+  });
+
+  test("says what it opens to anyone not seeing it, in their language", () => {
+    // A question mark read aloud says nothing about what is behind it, so the
+    // label is the button's only name for a screen reader.
+    expect(renderToStaticMarkup(guide)).toContain('aria-label="Help"');
+    setLocaleForTesting("it");
+    expect(renderToStaticMarkup(guide)).toContain('aria-label="Aiuto"');
   });
 });
 

@@ -15,6 +15,24 @@ import type { SatelliteCategory } from "../satellite/categories";
  */
 export type Strings = {
   intro: IntroStrings;
+  /**
+   * The intro's pages about the screen, read again from the `?` in the corner of
+   * the sky view (`GuideToggle`).
+   *
+   * The pages say what they said the first time, in `intro`'s own words: the
+   * guide is those pages, not a second telling of them that could come to
+   * disagree. These are only the three things it has that the intro does not —
+   * the button that opens it, a way out from any page, and a last button that
+   * goes back to the sky rather than asking for anything.
+   */
+  guide: {
+    /** The `?`, for a screen reader: a question mark read aloud says nothing about what it opens. */
+    open: string;
+    /** The corner control that closes the guide from whichever page it is on. */
+    close: string;
+    /** The last page's button, in place of `intro.allowAccess`. */
+    done: string;
+  };
   scene: {
     /** What the marker count says to a screen reader. `{count}`. */
     visibleSatellites: string;
@@ -322,16 +340,21 @@ export type IntroStrings = {
     footnote: string;
   };
   /**
-   * The fifth: the three corners left, each beside a copy of the badge it
-   * wears — a bare number in the corner of a camera view says nothing about
-   * what it counts — with `where` naming the corner, since that is how someone
-   * finds it again afterwards.
+   * The fifth: the three corners left and the controls in them, each beside a
+   * copy of the badge it wears — a bare number in the corner of a camera view
+   * says nothing about what it counts — with `where` naming the corner, since
+   * that is how someone finds it again afterwards.
    */
   corners: {
     title: string;
     body: string;
     count: IntroElementStrings;
     filter: IntroElementStrings;
+    /**
+     * The `?` above the console, which brings these pages back. Its `where` is
+     * the console's, since that is the corner the two share.
+     */
+    guide: IntroElementStrings;
     console: IntroElementStrings;
   };
   /** The last: what the phone is about to ask the operating system for. */

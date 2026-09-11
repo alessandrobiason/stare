@@ -10,7 +10,8 @@ import {
   View
 } from "react-native";
 import { useLocale } from "../hooks/useLocale";
-import { introButtonLabel, introPages } from "../onboarding/introPages";
+import { strings } from "../i18n";
+import { IntroMode, introButtonLabel, introPages } from "../onboarding/introPages";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { CalloutList, ColorKey, MarkTile, PassesPicture, PathPicture } from "./IntroFigures";
@@ -20,12 +21,22 @@ import { SafeAreaLayer } from "./SafeAreaLayer";
 import { theme } from "./theme";
 
 type Props = {
-  /** Called once the last page is accepted. Boot starts on the other side. */
+  /**
+   * Called once the last page is accepted. On the first launch, boot starts on
+   * the other side; in the guide it is the way back to the sky, from the last
+   * page's button or from the corner.
+   */
   onDone: () => void;
+  /**
+   * Which telling of the pages this is: the first launch unless said otherwise,
+   * or the guide the sky view's `?` opens over itself. See `IntroMode`.
+   */
+  mode?: IntroMode;
 };
 
 /**
- * The screen the app opens on the very first time, and never again.
+ * The screen the app opens on the very first time — and the part of it worth
+ * reading again, whenever somebody asks for it.
  *
  * Six pages over the same turning sky the boot screen shows, so the intro and
  * the launch after it are one continuous thing rather than two designs. What is
@@ -44,8 +55,19 @@ type Props = {
  * The corner holds the language picker, and this is the screen that most needs
  * one: everything here is to be read, and a phone whose language is not its
  * reader's makes every page useless at once. See `LanguagePicker`.
+ *
+ * **As the guide** (`mode="guide"`, opened by `GuideToggle`) it is the four
+ * pages about reading the screen, laid over the sky view rather than put in its
+ * place. The view goes on running underneath, dimmed instead of hidden behind
+ * the boot sky: what the pages explain is the screen behind them, and closing
+ * them should land on a sky that is still aimed rather than one that has to
+ * settle again. Nothing about the first launch comes with them — no welcome, no
+ * permissions, and a last button that goes back to the sky instead of asking
+ * for anything. The corner is a way out from any page rather than the languages,
+ * which are the console's to change once the intro is behind the phone.
  */
-export const IntroScreen: React.FC<Props> = ({ onDone }) => {
+export const IntroScreen: React.FC<Props> = ({ onDone, mode = "intro" }) => {
+  const guide = mode === "guide";
   const [frame, setFrame] = useState<FrameSize | null>(null);
   /**
    * The safe area inside that frame, which is what the pages are laid out in.
@@ -64,7 +86,7 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   // corner picker changes it. This screen renders on a swipe, so reading the
   // pages again costs nothing worth memoising.
   useLocale();
-  const pages = introPages();
+  const pages = introPages(mode);
 
   const measure = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -107,8 +129,16 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   }, [safeBox, onDone, page, pages]);
 
   return (
-    <View style={styles.root} onLayout={measure}>
-      <BootSky frame={frame} turning />
+    <View
+      style={[styles.root, guide && styles.guideRoot]}
+      // Over a view that is still there, so a screen reader is told to leave
+      // what is behind it alone. The first launch has nothing behind it.
+      aria-modal={guide}
+      onLayout={measure}
+    >
+      {/* The first launch's own sky. The guide's is the sky view itself, still
+          running under it. */}
+      {!guide && <BootSky frame={frame} turning />}
 
       {pages[page]?.wordmark && (
         <View style={styles.wordmarkLayer} pointerEvents="none">
@@ -186,7 +216,7 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
                       ) : null}
 
                       {content.elements?.map((element) => (
-                        <View key={element.where} style={styles.element}>
+                        <View key={element.badge} style={styles.element}>
                           {/* The badge as the real screen wears it, so the row
                               is a key to the panel rather than a description of
                               it. Fixed width, so rows of very different badges
@@ -233,15 +263,29 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
                   style={styles.button}
                   onPress={advance}
                 >
-                  <Text style={styles.buttonLabel}>{introButtonLabel(page)}</Text>
+                  <Text style={styles.buttonLabel}>{introButtonLabel(page, mode)}</Text>
                 </Pressable>
               </View>
             </>
           ) : null}
         </View>
 
-        {/* Last, so the list it opens is over the pages and the footer both. */}
-        <LanguagePicker />
+        {/* Last, so the list it opens is over the pages and the footer both.
+            The guide has no list to open: its corner is the way back to the
+            sky, from whichever page it is on. */}
+        {guide ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={strings().guide.close}
+            hitSlop={6}
+            style={styles.close}
+            onPress={onDone}
+          >
+            <Text style={styles.closeLabel}>✕</Text>
+          </Pressable>
+        ) : (
+          <LanguagePicker />
+        )}
       </SafeAreaLayer>
     </View>
   );
@@ -254,6 +298,19 @@ const styles = StyleSheet.create({
     // the same night rather than a flash of a different one.
     backgroundColor: BOOT_SKY_BACKGROUND,
     overflow: "hidden"
+  },
+  /**
+   * The guide, over a sky view that already fills the screen: laid on top of it
+   * rather than in the flow, and the view under it dimmed rather than hidden.
+   *
+   * The dim is the night the card is cut from, heavy enough that the dots and
+   * the button under the pager still read over a daylight sky, and light enough
+   * that the view is visibly still there. These are pages about that screen,
+   * and a glance past the card at the real marks is worth keeping.
+   */
+  guideRoot: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(4, 13, 26, 0.82)"
   },
   // Everything read or tapped, inside the safe area: the pages, the footer,
   // and the box the pager measures a page against.
@@ -430,6 +487,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5
+  },
+  // The language picker's pill, in the language picker's corner, holding a way
+  // out instead: the guide is recognisably the screen the intro was.
+  close: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.color.divider,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.color.panel
+  },
+  // The satellite card's own close glyph, at its size.
+  closeLabel: {
+    color: theme.color.textDim,
+    fontSize: 13,
+    fontWeight: "700"
   }
 });
 

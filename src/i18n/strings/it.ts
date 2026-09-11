@@ -45,7 +45,7 @@ export const it: Strings = {
     },
     corners: {
       title: "Negli angoli",
-      body: "Altre tre cose che puoi toccare.",
+      body: "Altre quattro cose che puoi toccare.",
       count: {
         where: "In alto a sinistra",
         meaning: "Quanti satelliti ci sono sullo schermo. Toccalo per vedere quali."
@@ -53,6 +53,10 @@ export const it: Strings = {
       filter: {
         where: "In alto a destra",
         meaning: "Scegli quali tipi di satelliti mostrare."
+      },
+      guide: {
+        where: "In basso a destra",
+        meaning: "Mostra di nuovo queste pagine, quando ti servono."
       },
       console: {
         where: "In basso a destra",
@@ -74,6 +78,11 @@ export const it: Strings = {
     },
     next: "AVANTI",
     allowAccess: "CONSENTI"
+  },
+  guide: {
+    open: "Aiuto",
+    close: "Chiudi l'aiuto",
+    done: "TORNA AL CIELO"
   },
   scene: {
     visibleSatellites: "{count} satelliti visibili",

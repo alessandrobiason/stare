@@ -36,6 +36,18 @@ export type SceneControls = {
   debug: boolean;
   toggleDebug: () => void;
   /**
+   * Whether the guide is open over the view: the intro's pages about reading
+   * the screen, brought back by the `?` above the console toggle
+   * (`GuideToggle`). Shut on open, like the console — it is something asked for.
+   *
+   * Opened and closed rather than toggled, because no one control does both:
+   * the `?` is underneath the guide while it is up, and the ways out are the
+   * guide's own corner and its last page.
+   */
+  guide: boolean;
+  openGuide: () => void;
+  closeGuide: () => void;
+  /**
    * Whether the sky mask is allowed to hide markers behind terrain. On, because
    * that is the view the app is for; the debug menu's switch is what turns it
    * off, and with it off every satellite above the elevation mask is drawn
@@ -71,9 +83,9 @@ const NO_SKY: SkySummary = {
 
 /**
  * The controls both scenes carry: which categories are drawn, how many markers
- * the last frame placed and what they are, and whether the debug overlays are
- * up. The same sky either way, so the same controls — a phone and the replay
- * behave identically.
+ * the last frame placed and what they are, whether the debug overlays are up,
+ * and whether the guide is open over all of it. The same sky either way, so the
+ * same controls — a phone and the replay behave identically.
  */
 export function useSceneControls(): SceneControls {
   const [enabledCategories, setEnabledCategories] =
@@ -81,6 +93,7 @@ export function useSceneControls(): SceneControls {
   const [starlink, setStarlink] = useState(true);
   const [sky, setSky] = useState<SkySummary>(NO_SKY);
   const [debug, setDebug] = useState(false);
+  const [guide, setGuide] = useState(false);
   const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
   const [celestialAlignment, setCelestialAlignment] = useState(true);
 
@@ -99,6 +112,8 @@ export function useSceneControls(): SceneControls {
     setStarlink(true);
   }, []);
   const toggleDebug = useCallback(() => setDebug((on) => !on), []);
+  const openGuide = useCallback(() => setGuide(true), []);
+  const closeGuide = useCallback(() => setGuide(false), []);
   const toggleSkyMaskFiltering = useCallback(() => setSkyMaskFiltering((on) => !on), []);
   const toggleCelestialAlignment = useCallback(() => setCelestialAlignment((on) => !on), []);
 
@@ -112,6 +127,9 @@ export function useSceneControls(): SceneControls {
     setSky,
     debug,
     toggleDebug,
+    guide,
+    openGuide,
+    closeGuide,
     skyMaskFiltering,
     toggleSkyMaskFiltering,
     celestialAlignment,

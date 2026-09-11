@@ -47,7 +47,7 @@ export const pt: Strings = {
     },
     corners: {
       title: "Nos cantos",
-      body: "Mais três coisas que você pode tocar.",
+      body: "Mais quatro coisas que você pode tocar.",
       count: {
         where: "Canto superior esquerdo",
         meaning: "Quantos satélites estão na tela. Toque para ver quais."
@@ -55,6 +55,10 @@ export const pt: Strings = {
       filter: {
         where: "Canto superior direito",
         meaning: "Escolha que tipos de satélite mostrar."
+      },
+      guide: {
+        where: "Canto inferior direito",
+        meaning: "Mostra estas páginas de novo sempre que você precisar."
       },
       console: {
         where: "Canto inferior direito",
@@ -76,6 +80,11 @@ export const pt: Strings = {
     },
     next: "SEGUINTE",
     allowAccess: "PERMITIR"
+  },
+  guide: {
+    open: "Ajuda",
+    close: "Fechar a ajuda",
+    done: "VOLTAR AO CÉU"
   },
   scene: {
     visibleSatellites: "{count} satélites visíveis",

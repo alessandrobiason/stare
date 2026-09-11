@@ -9,6 +9,18 @@ type Props = {
    * are arranged inside them is the caller's business.
    */
   style?: StyleProp<ViewStyle>;
+  /**
+   * Takes the layer off the screen without taking anything in it down.
+   *
+   * For while something is laid over the whole view — the guide
+   * (`IntroScreen`'s `guide` mode). The panels would otherwise show through its
+   * dimmed backdrop as a second set of controls under its own, and the guide's
+   * button drawn over the ghost of the console is a screen that reads as two.
+   * Hidden rather than unmounted, so a filter left open is still open when the
+   * guide is put away; and hidden rather than transparent, so a screen reader
+   * does not find them behind it either.
+   */
+  hidden?: boolean;
 };
 
 /**
@@ -55,10 +67,14 @@ type Props = {
  * which is the failure worth having — an app that has silently stopped
  * insetting anything looks fine until it is held in front of a notch.
  */
-export const SafeAreaLayer: React.FC<Props> = ({ children, style }) => {
+export const SafeAreaLayer: React.FC<Props> = ({ children, style, hidden = false }) => {
   const insets = useSafeAreaInsets();
 
-  return <View style={[styles.layer, safeAreaBox(insets), style]}>{children}</View>;
+  return (
+    <View style={[styles.layer, safeAreaBox(insets), hidden && styles.hidden, style]}>
+      {children}
+    </View>
+  );
 };
 
 /**
@@ -86,6 +102,9 @@ const styles = StyleSheet.create({
     // In the style rather than as the `pointerEvents` prop, which both React
     // Native and the web have moved on from and the latter warns about.
     pointerEvents: "box-none"
+  },
+  hidden: {
+    display: "none"
   }
 });
 

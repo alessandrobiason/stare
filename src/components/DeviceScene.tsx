@@ -15,6 +15,7 @@ import { AttitudeSource } from "../hooks/useSmoothedOrientation";
 import { cameraFrameGrabber } from "../vision/cameraFrameGrabber";
 import { CameraBackground } from "./CameraBackground";
 import { CompassNotice, compassNoticeShowing } from "./CompassNotice";
+import { IntroScreen } from "./IntroScreen";
 import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SceneStatus } from "./SceneStatus";
 import { SceneFrame, SkyOverlay } from "./SkyOverlay";
@@ -180,6 +181,8 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onSkyFixChange={setSkyFixStanding}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
+        guide={controls.guide}
+        onOpenGuide={controls.openGuide}
         warned={boot.warnings.length > 0}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
@@ -213,8 +216,9 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
       {/* The scene's own two panels, inset off the notch and the home
           indicator while the camera underneath them is not. The overlay's
           panels sit in a layer of their own for the same reason, and both
-          measure from the same safe corners. See `SafeAreaLayer`. */}
-      <SafeAreaLayer>
+          measure from the same safe corners — and both are put away while the
+          guide is over them. See `SafeAreaLayer`. */}
+      <SafeAreaLayer hidden={controls.guide}>
         <SceneStatus sky={controls.sky} />
         <CompassNotice
           accuracy={compass.accuracy}
@@ -222,6 +226,11 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
           skyFixStanding={skyFixStanding}
         />
       </SafeAreaLayer>
+
+      {/* Last, so it is over every panel on the screen — the overlay's and the
+          two above — rather than between them. The view keeps running under
+          it, so closing the guide is back to a sky that never stopped. */}
+      {controls.guide && <IntroScreen mode="guide" onDone={controls.closeGuide} />}
     </View>
   );
 };

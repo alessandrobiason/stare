@@ -47,7 +47,7 @@ export const ru: Strings = {
     },
     corners: {
       title: "По углам",
-      body: "Ещё три элемента, на которые можно нажать.",
+      body: "Ещё четыре элемента, на которые можно нажать.",
       count: {
         where: "Слева вверху",
         meaning: "Сколько спутников на экране. Нажмите, чтобы увидеть какие."
@@ -55,6 +55,10 @@ export const ru: Strings = {
       filter: {
         where: "Справа вверху",
         meaning: "Выберите, какие спутники показывать."
+      },
+      guide: {
+        where: "Справа внизу",
+        meaning: "Снова открывает эти страницы, когда они понадобятся."
       },
       console: {
         where: "Справа внизу",
@@ -76,6 +80,11 @@ export const ru: Strings = {
     },
     next: "ДАЛЕЕ",
     allowAccess: "РАЗРЕШИТЬ"
+  },
+  guide: {
+    open: "Справка",
+    close: "Закрыть справку",
+    done: "ВЕРНУТЬСЯ К НЕБУ"
   },
   scene: {
     visibleSatellites: "видимых спутников: {count}",

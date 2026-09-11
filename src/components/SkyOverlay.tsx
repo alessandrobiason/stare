@@ -35,6 +35,7 @@ import { CategoryLegend } from "./CategoryLegend";
 import { strings } from "../i18n";
 import { DebugPanel } from "./DebugPanel";
 import { DebugToggle } from "./DebugToggle";
+import { GuideToggle } from "./GuideToggle";
 import {
   frameBoxFor,
   FrameFit,
@@ -141,6 +142,15 @@ type Props = {
   /** Whether the debug overlays are drawn on top of the normal view. */
   debug: boolean;
   onToggleDebug: () => void;
+  /**
+   * Whether the guide is open over the view — the intro's pages about this
+   * screen — and how to open it, from the `?` above the console toggle
+   * (`GuideToggle`). The guide itself is the scene's to draw, because it goes
+   * over the scene's own panels as well as these; what the overlay does about
+   * it is put its panels away while it is up (`SafeAreaLayer`'s `hidden`).
+   */
+  guide: boolean;
+  onOpenGuide: () => void;
   /** Whether boot reported anything degraded; tints the console toggle. */
   warned?: boolean;
   /**
@@ -226,6 +236,8 @@ export const SkyOverlay: React.FC<Props> = ({
   onSkyFixChange,
   debug,
   onToggleDebug,
+  guide,
+  onOpenGuide,
   warned = false,
   skyMaskFiltering,
   onToggleSkyMaskFiltering,
@@ -455,8 +467,9 @@ export const SkyOverlay: React.FC<Props> = ({
       {/* The panels, inset off the notch and the home indicator while the
           picture underneath them is not. Each one still places itself in a
           corner of its parent; the layer is what makes that corner the safe
-          one. See `SafeAreaLayer`. */}
-      <SafeAreaLayer>
+          one. Put away while the guide is over them, rather than left to show
+          through it. See `SafeAreaLayer`. */}
+      <SafeAreaLayer hidden={guide}>
         <CategoryLegend
           enabledCategories={enabledCategories}
           onToggleCategory={onToggleCategory}
@@ -496,6 +509,12 @@ export const SkyOverlay: React.FC<Props> = ({
             palette={palette}
           />
         )}
+
+        {/* Above the console toggle, in the corner kept for the controls about
+            the app. Not while the card or the console's panel is up: both open
+            from just above the bottom row, over this spot, and each is already
+            something being read. */}
+        {!debug && !selection && <GuideToggle onOpen={onOpenGuide} />}
 
         {debug && <DebugPanel sourceRef={debugSourceRef} onClose={onToggleDebug} />}
         <DebugToggle on={debug} onToggle={onToggleDebug} warned={warned} />

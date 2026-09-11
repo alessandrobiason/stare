@@ -47,7 +47,7 @@ export const nl: Strings = {
     },
     corners: {
       title: "In de hoeken",
-      body: "Nog drie dingen om op te tikken.",
+      body: "Nog vier dingen om op te tikken.",
       count: {
         where: "Linksboven",
         meaning: "Hoeveel satellieten er in beeld zijn. Tik om te zien welke."
@@ -55,6 +55,10 @@ export const nl: Strings = {
       filter: {
         where: "Rechtsboven",
         meaning: "Kies welke soorten satellieten je wilt zien."
+      },
+      guide: {
+        where: "Rechtsonder",
+        meaning: "Laat deze pagina's opnieuw zien wanneer je ze nodig hebt."
       },
       console: {
         where: "Rechtsonder",
@@ -76,6 +80,11 @@ export const nl: Strings = {
     },
     next: "VERDER",
     allowAccess: "TOEGANG GEVEN"
+  },
+  guide: {
+    open: "Help",
+    close: "Help sluiten",
+    done: "TERUG NAAR DE HEMEL"
   },
   scene: {
     visibleSatellites: "{count} zichtbare satellieten",

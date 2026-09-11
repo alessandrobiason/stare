@@ -245,6 +245,8 @@ describe("and says it in the space it is given", () => {
     expect(width(t.boot.tryAgain, 11, 1.5)).toBeLessThan(320);
     expect(width(t.intro.next, 11, 1.5)).toBeLessThan(320);
     expect(width(t.intro.allowAccess, 11, 1.5)).toBeLessThan(320);
+    // The guide's last button, in the same place on the same card.
+    expect(width(t.guide.done, 11, 1.5)).toBeLessThan(320);
   });
 
   test.each(LOCALES)("%s fits the language picker", (locale) => {

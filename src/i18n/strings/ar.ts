@@ -43,7 +43,7 @@ export const ar: Strings = {
     },
     corners: {
       title: "في الزوايا",
-      body: "ثلاثة عناصر أخرى يمكنك لمسها.",
+      body: "أربعة عناصر أخرى يمكنك لمسها.",
       count: {
         where: "أعلى اليسار",
         meaning: "عدد الأقمار على الشاشة. المسه لترى أيها."
@@ -51,6 +51,10 @@ export const ar: Strings = {
       filter: {
         where: "أعلى اليمين",
         meaning: "اختر أنواع الأقمار التي تريد عرضها."
+      },
+      guide: {
+        where: "أسفل اليمين",
+        meaning: "يعرض هذه الصفحات مجددًا متى احتجت إليها."
       },
       console: {
         where: "أسفل اليمين",
@@ -72,6 +76,11 @@ export const ar: Strings = {
     },
     next: "التالي",
     allowAccess: "السماح بالوصول"
+  },
+  guide: {
+    open: "مساعدة",
+    close: "إغلاق المساعدة",
+    done: "العودة إلى السماء"
   },
   scene: {
     visibleSatellites: "أقمار مرئية: {count}",

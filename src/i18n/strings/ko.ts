@@ -43,7 +43,7 @@ export const ko: Strings = {
     },
     corners: {
       title: "화면 모서리",
-      body: "누를 수 있는 것이 세 가지 더 있습니다.",
+      body: "누를 수 있는 것이 네 가지 더 있습니다.",
       count: {
         where: "왼쪽 위",
         meaning: "지금 화면에 있는 위성 수입니다. 누르면 어떤 위성인지 보여 줍니다."
@@ -51,6 +51,10 @@ export const ko: Strings = {
       filter: {
         where: "오른쪽 위",
         meaning: "표시할 위성 종류를 고를 수 있습니다."
+      },
+      guide: {
+        where: "오른쪽 아래",
+        meaning: "이 페이지들을 언제든 다시 볼 수 있습니다."
       },
       console: {
         where: "오른쪽 아래",
@@ -72,6 +76,11 @@ export const ko: Strings = {
     },
     next: "다음",
     allowAccess: "접근 허용"
+  },
+  guide: {
+    open: "도움말",
+    close: "도움말 닫기",
+    done: "하늘로 돌아가기"
   },
   scene: {
     visibleSatellites: "보이는 위성 {count}개",
