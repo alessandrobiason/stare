@@ -12,92 +12,75 @@ export const en: Strings = {
   intro: {
     what: {
       body:
-        "Point the phone at the sky and turn slowly. The satellites passing over you " +
-        "are drawn onto the picture where they really are, and left out wherever a " +
-        "building or a tree is in the way."
+        "Point your phone at the sky and move it slowly. You'll see the satellites above " +
+        "you, right where they are."
     },
     marks: {
-      title: "What the marks say",
-      body:
-        "Every mark is one satellite, drawn where it is right now. Tap one to find out " +
-        "what it is.",
+      title: "What you'll see",
+      body: "Every dot is a satellite. Tap one to find out what it is.",
       moving: {
         name: "Moving",
-        meaning: "The tail is the way it came. The nearer it is, the bigger the mark."
+        meaning: "The tail shows where it came from. The bigger the dot, the closer it is."
       },
       parked: {
-        name: "Parked",
-        meaning: "A ring never moves: it holds station over the equator."
+        name: "Ring",
+        meaning: "Stays in the same spot in the sky."
       },
       shadow: {
         name: "Faint",
-        meaning: "In the Earth's shadow, so there is nothing there to see."
+        meaning: "In the Earth's shadow, so you can't see it."
       },
       landmark: {
-        name: "Landmarks",
-        meaning: "The space stations and great telescopes: haloed, and named."
+        name: "Highlights",
+        meaning: "Space stations and big telescopes, shown with their name."
       },
-      colors: "The colour says what it is for:"
+      colors: "The colour shows what it's for:"
     },
     paths: {
-      title: "Where and when to look",
+      title: "When and where to look",
       body:
-        "The few worth going outside for carry the line they will follow across the " +
-        "sky, even before they rise.",
-      minutes: "An arrowhead for every minute, pointing the way it goes.",
-      time: "Its name, and the time it will be at that point.",
-      follow:
-        "Drawn over roofs and off the edge of the screen too: follow it to where it " +
-        "comes up.",
-      footnote: "Tap the name for everything about it."
+        "Space stations and telescopes show the path they'll take, even before they " +
+        "appear.",
+      minutes: "One arrow per minute, pointing the way it's going.",
+      time: "Its name, and the time it will be there.",
+      follow: "Follow the line to find where it will appear.",
+      footnote: "Tap the name to learn more."
     },
     passes: {
-      title: "What is coming over",
-      body:
-        "Landmarks spend most of their time below the horizon, so the bottom-left " +
-        "corner keeps track of the next ones due.",
-      shut: "The next one over you, and how long until it rises.",
-      open:
-        "Tap it for the next three hours: where each one comes up, how high it gets and " +
-        "whether you will be able to see it. Tap a pass for its details.",
-      footnote: "When nothing is due in the next three hours, that corner stays empty."
+      title: "Coming up",
+      body: "The bottom-left corner shows what will pass over you next.",
+      shut: "The next one, and how long until it appears.",
+      open: "Tap to see the next few hours: where to look, how high it gets and whether you'll see it.",
+      footnote: "If nothing is coming, the corner stays empty."
     },
     corners: {
-      title: "And in the corners",
-      body: "Three more things sit around the sky.",
+      title: "Around the edges",
+      body: "Three more things you can tap.",
       count: {
         where: "Top left",
-        meaning:
-          "How many satellites are drawn right now — not how many exist. Tap it to see " +
-          "which they are, and how many are in sunlight."
+        meaning: "How many satellites are on screen. Tap to see which ones."
       },
       filter: {
         where: "Top right",
-        meaning: "Which kinds to draw, Starlink included, and the key to the colours."
+        meaning: "Choose which kinds of satellite to show."
       },
       console: {
         where: "Bottom right",
-        meaning:
-          "The sensor readings behind the view, for when something looks wrong. In " +
-          "English only, and never needed to use the app."
+        meaning: "Technical readings, in English. You won't need them."
       }
     },
     access: {
-      title: "What it needs",
-      body: "Two things, and the phone will ask you about each of them in a moment.",
+      title: "Two permissions",
+      body: "Your phone will ask for them next.",
       camera: {
         name: "Camera",
-        reason: "The sky in front of you, and what is standing in the way of it."
+        reason: "To show the sky in front of you."
       },
       location: {
         name: "Location",
-        reason: "Which satellites are above you, and where in the sky they sit."
+        reason: "To know which satellites are above you."
       },
-      footnote:
-        "Which way the phone is pointed comes from its own motion sensors, which it " +
-        "reads without asking. Everything here is used on the phone alone: the only " +
-        "thing Stare sends or fetches is the public satellite catalogue, and where you " +
-        "are never leaves the device."
+      footnote: "Your location never leaves your phone."
     },
     next: "NEXT",
     allowAccess: "ALLOW ACCESS"
@@ -137,7 +120,7 @@ export const en: Strings = {
     ringKey: "RING = PARKED OVER THE EQUATOR",
     shadowKey: "FAINT = IN THE EARTH'S SHADOW",
     categories: {
-      LANDMARK: "LANDMARKS",
+      LANDMARK: "HIGHLIGHTS",
       NAVIGATION: "NAVIGATION",
       EARTH: "EARTH WATCH",
       COMMS: "INTERNET & TV",

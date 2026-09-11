@@ -4,91 +4,75 @@ export const de: Strings = {
   intro: {
     what: {
       body:
-        "Richte das Telefon zum Himmel und dreh es langsam. Die Satelliten über dir " +
-        "werden genau dort ins Bild gezeichnet, wo sie wirklich stehen — und " +
-        "weggelassen, wo ein Haus oder ein Baum im Weg ist."
+        "Richte dein Handy auf den Himmel und bewege es langsam. Du siehst die Satelliten " +
+        "über dir – genau dort, wo sie sind."
     },
     marks: {
-      title: "Was die Markierungen sagen",
-      body:
-        "Jede Markierung ist ein Satellit, gezeichnet, wo er gerade steht. Tippe eine " +
-        "an, um zu sehen, was es ist.",
+      title: "Was du siehst",
+      body: "Jeder Punkt ist ein Satellit. Tippe darauf, um zu sehen, was es ist.",
       moving: {
         name: "In Bewegung",
-        meaning: "Der Schweif zeigt, woher er kommt. Je näher, desto größer die Markierung."
+        meaning: "Der Schweif zeigt, woher er kommt. Je größer der Punkt, desto näher."
       },
       parked: {
-        name: "Steht still",
-        meaning: "Ein Ring bewegt sich nie: er steht über dem Äquator."
+        name: "Ring",
+        meaning: "Steht immer an derselben Stelle am Himmel."
       },
       shadow: {
         name: "Blass",
-        meaning: "Im Erdschatten, dort gibt es also nichts zu sehen."
+        meaning: "Im Erdschatten, also nicht zu sehen."
       },
       landmark: {
         name: "Highlights",
-        meaning: "Die Raumstationen und großen Teleskope: mit Schein und Namen."
+        meaning: "Raumstationen und große Teleskope, mit Namen."
       },
-      colors: "Die Farbe sagt, wofür der Satellit da ist:"
+      colors: "Die Farbe zeigt, wofür er da ist:"
     },
     paths: {
-      title: "Wo und wann hinsehen",
-      body:
-        "Die wenigen, für die man vor die Tür geht, tragen die Bahn, der sie am Himmel " +
-        "folgen werden — schon bevor sie aufgehen.",
-      minutes: "Eine Pfeilspitze je Minute, in die Richtung, in die er zieht.",
-      time: "Der Name, und die Uhrzeit, zu der er an dieser Stelle ist.",
-      follow:
-        "Auch über Dächer und über den Bildschirmrand hinaus gezeichnet: folge ihr bis " +
-        "dorthin, wo er aufgeht.",
-      footnote: "Tippe auf den Namen, um alles darüber zu erfahren."
+      title: "Wann und wohin schauen",
+      body: "Raumstationen und Teleskope zeigen ihre Bahn schon, bevor sie auftauchen.",
+      minutes: "Ein Pfeil pro Minute, in Flugrichtung.",
+      time: "Der Name und die Uhrzeit, zu der er dort ist.",
+      follow: "Folge der Linie, um zu sehen, wo er auftaucht.",
+      footnote: "Tippe auf den Namen für mehr Infos."
     },
     passes: {
-      title: "Was als Nächstes kommt",
-      body:
-        "Meist stehen sie unter dem Horizont, darum behält die Ecke unten links die " +
-        "nächsten im Blick.",
-      shut: "Der nächste über dir, und wie lange es bis zum Aufgang dauert.",
+      title: "Demnächst",
+      body: "Unten links steht, was als Nächstes über dich hinwegzieht.",
+      shut: "Der nächste Überflug und wie lange es noch dauert.",
       open:
-        "Antippen zeigt die nächsten drei Stunden: wo jeder aufgeht, wie hoch er steigt " +
-        "und ob du ihn sehen kannst. Tippe einen Überflug an für die Details.",
-      footnote: "Kommt in den nächsten drei Stunden nichts, bleibt diese Ecke leer."
+        "Tippe darauf für die nächsten Stunden: wohin du schauen musst, wie hoch er steigt " +
+        "und ob er zu sehen ist.",
+      footnote: "Kommt nichts, bleibt die Ecke leer."
     },
     corners: {
-      title: "Und in den Ecken",
-      body: "Drei weitere Dinge liegen um den Himmel herum.",
+      title: "In den Ecken",
+      body: "Drei weitere Dinge zum Antippen.",
       count: {
         where: "Oben links",
-        meaning:
-          "Wie viele Satelliten gerade gezeichnet sind — nicht, wie viele es gibt. " +
-          "Antippen zeigt, welche es sind und wie viele in der Sonne stehen."
+        meaning: "Wie viele Satelliten gerade zu sehen sind. Tippe, um zu sehen, welche."
       },
       filter: {
         where: "Oben rechts",
-        meaning: "Welche Arten gezeichnet werden, Starlink inklusive, und die Farblegende."
+        meaning: "Wähle, welche Arten von Satelliten angezeigt werden."
       },
       console: {
         where: "Unten rechts",
-        meaning:
-          "Die Sensorwerte hinter der Ansicht, falls etwas nicht stimmt. Nur auf " +
-          "Englisch, und zum Benutzen nie nötig."
+        meaning: "Technische Daten, auf Englisch. Brauchst du nicht."
       }
     },
     access: {
-      title: "Was sie braucht",
-      body: "Zwei Dinge, und das Telefon fragt gleich nach beiden.",
+      title: "Zwei Berechtigungen",
+      body: "Dein Handy fragt gleich danach.",
       camera: {
         name: "Kamera",
-        reason: "Der Himmel vor dir, und was ihm im Weg steht."
+        reason: "Um den Himmel vor dir zu zeigen."
       },
       location: {
         name: "Standort",
-        reason: "Welche Satelliten über dir sind, und wo am Himmel sie stehen."
+        reason: "Um zu wissen, welche Satelliten über dir sind."
       },
-      footnote:
-        "Wohin das Telefon zeigt, kommt aus seinen eigenen Bewegungssensoren, die es " +
-        "ohne Nachfrage ausliest. Alles bleibt auf dem Telefon: Stare lädt einzig den " +
-        "öffentlichen Satellitenkatalog, und dein Standort verlässt das Gerät nie."
+      footnote: "Dein Standort bleibt auf deinem Handy."
     },
     next: "WEITER",
     allowAccess: "ZUGRIFF ERLAUBEN"

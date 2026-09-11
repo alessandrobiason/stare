@@ -4,92 +4,75 @@ export const nl: Strings = {
   intro: {
     what: {
       body:
-        "Richt de telefoon op de hemel en draai langzaam. De satellieten die over je " +
-        "heen trekken worden in het beeld getekend waar ze echt staan, en weggelaten " +
-        "waar een gebouw of een boom in de weg staat."
+        "Richt je telefoon op de hemel en beweeg hem langzaam. Je ziet de satellieten boven " +
+        "je, precies waar ze zijn."
     },
     marks: {
-      title: "Wat de stippen zeggen",
-      body:
-        "Elke stip is één satelliet, getekend waar hij nu staat. Tik erop om te zien wat " +
-        "het is.",
+      title: "Wat je ziet",
+      body: "Elke stip is een satelliet. Tik erop om te zien wat het is.",
       moving: {
         name: "In beweging",
-        meaning: "De staart is de weg die hij kwam. Hoe dichterbij, hoe groter de stip."
+        meaning: "Het staartje laat zien waar hij vandaan komt. Hoe groter de stip, hoe dichterbij."
       },
       parked: {
-        name: "Staat stil",
-        meaning: "Een ring beweegt nooit: hij staat stil boven de evenaar."
+        name: "Ring",
+        meaning: "Staat altijd op dezelfde plek aan de hemel."
       },
       shadow: {
         name: "Vaag",
-        meaning: "In de schaduw van de aarde, dus er is niets te zien."
+        meaning: "In de schaduw van de aarde, dus niet te zien."
       },
       landmark: {
         name: "Hoogtepunten",
-        meaning: "De ruimtestations en grote telescopen: met een gloed en een naam."
+        meaning: "Ruimtestations en grote telescopen, met hun naam."
       },
-      colors: "De kleur zegt waar hij voor dient:"
+      colors: "De kleur laat zien waarvoor hij dient:"
     },
     paths: {
       title: "Waar en wanneer kijken",
-      body:
-        "De paar waarvoor je naar buiten loopt, dragen de baan die ze aan de hemel gaan " +
-        "volgen, nog voordat ze opkomen.",
-      minutes: "Een pijlpunt per minuut, in de richting waarin hij gaat.",
-      time: "Zijn naam, en de tijd waarop hij op dat punt is.",
-      follow:
-        "Ook over daken en voorbij de rand van het scherm getekend: volg hem tot waar hij " +
-        "opkomt.",
-      footnote: "Tik op de naam voor alles erover."
+      body: "Ruimtestations en telescopen tonen hun route al voordat ze verschijnen.",
+      minutes: "Eén pijl per minuut, in de richting waarin hij gaat.",
+      time: "De naam en hoe laat hij daar is.",
+      follow: "Volg de lijn om te zien waar hij verschijnt.",
+      footnote: "Tik op de naam voor meer info."
     },
     passes: {
-      title: "Wat er aankomt",
-      body:
-        "Meestal staan ze onder de horizon, dus houdt de hoek linksonder de volgende in " +
-        "de gaten.",
-      shut: "De volgende boven je, en hoe lang het nog duurt voor hij opkomt.",
+      title: "Binnenkort",
+      body: "Linksonder zie je wat er straks over je heen komt.",
+      shut: "De volgende en hoe lang het nog duurt.",
       open:
-        "Tik erop voor de komende drie uur: waar elk opkomt, hoe hoog hij komt en of je " +
-        "hem kunt zien. Tik op een passage voor de details.",
-      footnote: "Komt er de komende drie uur niets, dan blijft die hoek leeg."
+        "Tik erop voor de komende uren: waar je moet kijken, hoe hoog hij komt en of je hem " +
+        "kunt zien.",
+      footnote: "Komt er niets aan, dan blijft die hoek leeg."
     },
     corners: {
-      title: "En in de hoeken",
-      body: "Er staan nog drie dingen om de hemel heen.",
+      title: "In de hoeken",
+      body: "Nog drie dingen om op te tikken.",
       count: {
         where: "Linksboven",
-        meaning:
-          "Hoeveel satellieten er nu getekend zijn — niet hoeveel er zijn. Tik erop om te " +
-          "zien welke, en hoeveel er in de zon staan."
+        meaning: "Hoeveel satellieten er in beeld zijn. Tik om te zien welke."
       },
       filter: {
         where: "Rechtsboven",
-        meaning: "Welke soorten getekend worden, Starlink inbegrepen, en de kleurlegenda."
+        meaning: "Kies welke soorten satellieten je wilt zien."
       },
       console: {
         where: "Rechtsonder",
-        meaning:
-          "De sensormetingen achter het beeld, voor als er iets niet klopt. Alleen in " +
-          "het Engels, en nooit nodig."
+        meaning: "Technische gegevens, in het Engels. Heb je niet nodig."
       }
     },
     access: {
-      title: "Wat de app nodig heeft",
-      body: "Twee dingen, en de telefoon vraagt zo meteen om allebei.",
+      title: "Twee toestemmingen",
+      body: "Je telefoon vraagt er zo om.",
       camera: {
         name: "Camera",
-        reason: "De hemel voor je, en wat er in de weg staat."
+        reason: "Om de hemel voor je te laten zien."
       },
       location: {
         name: "Locatie",
-        reason: "Welke satellieten boven je staan, en waar aan de hemel ze zitten."
+        reason: "Om te weten welke satellieten boven je zijn."
       },
-      footnote:
-        "Waar de telefoon heen wijst komt uit zijn eigen bewegingssensoren, die hij " +
-        "zonder vragen uitleest. Alles blijft op de telefoon: het enige dat Stare " +
-        "ophaalt is de openbare satellietcatalogus, en je locatie verlaat het toestel " +
-        "nooit."
+      footnote: "Je locatie verlaat je telefoon nooit."
     },
     next: "VERDER",
     allowAccess: "TOEGANG GEVEN"

@@ -4,92 +4,75 @@ export const es: Strings = {
   intro: {
     what: {
       body:
-        "Apunta el teléfono al cielo y gira despacio. Los satélites que pasan sobre ti " +
-        "se dibujan en la imagen justo donde están, y se omiten donde un edificio o un " +
-        "árbol se interpone."
+        "Apunta el teléfono al cielo y muévelo despacio. Verás los satélites que tienes " +
+        "encima, justo donde están."
     },
     marks: {
-      title: "Qué dicen las marcas",
-      body:
-        "Cada marca es un satélite, dibujado donde está ahora mismo. Toca una para saber " +
-        "qué es.",
+      title: "Qué ves",
+      body: "Cada punto es un satélite. Tócalo para saber qué es.",
       moving: {
         name: "En movimiento",
-        meaning: "La cola es el camino que trae. Cuanto más cerca, más grande la marca."
+        meaning: "La estela indica de dónde viene. Cuanto más grande, más cerca está."
       },
       parked: {
-        name: "Fijo",
-        meaning: "Un anillo nunca se mueve: está fijo sobre el ecuador."
+        name: "Anillo",
+        meaning: "Siempre está en el mismo punto del cielo."
       },
       shadow: {
         name: "Tenue",
-        meaning: "En la sombra de la Tierra, así que ahí no hay nada que ver."
+        meaning: "Está en la sombra de la Tierra, así que no se ve."
       },
       landmark: {
-        name: "Imprescindibles",
-        meaning: "Las estaciones espaciales y los grandes telescopios: con halo y nombre."
+        name: "Destacados",
+        meaning: "Estaciones espaciales y grandes telescopios, con su nombre."
       },
-      colors: "El color dice para qué sirve:"
+      colors: "El color indica para qué sirve:"
     },
     paths: {
       title: "Dónde y cuándo mirar",
       body:
-        "Los pocos por los que merece la pena salir llevan la línea que seguirán por el " +
-        "cielo, incluso antes de salir.",
-      minutes: "Una punta de flecha por cada minuto, en el sentido en que avanza.",
-      time: "Su nombre, y la hora a la que estará en ese punto.",
-      follow:
-        "Se dibuja también sobre los tejados y más allá del borde de la pantalla: síguela " +
-        "hasta donde sale.",
-      footnote: "Toca el nombre para saberlo todo de él."
+        "Las estaciones y los telescopios muestran el recorrido que harán, incluso antes " +
+        "de aparecer.",
+      minutes: "Una flecha por minuto, en la dirección en la que va.",
+      time: "Su nombre y la hora a la que pasará por ahí.",
+      follow: "Sigue la línea para ver por dónde aparecerá.",
+      footnote: "Toca el nombre para saber más."
     },
     passes: {
-      title: "Qué está por pasar",
-      body:
-        "Casi siempre están bajo el horizonte, así que la esquina inferior izquierda " +
-        "vigila los próximos.",
-      shut: "El próximo sobre ti, y cuánto falta para que salga.",
-      open:
-        "Tócala para ver las próximas tres horas: por dónde sale cada uno, cuánto sube y " +
-        "si se podrá ver. Toca un pase para ver sus detalles.",
-      footnote: "Si no pasa nada en las próximas tres horas, esa esquina queda vacía."
+      title: "Próximos pases",
+      body: "Abajo a la izquierda verás qué pasará sobre ti.",
+      shut: "El siguiente y cuánto falta para que aparezca.",
+      open: "Tócalo para ver las próximas horas: dónde mirar, cuánto sube y si se podrá ver.",
+      footnote: "Si no viene nada, esa esquina queda vacía."
     },
     corners: {
-      title: "Y en las esquinas",
-      body: "Alrededor del cielo hay tres cosas más.",
+      title: "En las esquinas",
+      body: "Tres cosas más que puedes tocar.",
       count: {
         where: "Arriba a la izquierda",
-        meaning:
-          "Cuántos satélites se dibujan ahora mismo, no cuántos existen. Tócalo para ver " +
-          "cuáles son y cuántos están al sol."
+        meaning: "Cuántos satélites hay en pantalla. Tócalo para ver cuáles."
       },
       filter: {
         where: "Arriba a la derecha",
-        meaning: "Qué tipos dibujar, Starlink incluido, y la clave de los colores."
+        meaning: "Elige qué tipos de satélites mostrar."
       },
       console: {
         where: "Abajo a la derecha",
-        meaning:
-          "Las lecturas de los sensores que hay detrás de la vista, por si algo no " +
-          "cuadra. Solo en inglés, y nunca hacen falta para usar la app."
+        meaning: "Datos técnicos, en inglés. No los necesitas."
       }
     },
     access: {
-      title: "Qué necesita",
-      body: "Dos cosas, y el teléfono te preguntará por cada una en un momento.",
+      title: "Dos permisos",
+      body: "El teléfono te los pedirá ahora.",
       camera: {
         name: "Cámara",
-        reason: "El cielo que tienes delante, y lo que se interpone en él."
+        reason: "Para mostrar el cielo que tienes delante."
       },
       location: {
         name: "Ubicación",
-        reason: "Qué satélites tienes encima, y en qué punto del cielo están."
+        reason: "Para saber qué satélites tienes encima."
       },
-      footnote:
-        "Hacia dónde apunta el teléfono lo dicen sus propios sensores de movimiento, que " +
-        "lee sin pedir permiso. Todo se usa solo en el teléfono: lo único que Stare " +
-        "descarga es el catálogo público de satélites, y tu ubicación nunca sale del " +
-        "dispositivo."
+      footnote: "Tu ubicación nunca sale del teléfono."
     },
     next: "SIGUIENTE",
     allowAccess: "PERMITIR"
@@ -129,9 +112,9 @@ export const es: Strings = {
     ringKey: "ANILLO = FIJO SOBRE EL ECUADOR",
     shadowKey: "TENUE = EN LA SOMBRA DE LA TIERRA",
     categories: {
-      LANDMARK: "IMPRESCINDIBLES",
+      LANDMARK: "DESTACADOS",
       NAVIGATION: "NAVEGACIÓN",
-      EARTH: "OBSERVAN LA TIERRA",
+      EARTH: "OBSERVACIÓN TERRESTRE",
       COMMS: "INTERNET Y TV",
       OTHER: "OTROS"
     }

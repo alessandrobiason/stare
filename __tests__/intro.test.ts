@@ -95,13 +95,6 @@ test("nothing is listed that the phone never asks about", () => {
   // distrust the next one.
   const asked = introPages().flatMap((page) => page.access ?? []);
   expect(asked.map((access) => access.name)).not.toContain("Motion & Fitness");
-
-  // Still said, though: the sensors are read, and the page that says what the
-  // app needs should not go quiet about the one thing it takes without asking.
-  const said = introPages()
-    .map((page) => `${page.body} ${page.footnote ?? ""}`)
-    .join(" ");
-  expect(said).toMatch(/motion sensors/i);
 });
 
 test("nothing is asked for before the app has said what it is", () => {

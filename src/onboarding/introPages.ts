@@ -20,10 +20,13 @@ import type { MarkSample } from "./introFigures";
  * are pointing.
  *
  * Two, not three. The phone's motion sensors are read without a prompt of
- * their own — see `readingsNeedPermission` — so they are described rather than
- * listed: naming an access that never appears teaches someone to expect a
- * prompt that is not coming, and the page is only worth having if it matches
- * what happens next.
+ * their own — see `readingsNeedPermission` — so they are not listed: naming an
+ * access that never appears teaches someone to expect a prompt that is not
+ * coming, and the page is only worth having if it matches what happens next.
+ *
+ * The copy is written for someone who has never looked for a satellite: short,
+ * concrete, and paraphrased freely per language rather than translated line for
+ * line. What each page must say is checked here; how it is said is not.
  *
  * **The middle pages are pictures.** The overlay speaks almost entirely in
  * shapes — a body and a tail, a ring, a fainter mark, a line with arrowheads

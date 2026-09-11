@@ -4,92 +4,77 @@ export const fr: Strings = {
   intro: {
     what: {
       body:
-        "Pointez le téléphone vers le ciel et tournez lentement. Les satellites qui " +
-        "passent au-dessus de vous sont dessinés sur l'image là où ils se trouvent " +
-        "vraiment, et retirés là où un immeuble ou un arbre les cache."
+        "Pointez votre téléphone vers le ciel et bougez-le lentement. Vous verrez les " +
+        "satellites au-dessus de vous, là où ils sont."
     },
     marks: {
-      title: "Ce que disent les marques",
-      body:
-        "Chaque marque est un satellite, dessiné là où il est en ce moment. Touchez-en " +
-        "une pour savoir ce que c'est.",
+      title: "Ce que vous voyez",
+      body: "Chaque point est un satellite. Touchez-le pour savoir ce que c'est.",
       moving: {
         name: "En mouvement",
-        meaning: "La traîne est le chemin parcouru. Plus il est proche, plus la marque est grande."
+        meaning: "La traînée montre d'où il vient. Plus le point est gros, plus il est proche."
       },
       parked: {
-        name: "Fixe",
-        meaning: "Un anneau ne bouge jamais : il reste fixe au-dessus de l'équateur."
+        name: "Anneau",
+        meaning: "Toujours au même endroit dans le ciel."
       },
       shadow: {
         name: "Pâle",
-        meaning: "Dans l'ombre de la Terre : il n'y a rien à voir."
+        meaning: "Dans l'ombre de la Terre : on ne peut pas le voir."
       },
       landmark: {
-        name: "À ne pas manquer",
-        meaning: "Les stations spatiales et les grands télescopes : avec un halo et leur nom."
+        name: "Les plus connus",
+        meaning: "Stations spatiales et grands télescopes, avec leur nom."
       },
-      colors: "La couleur dit à quoi il sert :"
+      colors: "La couleur indique à quoi il sert :"
     },
     paths: {
       title: "Où et quand regarder",
       body:
-        "Les quelques-uns qui valent la peine de sortir portent la trajectoire qu'ils " +
-        "vont suivre dans le ciel, avant même de se lever.",
-      minutes: "Une pointe de flèche par minute, dans le sens où il avance.",
-      time: "Son nom, et l'heure à laquelle il sera à cet endroit.",
-      follow:
-        "Tracée aussi par-dessus les toits et au-delà du bord de l'écran : suivez-la " +
-        "jusqu'à son lever.",
-      footnote: "Touchez le nom pour tout savoir sur lui."
+        "Les stations et les télescopes affichent le trajet qu'ils vont suivre, avant même " +
+        "d'apparaître.",
+      minutes: "Une flèche par minute, dans le sens où il avance.",
+      time: "Son nom et l'heure à laquelle il passera là.",
+      follow: "Suivez la ligne pour savoir où il apparaîtra.",
+      footnote: "Touchez le nom pour en savoir plus."
     },
     passes: {
-      title: "Ce qui va passer",
-      body:
-        "Ils sont presque toujours sous l'horizon, alors le coin en bas à gauche garde " +
-        "l'œil sur les prochains.",
-      shut: "Le prochain au-dessus de vous, et le temps qu'il reste avant son lever.",
+      title: "Bientôt",
+      body: "En bas à gauche, vous voyez ce qui va passer au-dessus de vous.",
+      shut: "Le prochain passage, et dans combien de temps.",
       open:
-        "Touchez-le pour les trois prochaines heures : où chacun se lève, à quelle " +
-        "hauteur il monte et s'il sera visible. Touchez un passage pour ses détails.",
-      footnote: "Si rien ne passe dans les trois prochaines heures, ce coin reste vide."
+        "Touchez-le pour voir les prochaines heures : où regarder, jusqu'où il monte et " +
+        "s'il sera visible.",
+      footnote: "Si rien n'arrive, ce coin reste vide."
     },
     corners: {
-      title: "Et dans les coins",
-      body: "Trois autres éléments entourent le ciel.",
+      title: "Dans les coins",
+      body: "Trois autres éléments à toucher.",
       count: {
         where: "En haut à gauche",
-        meaning:
-          "Combien de satellites sont dessinés en ce moment — pas combien il en existe. " +
-          "Touchez-le pour voir lesquels, et combien sont au soleil."
+        meaning: "Le nombre de satellites à l'écran. Touchez pour voir lesquels."
       },
       filter: {
         where: "En haut à droite",
-        meaning: "Quels types dessiner, Starlink compris, et la légende des couleurs."
+        meaning: "Choisissez les types de satellites à afficher."
       },
       console: {
         where: "En bas à droite",
-        meaning:
-          "Les mesures des capteurs derrière la vue, si quelque chose cloche. En anglais " +
-          "seulement, et jamais nécessaires pour s'en servir."
+        meaning: "Données techniques, en anglais. Vous n'en aurez pas besoin."
       }
     },
     access: {
-      title: "Ce dont elle a besoin",
-      body: "Deux choses, et le téléphone va vous les demander dans un instant.",
+      title: "Deux autorisations",
+      body: "Votre téléphone va vous les demander.",
       camera: {
         name: "Appareil photo",
-        reason: "Le ciel devant vous, et ce qui vient s'y interposer."
+        reason: "Pour afficher le ciel devant vous."
       },
       location: {
         name: "Localisation",
-        reason: "Quels satellites sont au-dessus de vous, et où ils se trouvent dans le ciel."
+        reason: "Pour savoir quels satellites sont au-dessus de vous."
       },
-      footnote:
-        "L'orientation du téléphone vient de ses propres capteurs de mouvement, qu'il lit " +
-        "sans rien demander. Tout est utilisé sur le téléphone seul : la seule chose que " +
-        "Stare télécharge est le catalogue public des satellites, et votre position ne " +
-        "quitte jamais l'appareil."
+      footnote: "Votre position ne quitte jamais le téléphone."
     },
     next: "SUIVANT",
     allowAccess: "AUTORISER"
@@ -129,7 +114,7 @@ export const fr: Strings = {
     ringKey: "ANNEAU = FIXE AU-DESSUS DE L'ÉQUATEUR",
     shadowKey: "PÂLE = DANS L'OMBRE DE LA TERRE",
     categories: {
-      LANDMARK: "À NE PAS MANQUER",
+      LANDMARK: "LES PLUS CONNUS",
       NAVIGATION: "NAVIGATION",
       EARTH: "OBSERVATION TERRE",
       COMMS: "INTERNET ET TV",
