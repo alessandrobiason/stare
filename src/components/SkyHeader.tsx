@@ -58,7 +58,7 @@ export const SkyHeader: React.FC<Props> = ({ sky, filterOpen, onToggleFilter }) 
     <View style={styles.header}>
       <View style={styles.row}>
         <View style={styles.titles}>
-          <Text style={styles.wordmark}>{APP_NAME}</Text>
+          <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>
 
           <Pressable
             accessibilityRole="button"
