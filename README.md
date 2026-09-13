@@ -7,9 +7,12 @@ Point the phone at the sky and the ~16,000 objects CelesTrak tracks are placed
 on the picture where they actually are — positioned by GPS, aimed by the phone's
 motion sensors, and hidden behind whatever buildings and trees are in the way.
 
-The view opens in **normal** mode: the camera picture, the markers, a marker
-count, a collapsed category filter, the next landmark due over you and a `?` that
-brings back the intro's pages about the screen. **A marker is the app's own logo**: the
+The view opens in **normal** mode: the camera picture, the markers, the app's
+name over a count of what is above you, one button for the category filter, a
+strip of cardinal points along the bottom of the frame, a card carrying the next
+landmark due over you, and a bar of three tabs — the sky, a catalog that is not
+built yet, and the settings the guide and the console now live in.
+**A marker is the app's own logo**: the
 body and tapered trail of `assets/icon.svg`, a couple of dozen pixels across,
 the same shape the boot screen turns five of — both drawn by `tools/make-logo.mjs`
 from the geometry in `src/components/bootSky.ts`. It carries five channels at once —
@@ -123,6 +126,8 @@ satellites → screen positions → markers, composited over the camera picture.
 | Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
 | Whether the sun is on it, and whether it can be seen from here | `src/satellite/illumination.ts`, `src/satellite/nakedEye.ts` |
 | A tap back into the sky: which markers, and what they are | `src/components/markerHitTest.ts`, `SkyTracker.describe`, `src/satellite/briefing.ts`, `src/satellite/landmarkPhotos.ts` |
+| The controls over the picture: glass, one accent, no words it can do without | `src/components/theme.ts`, `src/components/Icon.tsx`, `src/components/SkyOverlay.tsx` |
+| Which way the camera is pointing, as a rule under the picture | `src/components/HorizonCompass.tsx` |
 
 **Boot is all-or-nothing** (`src/boot/`). Before the view opens it must have the
 catalog, the sensors, a GPS fix, magnetic declination, camera permission and the
@@ -141,11 +146,12 @@ opening — two system prompts, back to back, over a screen that has explained
 nothing, each of them fatal to the view if refused. So a device that has not seen
 the app before opens on six pages instead: what it does; what a mark means, each
 kind beside a drawing of it; the line a landmark carries across the sky; what is
-coming over; the three corners and the controls in them, each named beside a copy
-of the badge it wears, since a bare `12` in the corner of a photograph says
-nothing about what it counts; and what it is about to ask for and why. The pictures are drawn by the
+coming over; the controls around the sky, each named beside a copy of the badge
+or the glyph it wears, since a bare `12` under the app's name says nothing about
+what it counts and a button drawn as three stacked planes says nothing about
+what it filters; and what it is about to ask for and why. The pictures are drawn by the
 app rather than of it — the sky's own renderer over a made-up frame, and the
-passes panel's own code over a made-up plan (`src/onboarding/introFigures.ts`) —
+passes card's own code over a made-up plan (`src/onboarding/introFigures.ts`) —
 so the key cannot drift from what it keys, and the suite measures every page
 against a 4.7-inch screen in all twelve languages. Two prompts, not three: the
 motion sensors the view is aimed by are read without one — iOS gates the
@@ -157,24 +163,25 @@ the app proper only then. A flag in the document directory keeps it to
 that one launch, alongside the catalog cache and through the same storage
 (`src/data/persistentStore.ts`); the launch after it opens straight on the name.
 
-**Four of those pages are read again** (`src/components/GuideToggle.tsx`). What a
-mark means, what a line means, what the bottom-left panel says and what is in the
-corners are as true on the hundredth launch as on the first, and more likely to be
-wanted on the hundredth — the evening somebody has forgotten what a ring is. So a
-`?` above the console toggle opens those four over the running view, dimmed
-rather than replaced. Its panels are put away while it is up, so the only controls
-on screen are the guide's; the camera, the fusion and the mask carry on underneath,
-and closing it lands on a sky that is still aimed. Nothing of the first launch comes
-with them — no welcome, no permissions page, and the last button says BACK TO THE
-SKY where the intro's says ALLOW ACCESS. It is the intro screen in a second mode
-rather than a second screen, so the guide cannot drift from the pages it repeats,
-and which pages those are is marked on each of them (`src/onboarding/introPages.ts`).
-Bottom right, because that corner already holds the one control about the app
-rather than the sky, and above the toggle is the spot the panels leave alone: the
-count and the filter open downwards, the passes panel and the compass notice keep
-to the left, and the only things that ever open over it — the satellite card and
-the console's own panel — are something being read already, so the `?` steps
-aside while either is up.
+**Four of those pages are read again** (`src/components/SettingsScreen.tsx`). What
+a mark means, what a line means, what the card along the bottom says and what the
+controls around the sky do are as true on the hundredth launch as on the first,
+and more likely to be wanted on the hundredth — the evening somebody has
+forgotten what a ring is. So a **Help** row in the settings tab opens those four
+over the running view, dimmed rather than replaced. The view's own controls are
+put away while it is up, so the only ones on screen are the guide's; the camera,
+the fusion and the mask carry on underneath, and closing it lands on a sky that
+is still aimed. Nothing of the first launch comes with them — no welcome, no
+permissions page, and the last button says BACK TO THE SKY where the intro's says
+ALLOW ACCESS. It is the intro screen in a second mode rather than a second
+screen, so the guide cannot drift from the pages it repeats, and which pages
+those are is marked on each of them (`src/onboarding/introPages.ts`).
+
+It is a row in a tab rather than a `?` on the picture, and so is the console
+beside it. Both are controls about the app rather than about the sky, neither is
+touched more than once in a session, and between them they were spending a corner
+of a photograph to say so — which is the whole argument the rest of this layer is
+built on (see **The controls over the picture**).
 
 **Where you are pointing** (`src/fusion/`). The device's Euler angles and the
 magnetic bearing to north are fused in a per-axis Kalman filter whose process
@@ -474,15 +481,18 @@ the question asked *before* the phone goes up at all, and the one the other two
 panels are both in the wrong tense for, had no answer on screen: is anything
 coming, and how long have I got.
 
-It is a third pill, in the corner above the bottom row, and **shut it is the
-next pass rather than a title** — `ISS · 14 min`, which is the whole answer most
-of the times anyone glances at it. That is what separates it from the two above
-it: a filter has nothing to report until it is opened, and this has one fact
-worth more than its own name. Open, it is the rest of the plan, soonest first,
-each pass with the compass point it comes up at, how high it gets and whether it
-can be seen. A row is a target like the names written along the paths: it opens
-the same card the object's own mark would, which for a pass that has not begun
-is the card saying how far below the horizon it still is.
+It is the card along the bottom of the sky, and **shut it is the next pass
+rather than a title** — `ISS · 14 min`, with where to stand and whether it can
+be seen under it, which is the whole answer most of the times anyone glances at
+it. That is what separates it from the filter: a filter has nothing to report
+until it is opened, and this has one fact worth more than its own name. Open, it
+is the rest of the plan, soonest first, each pass with the compass point it comes
+up at, how high it gets and whether it can be seen. A row is a target like the
+names written along the paths: it opens the same card the object's own mark
+would, which for a pass that has not begun is the card saying how far below the
+horizon it still is. The two are the same card in the same place, because the
+bottom of this screen says one thing at a time and it is always the thing most
+worth reading.
 
 **And the card answers in the pass's own tense.** Everything `SkyTracker.describe`
 returns is resolved at the instant it is read, which is right for an object on
@@ -513,10 +523,8 @@ job, once a minute.
 
 Nothing at all when there is nothing coming — the tier filtered off, or a sky
 where no landmark clears the roofline for three hours, which at high latitudes
-is most of them most of the time. A permanent pill saying "nothing" is a word
-over the picture in exchange for the absence of news. It also gives way to the
-compass notice, which stands under it and grows into it, and which says the
-bearings this panel is about to give are tens of degrees out.
+is most of them most of the time. A permanent card saying "nothing" is a piece of
+the picture spent on the absence of news.
 
 The picture is the whole screen. The camera keeps its own 4:3 shape, is scaled
 until it covers the display and is clipped where it runs past the edges
@@ -525,16 +533,87 @@ indicator sit over it, and nothing is spent on black bars. Everything drawn is
 still placed in percentages of that frame, which is what keeps a marker on the
 piece of sky it was projected onto; the third of the frame's width that falls
 off the sides is drawn and then cropped, exactly as a trail hanging over an edge
-always was. The one thing that has to know the difference is the count in the
-corner, which is a claim about the sky someone can see rather than about the
-frame, so it counts the marks inside the visible window (`viewportOf`). What is
-inset instead is the writing: the panels sit in a layer that carries the safe
-area (`SafeAreaLayer`), so each one measures its corner from the notch and the
-home indicator rather than from the screen's edge. Those insets are the phone's
-own, from `react-native-safe-area-context` — the one native dependency this
-layout has, and the reason it needs a build rather than an over-the-air update.
-A browser reports zero on every edge, so the harness runs the same layer
-against the same numbers.
+always was. Two things have to know the difference: the count under the app's
+name, which is a claim about the sky someone can see rather than about the
+frame, so it counts the marks inside the visible window (`viewportOf`) — and the
+compass strip, whose scale is that same window's field of view. What is inset
+instead is the writing: the controls sit in a layer that carries the safe area
+(`SafeAreaLayer`), so the header measures from below the clock and the tab bar
+from above the home indicator rather than from the screen's edge. Those insets
+are the phone's own, from `react-native-safe-area-context` — the one native
+dependency this layout has, and the reason it needs a build rather than an
+over-the-air update. A browser reports zero on every edge, so the harness runs
+the same layer against the same numbers.
+
+### The controls over the picture
+
+**Everything on this screen is a thin layer of glass over a camera.** The rule
+the layout is built on is that the picture is the product and the controls are
+what is left after taking away everything that could be somewhere else: the app's
+name and a live count of what is overhead in the top left, one round button for
+the filter in the top right, a rule of cardinal points along the bottom of the
+frame, one card above the tab bar, and the bar itself. Nothing else. The word
+FILTER became a layers glyph, the word CONSOLE and the `?` beside it became two
+rows in a tab, and the marker count stopped being a bare number in a pill and
+became the line under the title that says what it counts.
+
+The surfaces are a blue-black the night sky never quite reaches, laid on at about
+three quarters opacity with a single translucent hairline around them and a wide,
+soft shadow under them — glass, not panels (`src/components/theme.ts`). A browser
+blurs what is behind them with `backdrop-filter`; iOS has no blur here, because
+`UIVisualEffectView` is native code this app does not carry, so the alphas are set
+high enough to hold a caption over a lit horizon without one. Text is off-white
+over a muted blue-grey, and exactly one colour means anything: an electric blue
+for the control that is doing something — the tab you are on, the switch that is
+on, the filter whose panel is open, the pass that can actually be seen. Anything
+that needs more weight than that gets a fraction more opacity rather than a
+brighter colour.
+
+**The glyphs are views** (`src/components/Icon.tsx`). There is no icon set here
+and no vector library to reach for: adding one is native code, another device
+build and a megabyte of paths for half a dozen shapes. So each is composed from
+the primitives React Native already draws on both backends — a bordered box, a
+radius, a rotation, a scale — which costs nothing at run time, renders identically
+on the phone and in the harness, and takes its colour and size from props like a
+font would. An orbit seen edge on with its body out on the near side for the sky,
+a list for the catalog, two sliders for the settings, three stacked planes for the
+filter.
+
+**And the bottom of the screen is one column rather than four corners.** A
+notice, the compass strip, one card and the tab bar, laid out upwards from the
+home indicator (`SkyOverlay`'s `bottom`), so the things in it move for each other:
+the strip rises when a card grows a photograph, and a compass warning appearing
+pushes everything below it down instead of landing on top of it. That is what the
+old corners did to each other — the passes panel used to be taken off the screen
+outright whenever the compass notice wanted the same corner — and it is why the
+card is capped at a little under half the window and scrolls past it rather than
+growing over the sky it is describing.
+
+**The strip along the bottom is a ruler, not a rose**
+(`src/components/HorizonCompass.tsx`). A compass rose is a disc — eighty points
+across at its smallest legible size, over the piece of sky someone is trying to
+look at, answering a question this app has never been asked. What is actually
+wanted is narrower: *is the thing I am looking for to the left or to the right of
+what I am looking at*, and the answer to that is a ruler. So the eight points are
+laid along the foot of the frame at the bearings they sit at, in the letters that
+language's compass uses — German turns east into O, Italian west into O — with
+the point nearest the camera lit and a small diamond fixed at the middle. A
+satellite the card says is at `SE 143°` is found by turning until `SE` reaches
+the diamond.
+
+It is an indicator and nothing else: the heading is sampled from the same filter
+the markers are projected with and never written back to, so if the sky is drawn
+thirty degrees out then so is this — the strip and the marks have to be wrong
+together or the screen is telling two stories. Its scale is the visible field of
+view, opened out to at least 62° either side of the middle, because a phone crops
+a 4:3 frame onto a tall screen and is left showing about twenty degrees across:
+twenty degrees of an eight-point compass is a strip with one letter on it, and a
+letter nobody can see is no help in deciding which way to turn. And it moves
+without re-rendering — the labels are placed once at `bearing × pixels-per-degree`
+and the whole track is slid by an `Animated` transform from an animation frame,
+so a turn of the phone costs one style write rather than a React render of a dozen
+views sixty times a second. The only thing that renders is the emphasis, which
+changes eight times per revolution.
 
 Nothing that changes at sensor rate is React state. Attitude readings arrive
 twenty to forty times a second and go straight into the filter on a

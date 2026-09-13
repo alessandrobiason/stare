@@ -23,6 +23,7 @@ import { useCelestialAlignment } from "../hooks/useCelestialAlignment";
 import { useLatestRef } from "../hooks/useLatestRef";
 import { useSkyPalette } from "../hooks/useSkyPalette";
 import { useSkySegmentation } from "../hooks/useSkySegmentation";
+import { SceneTab } from "../hooks/useSceneControls";
 import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrientation";
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
@@ -32,10 +33,11 @@ import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
+import { CatalogScreen } from "./CatalogScreen";
 import { strings } from "../i18n";
+import { toDegrees } from "../math/angles";
 import { DebugPanel } from "./DebugPanel";
-import { DebugToggle } from "./DebugToggle";
-import { GuideToggle } from "./GuideToggle";
+import { HorizonCompass } from "./HorizonCompass";
 import {
   frameBoxFor,
   FrameFit,
@@ -49,7 +51,10 @@ import { pressPoint } from "./pressPoint";
 import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SatelliteCard } from "./SatelliteCard";
 import { SatelliteMarkers } from "./SatelliteMarkers";
+import { SettingsScreen } from "./SettingsScreen";
+import { SkyHeader } from "./SkyHeader";
 import { SkyMaskOverlay } from "./SkyMaskOverlay";
+import { TabBar } from "./TabBar";
 import { theme } from "./theme";
 import { UpcomingPasses } from "./UpcomingPasses";
 
@@ -103,6 +108,20 @@ export type SceneFrame = {
   render: (controls: { onDiscontinuity: () => void }) => React.ReactNode;
 };
 
+/**
+ * Nothing counted yet: what the header shows before the first frame.
+ *
+ * Daylight rather than dark, because the panel says something different in each
+ * and the empty sky before boot has finished should not be claiming the sun is
+ * down. The first frame replaces it a sixtieth of a second later.
+ */
+const NO_SKY: SkySummary = {
+  count: 0,
+  fleets: { rows: [], other: 0 },
+  sunlit: 0,
+  darkness: "daylight"
+};
+
 type Props = {
   /** The picture the markers are drawn over. */
   frame: SceneFrame;
@@ -123,11 +142,16 @@ type Props = {
   starlink: boolean;
   onToggleStarlink: () => void;
   onEnableAll: () => void;
+  /** Which tab is showing, and how to change it. See `TabBar`. */
+  tab: SceneTab;
+  onSelectTab: (tab: SceneTab) => void;
   /**
-   * Told what is drawn, what it is, and whether any of it can be seen from
-   * here: see `SceneStatus` and `SkySummary`.
+   * Whether the filter panel is down from its button in the header, and how to
+   * put it up or away. Held by the scene rather than by the panel, because the
+   * control that opens it is in the header and leaving the sky closes it.
    */
-  onSkyChange: (summary: SkySummary) => void;
+  filterOpen: boolean;
+  onToggleFilter: () => void;
   /** Told what the sky mask is doing, so a scene can show it. */
   onMaskStatusChange?: (status: string) => void;
   /**
@@ -142,16 +166,19 @@ type Props = {
   /** Whether the debug overlays are drawn on top of the normal view. */
   debug: boolean;
   onToggleDebug: () => void;
+  /** Opens the console from the settings tab, which is where it is listed. */
+  onOpenConsole: () => void;
   /**
    * Whether the guide is open over the view — the intro's pages about this
-   * screen — and how to open it, from the `?` above the console toggle
-   * (`GuideToggle`). The guide itself is the scene's to draw, because it goes
-   * over the scene's own panels as well as these; what the overlay does about
-   * it is put its panels away while it is up (`SafeAreaLayer`'s `hidden`).
+   * screen — and how to open it, from the row in the settings tab
+   * (`SettingsScreen`). The guide itself is the scene's to draw, because it
+   * goes over the scene's own panels as well as these; what the overlay does
+   * about it is put its panels away while it is up (`SafeAreaLayer`'s
+   * `hidden`).
    */
   guide: boolean;
   onOpenGuide: () => void;
-  /** Whether boot reported anything degraded; tints the console toggle. */
+  /** Whether boot reported anything degraded; dots the settings tab. */
   warned?: boolean;
   /**
    * Whether the sky mask hides the markers behind terrain, and how to change
@@ -170,18 +197,18 @@ type Props = {
   celestialAlignment: boolean;
   onToggleCelestialAlignment: () => void;
   /**
-   * Whether the scene is showing the compass notice under this view.
+   * The scene's own strip at the top of the bottom stack, if it has one.
    *
-   * The notice is the scene's — only the phone knows what its own compass is
-   * worth (`compassNoticeShowing`) — and it stands in the bottom-left corner
-   * and grows upwards as its sentence wraps, into the row the upcoming-passes
-   * panel keeps. So that panel gives way to it, which is the right way round
-   * twice over: a warning about the sky being aimed wrong outranks a list of
-   * what is crossing it, and what the list would be offering while the notice
-   * is up is a set of bearings the notice has just said are tens of degrees
-   * out. Defaults to `false` for a scene with no compass to warn about.
+   * A node rather than a flag, because what goes there is different for each
+   * scene and neither is this view's business: the phone puts its compass
+   * notice there (`CompassNotice`, and only a phone knows what its own compass
+   * is worth), the replay harness its transport. Handed in rather than drawn
+   * by the scene over the top of this view, so that it is laid out *with* the
+   * compass strip and the card instead of on top of them — everything in that
+   * stack moves down when it appears, and nothing of the app is ever under a
+   * control that is not the app's.
    */
-  compassWarning?: boolean;
+  notice?: React.ReactNode;
   /**
    * The scene's own debug pages, shown before the ones the view adds. Each
    * scene has a different answer to "where is this attitude coming from", and
@@ -191,7 +218,7 @@ type Props = {
 };
 
 /**
- * The AR view: a camera frame with the satellite markers and control panels
+ * The AR view: a camera frame with the satellite markers and the app's controls
  * composited over it, plus the debug overlays when they are switched on.
  *
  * Everything specific to where the picture comes from is in the `frame` it is
@@ -200,8 +227,24 @@ type Props = {
  * another. Two view modes: normal draws the markers, debug adds the sky mask
  * over the picture and a panel of the figures behind it.
  *
- * The picture is the whole screen and the panels are laid over it, rather than
- * the picture being one part of a screen and the panels the others. On the
+ * **The controls are a thin layer of glass over the picture, and there are
+ * five of them.** The app's name over a live count of what is overhead, top
+ * left, which opens into what those marks are; one round button, top right,
+ * which opens the filter; a rule of cardinal points along the foot of the
+ * frame (`HorizonCompass`); one card above the tab bar — the satellite
+ * somebody tapped, or the next pass if nobody has; and the bar itself, which is
+ * the way out of the sky and into the two tabs that are not it. Everything else
+ * the view used to keep on the picture — a word saying FILTER, a `?`, the word
+ * CONSOLE — is behind the settings tab or behind an icon, because every word
+ * over a camera view is a word over the thing somebody is trying to look at.
+ *
+ * The bottom four of those are laid out as one column rather than pinned to
+ * corners (`styles.bottom`), which is what lets them move for each other: the
+ * compass rises when a card grows a photograph, and a compass warning appearing
+ * pushes the stack down rather than landing on top of it.
+ *
+ * The picture is the whole screen and the controls are laid over it, rather
+ * than the picture being one part of a screen and the controls the others. On the
  * phone it covers: the frame keeps the camera's shape, is scaled until it fills
  * the screen and is clipped where it runs past it (`frameBoxFor`), so the sky
  * is edge to edge and no part of the layout is spent on black. That the frame
@@ -219,7 +262,9 @@ type Props = {
  * The picture is also the one control the normal view has: a tap on it asks
  * what is under the finger (`namesUnder`) and opens a card about it
  * (`SatelliteCard`), and a tap that lands on empty sky puts the card away
- * again.
+ * again — or, with the filter panel down from its button, puts that away
+ * instead, which is what a tap outside an open menu means everywhere else on
+ * this platform.
  */
 export const SkyOverlay: React.FC<Props> = ({
   frame,
@@ -231,11 +276,15 @@ export const SkyOverlay: React.FC<Props> = ({
   starlink,
   onToggleStarlink,
   onEnableAll,
-  onSkyChange,
+  tab,
+  onSelectTab,
+  filterOpen,
+  onToggleFilter,
   onMaskStatusChange,
   onSkyFixChange,
   debug,
   onToggleDebug,
+  onOpenConsole,
   guide,
   onOpenGuide,
   warned = false,
@@ -243,10 +292,20 @@ export const SkyOverlay: React.FC<Props> = ({
   onToggleSkyMaskFiltering,
   celestialAlignment,
   onToggleCelestialAlignment,
-  compassWarning = false,
+  notice = null,
   sceneDebugSections
 }) => {
   const [fatal, setFatal] = useState<Error | null>(null);
+  /**
+   * What the last frame put on screen, for the line under the title.
+   *
+   * Held here rather than by the scene, which is where it used to live: the
+   * only thing that reads it is the header a few nodes below this, and a
+   * summary routed out to the scene and back made every one of those updates a
+   * render of the scene, the camera view and this overlay to move a number.
+   * The loop publishes only on a real change (`SkySummary`).
+   */
+  const [sky, setSky] = useState<SkySummary>(NO_SKY);
   const [available, setAvailable] = useState<FrameSize | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const onLayout = useCallback(
@@ -271,6 +330,22 @@ export const SkyOverlay: React.FC<Props> = ({
   const viewport = useMemo<FrameViewport>(
     () => (available && frameStyle ? viewportOf(frameStyle, available) : WHOLE_FRAME),
     [available, frameStyle]
+  );
+  /**
+   * Half the field of view the screen is actually showing, across.
+   *
+   * The lens covers the whole frame, and under `cover` the screen is showing
+   * the middle fraction of it — so this is the lens's own half-angle narrowed
+   * by whatever the viewport kept. The compass strip is laid out against it,
+   * which is what makes a cardinal point sitting a third of the way across the
+   * strip a third of the way across the picture.
+   */
+  const halfFovDeg = useMemo(
+    () =>
+      toDegrees(
+        Math.atan(frame.lens.horizontalScale * ((viewport.right - viewport.left) / 100))
+      ),
+    [frame.lens.horizontalScale, viewport.left, viewport.right]
   );
 
   const smoothed = useSmoothedOrientation(attitude);
@@ -324,7 +399,7 @@ export const SkyOverlay: React.FC<Props> = ({
     enabledCategories,
     starlink,
     viewport,
-    onSkyChange
+    onSkyChange: setSky
   });
 
   // What the tapped satellite is, resolved on the card's own slow timer against
@@ -345,6 +420,13 @@ export const SkyOverlay: React.FC<Props> = ({
    * anything drawn over a photograph has to honour.
    */
   const onTapSky = (event: GestureResponderEvent) => {
+    // A panel hanging from the header is dismissed by a tap on the sky and
+    // nothing else happens, which is what a tap outside an open menu means
+    // everywhere else on this platform.
+    if (filterOpen) {
+      onToggleFilter();
+      return;
+    }
     // Where the press landed is a platform question, and `pressPoint` is the
     // whole of it: React Native measures it, the web has to be measured.
     const point = pressPoint(event);
@@ -464,60 +546,101 @@ export const SkyOverlay: React.FC<Props> = ({
         )}
       </View>
 
-      {/* The panels, inset off the notch and the home indicator while the
-          picture underneath them is not. Each one still places itself in a
-          corner of its parent; the layer is what makes that corner the safe
-          one. Put away while the guide is over them, rather than left to show
-          through it. See `SafeAreaLayer`. */}
+      {/* The control layer, inset off the notch and the home indicator while
+          the picture underneath it is not. A title and one button at the top,
+          a stack at the bottom, and nothing at all in the middle: what is in
+          the middle is the sky. Put away while the guide is over it, rather
+          than left to show through it. See `SafeAreaLayer`. */}
       <SafeAreaLayer hidden={guide}>
-        <CategoryLegend
-          enabledCategories={enabledCategories}
-          onToggleCategory={onToggleCategory}
-          starlink={starlink}
-          onToggleStarlink={onToggleStarlink}
-          onEnableAll={onEnableAll}
-          palette={palette}
-        />
+        {tab === "sky" && (
+          <>
+            <SkyHeader sky={sky} filterOpen={filterOpen} onToggleFilter={onToggleFilter} />
 
-        {/* What is coming, bottom left — level with the console toggle in the
-            opposite corner. Not while a card is open: the card is the width of
-            the screen and opens from just above this row, and it is the answer
-            to the row that was tapped anyway. Not while the compass notice is
-            up, which takes this exact corner and says the bearings this panel
-            is about to give are tens of degrees out. Not under the debug
-            overlays either, for the reason the card is not: the picture there
-            is the mask's. */}
-        {!debug && !selection && !compassWarning && (
-          <UpcomingPasses
-            passes={upcoming}
-            epochRef={epochRef}
-            // The same selection a tap on the object's own mark makes, so the
-            // card that opens is the card the sky would have opened. One name
-            // rather than a cluster: a row is one object by construction.
-            onSelect={(name) => setSelection({ names: [name], selected: name })}
+            <CategoryLegend
+              open={filterOpen}
+              enabledCategories={enabledCategories}
+              onToggleCategory={onToggleCategory}
+              starlink={starlink}
+              onToggleStarlink={onToggleStarlink}
+              onEnableAll={onEnableAll}
+              palette={palette}
+            />
+          </>
+        )}
+
+        {/* The other two tabs are sheets over the camera rather than screens
+            the app has navigated to: the view underneath keeps running, and
+            coming back is one tap onto a sky that never stopped. */}
+        {tab === "catalog" && <CatalogScreen />}
+        {tab === "settings" && (
+          <SettingsScreen
+            onOpenGuide={onOpenGuide}
+            onOpenConsole={onOpenConsole}
+            warned={warned}
           />
         )}
 
-        {!debug && selection && (
-          <SatelliteCard
-            names={selection.names}
-            selected={selection.selected}
-            onSelect={(name) => setSelection({ names: selection.names, selected: name })}
-            onClose={() => setSelection(null)}
-            describeRef={describeRef}
-            pass={passAhead(upcoming, selection.selected)}
-            palette={palette}
-          />
-        )}
+        {/* The bottom of the screen, as one column rather than four things each
+            pinned to a corner of it. Laying it out means the strip rises when a
+            card grows a photograph, and a notice appearing pushes everything
+            below it down instead of landing on top of it — which is what the
+            old corners did to each other, and why the passes panel used to be
+            taken off the screen whenever the compass notice was up. */}
+        <View style={styles.bottom}>
+          {tab === "sky" && (
+            <>
+              {notice ? <View style={styles.inset}>{notice}</View> : null}
 
-        {/* Above the console toggle, in the corner kept for the controls about
-            the app. Not while the card or the console's panel is up: both open
-            from just above the bottom row, over this spot, and each is already
-            something being read. */}
-        {!debug && !selection && <GuideToggle onOpen={onOpenGuide} />}
+              {/* Where the camera is pointing, as a rule under the picture.
+                  Drawn under the debug overlays too: it is a fact about the
+                  view rather than a panel over it. */}
+              <HorizonCompass
+                orientationFilterRef={smoothed.filterRef}
+                halfFovDeg={halfFovDeg}
+              />
 
-        {debug && <DebugPanel sourceRef={debugSourceRef} onClose={onToggleDebug} />}
-        <DebugToggle on={debug} onToggle={onToggleDebug} warned={warned} />
+              {/* One card at a time, and always the thing most worth reading:
+                  the satellite somebody tapped, or — with nothing tapped — the
+                  next pass. Neither under the debug overlays, where the picture
+                  is the mask's and the sheet is the console's. */}
+              {!debug && selection && (
+                <SatelliteCard
+                  style={styles.inset}
+                  names={selection.names}
+                  selected={selection.selected}
+                  onSelect={(name) => setSelection({ names: selection.names, selected: name })}
+                  onClose={() => setSelection(null)}
+                  describeRef={describeRef}
+                  pass={passAhead(upcoming, selection.selected)}
+                  palette={palette}
+                />
+              )}
+
+              {!debug && !selection && (
+                <UpcomingPasses
+                  style={styles.inset}
+                  passes={upcoming}
+                  epochRef={epochRef}
+                  // The same selection a tap on the object's own mark makes, so
+                  // the card that opens is the card the sky would have opened.
+                  // One name rather than a cluster: a row is one object by
+                  // construction.
+                  onSelect={(name) => setSelection({ names: [name], selected: name })}
+                />
+              )}
+
+              {debug && (
+                <DebugPanel
+                  style={styles.inset}
+                  sourceRef={debugSourceRef}
+                  onClose={onToggleDebug}
+                />
+              )}
+            </>
+          )}
+
+          <TabBar tab={tab} onSelect={onSelectTab} warned={warned} />
+        </View>
       </SafeAreaLayer>
     </View>
   );
@@ -581,6 +704,37 @@ const styles = StyleSheet.create({
     width: 0,
     height: 0,
     overflow: "hidden"
+  },
+  /**
+   * The bottom of the screen: a notice, the compass, one card and the tab bar,
+   * in that order, stacked upwards from the home indicator.
+   *
+   * A column rather than four absolute corners, so that the things in it move
+   * for each other. `box-none`, so the gaps between them are still sky — a tap
+   * between the compass and the card selects a satellite, as it does anywhere
+   * else on the picture.
+   */
+  bottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    gap: 10,
+    // `box-none`, so the gaps between the things in this column are still sky:
+    // a tap between the compass and the card selects a satellite, as it does
+    // anywhere else on the picture. In the style rather than as the prop,
+    // which both React Native and the web have moved on from.
+    pointerEvents: "box-none"
+  },
+  /**
+   * The inset the sheets in that stack keep off the sides of the screen.
+   *
+   * Not on the stack itself, because two of the things in it are edge to edge
+   * on purpose: the tab bar, which is a bar, and the compass strip, whose
+   * letters run off the sides of the picture the way the picture itself does.
+   */
+  inset: {
+    marginHorizontal: 12
   }
 });
 

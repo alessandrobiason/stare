@@ -40,12 +40,12 @@ export const fr: Strings = {
     },
     passes: {
       title: "Bientôt",
-      body: "En bas à gauche, vous voyez ce qui va passer au-dessus de vous.",
+      body: "La carte en bas montre ce qui va passer au-dessus de vous.",
       shut: "Le prochain passage, et dans combien de temps.",
       open:
         "Touchez-le pour voir les prochaines heures : où regarder, jusqu'où il monte et " +
         "s'il sera visible.",
-      footnote: "Si rien n'arrive, ce coin reste vide."
+      footnote: "Si rien n'arrive, la carte n'apparaît pas."
     },
     corners: {
       title: "Dans les coins",
@@ -59,11 +59,11 @@ export const fr: Strings = {
         meaning: "Choisissez les types de satellites à afficher."
       },
       guide: {
-        where: "En bas à droite",
+        where: "Réglages",
         meaning: "Réaffiche ces pages quand vous en avez besoin."
       },
       console: {
-        where: "En bas à droite",
+        where: "Réglages",
         meaning: "Données techniques, en anglais. Vous n'en aurez pas besoin."
       }
     },
@@ -87,6 +87,11 @@ export const fr: Strings = {
     open: "Aide",
     close: "Fermer l'aide",
     done: "RETOUR AU CIEL"
+  },
+  tabs: {
+    sky: "Ciel",
+    catalog: "Catalogue",
+    settings: "Réglages"
   },
   scene: {
     visibleSatellites: "{count} satellites visibles",
@@ -114,6 +119,9 @@ export const fr: Strings = {
         daylight: "il fait jour — rien à voir",
         unknown: "éclat non répertorié"
       }
+    },
+    compass: {
+      facing: "Orienté vers {point}"
     }
   },
   filter: {
@@ -185,6 +193,10 @@ export const fr: Strings = {
     failed: "Démarrage impossible",
     tryAgain: "RÉESSAYER",
     unsupported: "Cet appareil ne peut pas afficher la vue du ciel."
+  },
+  catalog: {
+    soon:
+      "Chercher n'importe quel objet du catalogue, qu'il soit au-dessus de vous ou non. Pas encore fait."
   },
   language: {
     title: "Langue",

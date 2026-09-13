@@ -1,5 +1,14 @@
 import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  ViewStyle
+} from "react-native";
 import { DebugChoice, DebugSection, DebugSource, DebugSwitch } from "../debug/sections";
 import { theme } from "./theme";
 import { Toggle } from "./Toggle";
@@ -11,6 +20,8 @@ type Props = {
    */
   sourceRef: MutableRefObject<DebugSource>;
   onClose: () => void;
+  /** Where it sits: laid over the sheet's own, by the stack that arranges it. */
+  style?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -35,9 +46,13 @@ const SAMPLE_INTERVAL_MS = 500;
  * without it this whole panel would be reconciled that often for text that
  * changes twice a second.
  */
-export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose }) => {
+export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose, style }) => {
   const [sections, setSections] = useState<DebugSection[]>(() => sourceRef.current());
   const [selected, setSelected] = useState<string | null>(null);
+  // Enough for a dozen rows, and never so much that the sky is only the sheet.
+  // Measured against the window rather than fixed, because this is laid out in
+  // the stack at the bottom of the view and has nothing else to be a share of.
+  const maxHeight = useWindowDimensions().height * 0.45;
 
   useEffect(() => {
     const handle = setInterval(() => setSections(sourceRef.current()), SAMPLE_INTERVAL_MS);
@@ -89,7 +104,7 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose }) =
   const active = sections.find((section) => section.id === selected) ?? sections[0];
 
   return (
-    <View style={styles.sheet}>
+    <View style={[styles.sheet, { maxHeight }, style]}>
       <View style={styles.tabs}>
         {sections.map((section) => {
           const on = section.id === active?.id;
@@ -177,17 +192,14 @@ DebugPanel.displayName = "DebugPanel";
 
 const styles = StyleSheet.create({
   sheet: {
-    position: "absolute",
-    left: 8,
-    right: 8,
-    // Clear of the toggle, which stays put so leaving is where entering was.
-    bottom: 58,
-    // Enough for a dozen rows, and never so much that the sky is only the sheet.
-    maxHeight: "45%",
-    borderRadius: 10,
-    borderWidth: 1,
+    // Laid out by the stack at the bottom of the sky view, in the place the
+    // satellite card and the passes card take: one sheet at a time, above the
+    // tab bar rather than on top of it. Its height is the window's, measured
+    // in the component.
+    borderRadius: theme.radius.sheet,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     borderColor: theme.color.divider,
-    backgroundColor: theme.color.panel,
+    backgroundColor: theme.color.panelDeep,
     overflow: "hidden"
   },
   tabs: {

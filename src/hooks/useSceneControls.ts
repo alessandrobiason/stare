@@ -1,8 +1,19 @@
 import { useCallback, useState } from "react";
 import { allCategories, SatelliteCategory } from "../satellite/categories";
-import { SkySummary } from "./useAnimatedMarkers";
+
+/**
+ * Which of the three tabs the app is showing.
+ *
+ * The sky is the app and the other two are what used to be drawn on top of it:
+ * a catalog to look things up in, which is not built yet, and everything about
+ * the app rather than about the sky. See `TabBar`.
+ */
+export type SceneTab = "sky" | "catalog" | "settings";
 
 export type SceneControls = {
+  /** Which tab is showing. The sky, because the sky is the app. */
+  tab: SceneTab;
+  setTab: (tab: SceneTab) => void;
   enabledCategories: Set<SatelliteCategory>;
   toggleCategory: (category: SatelliteCategory) => void;
   /**
@@ -18,23 +29,29 @@ export type SceneControls = {
   /** Everything back on: the five categories and Starlink with them. */
   enableAllCategories: () => void;
   /**
-   * What the last frame put on screen, and whether any of it can be seen.
+   * Whether the filter panel is down from its button in the header.
    *
-   * Reported from the render loop; React bails out when the object is
-   * unchanged, which the loop arranges by publishing only on a real change
-   * (`SkySummary`). One value rather than the count and the breakdown
-   * separately: they are worked out on the same tick from the same marks, and
-   * handed over apart they would be two state updates for one fact, with a
-   * render in between showing a count its own breakdown disagreed with.
+   * Here rather than inside the panel, because the control that opens it is
+   * somewhere else on the screen — the layers button in the header — and
+   * because leaving the sky has to put it away (`setTab`).
    */
-  sky: SkySummary;
-  setSky: (summary: SkySummary) => void;
+  filterOpen: boolean;
+  toggleFilter: () => void;
   /**
    * Which of the two view modes is running: normal, or normal plus the debug
    * overlays. Off on open — debug is what someone asks for, not what they land in.
    */
   debug: boolean;
   toggleDebug: () => void;
+  /**
+   * Opens the console, from the settings tab it is listed on.
+   *
+   * Two things at once, which is why it is not `toggleDebug`: the console draws
+   * its overlays over the camera picture — the sky mask, the marker figures —
+   * and opening it from a sheet that covers that picture would put a page of
+   * readings about a view nobody can see over a view nobody can see.
+   */
+  openConsole: () => void;
   /**
    * Whether the guide is open over the view: the intro's pages about reading
    * the screen, brought back by the `?` above the console toggle
@@ -68,30 +85,22 @@ export type SceneControls = {
 };
 
 /**
- * Nothing counted yet: what a scene shows before its first frame.
- *
- * Daylight rather than dark, because the panel says something different in each
- * and the empty sky before boot has finished should not be claiming the sun is
- * down. The first frame replaces it a sixtieth of a second later.
- */
-const NO_SKY: SkySummary = {
-  count: 0,
-  fleets: { rows: [], other: 0 },
-  sunlit: 0,
-  darkness: "daylight"
-};
-
-/**
- * The controls both scenes carry: which categories are drawn, how many markers
- * the last frame placed and what they are, whether the debug overlays are up,
- * and whether the guide is open over all of it. The same sky either way, so the
+ * The controls both scenes carry: which tab is up, which categories are drawn,
+ * whether the filter panel is open, whether the debug overlays are up, and
+ * whether the guide is open over all of it. The same sky either way, so the
  * same controls — a phone and the replay behave identically.
+ *
+ * What the sky itself is showing is not here. The count and its breakdown are
+ * read from the frame loop and drawn in the header a few nodes away
+ * (`SkyOverlay`, `SkyHeader`), so they never leave the view that produces
+ * them.
  */
 export function useSceneControls(): SceneControls {
+  const [tab, setTabState] = useState<SceneTab>("sky");
   const [enabledCategories, setEnabledCategories] =
     useState<Set<SatelliteCategory>>(allCategories);
   const [starlink, setStarlink] = useState(true);
-  const [sky, setSky] = useState<SkySummary>(NO_SKY);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [debug, setDebug] = useState(false);
   const [guide, setGuide] = useState(false);
   const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
@@ -111,22 +120,39 @@ export function useSceneControls(): SceneControls {
     setEnabledCategories(allCategories());
     setStarlink(true);
   }, []);
+  const toggleFilter = useCallback(() => setFilterOpen((open) => !open), []);
+  /**
+   * Leaving the sky puts the filter away with it: the panel hangs off a button
+   * that is no longer on the screen, and coming back to a sheet nobody opened
+   * is a view that remembers the wrong thing.
+   */
+  const setTab = useCallback((next: SceneTab) => {
+    setTabState(next);
+    setFilterOpen(false);
+  }, []);
   const toggleDebug = useCallback(() => setDebug((on) => !on), []);
+  const openConsole = useCallback(() => {
+    setTabState("sky");
+    setDebug(true);
+  }, []);
   const openGuide = useCallback(() => setGuide(true), []);
   const closeGuide = useCallback(() => setGuide(false), []);
   const toggleSkyMaskFiltering = useCallback(() => setSkyMaskFiltering((on) => !on), []);
   const toggleCelestialAlignment = useCallback(() => setCelestialAlignment((on) => !on), []);
 
   return {
+    tab,
+    setTab,
     enabledCategories,
     toggleCategory,
     starlink,
     toggleStarlink,
     enableAllCategories,
-    sky,
-    setSky,
+    filterOpen,
+    toggleFilter,
     debug,
     toggleDebug,
+    openConsole,
     guide,
     openGuide,
     closeGuide,

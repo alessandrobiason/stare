@@ -229,8 +229,12 @@ const styles = StyleSheet.create({
     marginTop: PASSES_PICTURE_PADDING
   },
   passesPanel: {
-    // Laid out in the picture, rather than pinned to a corner of the screen.
-    position: "relative"
+    // Laid out in the picture rather than by the stack at the bottom of the
+    // sky, and given what the row leaves after the callout beside it: the card
+    // is the width of the screen where it really stands, so left to itself it
+    // fills this picture and the callout hangs off the edge.
+    position: "relative",
+    flex: 1
   },
   passesCallout: {
     marginLeft: 8,

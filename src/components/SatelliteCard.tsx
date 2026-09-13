@@ -1,5 +1,16 @@
 import React, { MutableRefObject, useEffect, useState } from "react";
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  ViewStyle
+} from "react-native";
 import { MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import { fill, strings } from "../i18n";
 import {
@@ -19,8 +30,9 @@ import {
 } from "../satellite/landmarkPhotos";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { SatelliteDetail } from "../types";
+import { Icon } from "./Icon";
 import { cssColor, MarkerPalette } from "./palette";
-import { theme } from "./theme";
+import { glass, lift, theme } from "./theme";
 
 type Props = {
   /**
@@ -54,6 +66,8 @@ type Props = {
   pass?: UpcomingPass | null;
   /** The colours the sky is drawn in, so the swatch is the mark on the frame. */
   palette: MarkerPalette;
+  /** Where it sits: laid over the card's own, by the stack that arranges it. */
+  style?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -114,9 +128,22 @@ export const SatelliteCard: React.FC<Props> = ({
   onClose,
   describeRef,
   pass = null,
-  palette
+  palette,
+  style
 }) => {
   const t = strings();
+  /**
+   * The most of the screen this card may take, which is a little under half.
+   *
+   * It is laid out in the stack at the bottom of the sky view, so everything
+   * above it — the compass strip, the notice — is pushed up by whatever height
+   * it takes: a landmark's card is a photograph, a paragraph, a verdict and
+   * five figures, and left to grow it would put the compass across the middle
+   * of the picture and the picture itself behind writing. Past this it scrolls
+   * instead, which keeps the camera the larger half of the screen on every
+   * phone rather than on the one this was laid out against.
+   */
+  const maxHeight = useWindowDimensions().height * 0.46;
   const [detail, setDetail] = useState<SatelliteDetail | null>(() =>
     describeRef.current(selected)
   );
@@ -138,7 +165,14 @@ export const SatelliteCard: React.FC<Props> = ({
   }, [describeRef, selected]);
 
   return (
-    <View style={styles.sheet} accessibilityLabel={t.card.details}>
+    <View style={[styles.sheet, { maxHeight }, style]} accessibilityLabel={t.card.details}>
+      {/* The same grip the passes card wears, because they are the same card:
+          the bottom of the sky view says one thing at a time, and this is what
+          it says while a satellite is selected. */}
+      <View style={styles.gripRow}>
+        <View style={styles.grip} />
+      </View>
+
       {names.length > 1 && (
         <ScrollView
           horizontal
@@ -172,49 +206,69 @@ export const SatelliteCard: React.FC<Props> = ({
       )}
 
       <View style={styles.header}>
+        {/* The mark's own colour, as the thing the name hangs off. The sky
+            draws this object in that colour and this is the same swatch the
+            filter's list uses, so the card is tied to the dot that was tapped
+            rather than merely being about it. */}
+        <View
+          style={[
+            styles.badge,
+            detail && {
+              borderColor: palette.categories[detail.category],
+              backgroundColor: cssColor({ ...palette.outline, alpha: 0.25 })
+            }
+          ]}
+        >
+          {detail && (
+            <View
+              style={[
+                styles.badgeMark,
+                {
+                  backgroundColor: palette.categories[detail.category],
+                  borderColor: cssColor(palette.outline)
+                }
+              ]}
+            />
+          )}
+        </View>
+
         <View style={styles.heading}>
           <Text numberOfLines={1} style={styles.name}>
             {selected}
           </Text>
           {detail && (
-            <View style={styles.purpose}>
-              <View
-                style={[
-                  styles.swatch,
-                  {
-                    backgroundColor: palette.categories[detail.category],
-                    borderColor: cssColor(palette.outline)
-                  }
-                ]}
-              />
-              <Text numberOfLines={1} style={styles.purposeLabel}>
-                {t.filter.categories[detail.category]}
-                {detail.parked ? ` · ${t.card.holdsStation}` : ""}
-              </Text>
-            </View>
+            <Text numberOfLines={1} style={styles.purposeLabel}>
+              {t.filter.categories[detail.category]}
+              {detail.parked ? ` · ${t.card.holdsStation}` : ""}
+            </Text>
           )}
         </View>
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t.card.close}
           style={styles.close}
           onPress={onClose}
         >
-          <Text style={styles.closeLabel}>✕</Text>
+          <Icon name="close" size={14} color={theme.color.textDim} />
         </Pressable>
       </View>
 
-      {/* Keyed by the file, so switching between two satellites under one finger
-          starts the picture over rather than showing the Soyuz's for the frame
-          before the ISS's effect has run. */}
-      {photoFile && <Photograph key={photoFile} file={photoFile} of={selected} />}
+      {/* Under the name, and scrolling: the picture and the paragraph are the
+          tall half of this card, and a card that grows past its share of the
+          screen is a card over the sky it is describing. */}
+      <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+        {/* Keyed by the file, so switching between two satellites under one
+            finger starts the picture over rather than showing the Soyuz's for
+            the frame before the ISS's effect has run. */}
+        {photoFile && <Photograph key={photoFile} file={photoFile} of={selected} />}
 
-      {briefing && (
-        <View style={styles.briefing}>
-          <Text style={styles.briefingText}>{briefing.text}</Text>
-          {briefing.url && <OfficialSite url={briefing.url} />}
-        </View>
-      )}
+        {briefing && (
+          <View style={styles.briefing}>
+            <Text style={styles.briefingText}>{briefing.text}</Text>
+            {briefing.url && <OfficialSite url={briefing.url} />}
+          </View>
+        )}
 
       {/* Between what the thing is and where it is, because that is the order
           somebody who has just tapped a mark asks in: what is that, can I see
@@ -224,25 +278,27 @@ export const SatelliteCard: React.FC<Props> = ({
           under this line are all about where it is now, and this one alone is
           about a sky three hours from now, so it names the clock time it
           answers for. See `seeingOnPass`. */}
-      {detail && (
-        <Text style={styles.seeing}>
-          {answersForPass(detail, pass) ? seeingOnPass(pass) : seeing(detail)}
-        </Text>
-      )}
+        {detail && (
+          <Text style={styles.seeing}>
+            {answersForPass(detail, pass) ? seeingOnPass(pass) : seeing(detail)}
+          </Text>
+        )}
 
-      {detail ? (
-        <View style={styles.facts}>
-          <Fact label={t.card.facts.distance} value={kilometres(detail.rangeKm)} />
-          <Fact label={t.card.facts.altitude} value={kilometres(detail.altitudeKm)} />
-          <Fact label={t.card.facts.speed} value={speed(detail.speedKmPerSecond)} />
-          <Fact label={t.card.facts.look} value={lookDirection(detail)} />
-          <Fact label={t.card.facts.orbit} value={orbitPeriod(detail.orbitPeriodMinutes)} />
-        </View>
-      ) : (
-        // The catalog is reloaded every couple of hours and objects leave it —
-        // an honest gap, rather than a card of dashes that looks like a fault.
-        <Text style={styles.missing}>{t.card.missing}</Text>
-      )}
+        {detail ? (
+          <View style={styles.facts}>
+            <Fact label={t.card.facts.distance} value={kilometres(detail.rangeKm)} />
+            <Fact label={t.card.facts.altitude} value={kilometres(detail.altitudeKm)} />
+            <Fact label={t.card.facts.speed} value={speed(detail.speedKmPerSecond)} />
+            <Fact label={t.card.facts.look} value={lookDirection(detail)} />
+            <Fact label={t.card.facts.orbit} value={orbitPeriod(detail.orbitPeriodMinutes)} />
+          </View>
+        ) : (
+          // The catalog is reloaded every couple of hours and objects leave it
+          // — an honest gap, rather than a card of dashes that looks like a
+          // fault.
+          <Text style={styles.missing}>{t.card.missing}</Text>
+        )}
+      </ScrollView>
     </View>
   );
 };
@@ -384,40 +440,56 @@ function answersForPass(
   return pass !== null && detail.elevationDeg <= MINIMUM_SATELLITE_ELEVATION_DEG;
 }
 
-const SWATCH_SIZE = 10;
+const BADGE_SIZE = 38;
+const BADGE_MARK = 12;
 
 const styles = StyleSheet.create({
   sheet: {
-    position: "absolute",
-    left: 8,
-    right: 8,
-    // Clear of the debug toggle, which keeps its corner whatever else is open.
-    bottom: 58,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: theme.color.divider,
-    backgroundColor: theme.color.panel,
-    overflow: "hidden"
+    // Laid out by the stack at the bottom of the sky view rather than pinned
+    // to it: the compass above it moves up when this card grows, which is what
+    // keeps a card with a photograph on it from covering the strip.
+    borderRadius: theme.radius.sheet,
+    overflow: "hidden",
+    ...glass(theme.color.panelDeep, 26),
+    ...lift
+  },
+  gripRow: {
+    alignItems: "center",
+    paddingTop: 7
+  },
+  body: {
+    flexGrow: 0
+  },
+  grip: {
+    width: 34,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.color.divider
   },
   strip: {
     flexGrow: 0,
-    borderBottomWidth: 1,
+    marginTop: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth * 2,
     borderBottomColor: theme.color.divider
   },
   stripContent: {
-    padding: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
     gap: 6
   },
   chip: {
     // A thumb-sized target, like every other control on the sky.
     minHeight: 30,
     justifyContent: "center",
-    paddingHorizontal: 10,
-    borderRadius: 15,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: theme.color.divider,
     backgroundColor: theme.color.control
   },
   chipOn: {
-    backgroundColor: theme.color.controlActive
+    borderColor: theme.color.accentBorder,
+    backgroundColor: theme.color.accentSoft
   },
   chipLabel: {
     color: theme.color.textDim,
@@ -430,39 +502,44 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    paddingLeft: 10,
-    paddingTop: 8,
-    gap: 8
+    alignItems: "center",
+    gap: 12,
+    paddingLeft: 14,
+    paddingRight: 8,
+    paddingTop: 8
   },
-  heading: {
-    flex: 1
+  badge: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: theme.color.divider,
+    backgroundColor: theme.color.control
   },
-  name: {
-    color: theme.color.textBright,
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: 0.4
-  },
-  purpose: {
-    marginTop: 3,
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  swatch: {
-    width: SWATCH_SIZE,
-    height: SWATCH_SIZE,
-    borderRadius: SWATCH_SIZE / 2,
-    marginRight: 7,
+  badgeMark: {
+    width: BADGE_MARK,
+    height: BADGE_MARK,
+    borderRadius: BADGE_MARK / 2,
     // Rimmed like the marks on the sky are; the colour comes from the palette.
     borderWidth: 1.5
   },
-  purposeLabel: {
+  heading: {
     flex: 1,
-    color: theme.color.textFaint,
-    fontSize: 9,
+    gap: 2
+  },
+  name: {
+    color: theme.color.textBright,
+    fontSize: 17,
+    fontWeight: "600",
+    letterSpacing: 0.2
+  },
+  purposeLabel: {
+    color: theme.color.textDim,
+    fontSize: 10,
     fontWeight: "700",
-    letterSpacing: 0.6
+    letterSpacing: 0.7
   },
   close: {
     width: 38,
@@ -470,20 +547,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  closeLabel: {
-    color: theme.color.textDim,
-    fontSize: 13,
-    fontWeight: "700"
-  },
   photo: {
-    marginTop: 8,
+    marginTop: 10,
     // A strip rather than a whole picture. The card is anchored to the bottom of
     // a live camera view, and every point it grows is a point of sky it covers;
     // this is about as short as a spacecraft against black stays recognisable,
     // and about as much of a portrait picture as can be cropped away safely.
-    height: 150,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+    height: 148,
+    borderTopWidth: StyleSheet.hairlineWidth * 2,
+    borderBottomWidth: StyleSheet.hairlineWidth * 2,
     borderColor: theme.color.divider,
     // What is behind the picture while its bytes arrive. Not the same thing as a
     // placeholder for the lookup: by the time this box exists the URL is known,
@@ -501,10 +573,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     // A thumb-sized target, like every other control on the sky.
     minHeight: 30,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     justifyContent: "center",
     // Dark enough to read white text over the bright side of any photograph.
-    backgroundColor: theme.color.panel
+    backgroundColor: theme.color.panelDeep
   },
   creditLabel: {
     color: theme.color.textDim,
@@ -512,15 +584,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3
   },
   briefing: {
-    paddingHorizontal: 10,
-    paddingTop: 7
+    paddingHorizontal: 14,
+    paddingTop: 10
   },
   briefingText: {
     color: theme.color.text,
-    fontSize: 11.5,
+    fontSize: 12.5,
     // Prose rather than a figure, so it is set to be read: looser lines than
     // the label-and-number rows under it.
-    lineHeight: 16
+    lineHeight: 18
   },
   site: {
     // A thumb-sized target, like every other control on the sky.
@@ -528,59 +600,59 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   siteLabel: {
-    color: theme.color.textBright,
+    color: theme.color.accent,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.3
   },
   seeing: {
-    marginHorizontal: 10,
-    marginTop: 8,
-    paddingTop: 7,
+    marginHorizontal: 14,
+    marginTop: 10,
+    paddingTop: 9,
     // Ruled off above rather than below: what it belongs with is the figures
     // under it, which are the other things true of this object at this instant,
     // and what it is being separated from is the paragraph about what the
     // object is — which is true whatever the sky is doing.
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth * 2,
     borderTopColor: theme.color.divider,
     color: theme.color.textBright,
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: "600",
-    lineHeight: 16
+    lineHeight: 18
   },
   facts: {
-    paddingHorizontal: 10,
-    paddingTop: 6,
-    paddingBottom: 9
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 12
   },
   fact: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    paddingVertical: 2
+    paddingVertical: 3
   },
   factLabel: {
     // Shrinks before the figure does: the label is a word someone already
     // knows by the second row, and the number is what the row is for.
     flexShrink: 1,
     color: theme.color.textFaint,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 0.3
   },
   factValue: {
     flexShrink: 1,
     color: theme.color.text,
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: "600",
     fontVariant: ["tabular-nums"]
   },
   missing: {
-    paddingHorizontal: 10,
-    paddingTop: 4,
-    paddingBottom: 10,
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 14,
     color: theme.color.textDim,
-    fontSize: 11
+    fontSize: 12
   }
 });
 

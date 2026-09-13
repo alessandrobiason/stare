@@ -16,8 +16,8 @@ import type { SatelliteCategory } from "../satellite/categories";
 export type Strings = {
   intro: IntroStrings;
   /**
-   * The intro's pages about the screen, read again from the `?` in the corner of
-   * the sky view (`GuideToggle`).
+   * The intro's pages about the screen, read again from the Help row in the
+   * settings tab (`SettingsScreen`).
    *
    * The pages say what they said the first time, in `intro`'s own words: the
    * guide is those pages, not a second telling of them that could come to
@@ -26,12 +26,28 @@ export type Strings = {
    * goes back to the sky rather than asking for anything.
    */
   guide: {
-    /** The `?`, for a screen reader: a question mark read aloud says nothing about what it opens. */
+    /** What the settings row that opens these pages is called. */
     open: string;
     /** The corner control that closes the guide from whichever page it is on. */
     close: string;
     /** The last page's button, in place of `intro.allowAccess`. */
     done: string;
+  };
+  /**
+   * The three tabs along the bottom: the sky, the catalog, and everything
+   * about the app rather than about the sky.
+   *
+   * One word each. They are read under an icon in a bar a third of a screen
+   * wide, so a phrase does not fit and does not need to: what is behind each
+   * of them is either obvious or is titled again at the top of its own page.
+   */
+  tabs: {
+    /** The camera with the catalog drawn over it, which is the app. */
+    sky: string;
+    /** The catalog to look things up in, which is not built yet. */
+    catalog: string;
+    /** The guide, the language and the console. See `SettingsScreen`. */
+    settings: string;
   };
   scene: {
     /** What the marker count says to a screen reader. `{count}`. */
@@ -120,6 +136,18 @@ export type Strings = {
        * nothing.
        */
       seeing: Record<PassSeeing, string>;
+    };
+    /**
+     * The strip of cardinal points along the bottom of the picture.
+     *
+     * The letters on it are `compass` below — the same eight the card gives
+     * bearings in, so `SE` on the card and `SE` on the strip are the same
+     * letters in every language. This is the one sentence that is not a
+     * letter: what the strip says to somebody who is not looking at it.
+     */
+    compass: {
+      /** Which way the camera is pointing. `{point}`, from `compass`. */
+      facing: string;
     };
   };
   filter: {
@@ -255,6 +283,18 @@ export type Strings = {
     unsupported: string;
   };
   /**
+   * The catalog tab, which is a promise rather than a feature.
+   *
+   * The sky view answers "what is above me now", and the question it cannot
+   * answer is "where is the thing I came looking for" — an object below the
+   * horizon has no mark to tap. That is what the tab is for, and this is the
+   * line it carries until it is built. Its title is `tabs.catalog`.
+   */
+  catalog: {
+    /** What will be there, and that it is not there yet. */
+    soon: string;
+  };
+  /**
    * The language picker: the intro's top right corner, and the console.
    *
    * Two words, because the languages themselves are not translated — a list of
@@ -340,10 +380,11 @@ export type IntroStrings = {
     footnote: string;
   };
   /**
-   * The fifth: the three corners left and the controls in them, each beside a
-   * copy of the badge it wears — a bare number in the corner of a camera view
-   * says nothing about what it counts — with `where` naming the corner, since
-   * that is how someone finds it again afterwards.
+   * The fifth: the controls around the sky, each beside a copy of the badge or
+   * the glyph it wears — a bare number under the app's name says nothing about
+   * what it counts, and a button drawn as three stacked planes says nothing
+   * about what it filters — with `where` naming the place, since that is how
+   * someone finds it again afterwards.
    */
   corners: {
     title: string;
@@ -371,7 +412,10 @@ export type IntroStrings = {
 };
 
 export type IntroElementStrings = {
-  /** Where on screen to look for it: "top left", and so on. */
+  /**
+   * Where to look for it: "top left" for the two controls that are on the sky
+   * itself, and the settings tab's own name for the two that live behind it.
+   */
   where: string;
   /** What it is and what it is worth. */
   meaning: string;

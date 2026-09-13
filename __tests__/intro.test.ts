@@ -288,22 +288,25 @@ test("and in the reader's language, since it is the panel's own words", () => {
 
 test("the corners page keys the controls the pictures do not show", () => {
   // A bare number in the corner of a camera view says nothing about what it
-  // counts. Each badge is the one the real screen wears, in the language being
-  // read — the filter's own title — or the page is a description of a panel
-  // rather than a picture of one.
+  // counts, and neither does a button drawn as three stacked planes. Each row
+  // wears the badge the real screen wears — the figure, or the glyph itself —
+  // or the page is a description of a control rather than a picture of one.
   for (const locale of LOCALES) {
     setLocaleForTesting(locale);
     const elements = introPages().flatMap((page) => page.elements ?? []);
 
-    expect(elements.map((element) => element.badge)).toEqual([
+    expect(elements.map((element) => element.badge ?? element.icon)).toEqual([
       "12",
-      strings().filter.title,
-      // The guide's own button: a glyph in a corner only explains itself to
-      // somebody who has been told once what is behind it.
-      "?",
-      "CONSOLE"
+      // The filter is an icon in the corner of the sky now, so the page keys
+      // the icon; the two rows behind the settings tab are found by looking
+      // for that tab, which is what their own glyph says.
+      "layers",
+      "settings",
+      "settings"
     ]);
     for (const element of elements) {
+      // Exactly one of the two, so a row is a badge or a glyph and never both.
+      expect(Boolean(element.badge) !== Boolean(element.icon)).toBe(true);
       expect(element.where.length).toBeGreaterThan(1);
       expect(element.meaning.length).toBeGreaterThan(15);
     }

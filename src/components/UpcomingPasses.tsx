@@ -5,7 +5,8 @@ import { strings } from "../i18n";
 import { passDirection, passSeeing, timeUntil } from "../i18n/format";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { OrbitEpoch } from "../types";
-import { panelStyles, theme } from "./theme";
+import { Icon } from "./Icon";
+import { glass, lift, theme } from "./theme";
 
 type Props = {
   /**
@@ -26,44 +27,51 @@ type Props = {
   epochRef: MutableRefObject<OrbitEpoch>;
   /** Open the card for one of them, as tapping its mark on the sky would. */
   onSelect: (name: string) => void;
+  /** Where it sits: laid over the card's own, by the stack that arranges it. */
+  style?: StyleProp<ViewStyle>;
 };
 
 /**
- * What is coming over, and how long there is to get outside.
+ * What is coming, as the card at the bottom of the sky.
  *
- * The third panel around the sky, and the only one in the future tense. The
- * count in the opposite corner says what is on the frame and the filter says
- * what may be drawn — both of them facts about this instant — and the question
- * neither answers is the one asked before the phone goes up at all: is anything
- * worth waiting for.
+ * The only panel in the app in the future tense. The count in the header says
+ * what is on the frame and the filter says what may be drawn — both of them
+ * facts about this instant — and the question neither answers is the one asked
+ * before the phone goes up at all: is anything worth waiting for.
  *
  * The app has always known. The landmarks carry their next three hours of sky
  * with them (`orbitPath.ts`), drawn as the arc each will trace — but an arc is
  * only an answer to somebody already pointing the phone at the piece of sky it
  * crosses, and for most of those three hours that is nobody: the plan covers
  * the whole sky and the camera holds sixty degrees of it. So the same plan is
- * read out here as a list, where it can be seen without hunting for it.
+ * read out here, where it can be seen without hunting for it.
  *
- * **Shut, it is the next pass**, not a title — `ISS · 14 min`, which is the
- * whole answer for most of the times anyone looks at it. That is the difference
- * between this pill and the two above it: their closed states are labels
- * because a filter has nothing to report until it is opened, and this one has
- * one fact worth more than its own name. Open, it is the rest of the plan: each
- * pass with where to stand for it, how high it gets, and whether it can be seen
- * when it comes.
+ * **Shut, it is the next pass** — the object, how long there is, where to stand
+ * and whether it can be seen — which is the whole answer for most of the times
+ * anyone looks at it. It stands in the one place on this screen that is a card
+ * rather than a control, directly above the tab bar, and it is the same card
+ * the satellite details open into: the bottom of the sky view says one thing at
+ * a time, and it is always the thing most worth reading.
+ *
+ * **Open, it is the rest of the plan**: each pass with where to stand for it,
+ * how high it gets, and whether it can be seen when it comes.
  *
  * **Nothing at all when there is nothing coming.** The tier filtered off, or a
  * sky where none of the landmarks clear the roofline for three hours — which at
- * high latitudes is most of them, most of the time — and the panel is not
- * drawn. A permanent pill saying "nothing" is a word over the picture in
- * exchange for the absence of news, and the intro says the panel comes and
- * goes for that reason.
+ * high latitudes is most of them, most of the time — and the card is not drawn.
+ * A permanent card saying "nothing" is a piece of the picture spent on the
+ * absence of news, and the intro says the card comes and goes for that reason.
  *
  * A row is a target, like the names written along the paths (`namesUnder`): it
- * opens the same card the object's own mark would, which for a pass that has
+ * opens the same details the object's own mark would, which for a pass that has
  * not begun is the card saying how far below the horizon it still is.
  */
-export const UpcomingPasses: React.FC<Props> = React.memo(({ passes, epochRef, onSelect }) => {
+export const UpcomingPasses: React.FC<Props> = React.memo(({
+  passes,
+  epochRef,
+  onSelect,
+  style
+}) => {
   // Nothing in this component's props changes when the console's picker changes
   // the language, and every word in the panel does. See `useLocale`.
   useLocale();
@@ -77,7 +85,7 @@ export const UpcomingPasses: React.FC<Props> = React.memo(({ passes, epochRef, o
       expanded={expanded}
       onToggle={() => setExpanded((open) => !open)}
       onSelect={onSelect}
-      style={styles.position}
+      style={style}
     />
   );
 });
@@ -91,16 +99,16 @@ type PanelProps = {
   expanded: boolean;
   onToggle: () => void;
   onSelect: (name: string) => void;
-  /** Where it sits: the overlay pins it to a corner, the intro lays it out. */
+  /** Laid over the card's own: the intro lays it out, the sky view does not. */
   style?: StyleProp<ViewStyle>;
 };
 
 /**
- * The panel as it is drawn, with nothing of its own to remember or to tick.
+ * The card as it is drawn, with nothing of its own to remember or to tick.
  *
  * Apart from `UpcomingPasses` for the intro, which shows it shut and open over
  * a plan made up for the picture (`introFigures.ts`). Drawn by this code rather
- * than copied, so the page is a picture of the panel and cannot drift from it.
+ * than copied, so the page is a picture of the card and cannot drift from it.
  */
 export const PassesPanel: React.FC<PanelProps> = ({
   passes,
@@ -115,32 +123,62 @@ export const PassesPanel: React.FC<PanelProps> = ({
   if (!next) return null;
 
   return (
-    <View style={[panelStyles.panel, styles.panel, style]}>
+    <View style={[styles.card, style]}>
+      {/* The grip. It is not a drag handle — nothing here is dragged — it is
+          the mark every sheet on this platform wears to say it opens, and it
+          is what makes a tap on the card an obvious thing to try. */}
+      <View style={styles.gripRow}>
+        <View style={styles.grip} />
+      </View>
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t.open}
         aria-expanded={expanded}
-        style={[styles.header, expanded && styles.headerOpen]}
-        hitSlop={{ top: 8, bottom: 8, left: 10, right: 10 }}
+        style={styles.head}
         onPress={onToggle}
       >
-        {expanded ? (
-          <Text style={[panelStyles.title, styles.headerTitle]}>{t.title}</Text>
-        ) : (
-          <>
-            {/* Capped and clipped rather than wrapped: shut, this pill is one
-                line and `Einstein Probe` is the longest name the tier has. */}
-            <Text numberOfLines={1} style={styles.name}>
-              {next.name}
-            </Text>
-            <Text style={styles.when}>{timeUntil(next.startsAtMs - nowMs)}</Text>
-          </>
-        )}
-        <Text style={styles.chevron}>{expanded ? "▴" : "▾"}</Text>
+        <View style={styles.badge}>
+          <Icon name="sky" size={20} color={theme.color.accent} />
+        </View>
+
+        <View style={styles.headText}>
+          {expanded ? (
+            <Text style={styles.title}>{t.title}</Text>
+          ) : (
+            <>
+              <View style={styles.nameRow}>
+                {/* Capped and clipped rather than wrapped: shut, this line is
+                    one row and `Einstein Probe` is the longest name the tier
+                    has. */}
+                <Text numberOfLines={1} style={styles.name}>
+                  {next.name}
+                </Text>
+                <Text style={styles.when}>{timeUntil(next.startsAtMs - nowMs)}</Text>
+              </View>
+              {/* Two lines rather than one: this is a bearing, a height and a
+                  verdict, and in the longer languages that runs past the width
+                  of the card. Clipped, what goes first is the verdict, which
+                  is the half that decides whether the countdown is worth
+                  acting on. */}
+              <Text numberOfLines={2} style={styles.meta}>
+                {passDirection(next)} ·{" "}
+                <Text style={seeingStyle(next)}>{passSeeing(next.nakedEye)}</Text>
+              </Text>
+            </>
+          )}
+        </View>
+
+        <Icon
+          name="chevron"
+          size={16}
+          direction={expanded ? "down" : "up"}
+          color={theme.color.textFaint}
+        />
       </Pressable>
 
       {expanded && (
-        // A list, and said to be one: what is under the pill is several passes
+        // A list, and said to be one: what is under the card is several passes
         // rather than one panel's worth of prose, and the rows are the targets.
         <View accessibilityRole="list" style={styles.list}>
           {passes.map((pass) => (
@@ -154,19 +192,23 @@ export const PassesPanel: React.FC<PanelProps> = ({
               style={styles.row}
               onPress={() => onSelect(pass.name)}
             >
-              <View style={styles.rowHead}>
-                <Text numberOfLines={1} style={styles.rowName}>
-                  {pass.name}
+              <View style={styles.rowText}>
+                <View style={styles.nameRow}>
+                  <Text numberOfLines={1} style={styles.rowName}>
+                    {pass.name}
+                  </Text>
+                  <Text style={styles.when}>{timeUntil(pass.startsAtMs - nowMs)}</Text>
+                </View>
+                {/* Where to stand and what it is worth, then whether it can be
+                    seen at all — in that order, because the first two are facts
+                    about the sky and the third is the one that decides whether
+                    either is worth acting on. */}
+                <Text style={styles.meta}>
+                  {passDirection(pass)} ·{" "}
+                  <Text style={seeingStyle(pass)}>{passSeeing(pass.nakedEye)}</Text>
                 </Text>
-                <Text style={styles.when}>{timeUntil(pass.startsAtMs - nowMs)}</Text>
               </View>
-              {/* Where to stand and what it is worth, then whether it can be
-                  seen at all — in that order, because the first two are facts
-                  about the sky and the third is the one that decides whether
-                  either is worth acting on. */}
-              <Text style={styles.rowMeta}>
-                {passDirection(pass)} · <Text style={seeingStyle(pass)}>{passSeeing(pass.nakedEye)}</Text>
-              </Text>
+              <Icon name="chevron" size={14} color={theme.color.textFaint} />
             </Pressable>
           ))}
         </View>
@@ -176,8 +218,8 @@ export const PassesPanel: React.FC<PanelProps> = ({
 };
 
 /**
- * The verdict's own weight: bright for a pass somebody could go and see, the
- * same faint grey as the rest of the line for one they could not.
+ * The verdict's own weight: the app's accent for a pass somebody could go and
+ * see, the same faint grey as the rest of the line for one they could not.
  *
  * Not the marks' half-strength channel, which says one particular thing — the
  * object is in the Earth's shadow (`filter.shadowKey`) — and would be saying it
@@ -201,7 +243,7 @@ function seeingStyle(pass: UpcomingPass) {
  * From the epoch rather than `Date.now()`, because that is the clock the plan
  * itself was made against — a recording being replayed has its own, and a seek
  * moves it by hours. The interval keeps running while the panel is shut, which
- * costs the same and is what keeps the one fact the shut pill carries true.
+ * costs the same and is what keeps the one fact the shut card carries true.
  */
 function useEpochSeconds(epochRef: MutableRefObject<OrbitEpoch>): number {
   const [nowMs, setNowMs] = useState(() => epochRef.current.time.getTime());
@@ -214,89 +256,96 @@ function useEpochSeconds(epochRef: MutableRefObject<OrbitEpoch>): number {
   return nowMs;
 }
 
+const BADGE_SIZE = 38;
+
 const styles = StyleSheet.create({
-  position: {
-    // The bottom-left corner, level with the console toggle in the opposite
-    // one — the same `bottom: 12` every panel in this row keeps, so the two
-    // sides read as one row rather than one of them floating above it. The
-    // compass notice shares this exact corner; the overlay does not draw this
-    // panel while that is up, or while a card covers the row instead.
-    bottom: 12,
-    left: 12
+  card: {
+    borderRadius: theme.radius.sheet,
+    paddingBottom: 6,
+    ...glass(theme.color.panel, 26),
+    ...lift
   },
-  panel: {
-    // The padding is the header's, so the whole pill is the tap target rather
-    // than a line of text with dead margin around it — as the two above it.
-    padding: 0
-    // Background left to `panelStyles.panel`, which is `theme.color.panel` —
-    // the same tone the console toggle and the filter panel are drawn in.
-    // This used to override it with a lighter, more transparent black, which
-    // read as a different (and unintentional) design from its neighbours.
+  gripRow: {
+    alignItems: "center",
+    paddingTop: 7
   },
-  header: {
+  grip: {
+    width: 34,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.color.divider
+  },
+  head: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10
   },
-  headerOpen: {
-    paddingBottom: 2
+  badge: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: theme.color.accentBorder,
+    backgroundColor: theme.color.accentSoft
   },
-  headerTitle: {
-    // The title row is the panel's heading when it is open, and `panelStyles`
-    // spaces it for a block underneath; the list below supplies that spacing.
-    marginBottom: 0
+  headText: {
+    flex: 1,
+    gap: 2
+  },
+  title: {
+    color: theme.color.textDim,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1.4
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   name: {
-    // Long enough for the longest name the landmark tier carries, and no
-    // longer: this sits over the sky.
-    maxWidth: 110,
+    flex: 1,
     color: theme.color.textBright,
-    fontSize: 11,
-    fontWeight: "700"
+    fontSize: 15,
+    fontWeight: "600"
   },
   when: {
     color: theme.color.text,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "600",
     fontVariant: ["tabular-nums"]
   },
-  chevron: {
-    color: theme.color.textFaint,
-    fontSize: 9,
-    fontWeight: "700"
+  meta: {
+    color: theme.color.textDim,
+    fontSize: 11,
+    fontWeight: "500",
+    lineHeight: 15
   },
   list: {
-    paddingHorizontal: 10,
-    paddingBottom: 10
+    paddingHorizontal: 14,
+    paddingBottom: 6
   },
   row: {
-    // The width the count panel's fleet rows keep, and for the same reason:
-    // two panels of different widths over one photograph read as two designs.
-    width: 170,
-    paddingTop: 7,
-    marginTop: 5,
-    borderTopWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 9,
+    borderTopWidth: StyleSheet.hairlineWidth * 2,
     borderTopColor: theme.color.divider
   },
-  rowHead: {
-    flexDirection: "row",
-    alignItems: "center"
+  rowText: {
+    flex: 1,
+    gap: 2
   },
   rowName: {
     flex: 1,
-    marginRight: 8,
-    color: theme.color.textBright,
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  rowMeta: {
-    marginTop: 2,
-    color: theme.color.textFaint,
-    fontSize: 9,
-    fontWeight: "600",
-    lineHeight: 13
+    color: theme.color.text,
+    fontSize: 13,
+    fontWeight: "600"
   },
   seeingVisible: {
     color: theme.color.accent

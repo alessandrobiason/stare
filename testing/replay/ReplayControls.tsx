@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { panelStyles, theme } from "../../src/components/theme";
+import { glass, theme } from "../../src/components/theme";
 
 /**
  * `react-native-web` has no range primitive, so the DOM element is used
@@ -70,7 +70,7 @@ export const ReplayControls: React.FC<Props> = ({ videoRef }) => {
   };
 
   return (
-    <View style={[panelStyles.panel, styles.bar]}>
+    <View style={styles.bar}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={playing ? "Pause the recording" : "Play the recording"}
@@ -119,33 +119,31 @@ const RANGE_STYLE = {
 } as const;
 
 const styles = StyleSheet.create({
+  /**
+   * In the app's own bottom stack, above the compass strip.
+   *
+   * It used to run along the bottom of the screen between two of the app's
+   * corners, and there are no corners left to take: the app's card, compass
+   * and tab bar fill that edge now (`SkyOverlay`). So the harness hands this
+   * to the view as the strip the phone puts its compass notice in, and it is
+   * laid out with everything else instead of on top of it — which also keeps
+   * the range input, which swallows every click over it, off the app's own
+   * controls.
+   */
   bar: {
-    // Clear of the upcoming-passes panel, which claims this exact corner on
-    // the phone too (`UpcomingPasses`) — 10 of padding, a 110pt name, a
-    // countdown up to `1h 22m` and a chevron is a little over 200pt at its
-    // widest, open or shut. The phone never has both at once (the passes panel
-    // gives way to a compass warning in that corner); the harness has no
-    // compass warning and this bar is permanent, so it is this that has to
-    // give the space rather than the app's own panel losing it in every build.
-    // Without the clearance, the range input painted on top of it swallowed
-    // every click meant for the panel underneath.
-    left: 220,
-    bottom: 12,
-    // Clear of the console toggle, which owns the bottom-right corner.
-    right: 116,
-    // The toggle's height, so the two read as one row along the bottom edge.
-    height: 38,
+    alignSelf: "center",
+    height: 34,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    // The shared panel's padding is for a stack of readouts; this is a single
-    // row of controls that fills its height.
-    paddingVertical: 0
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    ...glass(theme.color.panel, 20)
   },
   button: {
     width: 26,
     height: 26,
-    borderRadius: 4,
+    borderRadius: theme.radius.pill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.color.control

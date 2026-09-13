@@ -48,10 +48,10 @@ export const en: Strings = {
     },
     passes: {
       title: "Coming up",
-      body: "The bottom-left corner shows what will pass over you next.",
+      body: "The card at the bottom of the sky shows what will pass over you next.",
       shut: "The next one, and how long until it appears.",
       open: "Tap to see the next few hours: where to look, how high it gets and whether you'll see it.",
-      footnote: "If nothing is coming, the corner stays empty."
+      footnote: "If nothing is coming, the card is not there at all."
     },
     corners: {
       title: "Around the edges",
@@ -65,11 +65,11 @@ export const en: Strings = {
         meaning: "Choose which kinds of satellite to show."
       },
       guide: {
-        where: "Bottom right",
+        where: "Settings",
         meaning: "Shows these pages again, whenever you need them."
       },
       console: {
-        where: "Bottom right",
+        where: "Settings",
         meaning: "Technical readings, in English. You won't need them."
       }
     },
@@ -93,6 +93,11 @@ export const en: Strings = {
     open: "Help",
     close: "Close help",
     done: "BACK TO THE SKY"
+  },
+  tabs: {
+    sky: "Sky",
+    catalog: "Catalog",
+    settings: "Settings"
   },
   scene: {
     visibleSatellites: "{count} visible satellites",
@@ -120,6 +125,9 @@ export const en: Strings = {
         daylight: "daylight — nothing to see",
         unknown: "brightness not recorded"
       }
+    },
+    compass: {
+      facing: "Facing {point}"
     }
   },
   filter: {
@@ -190,6 +198,10 @@ export const en: Strings = {
     failed: "Could not start",
     tryAgain: "TRY AGAIN",
     unsupported: "This device cannot run the sky view."
+  },
+  catalog: {
+    soon:
+      "Look up any object in the catalog, whether or not it is over you right now. Not built yet."
   },
   language: {
     title: "Language",

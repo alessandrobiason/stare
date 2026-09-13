@@ -38,12 +38,12 @@ export const de: Strings = {
     },
     passes: {
       title: "Demnächst",
-      body: "Unten links steht, was als Nächstes über dich hinwegzieht.",
+      body: "Die Karte unten zeigt, was als Nächstes über dich hinwegzieht.",
       shut: "Der nächste Überflug und wie lange es noch dauert.",
       open:
         "Tippe darauf für die nächsten Stunden: wohin du schauen musst, wie hoch er steigt " +
         "und ob er zu sehen ist.",
-      footnote: "Kommt nichts, bleibt die Ecke leer."
+      footnote: "Kommt nichts, ist die Karte gar nicht da."
     },
     corners: {
       title: "In den Ecken",
@@ -57,11 +57,11 @@ export const de: Strings = {
         meaning: "Wähle, welche Arten von Satelliten angezeigt werden."
       },
       guide: {
-        where: "Unten rechts",
+        where: "Einstellungen",
         meaning: "Zeigt diese Seiten wieder, wann immer du sie brauchst."
       },
       console: {
-        where: "Unten rechts",
+        where: "Einstellungen",
         meaning: "Technische Daten, auf Englisch. Brauchst du nicht."
       }
     },
@@ -85,6 +85,11 @@ export const de: Strings = {
     open: "Hilfe",
     close: "Hilfe schließen",
     done: "ZURÜCK ZUM HIMMEL"
+  },
+  tabs: {
+    sky: "Himmel",
+    catalog: "Katalog",
+    settings: "Einstellungen"
   },
   scene: {
     visibleSatellites: "{count} sichtbare Satelliten",
@@ -112,6 +117,9 @@ export const de: Strings = {
         daylight: "Tageslicht — nichts zu sehen",
         unknown: "Helligkeit nicht erfasst"
       }
+    },
+    compass: {
+      facing: "Blick nach {point}"
     }
   },
   filter: {
@@ -183,6 +191,10 @@ export const de: Strings = {
     failed: "Start fehlgeschlagen",
     tryAgain: "NOCHMAL VERSUCHEN",
     unsupported: "Dieses Gerät kann die Himmelsansicht nicht anzeigen."
+  },
+  catalog: {
+    soon:
+      "Jedes Objekt im Katalog nachschlagen, auch wenn es gerade nicht über dir steht. Gibt es noch nicht."
   },
   language: {
     title: "Sprache",

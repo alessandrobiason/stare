@@ -13,11 +13,24 @@ import { expect, test } from "@playwright/test";
 // panels speak whatever language the browser asks for (`src/i18n`), and a
 // selector written against one of them has to know which.
 const BOOTED = '[aria-label$="visible satellites"]';
-const CONSOLE_TOGGLE = '[aria-label="CONSOLE"]';
+const SETTINGS_TAB = '[role="tab"][aria-label="Settings"]';
+const SKY_TAB = '[role="tab"][aria-label="Sky"]';
+const CONSOLE_ROW = '[aria-label="CONSOLE"]';
 const PASSES = '[aria-label="Upcoming passes"]';
 const CARD = '[aria-label="Satellite details"]';
-const GUIDE_TOGGLE = '[aria-label="Help"]';
+const FILTER = '[aria-label="Category filter"]';
+const GUIDE_ROW = '[aria-label="Help"]';
 const GUIDE_CLOSE = '[aria-label="Close help"]';
+const COMPASS = '[aria-label^="Facing"]';
+
+/**
+ * Opens the console, which is two taps now rather than one: it is a row in the
+ * settings tab, and pressing it comes back to the sky with the overlays up.
+ */
+async function openConsole(page: import("@playwright/test").Page): Promise<void> {
+  await page.locator(SETTINGS_TAB).click();
+  await page.locator(CONSOLE_ROW).click();
+}
 
 test.describe("replay overlay", () => {
   test("boots into the scene without React refusing an update cascade", async ({ page }) => {
@@ -42,7 +55,7 @@ test.describe("replay overlay", () => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
     // The mask is a console overlay, and the view opens in normal mode.
-    await page.locator(CONSOLE_TOGGLE).click();
+    await openConsole(page);
     // The mask model may still be loading; the grid only mounts once it lands.
     await page.locator("canvas").first().waitFor({ timeout: 300000 });
 
@@ -62,7 +75,10 @@ test.describe("replay overlay", () => {
     // Nothing from the console is on screen until it is asked for.
     await expect(page.locator("text=Behind terrain")).toHaveCount(0);
 
-    await page.locator(CONSOLE_TOGGLE).click();
+    await openConsole(page);
+    // It comes back to the sky to draw: the console's overlays are over the
+    // picture, and the settings sheet covers the picture. See `openConsole`.
+    await expect(page.locator(SKY_TAB)).toHaveAttribute("aria-selected", "true");
     // The scene's own page comes first: under the replay, the recorded streams.
     await expect(page.locator("text=Orbit time").first()).toBeVisible();
 
@@ -72,8 +88,36 @@ test.describe("replay overlay", () => {
     await page.getByRole("tab", { name: "SKY", exact: true }).click();
     await expect(page.locator("text=Behind terrain").first()).toBeVisible();
 
-    await page.locator(CONSOLE_TOGGLE).click();
+    await page.locator('[aria-label="Leave console"]').click();
     await expect(page.locator("text=Behind terrain")).toHaveCount(0);
+  });
+
+  test("the filter is an icon, and its panel is behind it", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+
+    // Nothing of the list over the sky until the button is pressed — not even
+    // the word FILTER, which used to sit in that corner.
+    await expect(page.getByText("SHOW ALL")).toHaveCount(0);
+
+    await page.locator(FILTER).click();
+    await expect(page.getByText("SHOW ALL").first()).toBeVisible();
+
+    // And a tap on the sky puts it away, as a tap outside an open menu does
+    // everywhere else on this platform.
+    await page.locator('[aria-label="Satellite markers"]').click({ position: { x: 40, y: 320 } });
+    await expect(page.getByText("SHOW ALL")).toHaveCount(0);
+  });
+
+  test("the compass strip says which way the camera is pointing", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+
+    // One reading rather than eight letters read out one after another, and it
+    // is one of the eight points the rest of the app gives bearings in.
+    const facing = page.locator(COMPASS).first();
+    await expect(facing).toBeVisible();
+    expect(await facing.getAttribute("aria-label")).toMatch(/^Facing (N|NE|E|SE|S|SW|W|NW)$/);
   });
 
   /**
@@ -95,18 +139,28 @@ test.describe("replay overlay", () => {
 
     test("the panels come up in Italian, not in English", async ({ page }) => {
       await page.goto("/");
-      // The marker count says what it counts, in Italian.
+      // The line under the app's name says what is over you, in Italian.
       await page
         .locator('[aria-label$="satelliti visibili"]')
         .first()
         .waitFor({ timeout: 300000 });
 
-      // The filter pill, which is a translated word over the sky.
-      await expect(page.getByText("FILTRO", { exact: true }).first()).toBeVisible();
+      // The bar along the bottom, which is three translated words.
+      await expect(page.getByText("Cielo", { exact: true }).first()).toBeVisible();
+      await expect(page.getByText("Catalogo", { exact: true }).first()).toBeVisible();
+      await expect(page.getByText("Impostazioni", { exact: true }).first()).toBeVisible();
       await expect(page.locator(BOOTED)).toHaveCount(0);
 
-      // And the console stays in English, deliberately — see `CONSOLE_LABEL`.
-      await expect(page.locator(CONSOLE_TOGGLE)).toBeVisible();
+      // And the compass strip, whose reading is translated with the rest of
+      // the panels — `COMPASS` above is the English one — and whose letters are
+      // that language's own: Italian turns west into O. See `strings().compass`.
+      const facing = page.locator('[aria-label^="Direzione"]').first();
+      await facing.waitFor({ timeout: 30000 });
+      expect(await facing.getAttribute("aria-label")).toMatch(/^Direzione (N|NE|E|SE|S|SO|O|NO)$/);
+
+      // The console stays in English, deliberately — see `CONSOLE_LABEL`.
+      await page.locator('[role="tab"][aria-label="Impostazioni"]').click();
+      await expect(page.locator(CONSOLE_ROW)).toBeVisible();
     });
   });
 
@@ -219,7 +273,8 @@ test.describe("the guide", () => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
 
-    await page.locator(GUIDE_TOGGLE).click();
+    await page.locator(SETTINGS_TAB).click();
+    await page.locator(GUIDE_ROW).click();
     // The first of the pages about the screen, and nothing about starting the
     // app: no button asking for access that was granted long ago.
     await expect(page.getByText("What you'll see").first()).toBeVisible();
@@ -227,19 +282,10 @@ test.describe("the guide", () => {
 
     await page.locator(GUIDE_CLOSE).click();
     await expect(page.getByText("What you'll see")).toHaveCount(0);
-    // The same scene, still up.
+    // Back on the settings tab it was opened from, with the scene still up
+    // behind it.
+    await expect(page.locator(GUIDE_ROW)).toBeVisible();
+    await page.locator(SKY_TAB).click();
     await expect(page.locator(BOOTED).first()).toBeVisible();
-    await expect(page.locator(GUIDE_TOGGLE)).toBeVisible();
-  });
-
-  test("steps aside while the console's panel is open over its spot", async ({ page }) => {
-    await page.goto("/");
-    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
-
-    await expect(page.locator(GUIDE_TOGGLE)).toBeVisible();
-    await page.locator(CONSOLE_TOGGLE).click();
-    await expect(page.locator(GUIDE_TOGGLE)).toHaveCount(0);
-    await page.locator(CONSOLE_TOGGLE).click();
-    await expect(page.locator(GUIDE_TOGGLE)).toBeVisible();
   });
 });

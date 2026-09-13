@@ -36,7 +36,7 @@ export const ko: Strings = {
     },
     passes: {
       title: "곧 지나갈 위성",
-      body: "왼쪽 아래에 다음으로 머리 위를 지날 위성이 표시됩니다.",
+      body: "화면 아래 카드에 다음으로 머리 위를 지날 위성이 표시됩니다.",
       shut: "다음 위성과 나타나기까지 남은 시간입니다.",
       open: "누르면 앞으로 몇 시간 동안의 목록이 나옵니다. 어디를 볼지, 얼마나 높이 오를지, 눈으로 보이는지 알 수 있습니다.",
       footnote: "한동안 지나가는 위성이 없으면 표시되지 않습니다."
@@ -53,11 +53,11 @@ export const ko: Strings = {
         meaning: "표시할 위성 종류를 고를 수 있습니다."
       },
       guide: {
-        where: "오른쪽 아래",
+        where: "설정",
         meaning: "이 페이지들을 언제든 다시 볼 수 있습니다."
       },
       console: {
-        where: "오른쪽 아래",
+        where: "설정",
         meaning: "기술 데이터이며 영어로만 나옵니다. 평소에는 필요 없습니다."
       }
     },
@@ -81,6 +81,11 @@ export const ko: Strings = {
     open: "도움말",
     close: "도움말 닫기",
     done: "하늘로 돌아가기"
+  },
+  tabs: {
+    sky: "하늘",
+    catalog: "목록",
+    settings: "설정"
   },
   scene: {
     visibleSatellites: "보이는 위성 {count}개",
@@ -108,6 +113,9 @@ export const ko: Strings = {
         daylight: "낮 — 볼 수 없음",
         unknown: "밝기 기록 없음"
       }
+    },
+    compass: {
+      facing: "{point} 방향"
     }
   },
   filter: {
@@ -178,6 +186,10 @@ export const ko: Strings = {
     failed: "시작하지 못했습니다",
     tryAgain: "다시 시도",
     unsupported: "이 기기에서는 하늘 화면을 실행할 수 없습니다."
+  },
+  catalog: {
+    soon:
+      "지금 머리 위에 없는 것도 포함해, 목록의 모든 물체를 찾아볼 수 있습니다. 아직 준비 중입니다."
   },
   language: {
     title: "언어",

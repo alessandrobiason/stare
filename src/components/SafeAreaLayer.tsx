@@ -13,12 +13,12 @@ type Props = {
    * Takes the layer off the screen without taking anything in it down.
    *
    * For while something is laid over the whole view — the guide
-   * (`IntroScreen`'s `guide` mode). The panels would otherwise show through its
-   * dimmed backdrop as a second set of controls under its own, and the guide's
-   * button drawn over the ghost of the console is a screen that reads as two.
-   * Hidden rather than unmounted, so a filter left open is still open when the
-   * guide is put away; and hidden rather than transparent, so a screen reader
-   * does not find them behind it either.
+   * (`IntroScreen`'s `guide` mode). The controls would otherwise show through
+   * its dimmed backdrop as a second set under its own, and the guide's button
+   * drawn over the ghost of a tab bar is a screen that reads as two. Hidden
+   * rather than unmounted, so a filter left open is still open when the guide
+   * is put away; and hidden rather than transparent, so a screen reader does
+   * not find them behind it either.
    */
   hidden?: boolean;
 };
@@ -32,11 +32,13 @@ type Props = {
  * on a tall phone that is a third of the screen spent on nothing.
  *
  * What does have to be inset is everything written *over* it, which is what
- * this is for. The panels place themselves absolutely as they always have —
- * `top: 20`, `bottom: 12`, a corner each — and this layer is the box those
- * corners belong to: it is the safe area itself, positioned to it, so a panel
- * measuring from its parent's top-left is measuring from below the clock.
- * Nothing else about a panel knows this exists.
+ * this is for. The controls place themselves absolutely against their parent —
+ * the header at the top, the stack of cards and the tab bar at the bottom — and
+ * this layer is the box they are placed against: it is the safe area itself,
+ * positioned to it, so a header measuring from its parent's top-left is
+ * measuring from below the clock and a tab bar sitting on its parent's bottom
+ * edge is sitting above the home indicator. Nothing else about a control knows
+ * this exists.
  *
  * The edges are the layer's own `top`/`left`/`right`/`bottom` rather than
  * padding, and that is the whole of what makes it work. React Native's layout
@@ -49,9 +51,9 @@ type Props = {
  * top two. Moving the layer's own edges is what a panel's corner follows.
  *
  * `pointerEvents: "box-none"`, so the layer is not a sheet of glass over the
- * sky: a tap between the panels falls through to the picture underneath, which
- * is the one control the normal view has (`SkyOverlay`). Only the panels
- * themselves take touches.
+ * sky: a tap between the controls falls through to the picture underneath,
+ * which is the one control the normal view has (`SkyOverlay`). Only the
+ * controls themselves take touches.
  *
  * The insets come from `react-native-safe-area-context` — the phone's real
  * ones, read from the window rather than assumed from a screen size, and the

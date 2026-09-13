@@ -38,12 +38,12 @@ export const nl: Strings = {
     },
     passes: {
       title: "Binnenkort",
-      body: "Linksonder zie je wat er straks over je heen komt.",
+      body: "De kaart onderin laat zien wat er straks over je heen komt.",
       shut: "De volgende en hoe lang het nog duurt.",
       open:
         "Tik erop voor de komende uren: waar je moet kijken, hoe hoog hij komt en of je hem " +
         "kunt zien.",
-      footnote: "Komt er niets aan, dan blijft die hoek leeg."
+      footnote: "Komt er niets aan, dan is de kaart er niet."
     },
     corners: {
       title: "In de hoeken",
@@ -57,11 +57,11 @@ export const nl: Strings = {
         meaning: "Kies welke soorten satellieten je wilt zien."
       },
       guide: {
-        where: "Rechtsonder",
+        where: "Instellingen",
         meaning: "Laat deze pagina's opnieuw zien wanneer je ze nodig hebt."
       },
       console: {
-        where: "Rechtsonder",
+        where: "Instellingen",
         meaning: "Technische gegevens, in het Engels. Heb je niet nodig."
       }
     },
@@ -85,6 +85,11 @@ export const nl: Strings = {
     open: "Help",
     close: "Help sluiten",
     done: "TERUG NAAR DE HEMEL"
+  },
+  tabs: {
+    sky: "Hemel",
+    catalog: "Catalogus",
+    settings: "Instellingen"
   },
   scene: {
     visibleSatellites: "{count} zichtbare satellieten",
@@ -112,6 +117,9 @@ export const nl: Strings = {
         daylight: "het is dag — niets te zien",
         unknown: "helderheid niet vastgelegd"
       }
+    },
+    compass: {
+      facing: "Gericht op {point}"
     }
   },
   filter: {
@@ -183,6 +191,10 @@ export const nl: Strings = {
     failed: "Kon niet starten",
     tryAgain: "OPNIEUW",
     unsupported: "Dit toestel kan de hemelweergave niet draaien."
+  },
+  catalog: {
+    soon:
+      "Zoek elk object uit de catalogus op, of het nu boven je staat of niet. Nog niet gebouwd."
   },
   language: {
     title: "Taal",

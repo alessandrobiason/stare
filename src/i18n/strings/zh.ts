@@ -36,10 +36,10 @@ export const zh: Strings = {
     },
     passes: {
       title: "即将经过",
-      body: "左下角会显示接下来从你头顶经过的卫星。",
+      body: "屏幕下方的卡片会显示接下来从你头顶经过的卫星。",
       shut: "下一个经过的卫星，以及还要多久出现。",
       open: "点开可查看接下来几小时：往哪看、升到多高、能不能用肉眼看到。",
-      footnote: "如果近期没有卫星经过，这里就不显示。"
+      footnote: "如果近期没有卫星经过，这张卡片就不出现。"
     },
     corners: {
       title: "屏幕边角",
@@ -53,11 +53,11 @@ export const zh: Strings = {
         meaning: "在这里选择要显示哪些类型的卫星。"
       },
       guide: {
-        where: "右下角",
+        where: "设置",
         meaning: "需要时，随时可以再打开这几页说明。"
       },
       console: {
-        where: "右下角",
+        where: "设置",
         meaning: "技术数据，只有英文。平时用不到。"
       }
     },
@@ -81,6 +81,11 @@ export const zh: Strings = {
     open: "帮助",
     close: "关闭帮助",
     done: "回到天空"
+  },
+  tabs: {
+    sky: "天空",
+    catalog: "目录",
+    settings: "设置"
   },
   scene: {
     visibleSatellites: "可见卫星 {count} 颗",
@@ -108,6 +113,9 @@ export const zh: Strings = {
         daylight: "白天 — 看不到",
         unknown: "亮度未记录"
       }
+    },
+    compass: {
+      facing: "朝向{point}"
     }
   },
   filter: {
@@ -175,6 +183,10 @@ export const zh: Strings = {
     failed: "无法启动",
     tryAgain: "重试",
     unsupported: "此设备无法运行天空视图。"
+  },
+  catalog: {
+    soon:
+      "查找目录里的任何物体，即使它此刻不在你头顶。还没做好。"
   },
   language: {
     title: "语言",

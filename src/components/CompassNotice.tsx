@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { COMPASS_ACCURACY } from "../constants";
 import { strings } from "../i18n";
-import { panelStyles, theme } from "./theme";
+import { glass, theme } from "./theme";
 
 type Props = {
   /** The platform's grade of its own compass, or `undefined` before the first heading. */
@@ -34,10 +34,17 @@ type Props = {
  * screen are the wrong satellites, steadily, and nothing about the view says so.
  *
  * Which is why this is a sentence over the sky where boot's warnings are not
- * (see `DebugToggle`). Those last the session and would be a permanent
- * paragraph on any phone missing a sensor; this one names something the phone
- * can fix in five seconds, and takes itself away when it has been — the
- * platform regrades its compass as the figure-eight feeds its calibration.
+ * (those are a dot on the settings tab — see `TabBar`). Boot's warnings last
+ * the session and would be a permanent paragraph on any phone missing a
+ * sensor; this one names something the phone can fix in five seconds, and
+ * takes itself away when it has been — the platform regrades its compass as
+ * the figure-eight feeds its calibration.
+ *
+ * It stands at the top of the stack the bottom of the sky view is built from,
+ * directly above the compass strip it is a warning about, and everything under
+ * it moves down rather than out of the way: the card and the strip are laid
+ * out in a column, so a notice appearing costs the picture its own height and
+ * nothing else. See `SkyOverlay`.
  *
  * Two states, and the accuracy wins: a compass the platform will not vouch for
  * makes the declination question moot, since a few degrees of true-versus-
@@ -55,28 +62,17 @@ export const CompassNotice: React.FC<Props> = (props) => {
   if (!notice) return null;
 
   return (
-    <View style={[panelStyles.panel, styles.notice]} accessibilityRole="alert">
-      <Text style={styles.title}>{notice.title}</Text>
-      <Text style={styles.detail}>{notice.detail}</Text>
+    <View style={styles.notice} accessibilityRole="alert">
+      <View style={styles.mark} />
+      <View style={styles.words}>
+        <Text style={styles.title}>{notice.title}</Text>
+        <Text style={styles.detail}>{notice.detail}</Text>
+      </View>
     </View>
   );
 };
 
 type Notice = { title: string; detail: string };
-
-/**
- * Whether this notice is going to be on screen, for whoever else wants the
- * strip it stands in.
- *
- * The notice runs the width of the bottom-left corner and grows upwards as its
- * sentence wraps, so the panel that sits above it — the upcoming passes — has
- * to know when it is there. Exported as the predicate rather than measured off
- * the rendered thing, because a scene has to decide what to draw before either
- * of them has a height. See `SkyOverlay`.
- */
-export function compassNoticeShowing(props: Props): boolean {
-  return noticeFor(props) !== null;
-}
 
 function noticeFor({ accuracy, declinationKnown, skyFixStanding }: Props): Notice | null {
   // Nothing at all while the sky is aiming the view: both notices are about the
@@ -96,27 +92,41 @@ const styles = StyleSheet.create({
   notice: {
     // Nothing here is touchable, and it sits over the picture.
     pointerEvents: "none",
-    // The bottom strip, sharing its row with the console toggle: the toggle is
-    // 92pt wide at `right: 12`, so this stops short of it, and the satellite
-    // card opens from `bottom: 58` upwards and clears it too. The top corners
-    // are both spoken for — the marker count on the left, the filter on the
-    // right, and the filter grows downwards as it opens.
-    bottom: 12,
-    left: 12,
-    right: 112,
-    borderWidth: 1,
-    borderColor: theme.color.warning
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.panel,
+    ...glass(theme.color.panelDeep, 20),
+    borderColor: "rgba(240, 198, 116, 0.35)"
+  },
+  /**
+   * The warning colour, as a bar down the side rather than as an outline.
+   *
+   * An amber border around a panel over a camera picture is a rectangle of
+   * colour on the sky; a bar is the same claim in a tenth of the ink, and it
+   * is the shape every notice on this platform wears.
+   */
+  mark: {
+    width: 3,
+    alignSelf: "stretch",
+    borderRadius: 2,
+    backgroundColor: theme.color.warning
+  },
+  words: {
+    flex: 1
   },
   title: {
     color: theme.color.warning,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700"
   },
   detail: {
     marginTop: 3,
     color: theme.color.textDim,
-    fontSize: 10,
-    lineHeight: 13
+    fontSize: 11,
+    lineHeight: 15
   }
 });
 

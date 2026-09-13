@@ -198,11 +198,68 @@ const DAYLIGHT_COLORS = {
 };
 const OUTLINE = { night: "rgba(3, 9, 17, 0.85)", daylight: "rgba(244, 248, 253, 0.9)" };
 
-function statusPanel(scene) {
-  // What is on the screen rather than what is on the frame, as the app counts
-  // it: the picture covers the screen, so the marks past its sides are drawn
-  // and clipped, and a count that included them would be a number nobody can
-  // check against the sky in front of them. See `pointInViewport`.
+/**
+ * The glyphs the control layer wears, as SVG.
+ *
+ * The app composes these out of views because React Native has no vector
+ * primitive without another native dependency (`src/components/Icon.tsx`); a
+ * browser has one, so these are the same shapes drawn the short way. Same
+ * proportions, same stroke weights, same colours.
+ */
+const ICONS = {
+  layers: (color) =>
+    `<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round">
+      <path d="M10 2.6 17 6.6 10 10.6 3 6.6z" fill="${color}"/>
+      <path d="M3 10 10 14 17 10"/>
+      <path d="M3 13.4 10 17.4 17 13.4"/>
+    </svg>`,
+  sky: (color, size = 21) =>
+    `<svg viewBox="0 0 22 22" width="${size}" height="${size}" fill="none">
+      <ellipse cx="11" cy="11" rx="10" ry="3.7" stroke="${color}" stroke-width="1.7"
+               opacity="0.85" transform="rotate(-26 11 11)"/>
+      <circle cx="17.2" cy="7.1" r="2.6" fill="${color}"/>
+    </svg>`,
+  catalog: (color) =>
+    `<svg viewBox="0 0 20 20" width="20" height="20" fill="${color}">
+      <circle cx="2.2" cy="4.6" r="1.5"/><rect x="6" y="3.7" width="12" height="1.8" rx="0.9"/>
+      <circle cx="2.2" cy="10" r="1.5"/><rect x="6" y="9.1" width="12" height="1.8" rx="0.9"/>
+      <circle cx="2.2" cy="15.4" r="1.5"/><rect x="6" y="14.5" width="12" height="1.8" rx="0.9"/>
+    </svg>`,
+  settings: (color) =>
+    `<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round">
+      <path d="M1.6 6.6h16.8" opacity="0.65"/><circle cx="7.2" cy="6.6" r="2.2" fill="${color}" stroke="none"/>
+      <path d="M1.6 13.4h16.8" opacity="0.65"/><circle cx="13.6" cy="13.4" r="2.2" fill="${color}" stroke="none"/>
+    </svg>`,
+  chevron: (color, direction = "up", size = 16) => {
+    const points = { up: "4,10 8,6 12,10", down: "4,6 8,10 12,6", right: "6,4 10,8 6,12" }[direction];
+    return `<svg viewBox="0 0 16 16" width="${size}" height="${size}" fill="none" stroke="${color}"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="${points}"/>
+    </svg>`;
+  }
+};
+
+/** The eight points the compass strip carries, from north, clockwise. */
+const COMPASS_POINTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+/**
+ * How far either side of the middle the strip reaches, in degrees.
+ * `MINIMUM_HALF_SPAN_DEG` in `HorizonCompass`, which is what the phone uses:
+ * the camera shows about twenty degrees across and twenty degrees of an
+ * eight-point compass is a strip with one letter on it.
+ */
+const COMPASS_HALF_SPAN_DEG = 62;
+
+/**
+ * The app's name, and the one figure the sky view reports.
+ *
+ * The count is the marks **on the screen** rather than the marks on the frame,
+ * as the app counts it: the picture covers the screen, so the marks past its
+ * sides are drawn and clipped, and a count that included them would be a
+ * number nobody can check against the sky in front of them. See
+ * `pointInViewport`.
+ */
+function headerPanel(scene) {
   const count = scene.markers.filter(
     (marker) =>
       marker.left >= VIEWPORT.left &&
@@ -231,7 +288,7 @@ function statusPanel(scene) {
   }
   const rows = open
     ? `<div class="breakdown">
-        <div class="panel-title">IN VIEW</div>
+        <div class="sunlight">${escape(scene.sunlight ?? "All of these are in sunlight")}</div>
         ${breakdown.rows
           .map(
             ([name, tally]) =>
@@ -241,38 +298,87 @@ function statusPanel(scene) {
         <div class="row other"><span class="name">Others</span><span class="tally">${other}</span></div>
       </div>`
     : "";
+  const filterOpen = scene.panels.filter === "open";
 
-  return `<div class="panel status${open ? " open" : ""}">
-      <div class="header"><span class="count">${count}</span><span class="chevron">${open ? "▴" : "▾"}</span></div>
-      ${rows}
+  return `<div class="header">
+      <div class="titles">
+        <div class="wordmark">Stare</div>
+        <div class="count-row">
+          <span class="count">${count} visible satellites</span>
+          ${ICONS.chevron("rgba(147, 167, 192, 0.5)", open ? "up" : "down", 12)}
+        </div>
+        ${rows}
+      </div>
+      <div class="iconbutton${filterOpen ? " on" : ""}">
+        ${ICONS.layers(filterOpen ? "var(--accent)" : "var(--text)")}
+      </div>
     </div>`;
 }
 
-function legendPanel(scene) {
-  const open = scene.panels.filter === "open";
+/** The category filter, hanging from the button in the header. */
+function filterPanel(scene) {
+  if (scene.panels.filter !== "open") return "";
   const colors = scene.palette === "daylight" ? DAYLIGHT_COLORS : NIGHT_COLORS;
   const outline = OUTLINE[scene.palette] ?? OUTLINE.night;
-  const body = open
-    ? `${CATEGORY_ORDER.map(
+
+  return `<div class="filter">
+      <div class="filter-head"><span class="panel-title">FILTER</span></div>
+      ${CATEGORY_ORDER.map(
         (category) => `<div class="row">
         <span class="swatch" style="background:${colors[category]};border-color:${outline}"></span>
         <span class="name">${CATEGORY_LABELS[category]}</span>
-        <span class="toggle on"><span>ON</span></span>
+        <span class="toggle on"><span class="knob"></span></span>
       </div>`
       ).join("\n      ")}
       <div class="key"><span class="ring"></span><span>RING = PARKED OVER THE EQUATOR</span></div>
-      <div class="show-all">SHOW ALL</div>`
-    : "";
-
-  return `<div class="panel legend${open ? " open" : ""}">
-      <div class="header"><span class="panel-title">FILTER</span><span class="chevron">${open ? "▴" : "▾"}</span></div>
-      ${body}
+      <div class="show-all">SHOW ALL</div>
     </div>`;
 }
 
-function cardPanel(scene) {
+/**
+ * The rule of cardinal points along the foot of the picture.
+ *
+ * Placed as the app places them: linear in the bearing, the middle of the
+ * strip being where the camera is pointing, and the nearest point lit. See
+ * `HorizonCompass`.
+ */
+function compassStrip(scene) {
+  const heading = scene.headingDeg ?? 0;
+  const marks = COMPASS_POINTS.flatMap((label, index) => {
+    // The nearest turn of the ring, so a heading either side of north still
+    // has points on both sides of the marker.
+    return [-360, 0, 360].map((turn) => {
+      const offset = index * 45 + turn - heading;
+      return { label, offset, near: Math.abs(offset) < 22.5 };
+    });
+  }).filter((mark) => Math.abs(mark.offset) <= COMPASS_HALF_SPAN_DEG);
+
+  return `<div class="compass">
+      <div class="points">
+        ${marks
+          .map(
+            (mark) =>
+              `<span class="point${mark.near ? " near" : ""}" style="left:${(
+                50 +
+                (mark.offset / COMPASS_HALF_SPAN_DEG) * 50
+              ).toFixed(2)}%">${mark.label}<i></i></span>`
+          )
+          .join("\n        ")}
+      </div>
+      <div class="rule">${[0.08, 0.22, 0.34, 0.22, 0.08]
+        .map((opacity) => `<span style="opacity:${opacity}"></span>`)
+        .join("")}</div>
+      <div class="diamond"></div>
+    </div>`;
+}
+
+/** What a tapped satellite is, or — with nothing tapped — the next pass. */
+function bottomCard(scene) {
+  return scene.card ? satelliteCard(scene) : passesCard(scene);
+}
+
+function satelliteCard(scene) {
   const card = scene.card;
-  if (!card) return "";
   const colors = scene.palette === "daylight" ? DAYLIGHT_COLORS : NIGHT_COLORS;
   const outline = OUTLINE[scene.palette] ?? OUTLINE.night;
   const strip =
@@ -286,14 +392,15 @@ function cardPanel(scene) {
       : "";
 
   return `<div class="card">
+      <div class="grip"><span></span></div>
       ${strip}
       <div class="head">
+        <span class="badge" style="border-color:${colors[card.category]}">
+          <span class="mark" style="background:${colors[card.category]};border-color:${outline}"></span>
+        </span>
         <div class="heading">
           <div class="name">${escape(card.selected)}</div>
-          <div class="purpose">
-            <span class="swatch" style="background:${colors[card.category]};border-color:${outline}"></span>
-            <span class="purpose-label">${escape(card.purpose)}</span>
-          </div>
+          <div class="purpose-label">${escape(card.purpose)}</div>
         </div>
         <div class="close">✕</div>
       </div>
@@ -309,6 +416,57 @@ function cardPanel(scene) {
           )
           .join("\n        ")}
       </div>
+    </div>`;
+}
+
+/**
+ * The same card with nothing tapped: what is coming over, and when.
+ *
+ * Shut, which is how it stands unless somebody opens it — the next pass, where
+ * to stand for it and whether it can be seen. See `UpcomingPasses`.
+ */
+function passesCard(scene) {
+  const pass = scene.pass;
+  if (!pass) return "";
+  const seen = pass.seeing === "visible to the eye";
+
+  return `<div class="card passes">
+      <div class="grip"><span></span></div>
+      <div class="head">
+        <span class="badge accent">${ICONS.sky("var(--accent)", 20)}</span>
+        <div class="heading">
+          <div class="pass-name"><span>${escape(pass.name)}</span><span class="when">${escape(pass.inMinutes)}</span></div>
+          <div class="pass-meta">${escape(pass.where)} · <span${
+            seen ? ' class="visible"' : ""
+          }>${escape(pass.seeing)}</span></div>
+        </div>
+        ${ICONS.chevron("rgba(147, 167, 192, 0.5)", "up")}
+      </div>
+    </div>`;
+}
+
+/**
+ * The bar along the bottom: the sky, the catalog and the settings.
+ *
+ * The sky is always the tab a screenshot is taken on — these are pictures of
+ * the app doing the thing it is for — so the other two are only ever the way
+ * out of it.
+ */
+function tabBar() {
+  const tabs = [
+    ["sky", "Sky", true],
+    ["catalog", "Catalog", false],
+    ["settings", "Settings", false]
+  ];
+  return `<div class="tabbar">
+      ${tabs
+        .map(
+          ([icon, label, on]) =>
+            `<div class="tab${on ? " on" : ""}">${ICONS[icon](
+              on ? "var(--accent)" : "var(--text-dim)"
+            )}<span>${label}</span></div>`
+        )
+        .join("\n      ")}
     </div>`;
 }
 
@@ -379,12 +537,17 @@ ${asset("screen.css")}
     ${statusBar()}
     <div class="homebar"><span></span></div>
 
-    <!-- And the app's panels, inset off both of them. See \`SafeAreaLayer\`. -->
+    <!-- And the app's own controls, inset off both of them. See
+         \`SafeAreaLayer\`: a title and one button at the top, a stack at the
+         bottom, and nothing at all in the middle. -->
     <div class="hud">
-      ${statusPanel(scene)}
-      ${legendPanel(scene)}
-      ${cardPanel(scene)}
-      <div class="console">CONSOLE</div>
+      ${headerPanel(scene)}
+      ${filterPanel(scene)}
+      <div class="bottom">
+        ${compassStrip(scene)}
+        ${bottomCard(scene)}
+        ${tabBar()}
+      </div>
     </div>
   </div>
 <script>

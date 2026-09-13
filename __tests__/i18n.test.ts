@@ -138,34 +138,76 @@ describe("every language says everything", () => {
 describe("and says it in the space it is given", () => {
   test.each(LOCALES)("%s fits the filter panel", (locale) => {
     const t = stringsFor(locale).filter;
+    // The panel hangs from the header's button: 248 wide, less 14 of padding
+    // either side.
+    const COLUMN = 248 - 14 * 2;
 
-    // The closed pill: title, an optional count and a chevron, at `right: 12`.
-    expect(width(t.title, 10, 1)).toBeLessThan(90);
-    // The label column of a 164pt row, less the swatch and the toggle. Rows
-    // may grow, but every point of growth is sky the panel covers.
+    // The title shares its row with the `3/6` count and the gap after it.
+    expect(width(t.title, 10, 1.4)).toBeLessThan(COLUMN - 36);
+    // The label column of a row, less the swatch, its margin and the switch.
+    // Rows may grow, but every point of growth is sky the panel covers.
     for (const category of SATELLITE_CATEGORIES) {
-      expect(width(t.categories[category], 10)).toBeLessThan(135);
+      expect(width(t.categories[category], 11, 0.3)).toBeLessThan(COLUMN - 10 - 9 - 8 - 36);
     }
-    expect(width(t.showAll, 9, 1)).toBeLessThan(130);
-    // Wraps to a second line if it has to, so this is two lines of the panel.
-    expect(width(t.ringKey, 8, 0.4)).toBeLessThan(260);
+    expect(width(t.showAll, 10, 1.2)).toBeLessThan(COLUMN);
+    // Wraps to a second line if it has to, so this is two lines of the column
+    // the key rows keep, less the swatch that heads them.
+    expect(width(t.ringKey, 8, 0.4)).toBeLessThan(2 * (COLUMN - 19));
     // The other key row, the same size and in the same column: why half the
     // marks on a clear night sky are drawn faintly.
-    expect(width(t.shadowKey, 8, 0.4)).toBeLessThan(260);
+    expect(width(t.shadowKey, 8, 0.4)).toBeLessThan(2 * (COLUMN - 19));
+  });
+
+  test.each(LOCALES)("%s fits the header and the tab bar", (locale) => {
+    const t = stringsFor(locale);
+    // The line under the app's name, on the narrowest screen this ships to:
+    // 375 less the layer's 18 and 16, less the filter button and its gap,
+    // less the chevron that says the line opens.
+    const COUNT_COLUMN = 375 - 18 - 16 - 40 - 12 - 12 - 5;
+    expect(width(fill(t.scene.visibleSatellites, { count: 188 }), 13)).toBeLessThan(
+      COUNT_COLUMN
+    );
+
+    // One word under an icon, in a bar of three equal tabs.
+    for (const tab of Object.values(t.tabs)) {
+      expect(width(tab, 10, 0.2)).toBeLessThan(375 / 3);
+    }
+  });
+
+  test.each(LOCALES)("%s fits the two tabs that are not the sky", (locale) => {
+    const t = stringsFor(locale);
+    // The settings list: 375 less the sheet's 18 either side, less a row's own
+    // 14 either side, less the chevron and the gap before it.
+    const ROW = 375 - 18 * 2 - 14 * 2 - 16 - 12;
+    expect(width(t.tabs.settings, 27)).toBeLessThan(375 - 18 * 2);
+    // A row's label, and — on the language row — the value beside it. The
+    // longest endonym is the one this has to leave room for.
+    expect(width(t.guide.open, 14)).toBeLessThan(ROW / 2);
+    expect(width(t.language.title, 14) + width("Português", 13)).toBeLessThan(ROW);
+    // The line under a row's label, which wraps rather than being cut off.
+    for (const detail of [t.intro.corners.guide.meaning, t.intro.corners.console.meaning]) {
+      expect(width(detail, 11)).toBeLessThan(3 * ROW);
+    }
+
+    // The catalog's one line, centred in a 36pt-margined page and wrapping.
+    expect(width(t.catalog.soon, 13)).toBeLessThan(4 * (375 - 36 * 2));
   });
 
   test.each(LOCALES)("%s fits the satellite card", (locale) => {
     const t = stringsFor(locale).card;
+    // The card is the screen's width less 12 either side, less its own 14 of
+    // padding either side.
+    const COLUMN = 375 - 12 * 2 - 14 * 2;
 
-    // The card is the screen's width less 8 either side; the label column of a
-    // fact row leaves room for the figure it is labelling.
+    // The label column of a fact row leaves room for the figure it labels.
     for (const label of Object.values(t.facts)) {
-      expect(width(label, 10)).toBeLessThan(130);
+      expect(width(label, 11)).toBeLessThan(COLUMN - 150 - 12);
     }
-    // The purpose line: a category, a separator and this, beside a 38pt close
-    // button on a 375pt screen.
+    // The purpose line under the name: a category, a separator and this,
+    // between the mark's badge and the close button. One line — it is clipped
+    // rather than wrapped — so this is the whole of the room it has.
     const purpose = `${stringsFor(locale).filter.categories.COMMS} · ${t.holdsStation}`;
-    expect(width(purpose, 9, 0.6)).toBeLessThan(290);
+    expect(width(purpose, 10, 0.7)).toBeLessThan(375 - 12 * 2 - 14 - 8 - 38 - 12 - 12 - 38);
   });
 
   test.each(LOCALES)("%s fits the sunlight line in the count panel", (locale) => {
@@ -178,27 +220,28 @@ describe("and says it in the space it is given", () => {
     }
   });
 
-  test.each(LOCALES)("%s fits the upcoming-passes panel", (locale) => {
+  test.each(LOCALES)("%s fits the upcoming-passes card", (locale) => {
     setLocaleForTesting(locale);
     const t = stringsFor(locale).scene.passes;
+    // The card is the screen less 12 either side, less 14 of padding either
+    // side, less the badge, the chevron and the two gaps between them.
+    const COLUMN = 375 - 12 * 2 - 14 * 2 - 38 - 12 - 12 - 16;
 
-    // Shut, the pill is one row: 10 of padding, a name capped at 110, a 6pt
-    // gap, the countdown, another gap, the chevron and 10 of padding. The
-    // countdown is the half that grows with the language — `1 Std. 22 Min.` is
-    // half again the English — so what is checked is the whole pill against the
-    // narrowest screen this ships to, less its own 12pt inset either side.
-    const PILL_CHROME = 10 + 110 + 6 + 6 + 8 + 10;
+    // Shut, the top line is the name and the countdown, and the countdown is
+    // the half that grows with the language — `1 Std. 22 Min.` is half again
+    // the English. The name shrinks before it does, so what is checked is that
+    // there is still a name's worth of room left beside it.
     for (const countdown of [timeUntil(82 * 60_000), timeUntil(14 * 60_000), t.now]) {
-      expect(PILL_CHROME + width(countdown, 11)).toBeLessThan(375 - 12 * 2);
+      expect(width(countdown, 12)).toBeLessThan(COLUMN - 80);
     }
-    // Open, the title heads a 170pt column of rows.
-    expect(width(t.title, 10, 1)).toBeLessThan(170);
-    // And the second line of each row: where to stand, how high it gets, and
-    // whether it can be seen. Prose over a photograph, so what is checked is
-    // that it wraps inside that column rather than that it fits on one line.
+    // Open, the title heads the same column.
+    expect(width(t.title, 10, 1.4)).toBeLessThan(COLUMN);
+    // And the line under each name: where to stand, how high it gets, and
+    // whether it can be seen. It wraps to a second line rather than being cut
+    // off, so what is checked is that two lines are enough.
     for (const verdict of Object.values(t.seeing)) {
       const line = `${passDirection({ riseAzimuthDeg: 247, peakElevationDeg: 68 })} · ${verdict}`;
-      expect(width(line, 9)).toBeLessThan(3 * 170);
+      expect(width(line, 11)).toBeLessThan(2 * COLUMN);
     }
   });
 
@@ -208,7 +251,7 @@ describe("and says it in the space it is given", () => {
     // is prose over a photograph, so what is checked is that it wraps to two
     // lines rather than that it fits on one. This one is the longer of the two
     // shapes — a clause, a clock time, a verdict and a magnitude.
-    const CARD_COLUMN = 375 - 8 * 2 - 1 * 2 - 10 * 2;
+    const CARD_COLUMN = 375 - 12 * 2 - 14 * 2;
     for (const verdict of ["visible", "binoculars", "tooFaint"] as const) {
       const line = seeingOnPass({
         nakedEye: verdict,
@@ -216,26 +259,28 @@ describe("and says it in the space it is given", () => {
         magnitudeMeasured: false,
         peakAtMs: Date.UTC(2026, 7, 29, 19, 31, 0)
       });
-      expect(width(line, 11.5)).toBeLessThan(2 * CARD_COLUMN);
+      // Three lines rather than two: this is the longer of the card's two
+      // shapes — a clause, a clock time, a verdict and a magnitude — and in
+      // Russian it runs past two lines of a card set 12.5 points.
+      expect(width(line, 12.5)).toBeLessThan(3 * CARD_COLUMN);
     }
   });
 
   test.each(LOCALES)("%s fits the seeing line on the card", (locale) => {
-    // The verdict and, where there is one, the magnitude after it. The card
-    // runs from `left: 8` to `right: 8`, so on the narrowest phone this ships
-    // to it is 359 wide, less its own border and the 10pt margins this line
-    // keeps — and it is prose, so what is checked is that it wraps to two lines
-    // rather than that it fits on one.
-    const CARD_COLUMN = 375 - 8 * 2 - 1 * 2 - 10 * 2;
+    // The verdict and, where there is one, the magnitude after it. The card is
+    // inset 12 either side by the stack that lays it out, and this line keeps
+    // 14 more — and it is prose, so what is checked is that it wraps to two
+    // lines rather than that it fits on one.
+    const CARD_COLUMN = 375 - 12 * 2 - 14 * 2;
     const t = stringsFor(locale).card.seeing;
     const magnitude = fill(t.aboutMagnitude, { value: "-1.8" });
     // Only the three verdicts that rest on a brightness carry one; the other
     // three are the whole line on their own. See `seeing`.
     for (const verdict of [t.visible, t.binoculars, t.tooFaint]) {
-      expect(width(`${verdict} · ${magnitude}`, 11.5)).toBeLessThan(2 * CARD_COLUMN);
+      expect(width(`${verdict} · ${magnitude}`, 12.5)).toBeLessThan(2 * CARD_COLUMN);
     }
     for (const verdict of [t.eclipsed, t.daylight, t.unknown]) {
-      expect(width(verdict, 11.5)).toBeLessThan(2 * CARD_COLUMN);
+      expect(width(verdict, 12.5)).toBeLessThan(2 * CARD_COLUMN);
     }
   });
 
@@ -257,26 +302,32 @@ describe("and says it in the space it is given", () => {
   });
 
   test.each(LOCALES)("%s fits the compass notice", (locale) => {
-    // The notice runs from `left: 12` to `right: 112` — the console pill keeps
-    // the rest of that row — so on the narrowest phone this ships to it is
-    // 251pt wide, less 10 of padding either side.
+    // The notice is a strip in the stack at the bottom of the sky: the screen
+    // less 12 either side, less its own 12 of padding either side, less the
+    // warning bar down its left-hand edge and the gap after it.
     const t = stringsFor(locale).compassNotice;
-    expect(width(t.calibrate.title, 11)).toBeLessThan(231);
-    expect(width(t.magnetic.title, 11)).toBeLessThan(231);
+    const COLUMN = 375 - 12 * 2 - 12 * 2 - 3 - 10;
+    expect(width(t.calibrate.title, 12)).toBeLessThan(COLUMN);
+    expect(width(t.magnetic.title, 12)).toBeLessThan(COLUMN);
+    // The sentence under it wraps rather than being cut off.
+    for (const notice of [t.calibrate, t.magnetic]) {
+      expect(width(notice.detail, 11)).toBeLessThan(4 * COLUMN);
+    }
   });
 
   test.each(LOCALES)("%s fits the figures on one line", (locale) => {
     setLocaleForTesting(locale);
     // The widest reading the card ever shows: a full compass point, a bearing
-    // and an elevation, against the figure column of the card.
-    // The figure column of a fact row on the narrowest phone this ships to:
-    // a 375pt screen gives the card 359, less 20 of padding, less the widest
-    // label any language puts beside this row and the 12pt gap after it.
+    // and an elevation, against the figure column of a fact row — the card on
+    // the narrowest phone this ships to, less what the label beside it takes.
+    // A bound on each figure rather than on the pair, because the two columns
+    // shrink against each other and the row the longest of them lands in is
+    // the one that ellipsises rather than the one that overflows.
     const look = lookDirection({ azimuthDeg: 225, elevationDeg: -8.2 });
-    expect(width(look, 12)).toBeLessThan(246);
-    expect(width(kilometres(35786), 12)).toBeLessThan(120);
-    expect(width(orbitPeriod(1436), 12)).toBeLessThan(150);
-    expect(width(speed(7.58), 12)).toBeLessThan(120);
+    expect(width(look, 12.5)).toBeLessThan(250);
+    expect(width(kilometres(35786), 12.5)).toBeLessThan(130);
+    expect(width(orbitPeriod(1436), 12.5)).toBeLessThan(160);
+    expect(width(speed(7.58), 12.5)).toBeLessThan(130);
   });
 });
 

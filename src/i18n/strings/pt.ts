@@ -38,12 +38,12 @@ export const pt: Strings = {
     },
     passes: {
       title: "Em breve",
-      body: "No canto inferior esquerdo aparece o que vai passar sobre você.",
+      body: "O cartão de baixo mostra o que vai passar sobre você.",
       shut: "O próximo e quanto falta para ele aparecer.",
       open:
         "Toque para ver as próximas horas: para onde olhar, até que altura sobe e se vai " +
         "dar para ver.",
-      footnote: "Se nada estiver para passar, o canto fica vazio."
+      footnote: "Se nada estiver para passar, o cartão nem aparece."
     },
     corners: {
       title: "Nos cantos",
@@ -57,11 +57,11 @@ export const pt: Strings = {
         meaning: "Escolha que tipos de satélite mostrar."
       },
       guide: {
-        where: "Canto inferior direito",
+        where: "Configurações",
         meaning: "Mostra estas páginas de novo sempre que você precisar."
       },
       console: {
-        where: "Canto inferior direito",
+        where: "Configurações",
         meaning: "Dados técnicos, em inglês. Você não vai precisar."
       }
     },
@@ -85,6 +85,11 @@ export const pt: Strings = {
     open: "Ajuda",
     close: "Fechar a ajuda",
     done: "VOLTAR AO CÉU"
+  },
+  tabs: {
+    sky: "Céu",
+    catalog: "Catálogo",
+    settings: "Configurações"
   },
   scene: {
     visibleSatellites: "{count} satélites visíveis",
@@ -112,6 +117,9 @@ export const pt: Strings = {
         daylight: "é dia — nada para ver",
         unknown: "brilho não registado"
       }
+    },
+    compass: {
+      facing: "Virado para {point}"
     }
   },
   filter: {
@@ -182,6 +190,10 @@ export const pt: Strings = {
     failed: "Não foi possível iniciar",
     tryAgain: "TENTAR DE NOVO",
     unsupported: "Este aparelho não consegue mostrar a vista do céu."
+  },
+  catalog: {
+    soon:
+      "Procure qualquer objeto do catálogo, esteja ele sobre você agora ou não. Ainda não está pronto."
   },
   language: {
     title: "Idioma",

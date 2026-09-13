@@ -26,12 +26,12 @@ listing: most people see one and a half frames.
 
 | # | File | What it shows | Caption |
 | --- | --- | --- | --- |
-| 1 | `01-sky.png` | The plain view: a night sky over a city filling the screen, twenty-one marks on it, the count and the filter in their corners. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
+| 1 | `01-sky.png` | The plain view: a night sky over a city filling the screen, twenty-one marks on it, the app's name over what it counts, the filter button, the compass strip along the foot of the frame and the card saying the station is crossing now. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
 | 2 | `02-tap.png` | A tap on the ISS: the selection ring on the sky, the strip of names the tap covered, the briefing and the five figures. | **Tap a light, learn what it is** — What it is, who flies it, how far away — and the figures keep moving while you read. |
 | 3 | `03-occlusion.png` | A tower up the right of the frame. The Starlink train runs down to its corner, one mark mid-fade on the edge, and nothing over the building. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
 | 4 | `04-legend.png` | The same app at midday, filter open: the five categories, the parked ring, and the daylight palette on a bright sky. | **Colour is what it is for** — Size is how far away. A ring holds station over the equator. Day or night, the sky decides the ink. |
 | 5 | `05-inview.png` | The count opened into the breakdown behind it: Starlink 6, SES 3, Galileo 2, GPS 2, ISS 1, six others. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
-| 6 | `06-pass.png` | Two landmark paths: CHEOPS crossing now, at full strength with an arrowhead on each of its minutes, and the station's next pass — no marker, since it has not risen — faded by how far off it is, named and timed where it will come up. | **Know when to look up** — Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up. |
+| 6 | `06-pass.png` | Two landmark paths: CHEOPS crossing now, at full strength with an arrowhead on each of its minutes, and the station's next pass — no marker, since it has not risen — faded by how far off it is, named and timed where it will come up, with the card along the bottom counting it down. | **Know when to look up** — Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up. |
 
 Frames 3 and 4 are the two that are hard to copy and are the reason to keep
 them: hiding satellites behind buildings is the thing no other sky app does,
@@ -69,10 +69,14 @@ are easy to get wrong by eye:
   (`frameBoxFor`), not fitted into it — so it is 699 × 932 points, centred, with
   a third of its width off the sides and none of the app's background showing.
   That is what the phone shows: the camera reaches all four corners, the status
-  bar and the home indicator are over it rather than beside it, and the panels
-  are inset off both by the safe area (`SafeAreaLayer`), which is why the count
-  and the filter sit below the sensor housing rather than against the screen's
-  own top edge.
+  bar and the home indicator are over it rather than beside it, and the app's
+  own controls are inset off both by the safe area (`SafeAreaLayer`), which is
+  why the title sits below the sensor housing and the tab bar above the home
+  indicator rather than against the screen's own edges.
+- The compass strip along the foot of the frame is placed from the scene's own
+  `headingDeg`, on the same scale the app uses — 62° either side of the middle
+  (`HorizonCompass`) — so the letters under the diamond and the bearing on the
+  card above them agree.
 - The count is the marks **on the screen** rather than the marks on the frame,
   which is the figure the app publishes (`pointInViewport`) and the reason the
   first frame, whose scene holds thirty-one markers, shows twenty-one. The breakdown's "Others" row
@@ -99,19 +103,21 @@ Where the numbers come from, if a frame has to be argued about:
 | In the frame | In the app |
 | --- | --- |
 | The picture's box, and how much of it is on screen | `frameBoxFor`, `viewportOf` in `src/components/markerGeometry.ts` |
-| The safe area the panels are inset by | `src/components/SafeAreaLayer.tsx` |
+| The safe area the controls are inset by | `src/components/SafeAreaLayer.tsx` |
 | Marker sizes, rims, tails, rings, halos | `src/components/markerScene.ts`, `SATELLITE_MARKERS` in `src/constants.ts` |
 | The landmarks' paths, their marks and their fade | `src/satellite/orbitPath.ts`, `LANDMARK_PATHS` in `src/constants.ts` |
 | Marker colours, night and daylight | `src/satellite/categories.ts`, `src/components/palette.ts` |
-| Panels, card, console pill | `SceneStatus`, `CategoryLegend`, `SatelliteCard`, `DebugToggle`, `theme.ts` |
+| The header, the filter, the cards, the tab bar | `SkyHeader`, `CategoryLegend`, `SatelliteCard`, `UpcomingPasses`, `TabBar`, `theme.ts` |
+| The compass strip and its scale | `src/components/HorizonCompass.tsx` |
+| The glyphs on the buttons and the bar | `src/components/Icon.tsx` |
 | Every word on screen | `src/i18n/strings/en.ts` |
 | The ISS briefing and its link | `src/satellite/briefing.ts` |
 
 ## Editing them
 
 - **The story**: `tools/screenshots/scenes.mjs` — one entry per frame, holding
-  the caption, the sky, the markers on it, the landmark paths across it and
-  which panels are open. Marker positions are percentages of the camera frame,
+  the caption, the sky, the markers on it, the landmark paths across it, which
+  way the camera is pointing and which panels are open. Marker positions are percentages of the camera frame,
   as the projection hands them to the overlay; a path is taken from its own
   object rather than typed beside it (`pathAhead`), so it cannot end up pointing
   somewhere its marker is not going.

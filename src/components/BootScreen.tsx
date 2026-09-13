@@ -4,6 +4,7 @@ import { describeBuild } from "../debug/buildIdentity";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
+import { APP_NAME } from "./wordmark";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
 import { theme } from "./theme";
@@ -67,7 +68,9 @@ export const BootScreen: React.FC<Props> = ({
     <View style={styles.root} onLayout={measure}>
       <BootSky frame={frame} turning={!failed} />
 
-      {!failed && wordmark && <Text style={styles.wordmark}>STARE</Text>}
+      {!failed && wordmark && (
+        <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>
+      )}
 
       {failed && (
         <View style={styles.card}>

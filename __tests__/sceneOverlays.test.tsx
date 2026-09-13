@@ -2,13 +2,14 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
-import { DebugToggle } from "../src/components/DebugToggle";
-import { GuideToggle } from "../src/components/GuideToggle";
+import { compassMarks, nearestPoint } from "../src/components/HorizonCompass";
 import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
-import { SceneStatus } from "../src/components/SceneStatus";
+import { SkyHeader } from "../src/components/SkyHeader";
+import { TabBar } from "../src/components/TabBar";
+import { SettingsScreen } from "../src/components/SettingsScreen";
 import { UpcomingPasses } from "../src/components/UpcomingPasses";
-import { setLocaleForTesting } from "../src/i18n";
+import { fill, setLocaleForTesting, strings } from "../src/i18n";
 import { UpcomingPass } from "../src/satellite/upcomingPasses";
 import {
   clearLandmarkPhotosForTesting,
@@ -27,9 +28,10 @@ function textOf(element: React.ReactElement): string {
     .trim();
 }
 
-function legend(enabled = allCategories(), starlink = true) {
+function legend(enabled = allCategories(), starlink = true, open = true) {
   return (
     <CategoryLegend
+      open={open}
       enabledCategories={enabled}
       onToggleCategory={() => undefined}
       starlink={starlink}
@@ -41,14 +43,21 @@ function legend(enabled = allCategories(), starlink = true) {
 }
 
 describe("the category filter", () => {
-  test("opens closed: its own title, and none of the list", () => {
+  test("is not on the screen until its button is pressed", () => {
+    // The sky is what the screen is for; the list hangs off an icon in the
+    // header, and until that is pressed there is nothing of it over the
+    // picture at all — not even the word FILTER, which used to sit there.
+    const text = textOf(legend(allCategories(), true, false));
+
+    expect(text).toBe("");
+  });
+
+  test("opens onto the list, under its own title", () => {
     const text = textOf(legend());
 
     expect(text).toContain("FILTER");
-    // The sky is what the screen is for; the list is a tap away, not in the way.
-    expect(text).not.toContain("NAVIGATION");
-    expect(text).not.toContain("SHOW ALL");
-    expect(text).not.toContain("PARKED");
+    expect(text).toContain("NAVIGATION");
+    expect(text).toContain("SHOW ALL");
   });
 
   test("says so when it is hiding something, so a thin sky reads as a setting", () => {
@@ -69,11 +78,8 @@ describe("the category filter", () => {
     expect(textOf(legend(allCategories(), false))).toContain("5/6");
   });
 
-  test("the title is the control that opens it", () => {
-    const markup = renderToStaticMarkup(legend());
-
-    expect(markup).toContain('aria-label="Category filter"');
-    expect(markup).toContain('aria-expanded="false"');
+  test("says what it is to anyone not seeing it", () => {
+    expect(renderToStaticMarkup(legend())).toContain('aria-label="Category filter"');
   });
 });
 
@@ -84,7 +90,7 @@ const sky = (
   over: Partial<SkySummary> = {}
 ): SkySummary => ({ count, fleets, sunlit: count, darkness: "dark", ...over });
 
-describe("the marker count", () => {
+describe("the header", () => {
   const NOTHING = { rows: [], other: 0 };
   const SKY = {
     rows: [
@@ -103,62 +109,144 @@ describe("the marker count", () => {
     ...over
   });
 
-  test("is the number, and the chevron that says it opens", () => {
-    // Everything else is behind the tap: the panel sits over a photograph of
-    // the sky, and closed it is worth exactly the space a two-digit number takes.
-    const text = textOf(<SceneStatus sky={sky(17)} />);
+  const header = (summary: SkySummary) => (
+    <SkyHeader sky={summary} filterOpen={false} onToggleFilter={() => undefined} />
+  );
 
-    expect(text).toContain("17");
+  test("is the app's name and what is over you, and nothing else", () => {
+    // The breakdown is behind the tap: the line sits over a photograph of the
+    // sky, and the sky is what the screen is for.
+    const text = textOf(header(sky(17)));
+
+    expect(text).toContain("Stare");
+    expect(text).toContain("17 visible satellites");
     expect(text).not.toContain("Starlink");
     expect(text).not.toContain("IN VIEW");
   });
 
-  test("still says what it counts, for anyone not reading the screen", () => {
-    // And on the control rather than the panel, so the label the replay suite
-    // waits on is still the thing that announces itself.
-    expect(renderToStaticMarkup(<SceneStatus sky={sky(17, NOTHING)} />)).toContain(
-      'aria-label="17 visible satellites"'
-    );
-    expect(renderToStaticMarkup(<SceneStatus sky={sky(17, NOTHING)} />)).toContain(
-      'aria-expanded="false"'
-    );
+  test("the count is the control that opens the breakdown", () => {
+    // The label the replay suite waits on to know the app has booted, and the
+    // one thing that says what the number counts to anyone not reading it.
+    const markup = renderToStaticMarkup(header(sky(17, NOTHING)));
+
+    expect(markup).toContain('aria-label="17 visible satellites"');
+    expect(markup).toContain('aria-expanded="false"');
+  });
+
+  test("the filter is a button rather than a word over the sky", () => {
+    // What it opens says what it is (`CategoryLegend`); the button carries the
+    // name only for a screen reader.
+    expect(renderToStaticMarkup(header(sky(17)))).toContain('aria-label="Category filter"');
+    expect(textOf(header(sky(17)))).not.toContain("FILTER");
   });
 });
 
-describe("the console toggle", () => {
-  test("a degraded boot tints the pill rather than printing the warning", () => {
-    // On the control that opens the page saying what was degraded, rather than
-    // on the marker count, which is about the sky and not about the phone.
-    const warned = renderToStaticMarkup(
-      <DebugToggle on={false} onToggle={() => undefined} warned />
-    );
-
-    expect(textOf(<DebugToggle on={false} onToggle={() => undefined} warned />)).toBe("CONSOLE");
-    expect(warned).not.toBe(
-      renderToStaticMarkup(<DebugToggle on={false} onToggle={() => undefined} />)
-    );
-  });
-});
-
-describe("the guide button", () => {
+describe("the tab bar", () => {
   afterEach(() => setLocaleForTesting(undefined));
 
-  const guide = <GuideToggle onOpen={() => undefined} />;
+  const bar = (warned = false) => (
+    <TabBar tab="sky" onSelect={() => undefined} warned={warned} />
+  );
 
-  test("is a question mark, and nothing more over the sky", () => {
-    // One glyph in every language: a word in that corner would be a second
-    // pill of writing stacked on the console's.
-    expect(textOf(guide)).toBe("?");
-    setLocaleForTesting("ja");
-    expect(textOf(guide)).toBe("?");
+  test("is three words, in the reader's own language", () => {
+    expect(textOf(bar())).toBe("Sky Catalog Settings");
+    setLocaleForTesting("it");
+    expect(textOf(bar())).toBe("Cielo Catalogo Impostazioni");
   });
 
-  test("says what it opens to anyone not seeing it, in their language", () => {
-    // A question mark read aloud says nothing about what is behind it, so the
-    // label is the button's only name for a screen reader.
-    expect(renderToStaticMarkup(guide)).toContain('aria-label="Help"');
+  test("says which one is showing to anyone not seeing it", () => {
+    const markup = renderToStaticMarkup(bar());
+
+    expect(markup).toContain('role="tablist"');
+    expect(markup).toContain('aria-selected="true"');
+  });
+
+  test("a degraded boot is a dot on the settings tab, not a paragraph", () => {
+    // Boot's warnings last the whole session, so spelling them out means a
+    // permanent paragraph over the sky on any phone missing a sensor. The dot
+    // points at the console, which is the page that says what was degraded.
+    expect(textOf(bar(true))).toBe(textOf(bar()));
+    expect(renderToStaticMarkup(bar(true))).not.toBe(renderToStaticMarkup(bar()));
+  });
+});
+
+describe("the settings tab", () => {
+  afterEach(() => setLocaleForTesting(undefined));
+
+  const settings = (
+    <SettingsScreen onOpenGuide={() => undefined} onOpenConsole={() => undefined} />
+  );
+
+  test("carries the two controls that used to sit on the camera picture", () => {
+    const text = textOf(settings);
+
+    expect(text).toContain("Help");
+    // The one word in the app that is not translated. See `CONSOLE_LABEL`.
+    expect(text).toContain("CONSOLE");
+    expect(text).toContain("English");
+  });
+
+  test("and says it in the reader's own language", () => {
     setLocaleForTesting("it");
-    expect(renderToStaticMarkup(guide)).toContain('aria-label="Aiuto"');
+    const text = textOf(settings);
+
+    expect(text).toContain("Impostazioni");
+    expect(text).toContain("Aiuto");
+    expect(text).toContain("CONSOLE");
+  });
+});
+
+describe("the compass strip", () => {
+  afterEach(() => setLocaleForTesting(undefined));
+
+  test("lights the point the camera is nearest, halfway between one and the next", () => {
+    // At 22.5° off north the phone is as near north-east as north, so that is
+    // where the emphasis changes hands.
+    expect(nearestPoint(0)).toBe(0);
+    expect(nearestPoint(22)).toBe(0);
+    expect(nearestPoint(23)).toBe(1);
+    expect(nearestPoint(180)).toBe(4);
+    // Round the back, and past it: a heading is not promised to be wrapped.
+    expect(nearestPoint(359)).toBe(0);
+    expect(nearestPoint(-46)).toBe(7);
+    expect(nearestPoint(405)).toBe(1);
+  });
+
+  test("lays the points out at their own bearings, three rings of them", () => {
+    // One ring either side of the one in use, so a heading near north has
+    // points on both sides of the marker rather than a gap where the track ran
+    // out. Two points a right angle apart are twice the spacing of two
+    // adjacent ones, whatever the scale.
+    const marks = compassMarks(strings().compass, 2);
+
+    expect(marks).toHaveLength(24);
+    const middle = marks.filter((mark) => mark.key.startsWith("0:"));
+    expect(middle.map((mark) => mark.label)).toEqual([...strings().compass]);
+    expect(middle[2].x - middle[0].x).toBe(2 * (middle[1].x - middle[0].x));
+    // The ring before and the ring after are a full turn away.
+    expect(marks[0].x).toBe(middle[0].x - 360 * 2);
+  });
+
+  test("is the letters that language's compass uses", () => {
+    // German turns east into O and Dutch turns south into Z; the strip reads
+    // from the same table the card's bearings do.
+    setLocaleForTesting("it");
+    expect(compassMarks(strings().compass, 1).map((mark) => mark.label)).toContain("O");
+    setLocaleForTesting("de");
+    expect(compassMarks(strings().compass, 1).map((mark) => mark.label)).toContain("O");
+  });
+
+  test("says which way the phone is pointing, for anyone not seeing it", () => {
+    setLocaleForTesting("it");
+    expect(fill(strings().scene.compass.facing, { point: strings().compass[6] })).toBe(
+      "Direzione O"
+    );
+  });
+
+  test("nothing at all is drawn before it has been laid out", () => {
+    // No width, no scale, no marks: the strip is placed against its own width
+    // and there is nothing to place until the first layout arrives.
+    expect(compassMarks(strings().compass, 0)).toEqual([]);
   });
 });
 
@@ -218,15 +306,19 @@ describe("what the count breaks down into", () => {
     expect(counted + breakdown.other).toBe(many.length);
   });
 
-  test("the panel opens onto the same style as the filter opposite it", () => {
-    const open = renderToStaticMarkup(
-      <SceneStatus sky={sky(17, { rows: [{ name: "Starlink", count: 10 }], other: 7 })} />
+  test("is behind the count rather than under it", () => {
+    const header = renderToStaticMarkup(
+      <SkyHeader
+        sky={sky(17, { rows: [{ name: "Starlink", count: 10 }], other: 7 })}
+        filterOpen={false}
+        onToggleFilter={() => undefined}
+      />
     );
 
     // Rendered shut, since that is how it lands on the screen: what the markup
     // has to carry is the control that opens it and nothing of the list.
-    expect(open).toContain('aria-expanded="false"');
-    expect(open).not.toContain("Starlink");
+    expect(header).toContain('aria-expanded="false"');
+    expect(header).not.toContain("Starlink");
   });
 });
 
@@ -302,18 +394,18 @@ describe("what is coming", () => {
     expect(renderToStaticMarkup(panel([]))).toBe("");
   });
 
-  test("the pill is the control that opens it, and the list is behind it", () => {
+  test("the card is the control that opens it, and the rest is behind it", () => {
     const markup = renderToStaticMarkup(panel([pass(), pass({ name: "Tiangong" })]));
 
     expect(markup).toContain('aria-label="Upcoming passes"');
     expect(markup).toContain('aria-expanded="false"');
-    // Rendered shut, since that is how it lands on the screen — as the filter
-    // and the count panel are. The sky behind it is the point of the screen,
-    // and the rest of the plan is a tap away rather than in the way.
+    // Rendered shut, since that is how it lands on the screen. Shut it is the
+    // next pass and everything about it — the object, the countdown, where to
+    // stand and whether it can be seen — and nothing about the pass after it.
     const text = textOf(panel([pass(), pass({ name: "Tiangong" })]));
+    expect(text).toContain("ISS");
+    expect(text).toContain("68° up");
     expect(text).not.toContain("Tiangong");
-    expect(text).not.toContain("68° up");
-    expect(text).not.toContain("visible to the eye");
   });
 });
 

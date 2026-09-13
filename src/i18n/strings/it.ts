@@ -38,10 +38,10 @@ export const it: Strings = {
     },
     passes: {
       title: "In arrivo",
-      body: "In basso a sinistra trovi cosa passerà sopra di te.",
+      body: "La scheda in basso mostra cosa passerà sopra di te.",
       shut: "Il prossimo passaggio e tra quanto compare.",
       open: "Toccalo per vedere le prossime ore: dove guardare, quanto sale e se sarà visibile.",
-      footnote: "Se non passa niente, l'angolo resta vuoto."
+      footnote: "Se non passa niente, la scheda non compare."
     },
     corners: {
       title: "Negli angoli",
@@ -55,11 +55,11 @@ export const it: Strings = {
         meaning: "Scegli quali tipi di satelliti mostrare."
       },
       guide: {
-        where: "In basso a destra",
+        where: "Impostazioni",
         meaning: "Mostra di nuovo queste pagine, quando ti servono."
       },
       console: {
-        where: "In basso a destra",
+        where: "Impostazioni",
         meaning: "Dati tecnici, in inglese. Non ti servono."
       }
     },
@@ -83,6 +83,11 @@ export const it: Strings = {
     open: "Aiuto",
     close: "Chiudi l'aiuto",
     done: "TORNA AL CIELO"
+  },
+  tabs: {
+    sky: "Cielo",
+    catalog: "Catalogo",
+    settings: "Impostazioni"
   },
   scene: {
     visibleSatellites: "{count} satelliti visibili",
@@ -110,6 +115,9 @@ export const it: Strings = {
         daylight: "è giorno — niente da vedere",
         unknown: "luminosità non registrata"
       }
+    },
+    compass: {
+      facing: "Direzione {point}"
     }
   },
   filter: {
@@ -181,6 +189,10 @@ export const it: Strings = {
     failed: "Avvio non riuscito",
     tryAgain: "RIPROVA",
     unsupported: "Questo dispositivo non può mostrare la vista del cielo."
+  },
+  catalog: {
+    soon:
+      "Cerca qualsiasi oggetto del catalogo, anche quando non è sopra di te. Non c'è ancora."
   },
   language: {
     title: "Lingua",

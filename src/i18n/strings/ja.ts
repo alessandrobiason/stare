@@ -36,7 +36,7 @@ export const ja: Strings = {
     },
     passes: {
       title: "まもなく通過",
-      body: "左下に、次に頭上を通るものが表示されます。",
+      body: "画面下のカードに、次に頭上を通るものが表示されます。",
       shut: "次に通るものと、現れるまでの時間です。",
       open: "タップすると数時間先まで表示。どこを見ればいいか、どこまで高く上がるか、見えるかどうかがわかります。",
       footnote: "しばらく何も通らないときは、何も表示されません。"
@@ -53,11 +53,11 @@ export const ja: Strings = {
         meaning: "表示する衛星の種類をここで選べます。"
       },
       guide: {
-        where: "右下",
+        where: "設定",
         meaning: "これらのページを、いつでももう一度見られます。"
       },
       console: {
-        where: "右下",
+        where: "設定",
         meaning: "技術的なデータです（英語のみ）。ふだんは使いません。"
       }
     },
@@ -81,6 +81,11 @@ export const ja: Strings = {
     open: "ヘルプ",
     close: "ヘルプを閉じる",
     done: "空に戻る"
+  },
+  tabs: {
+    sky: "空",
+    catalog: "カタログ",
+    settings: "設定"
   },
   scene: {
     visibleSatellites: "見えている衛星 {count} 個",
@@ -108,6 +113,9 @@ export const ja: Strings = {
         daylight: "昼間 — 見えません",
         unknown: "明るさは未記録"
       }
+    },
+    compass: {
+      facing: "{point}の方向"
     }
   },
   filter: {
@@ -178,6 +186,10 @@ export const ja: Strings = {
     failed: "起動できませんでした",
     tryAgain: "再試行",
     unsupported: "この端末では空のビューを実行できません。"
+  },
+  catalog: {
+    soon:
+      "今は頭上になくても、カタログのどの天体でも調べられます。まだ準備中です。"
   },
   language: {
     title: "言語",

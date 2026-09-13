@@ -15,6 +15,7 @@ import { IntroMode, introButtonLabel, introPages } from "../onboarding/introPage
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { CalloutList, ColorKey, MarkTile, PassesPicture, PathPicture } from "./IntroFigures";
+import { Icon } from "./Icon";
 import { LanguagePicker } from "./LanguagePicker";
 import { FrameSize } from "./markerGeometry";
 import { SafeAreaLayer } from "./SafeAreaLayer";
@@ -216,15 +217,23 @@ export const IntroScreen: React.FC<Props> = ({ onDone, mode = "intro" }) => {
                       ) : null}
 
                       {content.elements?.map((element) => (
-                        <View key={element.badge} style={styles.element}>
+                        <View
+                          key={element.badge ?? `${element.icon}:${element.where}`}
+                          style={styles.element}
+                        >
                           {/* The badge as the real screen wears it, so the row
-                              is a key to the panel rather than a description of
-                              it. Fixed width, so rows of very different badges
-                              still line their text up. */}
+                              is a key to the control rather than a description
+                              of it — the figure the header shows, or the glyph
+                              the button is drawn with. Fixed width, so rows of
+                              very different badges still line their text up. */}
                           <View style={styles.badge}>
-                            <Text numberOfLines={1} style={styles.badgeLabel}>
-                              {element.badge}
-                            </Text>
+                            {element.icon ? (
+                              <Icon name={element.icon} size={18} color={theme.color.textBright} />
+                            ) : (
+                              <Text numberOfLines={1} style={styles.badgeLabel}>
+                                {element.badge}
+                              </Text>
+                            )}
                           </View>
                           <View style={styles.elementText}>
                             <Text style={styles.elementWhere}>{element.where}</Text>

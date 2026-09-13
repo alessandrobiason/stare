@@ -53,11 +53,10 @@ describe("a page's switches", () => {
     }
   ];
 
-  test("are drawn above the figures they govern, showing where they stand", () => {
+  test("are drawn above the figures they govern", () => {
     const text = textOf(panel(() => withSwitch));
 
     expect(text.indexOf("Hide behind terrain")).toBeLessThan(text.indexOf("Open sky"));
-    expect(text).toContain("ON");
   });
 
   test("are switches for anyone not reading the screen, not just labels", () => {
@@ -68,15 +67,19 @@ describe("a page's switches", () => {
   });
 
   test("show where they stand rather than only that they exist", () => {
+    // Which is the knob's position now rather than the words ON and OFF — a
+    // switch over a camera picture says what it is by where its knob is, and
+    // the state that has to survive is the one a screen reader is told.
     const off = withSwitch.map((section) => ({
       ...section,
       switches: [{ label: "Hide behind terrain", on: false, onToggle: () => undefined }]
     }));
 
-    expect(textOf(panel(() => off))).toContain("OFF");
+    expect(renderToStaticMarkup(panel(() => withSwitch))).toContain('aria-checked="true"');
+    expect(renderToStaticMarkup(panel(() => off))).toContain('aria-checked="false"');
   });
 
   test("a page without any is the table of figures it always was", () => {
-    expect(textOf(panel())).not.toContain("ON");
+    expect(renderToStaticMarkup(panel())).not.toContain('role="checkbox"');
   });
 });

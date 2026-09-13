@@ -5,8 +5,6 @@ import { useDeviceOrientation } from "../../src/hooks/useDeviceOrientation";
 import { useSceneControls } from "../../src/hooks/useSceneControls";
 import { AttitudeSource } from "../../src/hooks/useSmoothedOrientation";
 import { IntroScreen } from "../../src/components/IntroScreen";
-import { SafeAreaLayer } from "../../src/components/SafeAreaLayer";
-import { SceneStatus } from "../../src/components/SceneStatus";
 import { SceneFrame, SkyOverlay } from "../../src/components/SkyOverlay";
 import {
   MAGNETIC_DECLINATION_DEG,
@@ -125,10 +123,14 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onToggleStarlink={controls.toggleStarlink}
         onToggleCategory={controls.toggleCategory}
         onEnableAll={controls.enableAllCategories}
-        onSkyChange={controls.setSky}
+        tab={controls.tab}
+        onSelectTab={controls.setTab}
+        filterOpen={controls.filterOpen}
+        onToggleFilter={controls.toggleFilter}
         onMaskStatusChange={setMaskStatus}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
+        onOpenConsole={controls.openConsole}
         guide={controls.guide}
         onOpenGuide={controls.openGuide}
         warned={boot.warnings.length > 0}
@@ -136,6 +138,12 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
         celestialAlignment={controls.celestialAlignment}
         onToggleCelestialAlignment={controls.toggleCelestialAlignment}
+        // The one control here that is not the app's, laid out in the app's own
+        // bottom stack — where the phone puts its compass notice. Anywhere else
+        // it would sit over something: the top of the screen is the title and
+        // the filter button, and the range input swallows the clicks meant for
+        // whatever is under it.
+        notice={<ReplayControls videoRef={videoRef} />}
         sceneDebugSections={() => {
           // Read as the panel draws, since a video frame no longer renders this.
           const snapshot = replay.snapshotRef.current;
@@ -162,17 +170,6 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
           ];
         }}
       />
-
-      {/* The same layer the app puts its panels in, so the harness is the app's
-          layout as well as its view. A browser window has no notch, so what
-          it insets here is nothing at all. See `SafeAreaLayer`. */}
-      <SafeAreaLayer hidden={controls.guide}>
-        <SceneStatus sky={controls.sky} />
-
-        {/* After the overlay, so the transport is over the tap target the scene
-            lays across the picture rather than under it. */}
-        <ReplayControls videoRef={videoRef} />
-      </SafeAreaLayer>
 
       {/* Last, as on the phone: over the transport and every panel, with the
           recording still playing underneath. */}

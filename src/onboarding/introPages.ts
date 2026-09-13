@@ -1,7 +1,6 @@
 import { strings } from "../i18n";
 import type { IntroAccessStrings, IntroElementStrings, IntroKeyStrings } from "../i18n/types";
-import { CONSOLE_LABEL } from "../components/consoleLabel";
-import { GUIDE_LABEL } from "../components/guideLabel";
+import type { IconName } from "../components/Icon";
 import { SATELLITE_CATEGORIES, SatelliteCategory } from "../satellite/categories";
 import type { MarkSample } from "./introFigures";
 
@@ -71,13 +70,19 @@ export type IntroMode = "intro" | "guide";
 /** One thing the operating system will ask about, and why the app needs it. */
 export type IntroAccess = IntroAccessStrings;
 
-/** One panel in a corner: the badge it wears, where it sits, and what it is. */
+/** One control on the sky view: the badge it wears, where it sits, what it is. */
 export type IntroElement = IntroElementStrings & {
   /**
    * Drawn as it appears on the real screen, so the page is a key to the thing
    * rather than a description of it.
+   *
+   * A word or a figure for the controls that carry one, and the glyph itself
+   * for the ones that do not: the filter is a layers button in the corner of
+   * the sky, and the two rows that now live behind the settings tab are found
+   * by looking for that tab's own icon in the bar. Exactly one of the two.
    */
-  badge: string;
+  badge?: string;
+  icon?: IconName;
 };
 
 /** One kind of mark, beside a drawing of it. */
@@ -176,17 +181,21 @@ export function introPages(mode: IntroMode = "intro"): readonly IntroPage[] {
       title: intro.corners.title,
       body: intro.corners.body,
       guide: true,
-      // Clockwise from the top left, which is the order the eye goes round the
-      // screen in; the bottom left is the passes panel, on the page before. The
-      // `?` comes before the console because it sits on top of it.
+      // Top left, top right, then the two behind the settings tab — which is
+      // the order they are found in, and the order the page before this one
+      // left off at: the card along the bottom is the passes panel.
       elements: [
         { badge: SAMPLE_MARKER_COUNT, ...intro.corners.count },
-        { badge: t.filter.title, ...intro.corners.filter },
-        // Not translated either, and not a word: see `GUIDE_LABEL`.
-        { badge: GUIDE_LABEL, ...intro.corners.guide },
-        // Not translated, and said so on the row itself: the console is the
-        // one panel that stays in English. See `CONSOLE_LABEL`.
-        { badge: CONSOLE_LABEL, ...intro.corners.console }
+        // The button itself rather than the word it used to be: the filter is
+        // an icon in the corner of the sky now, and a page keying it to the
+        // word FILTER would be keying it to something no longer on screen.
+        { icon: "layers", ...intro.corners.filter },
+        // Both of these live behind the settings tab, so both are found by the
+        // same icon — which is what their `where` says in words.
+        { icon: "settings", ...intro.corners.guide },
+        // The console's row is the one thing in the app that stays in English,
+        // and the page says so. See `CONSOLE_LABEL`.
+        { icon: "settings", ...intro.corners.console }
       ]
     },
     {

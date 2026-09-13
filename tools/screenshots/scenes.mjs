@@ -1,8 +1,9 @@
 /*
- * The five frames, as data.
+ * The six frames, as data.
  *
  * One entry per App Store screenshot: the caption it carries, the sky behind
- * it, the markers on that sky and which of the app's panels are open. Nothing
+ * it, the markers on that sky, which way the camera is pointing and which of
+ * the app's panels are open. Nothing
  * here draws anything — `page/sky.js` and `page/markers.js` do that, from these
  * numbers — so this file is the one to edit when the story changes rather than
  * the picture.
@@ -215,6 +216,9 @@ const ISS_NEXT_PASS = {
 const scenes = [
   {
     id: "01-sky",
+    // Where the camera is pointing, for the strip along the foot of the
+    // frame (`HorizonCompass`). The card's own bearings are read against it.
+    headingDeg: 41,
     caption: {
       title: "Point it at the sky",
       body: "The satellites passing over you, drawn on the picture where they actually are."
@@ -222,6 +226,14 @@ const scenes = [
     sky: NIGHT_CITY,
     palette: "night",
     panels: { filter: "closed", status: "closed" },
+    // The card along the bottom, shut: the station is crossing now, which is
+    // what the plan says when a pass has already begun (`scene.passes.now`).
+    pass: {
+      name: "ISS",
+      inMinutes: "now",
+      where: "NE · 38° up",
+      seeing: "visible to the eye"
+    },
     // The station's own arc, running on ahead of it: the same line the marker
     // is travelling along, with the next minute marked on it.
     // A minute of the station is most of the frame's width, so where the next
@@ -254,6 +266,9 @@ const scenes = [
 
   {
     id: "02-tap",
+    // Where the camera is pointing, for the strip along the foot of the
+    // frame (`HorizonCompass`). The card's own bearings are read against it.
+    headingDeg: 38,
     caption: {
       title: "Tap a light, learn what it is",
       body: "What it is, who flies it, how far away — and the figures keep moving while you read."
@@ -305,6 +320,9 @@ const scenes = [
 
   {
     id: "03-occlusion",
+    // Where the camera is pointing, for the strip along the foot of the
+    // frame (`HorizonCompass`). The card's own bearings are read against it.
+    headingDeg: 128,
     caption: {
       title: "It knows what is in the way",
       body: "Anything behind a building or a tree is left out, rather than drawn over it."
@@ -353,6 +371,9 @@ const scenes = [
 
   {
     id: "04-legend",
+    // Where the camera is pointing, for the strip along the foot of the
+    // frame (`HorizonCompass`). The card's own bearings are read against it.
+    headingDeg: 196,
     caption: {
       title: "Colour is what it is for",
       body: "Size is how far away. A ring holds station over the equator. Day or night, the sky decides the ink."
@@ -390,6 +411,9 @@ const scenes = [
 
   {
     id: "05-inview",
+    // Where the camera is pointing, for the strip along the foot of the
+    // frame (`HorizonCompass`). The card's own bearings are read against it.
+    headingDeg: 22,
     caption: {
       title: "What is overhead, right now",
       body: "The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds."
@@ -400,6 +424,9 @@ const scenes = [
     // The named fleets only. What is left over is worked out by the generator
     // from the marks actually on the screen, so the rows and the count above
     // them always add up — see `statusPanel`.
+    // The line the breakdown opens with: a count of marks says nothing about
+    // whether any of them can be seen. See `scene.sunlight`.
+    sunlight: "14 of these are in sunlight",
     breakdown: {
       rows: [
         ["Starlink", 6],
@@ -433,6 +460,9 @@ const scenes = [
 
   {
     id: "06-pass",
+    // Where the camera is pointing, for the strip along the foot of the
+    // frame (`HorizonCompass`). The card's own bearings are read against it.
+    headingDeg: 305,
     caption: {
       title: "Know when to look up",
       body: "Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up."
@@ -440,6 +470,15 @@ const scenes = [
     sky: { ...NIGHT_CITY, seed: 53 },
     palette: "night",
     panels: { filter: "closed", status: "closed" },
+    // And the same plan read out as the card along the bottom, which is where
+    // somebody who has not looked up yet reads it. Shut, as it stands unless
+    // it is opened: the next pass, where to stand and whether it can be seen.
+    pass: {
+      name: "ISS",
+      inMinutes: "14 min",
+      where: "NW · 63° up",
+      seeing: "visible to the eye"
+    },
     // Two passes, which is what the frame is about. One is under way and is
     // drawn at full strength from the object itself; the other has not begun,
     // so it has no marker at all — only the line, faded by how far off it is,
