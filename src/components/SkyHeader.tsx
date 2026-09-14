@@ -43,8 +43,11 @@ type Props = {
  * A degraded boot is not reported here: it tints the settings tab, which is
  * where the console that explains it now lives. This line is about the sky,
  * not about the phone.
+ *
+ * Memoized: it renders when the count does, not whenever a sky mask lands on
+ * the view above it.
  */
-export const SkyHeader: React.FC<Props> = ({ sky, filterOpen, onToggleFilter }) => {
+export const SkyHeader: React.FC<Props> = React.memo(({ sky, filterOpen, onToggleFilter }) => {
   // Nothing in this component's props changes when the console's picker
   // changes the language, and every word in it does. See `useLocale`.
   useLocale();
@@ -117,7 +120,9 @@ export const SkyHeader: React.FC<Props> = ({ sky, filterOpen, onToggleFilter }) 
       )}
     </View>
   );
-};
+});
+
+SkyHeader.displayName = "SkyHeader";
 
 const styles = StyleSheet.create({
   header: {

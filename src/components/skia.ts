@@ -1,5 +1,6 @@
 /**
- * Skia, as the two things in this app that draw with it need it.
+ * Skia, as the things in this app that use it need it: the two that draw with
+ * it, and the camera frame grabber, which decodes with it.
  *
  * The package's own entry point cannot be used here. It re-exports
  * `external/reanimated`, and one module in there — `useVideoLoading` — calls
@@ -25,6 +26,8 @@
 import "@shopify/react-native-skia/src/skia/NativeSetup";
 
 export {
+  AlphaType,
+  ColorType,
   createPicture,
   PaintStyle,
   Skia,

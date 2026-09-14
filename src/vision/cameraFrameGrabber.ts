@@ -2,6 +2,7 @@ import type { CameraView } from "expo-camera";
 import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { decode as decodeJpeg } from "jpeg-js";
+import { AlphaType, ColorType, Skia } from "../components/skia";
 import { DEVICE_CAMERA_CAPTURE_QUALITY } from "../constants";
 import { FramePixels, ShutterCallback, SkyFrameGrabber } from "./skySegmenter";
 import { Size } from "./skySegmentation";
@@ -15,8 +16,8 @@ import { Size } from "./skySegmentation";
  * canvas, and iOS has the camera API.
  *
  * The steps are all library work rather than pixel handling of our own —
- * `expo-camera` captures, `expo-image-manipulator` resamples natively, `jpeg-js`
- * decodes — because the alternative, a hand-written resampler over a raw camera
+ * `expo-camera` captures, `expo-image-manipulator` resamples natively, Skia
+ * decodes (`decodeFrame`) — because the alternative, a hand-written resampler over a raw camera
  * buffer, is exactly the sort of thing that quietly gets a colour order or a row
  * stride wrong and produces a plausible-looking mask of nothing.
  *
@@ -45,6 +46,70 @@ import { Size } from "./skySegmentation";
 
 /** JPEG quality for the hand-off between the resizer and the decoder. */
 const HANDOFF_QUALITY = 0.95;
+
+/** A decoded hand-off: RGBA, row-major, at whatever size the JPEG was. */
+type DecodedFrame = { width: number; height: number; data: Uint8Array };
+
+/** Whether the native decoder has already failed once and said so. */
+let nativeDecodeWarned = false;
+
+/**
+ * The hand-off JPEG as RGBA, decoded by Skia's native codec.
+ *
+ * It used to be `jpeg-js`, which is JavaScript, and on the phone that means
+ * interpreted JavaScript on the thread the markers are drawn from: a hundred
+ * milliseconds and more of a frozen sky on every pass, whether or not the mask
+ * was hiding anything. Skia is already in the app to draw the markers, and its
+ * codec is libjpeg-turbo, which does the same decode in a few milliseconds.
+ *
+ * The two decoders round a handful of pixels differently — well under a level on
+ * average, from chroma upsampling and the IDCT — which moves the mask by a small
+ * fraction of what the JPEG hand-off itself already costs it. Read without a
+ * colour space, so Skia hands back the stored values rather than converting them,
+ * which is what `jpeg-js` did.
+ *
+ * `jpeg-js` stays as the fallback: a codec that declines the file is a slower
+ * pass, not a camera that cannot be segmented.
+ */
+function decodeFrame(bytes: Uint8Array): DecodedFrame {
+  try {
+    const decoded = decodeNatively(bytes);
+    if (decoded) return decoded;
+    throw new Error("Skia could not decode the camera frame");
+  } catch (cause) {
+    if (!nativeDecodeWarned) {
+      nativeDecodeWarned = true;
+      console.warn("Decoding camera frames in JavaScript instead", cause);
+    }
+    return decodeJpeg(bytes, { useTArray: true });
+  }
+}
+
+function decodeNatively(bytes: Uint8Array): DecodedFrame | null {
+  // Both are native objects, released by hand for the reason every native image
+  // on this path is: see the note in `grab`.
+  const encoded = Skia.Data.fromBytes(bytes);
+  try {
+    const image = Skia.Image.MakeImageFromEncoded(encoded);
+    if (!image) return null;
+    try {
+      const width = image.width();
+      const height = image.height();
+      const data = image.readPixels(0, 0, {
+        width,
+        height,
+        colorType: ColorType.RGBA_8888,
+        alphaType: AlphaType.Unpremul
+      });
+      if (!data || data.length !== width * height * 4) return null;
+      return { width, height, data: data as Uint8Array };
+    } finally {
+      image.dispose();
+    }
+  } finally {
+    encoded.dispose();
+  }
+}
 
 /**
  * A phone frame source.
@@ -115,9 +180,7 @@ export function cameraFrameGrabber(
 
           const file = new File(saved.uri);
           try {
-            const decoded = decodeJpeg(new Uint8Array(await file.arrayBuffer()), {
-              useTArray: true
-            });
+            const decoded = decodeFrame(new Uint8Array(await file.arrayBuffer()));
             if (decoded.width !== size.width || decoded.height !== size.height) {
               throw new Error(
                 `The camera frame came back ${decoded.width}x${decoded.height}, not ${size.width}x${size.height}`

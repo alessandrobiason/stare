@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { statusSection } from "../../src/debug/sections";
 import { useDeviceOrientation } from "../../src/hooks/useDeviceOrientation";
@@ -40,7 +40,18 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
   const { replayStart, epochRef, onPlaybackTimeChange } = replay;
   const liveOrientation = useDeviceOrientation(boot.capabilities, MAGNETIC_DECLINATION_DEG);
   const controls = useSceneControls();
-  const [maskStatus, setMaskStatus] = useState("Waiting for the first sky mask…");
+  /**
+   * What the sky mask is doing, for the status page: in a ref rather than state.
+   *
+   * The line changes on every pass — the share of the frame that is sky is in
+   * it — and the only thing that reads it is the debug panel, on its own timer.
+   * As state it was a render of this whole scene, once a pass, for a line that
+   * is not on the screen, landing on the same frames as the rest of the pass.
+   */
+  const maskStatusRef = useRef("Waiting for the first sky mask…");
+  const onMaskStatusChange = useCallback((status: string) => {
+    maskStatusRef.current = status;
+  }, []);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // The video's clock, per displayed frame, is what drives the epoch.
@@ -127,7 +138,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onSelectTab={controls.setTab}
         filterOpen={controls.filterOpen}
         onToggleFilter={controls.toggleFilter}
-        onMaskStatusChange={setMaskStatus}
+        onMaskStatusChange={onMaskStatusChange}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
         onOpenConsole={controls.openConsole}
@@ -163,7 +174,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
                     ? new Date(replayStart.getTime() + snapshot.elapsedSeconds * 1000).toISOString()
                     : "—"
                 },
-                { label: "Sky mask", value: maskStatus }
+                { label: "Sky mask", value: maskStatusRef.current }
               ],
               warnings: boot.warnings
             })

@@ -127,29 +127,39 @@ export function toModelTensor(
     );
   }
 
+  const [red, green, blue] = normalizationTables();
   const data = new Float32Array(3 * plane);
-  for (let pixel = 0; pixel < plane; pixel += 1) {
-    for (let channel = 0; channel < 3; channel += 1) {
-      data[channel * plane + pixel] =
-        (pixels[pixel * channels + channel] / 255 - MEAN[channel]) / STANDARD_DEVIATION[channel];
-    }
+  const redPlane = data.subarray(0, plane);
+  const greenPlane = data.subarray(plane, 2 * plane);
+  const bluePlane = data.subarray(2 * plane);
+  for (let pixel = 0, source = 0; pixel < plane; pixel += 1, source += channels) {
+    redPlane[pixel] = red[pixels[source]];
+    greenPlane[pixel] = green[pixels[source + 1]];
+    bluePlane[pixel] = blue[pixels[source + 2]];
   }
   return data;
 }
 
-/** Softmax over the class logits at one pixel, returning the sky probability. */
-function skyProbability(logits: Float32Array, plane: number, pixel: number): number {
-  let maximum = -Infinity;
-  for (let klass = 0; klass < CLASS_COUNT; klass += 1) {
-    maximum = Math.max(maximum, logits[klass * plane + pixel]);
-  }
-
-  let total = 0;
-  for (let klass = 0; klass < CLASS_COUNT; klass += 1) {
-    total += Math.exp(logits[klass * plane + pixel] - maximum);
-  }
-
-  return Math.exp(logits[SKY_CLASS * plane + pixel] - maximum) / total;
+/**
+ * What every 8-bit value of each channel normalizes to, worked out once.
+ *
+ * A pass is three divisions for every pixel of the model's input — over four
+ * hundred thousand of them — of only 768 distinct values, and on the phone each
+ * one was an interpreted division on the thread that draws the markers. Held as
+ * float32, which is exactly what writing the computed double into the tensor
+ * rounds it to, so a lookup is the same value to the bit.
+ */
+let normalization: readonly Float32Array[] | null = null;
+function normalizationTables(): readonly Float32Array[] {
+  if (normalization) return normalization;
+  normalization = MEAN.map((mean, channel) => {
+    const table = new Float32Array(256);
+    for (let value = 0; value < 256; value += 1) {
+      table[value] = (value / 255 - mean) / STANDARD_DEVIATION[channel];
+    }
+    return table;
+  });
+  return normalization;
 }
 
 /** Cell boundaries that tile `extent` exactly: no gaps, no overlaps, none empty. */
@@ -179,10 +189,35 @@ export function poolSkyLogits(
   input: Size,
   grid: MaskGrid
 ): SkyMask {
-  const plane = input.width * input.height;
+  const pooling = startSkyPooling(logits, input, grid);
+  for (let row = 0; row < pooling.rows; row += 1) pooling.poolRow(row);
+  return pooling.finish();
+}
+
+/**
+ * `poolSkyLogits`, a row of sub-cells at a time.
+ *
+ * A pass over every pixel of the model's output is the longest stretch of work
+ * the segmentation puts on the JS thread, and that is the thread the markers are
+ * drawn from: run in one go on the phone it is several frames of a frozen sky,
+ * every time a mask lands. Split by row, a caller can hand the thread back
+ * between rows (`startSlicing`) and the mask comes out the same — each sub-cell
+ * is pooled from its own pixels, so when its row is pooled changes nothing.
+ */
+export type SkyPooling = {
+  /** Rows of sub-cells, each of which has to be pooled before `finish`. */
+  rows: number;
+  poolRow(row: number): void;
+  /** The mask, once every row has been pooled. */
+  finish(): SkyMask;
+};
+
+export function startSkyPooling(logits: Float32Array, input: Size, grid: MaskGrid): SkyPooling {
+  const { width, height } = input;
+  const plane = width * height;
   if (logits.length < CLASS_COUNT * plane) {
     throw new Error(
-      `Sky segmentation expected ${CLASS_COUNT * plane} logits for ${input.width}x${input.height}, got ${logits.length}`
+      `Sky segmentation expected ${CLASS_COUNT * plane} logits for ${width}x${height}, got ${logits.length}`
     );
   }
 
@@ -191,27 +226,60 @@ export function poolSkyLogits(
   const fineRows = grid.rows * factor;
   const fine = new Float64Array(fineColumns * fineRows);
 
-  for (let row = 0; row < fineRows; row += 1) {
-    const startY = boundary(row, fineRows, input.height);
-    const endY = Math.max(startY + 1, boundary(row + 1, fineRows, input.height));
-
-    for (let column = 0; column < fineColumns; column += 1) {
-      const startX = boundary(column, fineColumns, input.width);
-      const endX = Math.max(startX + 1, boundary(column + 1, fineColumns, input.width));
-
-      let sum = 0;
-      let pixels = 0;
-      for (let y = startY; y < endY && y < input.height; y += 1) {
-        for (let x = startX; x < endX && x < input.width; x += 1) {
-          sum += skyProbability(logits, plane, y * input.width + x);
-          pixels += 1;
-        }
-      }
-      fine[row * fineColumns + column] = pixels ? sum / pixels : 0;
-    }
+  // The same span for a column on every row, so worked out once rather than
+  // per sub-cell. Clamped to the image here instead of on every pixel.
+  const startsX = new Int32Array(fineColumns);
+  const endsX = new Int32Array(fineColumns);
+  for (let column = 0; column < fineColumns; column += 1) {
+    const startX = boundary(column, fineColumns, width);
+    startsX[column] = startX;
+    endsX[column] = Math.min(width, Math.max(startX + 1, boundary(column + 1, fineColumns, width)));
   }
 
-  return coarsen(fine, grid, factor);
+  // SkyWater-Seg's four classes, one plane each (`CLASS_COUNT`), with sky the
+  // second of them (`SKY_CLASS`).
+  const first = logits.subarray(0, plane);
+  const sky = logits.subarray(plane, 2 * plane);
+  const third = logits.subarray(2 * plane, 3 * plane);
+  const fourth = logits.subarray(3 * plane, 4 * plane);
+
+  return {
+    rows: fineRows,
+    poolRow(row: number) {
+      const startY = boundary(row, fineRows, height);
+      const endY = Math.min(height, Math.max(startY + 1, boundary(row + 1, fineRows, height)));
+
+      for (let column = 0; column < fineColumns; column += 1) {
+        const startX = startsX[column];
+        const endX = endsX[column];
+
+        let sum = 0;
+        let pixels = 0;
+        for (let y = startY; y < endY; y += 1) {
+          const end = y * width + endX;
+          for (let pixel = y * width + startX; pixel < end; pixel += 1) {
+            // The softmax's sky probability, unrolled: one call for the
+            // largest logit and one exponential per class, summed in class
+            // order. That order is what keeps the result identical to the bit
+            // to the per-class loop this replaced, and the calls it saves are
+            // most of what a pass cost in an interpreter.
+            const skyLogit = sky[pixel];
+            const maximum = Math.max(first[pixel], skyLogit, third[pixel], fourth[pixel]);
+            const skyWeight = Math.exp(skyLogit - maximum);
+            sum +=
+              skyWeight /
+              (Math.exp(first[pixel] - maximum) +
+                skyWeight +
+                Math.exp(third[pixel] - maximum) +
+                Math.exp(fourth[pixel] - maximum));
+            pixels += 1;
+          }
+        }
+        fine[row * fineColumns + column] = pixels ? sum / pixels : 0;
+      }
+    },
+    finish: () => coarsen(fine, grid, factor)
+  };
 }
 
 /**

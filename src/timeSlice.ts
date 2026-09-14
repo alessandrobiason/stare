@@ -35,7 +35,7 @@ export const SLICE_BUDGET_MS = 8;
  * its frame callbacks on, which is precisely the queue that has to be allowed
  * to run.
  */
-const yieldToEventLoop = (): Promise<void> =>
+export const yieldToEventLoop = (): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, 0);
   });

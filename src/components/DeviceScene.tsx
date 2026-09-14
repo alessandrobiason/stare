@@ -50,7 +50,18 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
   // rather than twenty times a second. See `useCompassAccuracy`.
   const compass = useCompassAccuracy(orientation);
   const controls = useSceneControls();
-  const [maskStatus, setMaskStatus] = useState("Waiting for the first sky mask…");
+  /**
+   * What the sky mask is doing, for the status page: in a ref rather than state.
+   *
+   * The line changes on every pass — the share of the frame that is sky is in
+   * it — and the only thing that reads it is the debug panel, on its own timer.
+   * As state it was a render of this whole scene, once a pass, for a line that
+   * is not on the screen, landing on the same frames as the rest of the pass.
+   */
+  const maskStatusRef = useRef("Waiting for the first sky mask…");
+  const onMaskStatusChange = useCallback((status: string) => {
+    maskStatusRef.current = status;
+  }, []);
   /**
    * Whether the sun or the moon is currently aiming the view instead of the
    * magnetometer, which decides whether there is any point asking for a compass
@@ -169,7 +180,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onSelectTab={controls.setTab}
         filterOpen={controls.filterOpen}
         onToggleFilter={controls.toggleFilter}
-        onMaskStatusChange={setMaskStatus}
+        onMaskStatusChange={onMaskStatusChange}
         onSkyFixChange={setSkyFixStanding}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}
@@ -205,7 +216,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
                 value: `${observer.latitudeDeg.toFixed(4)}, ${observer.longitudeDeg.toFixed(4)} · ${observer.heightM.toFixed(0)} m`
               },
               { label: "Aim", value: aimReadout(orientation.latestRef.current) },
-              { label: "Sky mask", value: maskStatus }
+              { label: "Sky mask", value: maskStatusRef.current }
             ],
             warnings: boot.warnings
           })

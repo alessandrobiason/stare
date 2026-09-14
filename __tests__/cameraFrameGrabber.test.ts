@@ -32,9 +32,39 @@ jest.mock("expo-file-system", () => ({
   }
 }));
 
+/** Whether Skia's codec takes the hand-off JPEG, which a test can refuse. */
+let mockNativeDecodes = true;
+/** Native decoder objects made and not yet released. */
+let mockLiveNativeObjects = 0;
+
+jest.mock("../src/components/skia", () => {
+  const made = <T extends object>(object: T) => {
+    mockLiveNativeObjects += 1;
+    return { ...object, dispose: () => (mockLiveNativeObjects -= 1) };
+  };
+  return {
+    AlphaType: { Unpremul: 3 },
+    ColorType: { RGBA_8888: 4 },
+    Skia: {
+      Data: { fromBytes: () => made({}) },
+      Image: {
+        MakeImageFromEncoded: () => {
+          mockOrder.push("decode");
+          if (!mockNativeDecodes) return null;
+          return made({
+            width: () => 4,
+            height: () => 4,
+            readPixels: () => new Uint8Array(4 * 4 * 4)
+          });
+        }
+      }
+    }
+  };
+});
+
 jest.mock("jpeg-js", () => ({
   decode: () => {
-    mockOrder.push("decode");
+    mockOrder.push("decode in JavaScript");
     return { width: 4, height: 4, data: new Uint8Array(4 * 4 * 4) };
   }
 }));
@@ -80,4 +110,36 @@ test("the attitude is read when the still is asked for, not when it comes back",
     "read",
     "decode"
   ]);
+});
+
+test("the frame is decoded natively, and the native objects are let go of", async () => {
+  mockOrder.length = 0;
+  const grabber = cameraFrameGrabber(() => slowCamera() as never, FRAME);
+
+  const frame = await grabber.grab(SIZE, () => undefined);
+
+  // Decoded off the interpreter: a JPEG decoded in JavaScript is a frozen sky
+  // for as long as it takes, on every pass.
+  expect(mockOrder).toContain("decode");
+  expect(mockOrder).not.toContain("decode in JavaScript");
+  expect(frame.pixels).toHaveLength(SIZE.width * SIZE.height * 4);
+  expect(mockLiveNativeObjects).toBe(0);
+});
+
+test("a frame the native codec declines is decoded in JavaScript rather than failing the pass", async () => {
+  mockOrder.length = 0;
+  mockNativeDecodes = false;
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  try {
+    const grabber = cameraFrameGrabber(() => slowCamera() as never, FRAME);
+
+    const frame = await grabber.grab(SIZE, () => undefined);
+
+    expect(mockOrder.slice(-2)).toEqual(["decode", "decode in JavaScript"]);
+    expect(frame.pixels).toHaveLength(SIZE.width * SIZE.height * 4);
+    expect(mockLiveNativeObjects).toBe(0);
+  } finally {
+    mockNativeDecodes = true;
+    warn.mockRestore();
+  }
 });

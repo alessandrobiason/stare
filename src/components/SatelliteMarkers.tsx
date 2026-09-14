@@ -64,8 +64,13 @@ type Props = {
  * at all.
  *
  * The names are the exception, and stay views — see `MarkerLabels`.
+ *
+ * Memoized, because the view above it renders whenever a sky mask lands, and
+ * each of those renders was one more scene built and recorded on top of the
+ * frames this component is already drawing — on the frames the rest of the
+ * pass is landing on.
  */
-export const SatelliteMarkers: React.FC<Props> = ({
+export const SatelliteMarkers: React.FC<Props> = React.memo(({
   markers,
   frame,
   palette,
@@ -86,7 +91,9 @@ export const SatelliteMarkers: React.FC<Props> = ({
       <MarkerLabels labels={scene.labels} rollDeg={scene.rollDeg} palette={palette} />
     </>
   );
-};
+});
+
+SatelliteMarkers.displayName = "SatelliteMarkers";
 
 /** The scene as a display list, ready for the view to replay. */
 function record(scene: MarkerScene, frame: FrameSize): SkPicture {

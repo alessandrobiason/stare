@@ -10,6 +10,7 @@ import {
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { AttitudeReading } from "./useSmoothedOrientation";
 import { aimOffsetDeg, aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
+import { yieldToEventLoop } from "../timeSlice";
 import { applyHorizonPrior } from "../vision/horizonPrior";
 import { startSegmentationLoop } from "../vision/segmentationLoop";
 import { SkyMaskTemporalFilter, SkyMaskSensorSample } from "../vision/skyMaskTemporalFilter";
@@ -241,6 +242,16 @@ export function useSkySegmentation(
           passes: statsRef.current.passes + 1,
           failures: statsRef.current.failures
         };
+
+        // Everything from here to the end of the pass runs on the thread the
+        // markers are drawn from, and it used to run in one go with the last of
+        // the pooling: a mask landing was a run of frames the sky did not move
+        // on, whether or not the mask was hiding anything. So it takes turns —
+        // the aim, the blend and the publishing on one, the sighting on the
+        // next — and the frames go on being drawn between them.
+        await yieldToEventLoop();
+        if (!active) return;
+
         // Before the temporal filter, not after: the filter stores what it
         // returns and warps it into the next frame, so a mask cleared
         // afterwards would have its ground handed back by the very next blend.
@@ -254,6 +265,8 @@ export function useSkySegmentation(
 
         // After the mask, never before it: this is the second question about
         // the frame and the first one is what the view is waiting on.
+        await yieldToEventLoop();
+        if (!active) return;
         onFrameRef.current?.({
           pixels: pass.pixels,
           size: pass.size,

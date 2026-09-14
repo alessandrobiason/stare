@@ -402,6 +402,16 @@ export const SkyOverlay: React.FC<Props> = ({
     onSkyChange: setSky
   });
 
+  // A row of the passes panel, picked: the same selection a tap on the object's
+  // own mark makes, so the card that opens is the card the sky would have
+  // opened. One name rather than a cluster: a row is one object by
+  // construction. Stable, so the panel does not render every time a sky mask
+  // lands on this view.
+  const selectPass = useCallback(
+    (name: string) => setSelection({ names: [name], selected: name }),
+    []
+  );
+
   // What the tapped satellite is, resolved on the card's own slow timer against
   // the epoch of whatever frame is on screen when it asks.
   const describeRef = useLatestRef((name: string) => {
@@ -621,11 +631,7 @@ export const SkyOverlay: React.FC<Props> = ({
                   style={styles.inset}
                   passes={upcoming}
                   epochRef={epochRef}
-                  // The same selection a tap on the object's own mark makes, so
-                  // the card that opens is the card the sky would have opened.
-                  // One name rather than a cluster: a row is one object by
-                  // construction.
-                  onSelect={(name) => setSelection({ names: [name], selected: name })}
+                  onSelect={selectPass}
                 />
               )}
 

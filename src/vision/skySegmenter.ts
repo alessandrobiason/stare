@@ -1,7 +1,8 @@
+import { startSlicing } from "../timeSlice";
 import { SkyMask } from "./skyMask";
 import { createSkyModel } from "./skyModel";
 import { SkyModel } from "./skyModelTypes";
-import { maskGridFor, modelInputSize, poolSkyLogits, Size, toModelTensor } from "./skySegmentation";
+import { maskGridFor, modelInputSize, Size, startSkyPooling, toModelTensor } from "./skySegmentation";
 
 /**
  * Sky segmentation, on whichever platform is running.
@@ -116,8 +117,20 @@ export async function segmentSky(
   const captured = await grabber.grab(input, onShutter);
   const logits = await model.run(toModelTensor(captured.pixels, input, captured.channels), input);
 
+  // The model runs off the JS thread; pooling its output does not, and in one go
+  // it is the longest single stretch a pass holds that thread for — frames of a
+  // frozen sky on the phone, every time a mask lands, whether or not the mask is
+  // hiding anything. So the thread is handed back between rows. The mask is the
+  // one `poolSkyLogits` returns, arriving a few frames later.
+  const pooling = startSkyPooling(logits, input, maskGridFor(frame));
+  const slices = startSlicing();
+  for (let row = 0; row < pooling.rows; row += 1) {
+    pooling.poolRow(row);
+    if (slices.spent()) await slices.handOver();
+  }
+
   return {
-    mask: poolSkyLogits(logits, input, maskGridFor(frame)),
+    mask: pooling.finish(),
     pixels: captured,
     size: input
   };

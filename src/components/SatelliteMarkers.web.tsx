@@ -39,8 +39,9 @@ type Props = {
  * What both backends draw is decided in `markerScene`, which is where the look
  * of a marker is defined and where the tests read it from. This file, like its
  * native sibling, only knows how to fill a circle and a polygon and fade one.
+ * Memoized for the reason its sibling is.
  */
-export const SatelliteMarkers: React.FC<Props> = ({
+export const SatelliteMarkers: React.FC<Props> = React.memo(({
   markers,
   frame,
   palette,
@@ -90,7 +91,9 @@ export const SatelliteMarkers: React.FC<Props> = ({
       <MarkerLabels labels={scene.labels} rollDeg={scene.rollDeg} palette={palette} />
     </>
   );
-};
+});
+
+SatelliteMarkers.displayName = "SatelliteMarkers";
 
 function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
   context.lineJoin = "round";

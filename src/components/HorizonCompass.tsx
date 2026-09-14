@@ -90,9 +90,13 @@ const RULE_ROW = 10;
  * style write rather than a React render of a dozen views, sixty times a
  * second. The only thing that renders is the emphasis, which changes when the
  * nearest point changes: eight times per revolution rather than sixty times a
- * second.
+ * second — and memoized, so the view above rendering for a sky mask does not
+ * diff the strip either.
  */
-export const HorizonCompass: React.FC<Props> = ({ orientationFilterRef, halfFovDeg }) => {
+export const HorizonCompass: React.FC<Props> = React.memo(({
+  orientationFilterRef,
+  halfFovDeg
+}) => {
   // Every label in the strip is a translated letter, and nothing else here
   // changes when the console's picker changes the language. See `useLocale`.
   useLocale();
@@ -188,7 +192,9 @@ export const HorizonCompass: React.FC<Props> = ({ orientationFilterRef, halfFovD
       </View>
     </View>
   );
-};
+});
+
+HorizonCompass.displayName = "HorizonCompass";
 
 /** The eight points the compass table carries, from north, clockwise. */
 const COMPASS_POINTS = 8;
