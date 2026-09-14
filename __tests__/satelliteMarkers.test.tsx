@@ -8,9 +8,10 @@ import {
   shortName,
   TAIL_FADE
 } from "../src/components/markerScene";
-import { DAYLIGHT_PALETTE, MARK_COLOR, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
+import { DAYLIGHT_PALETTE, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
+import { CATEGORY_BLOOMS, CATEGORY_COLORS } from "../src/satellite/categories";
 import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../src/constants";
 import { setLocaleForTesting } from "../src/i18n";
 
@@ -58,7 +59,7 @@ test("draws nothing before the frame has been laid out", () => {
   ).toBe("");
 });
 
-test("draws every marker white, whatever it is for", () => {
+test("colours a marker by its category and nothing else, bloom included", () => {
   const { glyphs } = scene([
     marker({ category: "NAVIGATION" }),
     marker({ name: "OTHER SAT", category: "EARTH", rangeKm: 39000 }),
@@ -66,10 +67,23 @@ test("draws every marker white, whatever it is for", () => {
     marker({ name: "JUNK", category: "OTHER", parked: true, next: null })
   ]);
 
-  expect(new Set(glyphs.map((glyph) => glyph.color))).toEqual(new Set([MARK_COLOR]));
+  expect(glyphs.map((glyph) => glyph.color)).toEqual([
+    CATEGORY_COLORS.NAVIGATION,
+    CATEGORY_COLORS.EARTH,
+    CATEGORY_COLORS.LANDMARK,
+    CATEGORY_COLORS.OTHER
+  ]);
+  // The light around a mark is the mark's own colour, not a shared one: a
+  // satellite is light of that colour rather than a coloured dot in white light.
+  expect(glyphs.map((glyph) => glyph.bloomColor)).toEqual([
+    CATEGORY_BLOOMS.NAVIGATION,
+    CATEGORY_BLOOMS.EARTH,
+    CATEGORY_BLOOMS.LANDMARK,
+    CATEGORY_BLOOMS.OTHER
+  ]);
 });
 
-test("draws the same white mark on the same dark edge by day as by night", () => {
+test("draws the same coloured mark on the same dark edge by day as by night", () => {
   const frame: MarkerFrame = { markers: [marker()], paths: [], rollDeg: 0 };
   const night = buildMarkerScene(frame, FRAME, NIGHT_PALETTE);
   const day = buildMarkerScene(frame, FRAME, DAYLIGHT_PALETTE);
@@ -672,10 +686,10 @@ describe("a landmark's path across the sky", () => {
     };
   }
 
-  test("draws it as thin dashes, white on the marks' dark edge", () => {
+  test("draws it as thin dashes, in its object's colour on the marks' dark edge", () => {
     const [shape] = scene([], 0, FRAME, [path()]).paths;
 
-    expect(shape.color).toBe(MARK_COLOR);
+    expect(shape.color).toBe(CATEGORY_COLORS.LANDMARK);
     // Thinner than the marks it runs between, and rimmed like all of them: a
     // path is two thousand pixels long and must not be the loudest thing on a
     // photograph of the sky.

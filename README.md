@@ -12,17 +12,17 @@ name over a count of what is above you, one button for the category filter, a
 strip of cardinal points along the bottom of the frame, a card carrying the next
 landmark due over you, and a bar of three tabs — the sky, a catalog that is not
 built yet, and the settings the guide and the console now live in.
-**A marker is a point of light**: a white point a few pixels across
-in a soft glow and a cool bloom, trailing a comet's tail that fades to
+**A marker is a point of light**: a pastel point a few pixels across
+in a soft glow and a bloom of its own colour, trailing a comet's tail that fades to
 nothing — and the app's logo is that same light, on a wide arc over a horizon
 (`assets/icon.svg`, drawn by `tools/make-logo.mjs` with the overlay's own
 fades). Solid discs a couple of dozen pixels across covered the picture they
 were marking. Nearer objects are larger *and* brighter, glow and tail alike, on
-the same log scale as their size. **Every mark is white**, whatever the object is
-for: the marks were once coloured by purpose, and white on a dark edge read
-better than any of those five colours against both a night sky and a daylit one.
-What an object is for is on its card and is what the filter sorts by. A mark
-carries four channels at once — shape for whether the object holds station (a
+the same log scale as their size. A mark carries five channels at once —
+**colour for purpose**, one pastel per category (champagne for landmarks, coral
+blush for navigation, sage for Earth watch, lavender for communications, a misted
+slate for the rest), the same by day and by night and the same in the filter and
+on the card; shape for whether the object holds station (a
 geostationary ring, or a body trailing the 12 seconds of ground track it has
 just covered), size for range on a log scale from 400 km to 40,000 km, a label,
 spent only on a couple of dozen landmarks, and **strength for whether the sun is
@@ -89,11 +89,16 @@ them as a strip of names, with the sky ringing whichever one is being read about
 the card is open, because they are all moving: a low pass halves its range in
 the time it takes to read them.
 
-Every mark is white on a near-black edge, tail included, because a photograph of
-the sky is either far brighter or far darker than any fill — and a fill and an
-edge at the two ends of the scale read against both. At night the white is what
-is seen; by day the edge is, a dark ring with a light centre, and it holds over
-cloud. A mark in the Earth's shadow fades its white and keeps its edge. What does
+Every mark is a light pastel — its point, glow, bloom and tail all in its
+category's colour — because a photograph of the sky is either far brighter or
+far darker than any fill, and a pale fill with a near-black edge reads against
+both. At night the colour is what is seen, as light with no edge; by day the edge
+is, a dark ring with a light tinted centre, tail included, and it holds over
+cloud. A mark in the Earth's shadow fades its light and keeps its edge. The two
+ladders the marks were once coloured in — light by night, dark by day — never
+read at both ends of the day, and the all-white marks that replaced them said
+nothing about purpose; pastels keep what white bought and put purpose back
+(`src/satellite/categories.ts`). What does
 follow the sun is what is around a mark: it glows at night and not by day, and
 the landmark names are light text at night and dark by day, crossing over a
 two-degree band of solar altitude inside civil twilight — worked out from the GPS
@@ -381,9 +386,8 @@ rather than stating them. The suite holds the landmark list here and the one in
 than shrugging on the card.
 
 Which channel to spend was the one real design question, and the answer came
-from what is in use *at rest*. Fill, shape and size are all carrying
-something permanently (and hue was, when the marks still had one), so any of
-them would have traded one fact for another —
+from what is in use *at rest*. Hue, fill, shape and size are all carrying
+something permanently, so any of them would have traded one fact for another —
 and fill in particular is already the difference between a parked ring and an
 ordinary dot, which is why an unlit mark cannot be a hollow one: the legend
 would have had two rings in it meaning different things. Opacity is not spent:

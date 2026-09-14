@@ -26,9 +26,9 @@ const FADES: Record<Fade, readonly FadeStop[]> = {
 /**
  * `#rrggbb` as Skia wants it, parsed once per colour rather than per marker.
  *
- * A palette is a handful of colours — the white, the edge, the halo — against
- * several hundred draws a frame, and the fade between the day and night sets has
- * a fixed number of steps (`daylightFractionAt`), so this cannot grow without
+ * A palette is a handful of colours — five categories and their blooms, the
+ * edge, the halo — against several hundred draws a frame, and the fade between
+ * the day and night sets has a fixed number of steps (`daylightFractionAt`), so this cannot grow without
  * bound over a long session.
  */
 const colors = new Map<string, SkColor>();

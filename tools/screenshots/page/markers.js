@@ -67,7 +67,7 @@ const CORE_FADE = [
 ];
 
 /**
- * The landmarks' paths, as `LANDMARK_PATHS` has them: thin white dashes on the
+ * The landmarks' paths, as `LANDMARK_PATHS` has them: thin dashes in the landmark colour on the
  * marks' dark edge for the arc an object is about to cross, marked at every
  * round clock minute, and fading with how far ahead its pass is.
  *
@@ -91,13 +91,26 @@ const LANDMARK_PATHS = {
   farOpacity: 0.25
 };
 
-/** `MARK_COLOR`, `MARK_EDGE` and `MARK_BLOOM`: every mark, day and night. */
-const MARK_COLOR = "#ffffff";
+/** `CATEGORY_COLORS`, `CATEGORY_BLOOMS` and `MARK_EDGE`: every mark, day and night. */
+const CATEGORY_COLORS = {
+  LANDMARK: "#fbe6af",
+  NAVIGATION: "#fba8a0",
+  EARTH: "#90e1c5",
+  COMMS: "#bfa4f0",
+  OTHER: "#92a9b4"
+};
+const CATEGORY_BLOOMS = {
+  LANDMARK: "#e9c67d",
+  NAVIGATION: "#eb827b",
+  EARTH: "#52caa5",
+  COMMS: "#9d80e7",
+  OTHER: "#7598ad"
+};
 const MARK_EDGE = { color: "#05070a", alpha: 0.9 };
-const MARK_BLOOM = "#a9c9ff";
 
 const NIGHT_PALETTE = {
-  mark: MARK_COLOR,
+  categories: CATEGORY_COLORS,
+  blooms: CATEGORY_BLOOMS,
   outline: MARK_EDGE,
   halo: { color: "#ffffff", alpha: 0.18 },
   glow: 1,
@@ -107,7 +120,8 @@ const NIGHT_PALETTE = {
 };
 
 const DAYLIGHT_PALETTE = {
-  mark: MARK_COLOR,
+  categories: CATEGORY_COLORS,
+  blooms: CATEGORY_BLOOMS,
   outline: MARK_EDGE,
   halo: { color: "#04121f", alpha: 0.2 },
   glow: 0,
@@ -241,7 +255,7 @@ function pathShapeFor(path, box, scale, palette) {
   return {
     dashes,
     arrows,
-    color: palette.mark,
+    color: palette.categories[path.category ?? "LANDMARK"],
     alpha: pathOpacity(path.lead ?? 0),
     width,
     rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO),
@@ -295,7 +309,8 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
       glow: { radius: size * GLOW_RATIO, alpha: GLOW_ALPHA * strength * light },
       bloom: { radius: size * BLOOM_RATIO, alpha: BLOOM_ALPHA * strength * light },
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
-      color: palette.mark,
+      bloomColor: palette.blooms[marker.category],
+      color: palette.categories[marker.category],
       alpha,
       edgeAlpha: opacity * edge
     });
@@ -307,7 +322,7 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
         radius: diameter / 2 + SELECTION_GAP_PX * scale + (SELECTION_WIDTH_PX * scale) / 2,
         width: SELECTION_WIDTH_PX * scale,
         rimWidth: (SELECTION_WIDTH_PX + 2 * MIN_OUTLINE_PX) * scale,
-        color: palette.mark,
+        color: palette.categories[marker.category],
         rim: { color: palette.outline.color, alpha: palette.outline.alpha * edge },
         alpha: opacity
       };
@@ -414,7 +429,7 @@ function drawGlyph(context, glyph, palette) {
   };
 
   if (glyph.halo !== null) glow(glyph.halo, GLOW_FADE, palette.halo.color, palette.halo.alpha * glyph.alpha);
-  glow(glyph.bloom.radius, BLOOM_FADE, MARK_BLOOM, glyph.bloom.alpha * glyph.alpha);
+  glow(glyph.bloom.radius, BLOOM_FADE, glyph.bloomColor, glyph.bloom.alpha * glyph.alpha);
   glow(glyph.glow.radius, GLOW_FADE, glyph.color, glyph.glow.alpha * glyph.alpha);
   if (glyph.tail) drawTail(context, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
 

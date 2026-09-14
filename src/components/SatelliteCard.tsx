@@ -22,6 +22,7 @@ import {
   speed
 } from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
+import { CATEGORY_COLORS } from "../satellite/categories";
 import {
   cachedLandmarkPhoto,
   landmarkPhotoFile,
@@ -31,7 +32,7 @@ import {
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { SatelliteDetail } from "../types";
 import { Icon } from "./Icon";
-import { cssColor, MARK_COLOR, MARK_EDGE } from "./palette";
+import { cssColor } from "./palette";
 import { glass, lift, theme } from "./theme";
 
 type Props = {
@@ -203,13 +204,34 @@ export const SatelliteCard: React.FC<Props> = ({
       )}
 
       <View style={styles.header}>
-        {/* The mark that was tapped, as the thing the name hangs off: a white
-            point, or the ring the sky draws for an object parked over the
-            equator. What it is for is written beside it rather than coloured
-            in — every mark on the sky is white. */}
-        <View style={styles.badge}>
+        {/* The mark that was tapped, as the thing the name hangs off: a point,
+            or the ring the sky draws for an object parked over the equator, in
+            the colour the sky and the filter's list both draw its purpose in —
+            so the card is tied to the dot that was tapped rather than merely
+            being about it. */}
+        <View
+          style={[
+            styles.badge,
+            detail && {
+              borderColor: cssColor({ color: CATEGORY_COLORS[detail.category], alpha: 0.35 })
+            }
+          ]}
+        >
           {detail && (
-            <View style={[styles.badgeMark, detail.parked && styles.badgeRing]} />
+            <View
+              style={[
+                styles.badgeMark,
+                detail.parked
+                  ? [styles.badgeRing, { borderColor: CATEGORY_COLORS[detail.category] }]
+                  : {
+                      backgroundColor: CATEGORY_COLORS[detail.category],
+                      borderColor: cssColor({
+                        color: CATEGORY_COLORS[detail.category],
+                        alpha: 0.3
+                      })
+                    }
+              ]}
+            />
           )}
         </View>
 
@@ -503,15 +525,12 @@ const styles = StyleSheet.create({
     width: BADGE_MARK,
     height: BADGE_MARK,
     borderRadius: BADGE_MARK / 2,
-    // Edged like the marks on the sky are.
-    backgroundColor: MARK_COLOR,
-    borderWidth: 1.5,
-    borderColor: cssColor(MARK_EDGE)
+    // In a band of its own colour thinned out: the glow the sky draws it in.
+    borderWidth: 2.5
   },
   badgeRing: {
     backgroundColor: "transparent",
-    borderWidth: 2.5,
-    borderColor: MARK_COLOR
+    borderWidth: 2.5
   },
   heading: {
     flex: 1,

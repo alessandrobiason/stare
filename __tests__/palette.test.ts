@@ -4,12 +4,44 @@ import {
   DAYLIGHT_PALETTE,
   daylightFraction,
   daylightFractionAt,
-  MARK_COLOR,
   MARK_EDGE,
   NIGHT_PALETTE,
   skyPalette
 } from "../src/components/palette";
+import {
+  CATEGORY_BLOOMS,
+  CATEGORY_COLORS,
+  SATELLITE_CATEGORIES,
+  SatelliteCategory
+} from "../src/satellite/categories";
 import { ObserverLocation } from "../src/types";
+
+/** OKLab, so separation and chroma are measured rather than asserted. */
+function oklab(color: string): [number, number, number] {
+  const [red, green, blue] = [1, 3, 5].map((index) => {
+    const value = Number.parseInt(color.slice(index, index + 2), 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const long = Math.cbrt(0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue);
+  const medium = Math.cbrt(0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue);
+  const short = Math.cbrt(0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue);
+  return [
+    0.2104542553 * long + 0.793617785 * medium - 0.0040720468 * short,
+    1.9779984951 * long - 2.428592205 * medium + 0.4505937099 * short,
+    0.0259040371 * long + 0.7827717662 * medium - 0.808675766 * short
+  ];
+}
+
+function closestPair(colors: Record<SatelliteCategory, string>): number {
+  let closest = Infinity;
+  for (const [index, first] of SATELLITE_CATEGORIES.entries()) {
+    for (const second of SATELLITE_CATEGORIES.slice(index + 1)) {
+      const [one, other] = [oklab(colors[first]), oklab(colors[second])];
+      closest = Math.min(closest, Math.hypot(...one.map((value, axis) => value - other[axis])));
+    }
+  }
+  return closest;
+}
 
 const LONDON: ObserverLocation = { latitudeDeg: 51.5, longitudeDeg: -0.13, heightM: 0 };
 const SYDNEY: ObserverLocation = { latitudeDeg: -33.87, longitudeDeg: 151.21, heightM: 0 };
@@ -93,14 +125,46 @@ test("quantises the fade, so it has a fixed number of states", () => {
 });
 
 describe("the marks themselves", () => {
-  test("are white on a near-black edge at every point of the day", () => {
-    // Not two ladders any more: one mark, the same object at noon and midnight.
+  test("keep their colours on a near-black edge at every point of the day", () => {
+    // Not two ladders any more: one colour per purpose, the same at noon and
+    // at midnight.
     for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
       const palette = blendPalettes(fraction);
-      expect(palette.mark).toBe(MARK_COLOR);
+      expect(palette.categories).toEqual(CATEGORY_COLORS);
+      expect(palette.blooms).toEqual(CATEGORY_BLOOMS);
       expect(palette.outline).toEqual(MARK_EDGE);
     }
-    expect(luminance(MARK_COLOR)).toBe(1);
+  });
+
+  test("are pastels: light enough to read on a night sky and inside the daytime edge", () => {
+    for (const category of SATELLITE_CATEGORIES) {
+      const fill = luminance(CATEGORY_COLORS[category]);
+      // Over seven to one against the night sky's own dark, and against the edge.
+      expect((fill + 0.05) / (luminance("#0b1422") + 0.05)).toBeGreaterThan(7);
+      expect((fill + 0.05) / (luminance(MARK_EDGE.color) + 0.05)).toBeGreaterThan(7);
+      // And none of them a signal colour: well short of full chroma.
+      const [, a, b] = oklab(CATEGORY_COLORS[category]);
+      expect(Math.hypot(a, b)).toBeLessThan(0.12);
+    }
+  });
+
+  test("keep the five categories apart", () => {
+    // Pastels give up distance for softness: every pair is still at least
+    // 0.11 apart in OKLab, which reads as a different colour side by side and
+    // at a glance.
+    expect(closestPair(CATEGORY_COLORS)).toBeGreaterThan(0.11);
+  });
+
+  test("bloom in their own hue, deeper than the fill", () => {
+    for (const category of SATELLITE_CATEGORIES) {
+      const [fillL, fillA, fillB] = oklab(CATEGORY_COLORS[category]);
+      const [bloomL, bloomA, bloomB] = oklab(CATEGORY_BLOOMS[category]);
+      expect(bloomL).toBeLessThan(fillL);
+      expect(Math.hypot(bloomA, bloomB)).toBeGreaterThan(Math.hypot(fillA, fillB));
+      // The same hue, to within a few degrees.
+      const turn = Math.atan2(bloomB, bloomA) - Math.atan2(fillB, fillA);
+      expect(Math.abs(Math.atan2(Math.sin(turn), Math.cos(turn)))).toBeLessThan(0.15);
+    }
   });
 
   test("put the whole scale between the fill and its edge", () => {

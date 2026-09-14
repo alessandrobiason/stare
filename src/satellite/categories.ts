@@ -1,5 +1,6 @@
 /**
- * The satellite taxonomy the filter sorts by and the card names.
+ * The satellite taxonomy the filter sorts by, the card names and the marks are
+ * coloured by.
  *
  * `SATELLITE_CATEGORIES` is the single source of truth: the `SatelliteCategory`
  * union, the legend order and the "show all" default are all derived from it,
@@ -12,13 +13,11 @@
  * the entries were not alternatives to each other — Starlink *is*
  * communications, and a geostationary satellite almost always is too.
  *
- * It is not drawn on the sky. The marks used to be coloured by it, five colours
- * in two ladders for night and day, and every mark is white now (`palette.ts`):
- * white on a dark edge read better than any of the five at either end of the
- * day, and what an object is for is one tap away on its card. Whether an object
- * is parked over the equator *is* drawn, as a shape (see `isParked`), because
- * that is a behaviour someone can see rather than a purpose they have to be
- * told.
+ * Colour carries the purpose and nothing else (`CATEGORY_COLORS`). Whether an
+ * object is parked over the equator is drawn as a shape instead (see
+ * `isParked`), because that is a behaviour someone can see rather than a
+ * purpose they have to be told, and because five is about the limit of what
+ * colour alone can separate.
  */
 export const SATELLITE_CATEGORIES = [
   "LANDMARK",
@@ -36,6 +35,55 @@ export type SatelliteCategory = (typeof SATELLITE_CATEGORIES)[number];
  * a non-specialist can use, in twelve languages. The names in the union above
  * are keys and are never shown.
  */
+
+/**
+ * The colour of a mark, by what the satellite is for: its point, its glow and
+ * its tail, on the sky, in the filter and on the card.
+ *
+ * Pastels, and one set for the whole day. The marks were white for a while,
+ * because white on a dark edge reads at both ends of the day and no one fill
+ * of the old two ladders did; a pastel is most of the way to white, so it keeps
+ * that — light on a night sky, a light centre inside the near-black edge on a
+ * daylit one (`palette.ts`) — and spends what is left on a hue. Nothing here is
+ * saturated: seventy marks in signal colours over a photograph of the sky read
+ * as an instrument panel rather than as lights in it.
+ *
+ * Set in OKLCH and converted, so the hues are spaced by eye rather than by RGB:
+ *
+ * - `LANDMARK` champagne, the lightest and warmest, for the couple of dozen
+ *   objects worth looking up for — nearest the white they carry a halo and a
+ *   name beside.
+ * - `NAVIGATION` a coral blush, `EARTH` a sage, `COMMS` a lavender.
+ * - `OTHER` a misted slate, the least chroma and the least light, since it is
+ *   most of the catalogue and should be the quietest thing on the frame.
+ *
+ * No two are closer than 0.11 in OKLab, which is as far apart as five colours
+ * can get while all staying pastel; every one is over seven to one against a
+ * night sky and against the edge it sits in by day.
+ */
+export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
+  LANDMARK: "#fbe6af",
+  NAVIGATION: "#fba8a0",
+  EARTH: "#90e1c5",
+  COMMS: "#bfa4f0",
+  OTHER: "#92a9b4"
+};
+
+/**
+ * The wide bloom a mark's glow sits in, by category: the same hue, deeper.
+ *
+ * What makes a point read as light giving off colour rather than as a dot of
+ * paint. A pastel spread thin over a dark sky is a grey haze; the same hue with
+ * more chroma, at the bloom's low strength, is a tint of the mark's own colour
+ * in the air around it.
+ */
+export const CATEGORY_BLOOMS: Record<SatelliteCategory, string> = {
+  LANDMARK: "#e9c67d",
+  NAVIGATION: "#eb827b",
+  EARTH: "#52caa5",
+  COMMS: "#9d80e7",
+  OTHER: "#7598ad"
+};
 
 export function allCategories(): Set<SatelliteCategory> {
   return new Set(SATELLITE_CATEGORIES);

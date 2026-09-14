@@ -182,6 +182,20 @@ const CATEGORY_LABELS = {
   OTHER: "OTHER"
 };
 const CATEGORY_ORDER = ["LANDMARK", "NAVIGATION", "EARTH", "COMMS", "OTHER"];
+/** `CATEGORY_COLORS`: one pastel per purpose, day and night. */
+const CATEGORY_COLORS = {
+  LANDMARK: "#fbe6af",
+  NAVIGATION: "#fba8a0",
+  EARTH: "#90e1c5",
+  COMMS: "#bfa4f0",
+  OTHER: "#92a9b4"
+};
+
+/** A colour as `rgba()`, for the thinned-out band a swatch glows in. */
+function thinned(color, alpha) {
+  const [red, green, blue] = [1, 3, 5].map((index) => Number.parseInt(color.slice(index, index + 2), 16));
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
 
 /**
  * The glyphs the control layer wears, as SVG.
@@ -303,11 +317,11 @@ function headerPanel(scene) {
 /** The category filter, hanging from the button in the header. */
 function filterPanel(scene) {
   if (scene.panels.filter !== "open") return "";
-  // No swatch on a row: every mark is white whatever it is for (`CategoryLegend`).
   return `<div class="filter">
       <div class="filter-head"><span class="panel-title">FILTER</span></div>
       ${CATEGORY_ORDER.map(
         (category) => `<div class="row">
+        <span class="swatch" style="background:${CATEGORY_COLORS[category]};border-color:${thinned(CATEGORY_COLORS[category], 0.3)}"></span>
         <span class="name">${CATEGORY_LABELS[category]}</span>
         <span class="toggle on"><span class="knob"></span></span>
       </div>`
@@ -375,7 +389,7 @@ function satelliteCard(scene) {
       <div class="grip"><span></span></div>
       ${strip}
       <div class="head">
-        <span class="badge"><span class="mark${card.parked ? " ring" : ""}"></span></span>
+        <span class="badge" style="border-color:${thinned(CATEGORY_COLORS[card.category], 0.35)}"><span class="mark${card.parked ? " ring" : ""}" style="${card.parked ? `border-color:${CATEGORY_COLORS[card.category]}` : `background:${CATEGORY_COLORS[card.category]};border-color:${thinned(CATEGORY_COLORS[card.category], 0.3)}`}"></span></span>
         <div class="heading">
           <div class="name">${escape(card.selected)}</div>
           <div class="purpose-label">${escape(card.purpose)}</div>

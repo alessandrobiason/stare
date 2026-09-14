@@ -1,28 +1,30 @@
 import { sunAltitudeDeg } from "../coordinates/sunAltitude";
 import { clamp } from "../math/angles";
+import { CATEGORY_BLOOMS, CATEGORY_COLORS, SatelliteCategory } from "../satellite/categories";
 import { ObserverLocation } from "../types";
 
 /**
  * What the overlay is drawn in, and which of the two sets that is right now.
  *
- * **Every mark is white, day and night.** The markers sit on a photograph of
- * the sky, and that photograph is either far brighter or far darker than any
- * fill can be, so no one fill reads against both. At night that is no problem:
- * a white point on a dark sky is a star, and the mark is drawn as one — a hot
- * centre in light that falls away to nothing, with no outline at all. A dark
- * ring round it read as a white disc cut out and laid on the picture rather
- * than as something giving off light. By day the white would vanish, so the
- * mark gains a near-black edge and loses its light: a dark ring with a light
- * centre, which reads over cloud as well as over blue.
+ * **Every mark is a pastel of its purpose, day and night** (`CATEGORY_COLORS`).
+ * The markers sit on a photograph of the sky, and that photograph is either far
+ * brighter or far darker than any fill can be, so no one fill reads against
+ * both. At night that is no problem: a pale point on a dark sky is a star, and
+ * the mark is drawn as one — a hot centre in light of its own colour that falls
+ * away to nothing, with no outline at all. A dark ring round it read as a disc
+ * cut out and laid on the picture rather than as something giving off light. By
+ * day the pale fill would vanish, so the mark gains a near-black edge and loses
+ * its light: a dark ring with a light, tinted centre, which reads over cloud as
+ * well as over blue.
  *
- * The marks used to be coloured by what each satellite is for, in two ladders
- * of five — light marks in a dark rim at night, dark marks in a light rim by
- * day. White was clearer on the sky at both ends of the day than any of the
- * five, and a mark that is the same object at noon and at midnight needs no
- * key. What an object is for is still one tap away, on its card, and still
- * what the filter sorts by.
+ * The marks were once coloured in two ladders of five — light marks in a dark
+ * rim at night, dark marks in a light rim by day — and then all white, because
+ * white on a dark edge read at both ends of the day and neither ladder did.
+ * Pastels keep what white bought, being most of the way to it, and put the
+ * purpose back on the sky: the same colour at noon and at midnight, and the same
+ * colour in the filter and on the card.
  *
- * What turns over with the day is therefore everything *around* the white: how
+ * What turns over with the day is therefore everything *around* the fill: how
  * much light a mark gives off (`glow`), how strongly its edge is drawn
  * (`edge`), the landmark halo, and the names, which are text
  * rather than marks and read best as dark ink on a bright sky. The phone
@@ -44,7 +46,12 @@ export type Ink = {
   alpha: number;
 };
 
-/** The fill every mark, tail, path and selection ring is drawn in. */
+/**
+ * The app's own light: white. What the boot screen and the logo draw their
+ * satellites in, and the ring round a tapped mark — the sky's marks are
+ * coloured by purpose instead (`CATEGORY_COLORS`), and neither the icon nor
+ * the ring is any one purpose.
+ */
 export const MARK_COLOR = "#ffffff";
 
 /**
@@ -57,18 +64,24 @@ export const MARK_COLOR = "#ffffff";
 export const MARK_EDGE: Ink = { color: "#05070a", alpha: 0.9 };
 
 /**
- * The outer bloom around a mark's light: a cool, faint blue-white.
+ * The outer bloom around the app's own white light: a cool, faint blue-white.
  *
  * A star photographed at night is not a white disc but a white centre in a halo
  * that goes slightly blue as it thins, and a little of that colour is most of
  * what makes a point read as light rather than as paint. Faint enough that the
- * mark itself is still white.
+ * light itself is still white. The sky's marks bloom in their own hue instead
+ * (`CATEGORY_BLOOMS`).
  */
 export const MARK_BLOOM = "#a9c9ff";
 
 export type MarkerPalette = {
-  /** The mark's fill: `MARK_COLOR`, whatever the sky. */
-  mark: string;
+  /**
+   * A mark's fill, by what the satellite is for: its point, glow and tail, and
+   * a landmark's path. `CATEGORY_COLORS`, whatever the sky.
+   */
+  categories: Record<SatelliteCategory, string>;
+  /** The bloom a mark's glow sits in, by the same key: `CATEGORY_BLOOMS`. */
+  blooms: Record<SatelliteCategory, string>;
   /**
    * The edge under every mark: `MARK_EDGE`, whatever the sky.
    *
@@ -83,7 +96,7 @@ export type MarkerPalette = {
    *
    * All of it at night, where a satellite *is* a point of light and the marks
    * are drawn as one. None by day, where what is read is a mark's dark edge
-   * and a white glow over a bright sky would only wash that edge out.
+   * and a pale glow over a bright sky would only wash that edge out.
    */
   glow: number;
   /**
@@ -92,8 +105,7 @@ export type MarkerPalette = {
    *
    * None at night, where a dark ring round a point of light turns it back into
    * a disc; all of it by day, where the edge is what is read. The same goes for
-   * the landmarks' paths and the selection ring, which are white on the same
-   * edge.
+   * the landmarks' paths and the selection ring, which sit on the same edge.
    */
   edge: number;
   /** The landmark names, which are drawn as text. */
@@ -107,7 +119,8 @@ export type MarkerPalette = {
 };
 
 export const NIGHT_PALETTE: MarkerPalette = {
-  mark: MARK_COLOR,
+  categories: CATEGORY_COLORS,
+  blooms: CATEGORY_BLOOMS,
   outline: MARK_EDGE,
   halo: { color: "#ffffff", alpha: 0.18 },
   glow: 1,
@@ -117,7 +130,8 @@ export const NIGHT_PALETTE: MarkerPalette = {
 };
 
 export const DAYLIGHT_PALETTE: MarkerPalette = {
-  mark: MARK_COLOR,
+  categories: CATEGORY_COLORS,
+  blooms: CATEGORY_BLOOMS,
   outline: MARK_EDGE,
   halo: { color: "#04121f", alpha: 0.2 },
   glow: 0,
@@ -134,7 +148,7 @@ export const DAYLIGHT_PALETTE: MarkerPalette = {
  * Two degrees wide, which is about thirteen minutes at 51°N and eight at the
  * equator: long enough that nothing snaps, short enough that the overlay does
  * not spend the whole of dusk in between. What crosses over in it is the
- * glow, the edge, the halo and the names; the white itself is the same
+ * glow, the edge, the halo and the names; the marks' colours are the same
  * throughout.
  */
 export const DAYLIGHT_BAND = {
@@ -175,7 +189,8 @@ export function blendPalettes(fraction: number): MarkerPalette {
   const night = NIGHT_PALETTE;
   const day = DAYLIGHT_PALETTE;
   return {
-    mark: MARK_COLOR,
+    categories: CATEGORY_COLORS,
+    blooms: CATEGORY_BLOOMS,
     outline: MARK_EDGE,
     halo: mixInk(night.halo, day.halo, fraction),
     glow: night.glow + (day.glow - night.glow) * fraction,

@@ -16,7 +16,7 @@ import {
   TAIL_FADE,
   TailShape
 } from "./markerScene";
-import { cssColor, MARK_BLOOM, MarkerPalette } from "./palette";
+import { cssColor, MarkerPalette } from "./palette";
 
 type Props = {
   /** The drawn frames, as a subscription. See `MarkerSource`. */
@@ -215,7 +215,7 @@ function drawGlyph(
   if (glyph.halo !== null) {
     glow(glyph.halo, GLOW_FADE, palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
-  glow(glyph.bloom.radius, BLOOM_FADE, MARK_BLOOM, glyph.bloom.alpha * glyph.alpha);
+  glow(glyph.bloom.radius, BLOOM_FADE, glyph.bloomColor, glyph.bloom.alpha * glyph.alpha);
   glow(glyph.glow.radius, GLOW_FADE, glyph.color, glyph.glow.alpha * glyph.alpha);
   if (glyph.tail) {
     drawTail(context, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
@@ -254,7 +254,7 @@ function drawRim(
 }
 
 /**
- * The comet's tail, faded from the point to its tip: in white, or — `outset`
+ * The comet's tail, faded from the point to its tip: in the mark's colour, or — `outset`
  * wider on every side — in the edge's ink under it.
  */
 function drawTail(

@@ -13,7 +13,7 @@ import {
   SelectionRing,
   TailShape
 } from "./markerScene";
-import { MARK_BLOOM, MarkerPalette } from "./palette";
+import { MarkerPalette } from "./palette";
 import {
   PaintStyle,
   Skia,
@@ -143,7 +143,7 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
  * its own tail, or through the light around it.
  *
  * The edge is a larger shape *under* the mark rather than a border inside it, so
- * the white keeps the full diameter — at the few pixels a point is drawn at, a
+ * the colour keeps the full diameter — at the few pixels a point is drawn at, a
  * border would leave hardly any of it to see.
  */
 function drawGlyph(
@@ -155,7 +155,7 @@ function drawGlyph(
   if (glyph.halo !== null) {
     glow(canvas, paint, glyph, glyph.halo, "glow", palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
-  glow(canvas, paint, glyph, glyph.bloom.radius, "bloom", MARK_BLOOM, glyph.bloom.alpha * glyph.alpha);
+  glow(canvas, paint, glyph, glyph.bloom.radius, "bloom", glyph.bloomColor, glyph.bloom.alpha * glyph.alpha);
   glow(canvas, paint, glyph, glyph.glow.radius, "glow", glyph.color, glyph.glow.alpha * glyph.alpha);
   if (glyph.tail) {
     drawTail(canvas, paint, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
@@ -200,7 +200,7 @@ function glow(
 }
 
 /**
- * The comet's tail, faded from the point to its tip: in white, or — `outset`
+ * The comet's tail, faded from the point to its tip: in the mark's colour, or — `outset`
  * wider on every side — in the edge's ink under it.
  *
  * Placed the way a glow is — one triangle and one gradient, both a unit long,

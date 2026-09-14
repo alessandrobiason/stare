@@ -2,8 +2,12 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
-import { SATELLITE_CATEGORIES, SatelliteCategory } from "../satellite/categories";
-import { cssColor, MARK_COLOR, MARK_EDGE } from "./palette";
+import {
+  CATEGORY_COLORS,
+  SATELLITE_CATEGORIES,
+  SatelliteCategory
+} from "../satellite/categories";
+import { cssColor } from "./palette";
 import { glass, lift, theme } from "./theme";
 import { Toggle } from "./Toggle";
 
@@ -21,6 +25,7 @@ type Props = {
   onEnableAll: () => void;
 };
 
+const DIMMED_SWATCH_OPACITY = 0.25;
 const DIMMED_TEXT_OPACITY = 0.45;
 
 /** The category Starlink's row hangs off, because that is what Starlink is. */
@@ -46,8 +51,8 @@ const STARLINK_LABEL = "STARLINK";
 const FILTER_ROWS = SATELLITE_CATEGORIES.length + 1;
 
 /**
- * Per-purpose visibility filter, and the key to the two kinds of mark that are
- * not the ordinary white point.
+ * Per-purpose visibility filter, the key to the marks' colours, and the key to
+ * the two kinds of mark that are not the ordinary point.
  *
  * It hangs from the layers button in the top right and is not on the screen at
  * all until that button is pressed. The filter is set once and then left alone,
@@ -55,10 +60,11 @@ const FILTER_ROWS = SATELLITE_CATEGORIES.length + 1;
  * a pill saying FILTER over the picture is now an icon, and the panel is what
  * the icon opens.
  *
- * Open, it is the full list. The rows carry no swatch: every mark on the sky is
- * white whatever it is for, so a dot beside each purpose would be the same dot
- * five times and a key to nothing. The last two rows do carry one, drawn as the
- * sky draws the mark, and they carry no toggle and filter nothing: they are
+ * Open, it is the full list. Each purpose carries its colour as a point of light
+ * — a pastel dot in a halo of itself, the way the sky draws it at night — and
+ * the same colour is on the card, so the list is the key and nothing else has to
+ * be. The last two rows carry a neutral swatch instead, since they are true of a
+ * mark of any colour, and they carry no toggle and filter nothing: they are
  * there to explain why a good quarter of the markers on a southward frame are
  * rings that never move, and why half of them on a clear night are drawn
  * faintly.
@@ -125,6 +131,13 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
           return (
             <React.Fragment key={category}>
               <Pressable style={styles.row} onPress={() => onToggleCategory(category)}>
+                <View
+                  style={[
+                    styles.swatch,
+                    swatchColors(category),
+                    { opacity: enabled ? 1 : DIMMED_SWATCH_OPACITY }
+                  ]}
+                />
                 <Text style={[styles.label, { opacity: enabled ? 1 : DIMMED_TEXT_OPACITY }]}>
                   {t.categories[category]}
                 </Text>
@@ -134,10 +147,18 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
               {/* Indented under communications rather than listed beside it,
                   because it is not a sixth alternative to the five: it is one
                   operator inside one of them, and the row says so by sitting
-                  under its parent. Its own switch all the same — see
-                  `isStarlink`. */}
+                  under its parent in its parent's colour. Its own switch all
+                  the same — see `isStarlink`. */}
               {category === STARLINK_PARENT && (
                 <Pressable style={[styles.row, styles.subRow]} onPress={onToggleStarlink}>
+                  <View
+                    style={[
+                      styles.swatch,
+                      styles.subSwatch,
+                      swatchColors(STARLINK_PARENT),
+                      { opacity: starlinkDrawn ? 1 : DIMMED_SWATCH_OPACITY }
+                    ]}
+                  />
                   <Text
                     style={[
                       styles.label,
@@ -158,8 +179,8 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
           <View style={[styles.swatch, styles.ringSwatch]} />
           <Text style={styles.keyLabel}>{t.ringKey}</Text>
         </View>
-        {/* The other thing a mark's strength says. Drawn as the sky draws it —
-            the white at half, the edge whole — so the swatch is the mark. */}
+        {/* The other thing a mark's strength says. Drawn at the strength the
+            sky draws it at, so the swatch is the mark. */}
         <View style={styles.keyRow}>
           <View style={[styles.swatch, styles.shadowSwatch]} />
           <Text style={styles.keyLabel}>{t.shadowKey}</Text>
@@ -177,7 +198,17 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
 });
 CategoryLegend.displayName = "CategoryLegend";
 
+/**
+ * A category's swatch as a point of light: its colour, in a band of the same
+ * colour thinned out, which is the glow the sky draws round the mark at night.
+ */
+function swatchColors(category: SatelliteCategory) {
+  const color = CATEGORY_COLORS[category];
+  return { backgroundColor: color, borderColor: cssColor({ color, alpha: 0.3 }) };
+}
+
 const SWATCH_SIZE = 10;
+const SUB_SWATCH_SIZE = 7;
 
 const styles = StyleSheet.create({
   panel: {
@@ -238,6 +269,15 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
     minHeight: 28
   },
+  subSwatch: {
+    // Smaller than a category's, which is the other half of saying it sits
+    // inside one rather than beside it.
+    width: SUB_SWATCH_SIZE,
+    height: SUB_SWATCH_SIZE,
+    borderRadius: SUB_SWATCH_SIZE / 2,
+    borderWidth: 1.5,
+    marginRight: 9 + (SWATCH_SIZE - SUB_SWATCH_SIZE) / 2
+  },
   subLabel: {
     fontSize: 11,
     color: theme.color.textDim,
@@ -247,22 +287,22 @@ const styles = StyleSheet.create({
     width: SWATCH_SIZE,
     height: SWATCH_SIZE,
     borderRadius: SWATCH_SIZE / 2,
-    marginRight: 9
+    marginRight: 9,
+    borderWidth: 2
   },
   ringSwatch: {
-    // A white band with the panel showing through, as the sky shows through
-    // the ring. Its dark edge is left off: on this panel it would not show.
+    // A band with the panel showing through, as the sky shows through the
+    // ring. Neutral, because a mark of any colour can be one.
     backgroundColor: "transparent",
     borderWidth: 2.5,
-    borderColor: MARK_COLOR
+    borderColor: theme.color.textDim
   },
   shadowSwatch: {
-    // `SHADOW_ALPHA` in `markerScene.ts`: the white at half strength over the
-    // dark edge, which is not faded. Layered rather than given an opacity, so
-    // the edge stays whole.
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
-    borderWidth: 1.5,
-    borderColor: cssColor(MARK_EDGE)
+    // `SHADOW_ALPHA` in `markerScene.ts`, which is what the sky draws these at.
+    opacity: 0.5,
+    backgroundColor: theme.color.textDim,
+    borderColor: theme.color.textDim,
+    borderWidth: 0
   },
   label: {
     flex: 1,

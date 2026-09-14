@@ -375,8 +375,8 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 196,
     caption: {
-      title: "Clear by day and by night",
-      body: "White on a dark edge, readable against a bright sky or a dark one. Size is how far away; a ring holds station over the equator."
+      title: "Colour is what it is for",
+      body: "The same soft colours by day and by night. Size is how far away; a ring holds station over the equator."
     },
     sky: {
       mode: "day",
@@ -391,7 +391,7 @@ const scenes = [
     },
     palette: "daylight",
     panels: { filter: "open", status: "closed" },
-    // The same white marks as at night, read by their dark edges against a
+    // The same pastel marks as at night, read by their dark edges against a
     // bright sky — line and all.
     paths: [pathAhead(TIANGONG_BY_DAY, { runPct: 80 })],
     markers: [
