@@ -6,6 +6,7 @@ import {
   CORE_FADE,
   GlyphShape,
   shortName,
+  TAIL_DASH,
   TAIL_FADE
 } from "../src/components/markerScene";
 import { DAYLIGHT_PALETTE, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
@@ -24,7 +25,10 @@ function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
     parked: false,
     point: { left: 50, top: 50 },
     rangeKm: 1200,
-    next: { left: 58, top: 44 },
+    trail: [
+      { left: 46, top: 53 },
+      { left: 42, top: 56 }
+    ],
     opacity: 1,
     sunlit: "sunlit",
     ...overrides
@@ -42,12 +46,27 @@ function selectedScene(markers: SatelliteMarker[], name: string, box = FRAME) {
   return buildMarkerScene({ markers, paths: [], rollDeg: 0 }, box, NIGHT_PALETTE, name);
 }
 
-/** A tail's three corners, as points: the tip it tapers to and its head. */
-function corners(glyph: GlyphShape): { x: number; y: number }[] {
-  const points = glyph.tail?.points ?? [];
-  return points.flatMap((value, index) =>
-    index % 2 === 0 ? [{ x: value, y: points[index + 1] }] : []
-  );
+/** A run's length along itself, in pixels. */
+function runLength(run: number[]): number {
+  let length = 0;
+  for (let index = 2; index < run.length; index += 2) {
+    length += Math.hypot(run[index] - run[index - 2], run[index + 1] - run[index - 1]);
+  }
+  return length;
+}
+
+/** How far a run starts along the trail: the length from the mark to its first point. */
+function startAlong(glyph: GlyphShape, run: number[], trail: number[]): number {
+  let walked = 0;
+  for (let index = 2; index < trail.length; index += 2) {
+    const [x0, y0, x1, y1] = [trail[index - 2], trail[index - 1], trail[index], trail[index + 1]];
+    const step = Math.hypot(x1 - x0, y1 - y0);
+    const along = (run[0] - x0) * (x1 - x0) + (run[1] - y0) * (y1 - y0);
+    const off = Math.abs((run[0] - x0) * (y1 - y0) - (run[1] - y0) * (x1 - x0)) / step;
+    if (off < 1e-6 && along >= -1e-6 && along <= step * step + 1e-6) return walked + along / step;
+    walked += step;
+  }
+  throw new Error(`run does not start on the trail of the mark at ${glyph.x}, ${glyph.y}`);
 }
 
 test("draws nothing before the frame has been laid out", () => {
@@ -64,7 +83,7 @@ test("colours a marker by its category and nothing else, bloom included", () => 
     marker({ category: "NAVIGATION" }),
     marker({ name: "OTHER SAT", category: "EARTH", rangeKm: 39000 }),
     marker({ name: "ISS", category: "LANDMARK" }),
-    marker({ name: "JUNK", category: "OTHER", parked: true, next: null })
+    marker({ name: "JUNK", category: "OTHER", parked: true, trail: null })
   ]);
 
   expect(glyphs.map((glyph) => glyph.color)).toEqual([
@@ -94,7 +113,7 @@ test("draws the same coloured mark on the same dark edge by day as by night", ()
 });
 
 test("draws a parked satellite as a ring and gives it no tail", () => {
-  const parked = scene([marker({ parked: true, next: null, rangeKm: 39000 })]);
+  const parked = scene([marker({ parked: true, trail: null, rangeKm: 39000 })]);
   const moving = scene([marker()]);
 
   // A ring is a band of its colour with the sky showing through the middle; a
@@ -106,8 +125,8 @@ test("draws a parked satellite as a ring and gives it no tail", () => {
 });
 
 test("sizes the marker by distance, not by category", () => {
-  const near = scene([marker({ rangeKm: 500, next: null })]).glyphs[0];
-  const far = scene([marker({ rangeKm: 39000, next: null })]).glyphs[0];
+  const near = scene([marker({ rangeKm: 500, trail: null })]).glyphs[0];
+  const far = scene([marker({ rangeKm: 39000, trail: null })]).glyphs[0];
 
   expect(near.core.radius).toBeGreaterThan(far.core.radius);
 });
@@ -116,7 +135,7 @@ test("outlines every marker so it survives a bright sky", () => {
   // White cannot be read against a bright sky, so by day the dark edge is what
   // is actually being read.
   for (const category of ["LANDMARK", "COMMS", "OTHER"] as const) {
-    const { glyphs } = scene([marker({ category, next: null })]);
+    const { glyphs } = scene([marker({ category, trail: null })]);
     // The rim is a larger shape under the mark, so the colour keeps its full
     // diameter — drawn as a border inside it, it ate the middle instead.
     expect(glyphs[0].rim.radius).toBeGreaterThan(glyphs[0].core.radius);
@@ -126,8 +145,8 @@ test("outlines every marker so it survives a bright sky", () => {
 
 test("haloes the landmarks, and only them", () => {
   const { glyphs } = scene([
-    marker({ name: "ISS", category: "LANDMARK", next: null }),
-    marker({ name: "STARLINK-1234", next: null })
+    marker({ name: "ISS", category: "LANDMARK", trail: null }),
+    marker({ name: "STARLINK-1234", trail: null })
   ]);
 
   expect(glyphs[0].halo).toBeGreaterThan(glyphs[0].rim.radius);
@@ -181,7 +200,7 @@ describe("a satellite with no sun on it", () => {
     // The collision that ruled fill out as the channel: a parked object is
     // already a ring, so drawing an unlit one hollow would have said two things
     // with one mark and neither of them clearly.
-    const parked = marker({ parked: true, next: null, rangeKm: 39000 });
+    const parked = marker({ parked: true, trail: null, rangeKm: 39000 });
     const lit = scene([{ ...parked, sunlit: "sunlit" }]).glyphs[0];
     const dark = scene([{ ...parked, sunlit: "eclipsed" }]).glyphs[0];
 
@@ -210,7 +229,7 @@ test("rims a parked ring outwards, without eating into its colour", () => {
   // The band the ring is drawn as is not a border: it lies under the colour
   // and reaches past it, so the eight pixels a geostationary marker gets are
   // eight pixels of colour rather than colour minus a rim.
-  const { glyphs } = scene([marker({ parked: true, next: null, rangeKm: 39000 })]);
+  const { glyphs } = scene([marker({ parked: true, trail: null, rangeKm: 39000 })]);
   const { rim, core } = glyphs[0];
 
   expect(rim.width).not.toBeNull();
@@ -218,53 +237,90 @@ test("rims a parked ring outwards, without eating into its colour", () => {
   expect(rim.radius - rim.width! / 2).toBeCloseTo(core.radius - core.width! / 2);
 });
 
-test("lays the tail behind the marker, as far back as the object will travel", () => {
-  // The icon's shape: the body leads and the trail follows it. Drawn ahead of
-  // the mark instead, the shape has two ends and neither of them says which is
-  // the satellite.
+test("lays the tail behind the marker, through where the object has been", () => {
+  // The icon's shape: the body leads and the trail follows it. A 720x1280
+  // frame, so 10% across is 72 px and 10% down is 128.
   const [glyph] = scene([
-    marker({ point: { left: 50, top: 50 }, next: { left: 60, top: 50 } })
+    marker({
+      point: { left: 50, top: 50 },
+      trail: [
+        { left: 40, top: 50 },
+        { left: 30, top: 60 }
+      ]
+    })
   ]).glyphs;
-  const [tip, ...head] = corners(glyph);
+  const tail = glyph.tail!;
 
-  // 10% of a 720 px frame is 72 px of travel, so the tip sits 72 px the other
-  // way from a mark at the centre of the frame.
-  expect(tip.x).toBeCloseTo(360 - 72);
-  expect(tip.y).toBeCloseTo(640);
-  // Its head is the marker's own centre, and is where the width is.
-  expect(head.map((corner) => corner.x)).toEqual([360, 360]);
-  expect(head[0].y).toBeGreaterThan(head[1].y);
+  // It starts under the mark's own centre and ends where the object was.
+  expect(tail.runs[0].slice(0, 2)).toEqual([360, 640]);
+  expect(tail.tipX).toBeCloseTo(216);
+  expect(tail.tipY).toBeCloseTo(768);
+  expect(tail.length).toBeCloseTo(72 + Math.hypot(72, 128), 6);
 });
 
-test("tapers the tail from nothing to most of the point", () => {
+test("bends with the path, every dash on it rather than across the corner", () => {
+  const trail = [
+    { left: 45, top: 50 },
+    { left: 40, top: 52 },
+    { left: 35, top: 56 },
+    { left: 30, top: 62 },
+    { left: 25, top: 70 }
+  ];
+  const [glyph] = scene([marker({ point: { left: 50, top: 50 }, trail })]).glyphs;
+  const pixels = [360, 640, ...trail.flatMap((point) => [point.left * 7.2, point.top * 12.8])];
+
+  for (const run of glyph.tail!.runs) {
+    for (let index = 0; index < run.length; index += 2) {
+      const point = run.slice(index, index + 2);
+      expect(() => startAlong(glyph, point, pixels)).not.toThrow();
+    }
+  }
+});
+
+test("is solid where it leaves the mark, then dashes that shorten as their gaps widen", () => {
+  const trail = Array.from({ length: 12 }, (_, index) => ({
+    left: 50 - (index + 1) * 3,
+    top: 50
+  }));
+  const [glyph] = scene([marker({ point: { left: 50, top: 50 }, trail })]).glyphs;
+  const { runs, length } = glyph.tail!;
+  const pixels = [360, 640, ...trail.flatMap((point) => [point.left * 7.2, point.top * 12.8])];
+
+  // A long trail across the frame: the solid stretch is capped, so it is not a
+  // bar across the picture, and there are many dashes after it.
+  expect(runLength(runs[0])).toBeCloseTo(Math.min(length * TAIL_DASH.solidShare, TAIL_DASH.solidPx), 6);
+  expect(runs.length).toBeGreaterThan(8);
+
+  const starts = runs.map((run) => startAlong(glyph, run, pixels));
+  const lengths = runs.map(runLength);
+  for (let index = 2; index < runs.length - 1; index += 1) {
+    const gap = starts[index] - (starts[index - 1] + lengths[index - 1]);
+    const previousGap = starts[index - 1] - (starts[index - 2] + lengths[index - 2]);
+    expect(lengths[index]).toBeLessThan(lengths[index - 1]);
+    expect(gap).toBeGreaterThan(previousGap);
+  }
+  // And none of it runs past where the object was.
+  expect(starts[runs.length - 1] + lengths[runs.length - 1]).toBeLessThanOrEqual(length + 1e-6);
+});
+
+test("keeps a short trail mostly solid", () => {
+  const [glyph] = scene([
+    marker({ point: { left: 50, top: 50 }, trail: [{ left: 45, top: 50 }] })
+  ]).glyphs;
+  const { runs, length } = glyph.tail!;
+  expect(runLength(runs[0])).toBeCloseTo(length * TAIL_DASH.solidShare, 6);
+  expect(runs.length).toBeLessThan(8);
+});
+
+test("draws the tail as a line finer than the point it comes out of", () => {
   const [glyph] = scene([marker({ rangeKm: 500 })]).glyphs;
-  const [, ...head] = corners(glyph);
-  const width = Math.hypot(head[0].x - head[1].x, head[0].y - head[1].y);
-
-  // Three points is the taper: one at the tip, two at the head. The head is
-  // narrower than the point it comes out of, so the point stays the head.
-  expect(corners(glyph)).toHaveLength(3);
-  expect(width).toBeGreaterThan(0);
-  expect(width).toBeLessThan(glyph.core.radius * 2);
-  expect(width).toBeCloseTo(glyph.tail!.width, 6);
-});
-
-test("points the tail along the line of travel, in pixels", () => {
-  // Equal percentage steps across a 720x1280 frame are not equal distances, so
-  // a tail laid out in percent would trail away from the line the object is
-  // actually moving along. 10% of the width is 72 px; 10% of the height, 128.
-  const [glyph] = scene([
-    marker({ point: { left: 50, top: 50 }, next: { left: 60, top: 60 } })
-  ]).glyphs;
-  const [tip] = corners(glyph);
-
-  expect(tip.x).toBeCloseTo(360 - 72);
-  expect(tip.y).toBeCloseTo(640 - 128);
+  expect(glyph.tail!.width).toBeGreaterThan(0);
+  expect(glyph.tail!.width).toBeLessThan(glyph.core.radius * 2 * 0.5);
 });
 
 test("fades the tail from the point to nothing at its tip", () => {
-  // A comet's tail: brightest where it leaves the mark, gone where the object
-  // was twelve seconds ago, and never brighter further out than nearer in.
+  // Brightest where it leaves the mark, gone where the object was a minute and
+  // a half ago, and never brighter further out than nearer in.
   expect(TAIL_FADE[0]).toEqual({ at: 0, strength: 1 });
   expect(TAIL_FADE[TAIL_FADE.length - 1]).toEqual({ at: 1, strength: 0 });
   for (let index = 1; index < TAIL_FADE.length; index += 1) {
@@ -279,21 +335,9 @@ test("fades the tail from the point to nothing at its tip", () => {
   expect(glyph.tail!.alpha).toBeGreaterThan(0.5);
 });
 
-test("points the tail's fade from the mark towards the tip", () => {
-  const [glyph] = scene([
-    marker({ point: { left: 50, top: 50 }, next: { left: 50, top: 60 } })
-  ]).glyphs;
-  const [tip] = corners(glyph);
-
-  // Travelling down the frame, so the tail lies straight up from the mark.
-  expect(glyph.tail!.length).toBeCloseTo(128, 6);
-  expect(Math.cos(glyph.tail!.angle) * glyph.tail!.length).toBeCloseTo(tip.x - glyph.x, 6);
-  expect(Math.sin(glyph.tail!.angle) * glyph.tail!.length).toBeCloseTo(tip.y - glyph.y, 6);
-});
-
 describe("a moving mark", () => {
   test("is a small point in a glow, not a disc over the picture", () => {
-    const [glyph] = scene([marker({ rangeKm: 400, next: null })]).glyphs;
+    const [glyph] = scene([marker({ rangeKm: 400, trail: null })]).glyphs;
     const footprint = SATELLITE_MARKERS.nearDiameterPx;
 
     // The solid part, rim and all, is well under the disc the range scale used
@@ -310,7 +354,7 @@ describe("a moving mark", () => {
     // pixel of it is a grey smudge rather than a ring.
     for (const rangeKm of [400, 40000]) {
       const small = { width: 360, height: 640 };
-      const [glyph] = scene([marker({ rangeKm, next: null })], 0, small).glyphs;
+      const [glyph] = scene([marker({ rangeKm, trail: null })], 0, small).glyphs;
       expect(glyph.rim.radius - glyph.core.radius).toBeGreaterThanOrEqual(1.25);
     }
   });
@@ -518,7 +562,10 @@ test("keeps the tail of a landmark that has left the frame, but not its name", (
       name: "ISS",
       category: "LANDMARK",
       point: { left: 50, top: -1 },
-      next: { left: 50, top: -11 }
+      trail: [
+        { left: 50, top: 4 },
+        { left: 50, top: 9 }
+      ]
     })
   ]);
 

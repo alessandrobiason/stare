@@ -27,15 +27,6 @@ export type FrameViewport = { left: number; top: number; right: number; bottom: 
 /** The frame entire: what a fitted picture shows, and the default everywhere. */
 export const WHOLE_FRAME: FrameViewport = { left: 0, top: 0, right: 100, bottom: 100 };
 
-/** How far a marker's own motion carries it across the frame, in pixels. */
-export type TrailReach = {
-  /** Displacement from the marker to where it will be, in layout pixels. */
-  dx: number;
-  dy: number;
-  /** Its length: the distance the object covers in the trail window. */
-  length: number;
-};
-
 /**
  * Marker diameter for an object at `rangeKm`, in frame pixels.
  *
@@ -64,34 +55,35 @@ export function rangeShare(range: number): number {
 }
 
 /**
- * How far the object travels between two projected points, in pixels.
+ * The trail behind a mark in layout pixels: the mark's own centre, then the
+ * points the object passed through, as flat `x, y` pairs.
  *
- * A displacement rather than a placed box. The tail is drawn as a polygon
- * behind the mark (`markerScene`), so what it needs is a direction and a
- * length, and both come out of the difference between the two points.
+ * Both the mark and the trail arrive as percentages of the frame, and the frame
+ * is not square, so they are converted to pixels before any length is taken —
+ * measured in percent, a diagonal would come out at the wrong length and the
+ * dashes along it would stretch with the direction of travel.
  *
- * Both points arrive as percentages of the frame, and the frame is not square,
- * so they are converted to pixels before any length or direction is taken —
- * measured in percent, a diagonal would come out at the wrong angle and the
- * tails would fan away from the direction of travel.
- *
- * `null` when the two points are close enough that the object is holding
- * station, which is the case the ring is drawn for.
+ * `null` when the whole of it is short enough that the object is as good as
+ * holding still, which on the frame is a trail too small to draw.
  */
-export function trailReach(
+export function trailPixels(
   from: FramePoint,
-  to: FramePoint,
+  trail: readonly FramePoint[],
   frame: FrameSize
-): TrailReach | null {
-  const dx = ((to.left - from.left) / 100) * frame.width;
-  const dy = ((to.top - from.top) / 100) * frame.height;
-  const length = Math.hypot(dx, dy);
+): { points: number[]; length: number } | null {
+  const points = [(from.left / 100) * frame.width, (from.top / 100) * frame.height];
+  let length = 0;
+  for (const point of trail) {
+    const x = (point.left / 100) * frame.width;
+    const y = (point.top / 100) * frame.height;
+    length += Math.hypot(x - points[points.length - 2], y - points[points.length - 1]);
+    points.push(x, y);
+  }
   // Only to keep a degenerate shape off the frame; what actually decides that
   // an object draws no tail is `parked`, settled from its orbit rather than
   // from how short its line came out.
   if (!(length > SATELLITE_MARKERS.minimumTrailPx)) return null;
-
-  return { dx, dy, length };
+  return { points, length };
 }
 
 /**
@@ -192,31 +184,32 @@ export function pointInViewport(point: FramePoint, viewport: FrameViewport): boo
 
 /**
  * Whether the trail behind a marker crosses the frame, given where the object
- * is and where it is heading.
+ * is and where it has been.
  *
  * What this is for is the head that has *already* left. A trail is the ground
- * the object has just covered, and at twelve seconds of orbital motion the long
- * ones are a good fraction of the frame across — so dropping a satellite the
- * moment its mark passed the edge cut a tail that was still most of the way
- * across the view, and a phone turning at any speed did it several times a
- * second. What the eye reads there is not a satellite leaving: it is trails
- * being clipped off at the border, which is the flicker the edge had.
+ * the object has just covered, and at a minute and a half of orbital motion the
+ * long ones cross the whole frame — so dropping a satellite the moment its mark
+ * passed the edge cut a trail that was still most of the way across the view,
+ * and a phone turning at any speed did it several times a second. What the eye
+ * reads there is not a satellite leaving: it is trails being clipped off at the
+ * border, which is the flicker the edge had.
  *
  * Kept while its trail is on the frame, the same satellite instead slides out
  * of view the way it arrived — tip last — and the canvas clips what is past the
- * edge, as it already does for the half of a tail that hangs over one.
+ * edge, as it already does for the part of a trail that hangs over one.
  *
- * The tail runs *backwards*: from the mark to the reflection of where the
- * object is heading (`markerScene`), which is where it was a trail-window ago.
- * Both points arrive as percentages, and percent is a per-axis scaling of
- * pixels, so the frame is still the box `0..100` and the tail is still a
- * straight segment — the test costs no frame size and no trigonometry. The
- * segment is clipped against the box a slab at a time: it meets the frame when
- * what is left of it after both axes is not empty.
+ * The points arrive as percentages, and percent is a per-axis scaling of
+ * pixels, so the frame is still the box `0..100` and each stretch of the trail
+ * is still a straight segment: the test is one slab clip per stretch, and
+ * stops at the first that meets the frame.
  */
-export function trailOnFrame(from: FramePoint, to: FramePoint): boolean {
-  const tip = { left: 2 * from.left - to.left, top: 2 * from.top - to.top };
-  return clipSegment(from, tip, WHOLE_FRAME) !== null;
+export function trailOnFrame(from: FramePoint, trail: readonly FramePoint[]): boolean {
+  let previous = from;
+  for (const point of trail) {
+    if (clipSegment(previous, point, WHOLE_FRAME) !== null) return true;
+    previous = point;
+  }
+  return false;
 }
 
 /**

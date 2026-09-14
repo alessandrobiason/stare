@@ -200,13 +200,14 @@ function glow(
 }
 
 /**
- * The comet's tail, faded from the point to its tip: in the mark's colour, or — `outset`
- * wider on every side — in the edge's ink under it.
+ * The trail, faded from the point to its tip: its runs stroked in the mark's
+ * colour, or — `outset` wider on every side — in the edge's ink under it.
  *
- * Placed the way a glow is — one triangle and one gradient, both a unit long,
- * and the canvas turned and stretched onto the tail — for the same reason. The
- * stretch is not uniform, which a stroke would show and a fill does not: the
- * triangle is filled after it is transformed, so its edges are as sharp as any.
+ * Placed the way a glow is, for the same reason: one gradient per colour
+ * rather than one per mark per frame. The gradient runs a unit along `+x`, so
+ * the canvas is moved onto the mark, turned towards the tip and scaled —
+ * uniformly, so the curve keeps its shape — until the tip is at `(1, 0)`, and
+ * the runs are laid into the one reused path in those units.
  */
 function drawTail(
   canvas: SkCanvas,
@@ -218,14 +219,35 @@ function drawTail(
   outset: number
 ): void {
   if (!(alpha > 0)) return;
-  paint.setStyle(PaintStyle.Fill);
+  const dx = tail.tipX - glyph.x;
+  const dy = tail.tipY - glyph.y;
+  const chord = Math.hypot(dx, dy);
+  if (!(chord > 0)) return;
+  const cos = dx / chord;
+  const sin = dy / chord;
+
+  const path = reusedTailPath();
+  path.rewind();
+  for (const run of tail.runs) {
+    for (let index = 0; index < run.length; index += 2) {
+      const x = run[index] - glyph.x;
+      const y = run[index + 1] - glyph.y;
+      const u = (x * cos + y * sin) / chord;
+      const v = (y * cos - x * sin) / chord;
+      if (index === 0) path.moveTo(u, v);
+      else path.lineTo(u, v);
+    }
+  }
+
+  paint.setStyle(PaintStyle.Stroke);
+  paint.setStrokeWidth((tail.width + 2 * outset) / chord);
   paint.setShader(fadeShader("tail", color));
   paint.setAlphaf(alpha);
   canvas.save();
   canvas.translate(glyph.x, glyph.y);
-  canvas.rotate((tail.angle * 180) / Math.PI, 0, 0);
-  canvas.scale(tail.length + outset, tail.width / 2 + outset);
-  canvas.drawPath(unitTail(), paint);
+  canvas.rotate((Math.atan2(dy, dx) * 180) / Math.PI, 0, 0);
+  canvas.scale(chord, chord);
+  canvas.drawPath(path, paint);
   canvas.restore();
   paint.setShader(null);
 }
@@ -324,20 +346,11 @@ function stroke(paint: SkPaint, color: string, alpha: number, width: number): vo
   paint.setStrokeWidth(width);
 }
 
-/**
- * The tail's taper at unit size: the tip at `(1, 0)`, the head across the
- * origin from `(0, -1)` to `(0, 1)`. Made on first use, once Skia is set up.
- */
-let unitTailPath: SkPath | null = null;
-function unitTail(): SkPath {
-  if (unitTailPath) return unitTailPath;
-  const path = Skia.Path.Make();
-  path.moveTo(1, 0);
-  path.lineTo(0, 1);
-  path.lineTo(0, -1);
-  path.close();
-  unitTailPath = path;
-  return path;
+/** The path every trail is laid into, rewound per trail. Made on first use, once Skia is set up. */
+let tailPath: SkPath | null = null;
+function reusedTailPath(): SkPath {
+  if (!tailPath) tailPath = Skia.Path.Make();
+  return tailPath;
 }
 
 const styles = StyleSheet.create({

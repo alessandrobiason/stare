@@ -13,18 +13,20 @@ strip of cardinal points along the bottom of the frame, a card carrying the next
 landmark due over you, and a bar of three tabs — the sky, a catalog that is not
 built yet, and the settings the guide and the console now live in.
 **A marker is a point of light**: a pastel point a few pixels across
-in a soft glow and a bloom of its own colour, trailing a comet's tail that fades to
-nothing — and the app's logo is that same light, on a wide arc over a horizon
-(`assets/icon.svg`, drawn by `tools/make-logo.mjs` with the overlay's own
-fades). Solid discs a couple of dozen pixels across covered the picture they
+in a soft glow and a bloom of its own colour, trailing a fine line along the
+path it has really flown — solid where it leaves the point, then broken into
+dashes that shorten and spread apart until they are faint dots — and the app's
+logo is that same light, on a wide arc over a horizon (`assets/icon.svg`, drawn
+by `tools/make-logo.mjs` with the overlay's own fades). Solid discs a couple of dozen pixels across covered the picture they
 were marking. Nearer objects are larger *and* brighter, glow and tail alike, on
 the same log scale as their size. A mark carries five channels at once —
 **colour for purpose**, one pastel per category (champagne for landmarks, coral
 blush for navigation, sage for Earth watch, lavender for communications, a misted
 slate for the rest), the same by day and by night and the same in the filter and
 on the card; shape for whether the object holds station (a
-geostationary ring, or a body trailing the 12 seconds of ground track it has
-just covered), size for range on a log scale from 400 km to 40,000 km, a label,
+geostationary ring, or a body trailing the minute and a half of orbit it has
+just flown, integrated back from its state under gravity and projected point by
+point, so the line bends where the orbit does), size for range on a log scale from 400 km to 40,000 km, a label,
 spent only on a couple of dozen landmarks, and **strength for whether the sun is
 on it**.
 

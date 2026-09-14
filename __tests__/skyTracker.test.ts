@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { SATELLITE_TRACKING } from "../src/constants";
+import { SATELLITE_MARKERS, SATELLITE_TRACKING } from "../src/constants";
 import {
   createObserverFrame,
   eciToEnuInFrame,
@@ -154,46 +154,57 @@ test("a seek re-propagates rather than carrying a state across the gap", () => {
   }
 });
 
-/** How far the object swings across the sky over the trail window, in degrees. */
-function trailArcDeg(fix: { position: EnuPosition; nextPosition: EnuPosition }): number {
-  const travelled = Math.hypot(
-    fix.nextPosition.east - fix.position.east,
-    fix.nextPosition.north - fix.position.north,
-    fix.nextPosition.up - fix.position.up
+/** The angle between two directions from the observer, in degrees. */
+function separationDeg(one: EnuPosition, other: EnuPosition): number {
+  const dot = one.east * other.east + one.north * other.north + one.up * other.up;
+  const cross = Math.hypot(
+    one.north * other.up - one.up * other.north,
+    one.up * other.east - one.east * other.up,
+    one.east * other.north - one.north * other.east
   );
-  const range = Math.hypot(fix.position.east, fix.position.north, fix.position.up);
-  return (Math.atan2(travelled, range) * 180) / Math.PI;
+  return (Math.atan2(cross, dot) * 180) / Math.PI;
 }
 
-test("the lookahead resolves the trail against its own sidereal time", () => {
-  // A geostationary satellite appears motionless because Earth's rotation
-  // exactly cancels its orbit. Hold the sidereal time still while advancing
-  // the orbit and the cancellation is lost: the belt would draw a trail of
-  // about 0.065 degrees, which is a thousand times the arc it really covers
-  // and the longest thing on a southward frame.
+test("lays the trail through where the object really was, each point at its own sidereal time", () => {
+  // Against a full SGP4 propagation at each point's own instant. Gravity alone
+  // from the stored state lands within a few tens of metres of that over the
+  // window; holding the sidereal time still instead would leave the observer
+  // twenty-odd kilometres out of place by the far end, a degree or more.
+  const tracker = primedTracker();
+  const moving = tracker
+    .fixesAt(WHEN, observer)
+    .filter((fix) => !fix.parked)
+    .slice(0, 40);
+  expect(moving.length).toBeGreaterThan(10);
+  const { trailSeconds, trailPoints } = SATELLITE_MARKERS;
+  const frame = createObserverFrame(observer);
+
+  for (const fix of moving) {
+    const entry = catalog.entries.find((candidate) => candidate.name === fix.name)!;
+    expect(fix.trail).toHaveLength(trailPoints);
+    fix.trail.forEach((point, index) => {
+      const when = new Date(WHEN.getTime() - ((index + 1) * trailSeconds * 1000) / trailPoints);
+      const eci = propagator.propagateAt(entry.satrec, when)!;
+      const truth = eciToEnuInFrame(eci, gmstAt(when), frame);
+      expect(separationDeg(point, truth)).toBeLessThan(0.02);
+    });
+  }
+});
+
+test("gives an object that holds station no trail at all", () => {
   const tracker = primedTracker();
   const parked = tracker.fixesAt(WHEN, observer).filter((fix) => fix.parked);
   expect(parked.length).toBeGreaterThan(0);
-
-  const arcs = parked.map(trailArcDeg).sort((first, second) => first - second);
-  expect(arcs[arcs.length >> 1]).toBeLessThan(0.001);
-});
-
-test("parked objects draw no trail worth seeing, whatever their inclination", () => {
-  // Not all of the geosynchronous belt sits over the equator — the inclined
-  // BeiDou and IRNSS orbits trace a figure of eight through the day — so this
-  // is the bound the ring actually depends on, not a claim of zero. A twentieth
-  // of a degree is one pixel of this camera.
-  const tracker = primedTracker();
-  const parked = tracker.fixesAt(WHEN, observer).filter((fix) => fix.parked);
-  for (const fix of parked) expect(trailArcDeg(fix)).toBeLessThan(0.05);
+  for (const fix of parked) expect(fix.trail).toEqual([]);
 });
 
 test("objects in low orbit draw a trail across a real part of the frame", () => {
   const tracker = primedTracker();
   const moving = tracker.fixesAt(WHEN, observer).filter((fix) => !fix.parked);
-  // A degree is twenty pixels; the fastest low passes cover several.
-  expect(Math.max(...moving.map(trailArcDeg))).toBeGreaterThan(1);
+  // A degree is twenty pixels; over a minute and a half the fastest low passes
+  // cover a good part of the sky.
+  const arcs = moving.map((fix) => separationDeg(fix.position, fix.trail[fix.trail.length - 1]));
+  expect(Math.max(...arcs)).toBeGreaterThan(10);
 });
 
 test("carries the parked flag from the catalogue onto the fix", () => {

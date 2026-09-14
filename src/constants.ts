@@ -339,18 +339,26 @@ export const SATELLITE_MARKERS = {
   /**
    * How long a trail is, in seconds of orbital motion.
    *
-   * The trail is the object's own path, not a decoration: its length is how
-   * far the satellite actually travels in this window, so a low pass draws
-   * roughly a fifteenth of the frame and a parked satellite draws nothing at
-   * all. Long enough to be legible at a glance, short enough that the
-   * straight-line approximation holds.
+   * The trail is the object's own path, not a decoration: the points it runs
+   * through are where the satellite really was over this window (`SkyTracker`,
+   * `twoBodyPath`), so a fast low pass draws a long line, a slow high one a
+   * short one, and a parked satellite draws nothing at all.
    *
-   * The tracker propagates this far *ahead* (`SkyTracker`), and the tail is
-   * drawn the same distance behind the mark instead — the reflection of the
-   * step rather than a third propagated state per satellite per frame. Over a
-   * window this short the difference is far inside the marker itself.
+   * A minute and a half, which is long for a trail and is so on purpose. The
+   * frame is a rectilinear projection, and over a few seconds any orbit crosses
+   * it as a straight line; it is only over a minute or more that the orbit's own
+   * turn bends it by more than a pixel or two. The far half of that is drawn
+   * dashed and faint (`TAIL_DASH`, `TAIL_FADE`), so what reads at a glance is
+   * still the stretch nearest the mark.
    */
-  trailSeconds: 12,
+  trailSeconds: 90,
+  /**
+   * How many points the trail is resolved into. Each is a few seconds apart
+   * along the orbit: dense enough that the line between them is the curve to
+   * well inside a pixel, and few enough that a couple of hundred satellites
+   * cost a couple of thousand projections a frame.
+   */
+  trailPoints: 12,
   /** Trails shorter than this, in frame pixels, are not worth drawing. */
   minimumTrailPx: 4,
   /**

@@ -27,6 +27,7 @@ import {
 import { nakedEyeVerdict } from "./nakedEye";
 import { orbitPeriodMinutes, propagateStateAt } from "./propagator";
 import { standardMagnitudeFor } from "./standardMagnitude";
+import { twoBodyPath } from "./trajectory";
 
 /** What the tracker remembers about one catalog entry between propagations. */
 type TrackedEntry = {
@@ -151,11 +152,15 @@ export class SkyTracker {
     const gmst = gmstAt(when);
     const frame = createObserverFrame(observer);
     const whenMs = when.getTime();
-    // The trail's far end, resolved at its own sidereal time rather than this
-    // one. Reusing `gmst` would leave the Earth still underneath the orbit,
-    // and a geostationary satellite is motionless precisely because the two
-    // cancel — held still, it would grow the longest trail on the frame.
-    const aheadGmst = gmstAt(new Date(whenMs + SATELLITE_MARKERS.trailSeconds * 1000));
+    // The trail's points, each resolved at its own sidereal time rather than
+    // this one. Reusing `gmst` would leave the Earth still underneath the
+    // orbit, and a geostationary satellite is motionless precisely because the
+    // two cancel — held still, it would grow the longest trail on the frame.
+    const { trailSeconds, trailPoints } = SATELLITE_MARKERS;
+    const trailStepSeconds = -trailSeconds / trailPoints;
+    const trailGmst = Array.from({ length: trailPoints }, (_, index) =>
+      gmstAt(new Date(whenMs + (index + 1) * trailStepSeconds * 1000))
+    );
     // Where the Earth's shadow lies, once for the whole frame. The sun moves a
     // fortieth of a degree an hour, and this walk is several hundred long.
     const shadow = createShadowFrame(when);
@@ -176,7 +181,11 @@ export class SkyTracker {
         category: tracked.entry.category,
         parked: tracked.entry.parked,
         position: enu,
-        nextPosition: eciToEnuInFrame(this.aheadOf(tracked, position), aheadGmst, frame),
+        trail: tracked.entry.parked
+          ? []
+          : this.trailOf(tracked, whenMs, trailStepSeconds, trailPoints).map((point, index) =>
+              eciToEnuInFrame(point, trailGmst[index], frame)
+            ),
         // Asked in the inertial frame, where the question is about the Earth
         // and the sun rather than about the observer: whether this place is in
         // the dark is a separate matter, and the overlay asks it once for the
@@ -300,15 +309,21 @@ export class SkyTracker {
    * back to standing still, which draws no trail — the honest answer when
    * there is no velocity to go on.
    */
-  private aheadOf(tracked: TrackedEntry, position: EciPosition): EciPosition {
-    const velocity = tracked.state?.velocity;
-    if (!velocity) return position;
-    const dtSeconds = SATELLITE_MARKERS.trailSeconds;
-    return {
-      x: position.x + velocity.x * dtSeconds,
-      y: position.y + velocity.y * dtSeconds,
-      z: position.z + velocity.z * dtSeconds
-    };
+  /**
+   * Where a tracked object was over the trail window before `whenMs`, nearest
+   * first. Integrated from the stored state under gravity (`twoBodyPath`)
+   * rather than carried along its velocity: over a minute and a half the
+   * straight line is the one thing the trail must not be.
+   */
+  private trailOf(
+    tracked: TrackedEntry,
+    whenMs: number,
+    stepSeconds: number,
+    count: number
+  ): EciPosition[] {
+    const state = tracked.state;
+    if (!state) return [];
+    return twoBodyPath(state, (whenMs - tracked.stateAtMs) / 1000, stepSeconds, count);
   }
 
   /**

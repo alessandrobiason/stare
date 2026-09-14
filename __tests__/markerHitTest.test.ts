@@ -14,7 +14,7 @@ function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
     parked: false,
     point: { left: 50, top: 50 },
     rangeKm: 1200,
-    next: null,
+    trail: null,
     opacity: 1,
     sunlit: "sunlit",
     ...overrides
@@ -155,7 +155,7 @@ test("ignores a marker kept on the frame only for its trail", () => {
   const gone = marker({
     name: "ISS",
     point: { left: 50, top: -1 },
-    next: { left: 50, top: -11 }
+    trail: [{ left: 50, top: 9 }]
   });
   const hits = markersUnder(frame([gone]), FRAME, { x: 360, y: 4 });
 

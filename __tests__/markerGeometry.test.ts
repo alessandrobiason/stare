@@ -6,7 +6,7 @@ import {
   markerDiameterPx,
   pointOnFrame,
   trailOnFrame,
-  trailReach,
+  trailPixels,
   WHOLE_FRAME
 } from "../src/components/markerGeometry";
 
@@ -30,26 +30,42 @@ test("clamps the marker size at both ends of the scale", () => {
   expect(markerDiameterPx(400_000)).toBe(SATELLITE_MARKERS.farDiameterPx);
 });
 
-test("measures how far a marker's own motion carries it, in pixels", () => {
-  const reach = trailReach({ left: 20, top: 50 }, { left: 40, top: 50 }, FRAME);
-  expect(reach).not.toBeNull();
-  expect(reach?.dx).toBeCloseTo(144, 6); // 20% of a 720 px frame
-  expect(reach?.dy).toBeCloseTo(0, 6);
-  expect(reach?.length).toBeCloseTo(144, 6);
+test("lays the trail out in pixels, from the mark back through where it has been", () => {
+  const path = trailPixels(
+    { left: 20, top: 50 },
+    [
+      { left: 30, top: 50 },
+      { left: 40, top: 50 }
+    ],
+    FRAME
+  );
+  expect(path?.points).toEqual([144, 640, 216, 640, 288, 640]);
+  expect(path?.length).toBeCloseTo(144, 6); // 20% of a 720 px frame
 });
 
-test("takes the trail direction in pixels, not in percent", () => {
+test("measures the trail in pixels, not in percent", () => {
   // Equal percentage steps across a 720x1280 frame are not equal distances, so
-  // a direction taken in percent would point the tail away from the line of
-  // travel. 10% of the width is 72 px; 10% of the height is 128 px.
-  const reach = trailReach({ left: 40, top: 40 }, { left: 50, top: 50 }, FRAME);
-  expect(reach?.dx).toBeCloseTo(72, 6);
-  expect(reach?.dy).toBeCloseTo(128, 6);
-  expect(reach?.length).toBeCloseTo(Math.hypot(72, 128), 6);
+  // a length taken in percent would stretch the dashes along one axis. 10% of
+  // the width is 72 px; 10% of the height is 128 px.
+  const path = trailPixels({ left: 40, top: 40 }, [{ left: 50, top: 50 }], FRAME);
+  expect(path?.length).toBeCloseTo(Math.hypot(72, 128), 6);
+});
+
+test("follows the trail round its corners rather than cutting across them", () => {
+  const path = trailPixels(
+    { left: 50, top: 50 },
+    [
+      { left: 60, top: 50 },
+      { left: 60, top: 60 }
+    ],
+    FRAME
+  );
+  expect(path?.length).toBeCloseTo(72 + 128, 6);
 });
 
 test("draws no trail for an object that is holding station", () => {
-  expect(trailReach({ left: 50, top: 50 }, { left: 50, top: 50 }, FRAME)).toBeNull();
+  expect(trailPixels({ left: 50, top: 50 }, [{ left: 50, top: 50 }], FRAME)).toBeNull();
+  expect(trailPixels({ left: 50, top: 50 }, [], FRAME)).toBeNull();
 });
 
 test("counts a point as on the frame up to its very edge", () => {
@@ -60,35 +76,39 @@ test("counts a point as on the frame up to its very edge", () => {
 });
 
 test("keeps a marker whose mark has left the frame but whose trail has not", () => {
-  // Travelling left to right and gone off the right edge: the trail runs back
+  // Travelling right to left and gone off the left edge: the trail runs back
   // the way it came, which is still across the view.
-  const gone = { left: 110, top: 50 };
+  const gone = { left: -10, top: 50 };
   expect(pointOnFrame(gone)).toBe(false);
-  expect(trailOnFrame(gone, { left: 140, top: 50 })).toBe(true);
+  expect(trailOnFrame(gone, [{ left: 20, top: 50 }])).toBe(true);
 });
 
 test("lets go of a marker once its trail has left the frame too", () => {
   // The same satellite a moment later: the whole shape, tip included, is past
   // the edge, and there is nothing left of it to draw.
-  expect(trailOnFrame({ left: 140, top: 50 }, { left: 170, top: 50 })).toBe(false);
+  expect(trailOnFrame({ left: 140, top: 50 }, [{ left: 155, top: 50 }, { left: 170, top: 50 }])).toBe(
+    false
+  );
 });
 
-test("measures the trail backwards from the mark", () => {
-  // A satellite just off the top edge heading further off it drags its trail
-  // back down into the frame; one heading back in has already taken its trail
-  // out of the frame ahead of it.
-  expect(trailOnFrame({ left: 50, top: -5 }, { left: 50, top: -15 })).toBe(true);
-  expect(trailOnFrame({ left: 50, top: -5 }, { left: 50, top: 5 })).toBe(false);
+test("holds a trail whose later stretches are the ones on the frame", () => {
+  // The first stretch runs along outside the top edge; the curve brings the
+  // second one down into the view.
+  expect(
+    trailOnFrame({ left: 50, top: -5 }, [
+      { left: 60, top: -5 },
+      { left: 70, top: 10 }
+    ])
+  ).toBe(true);
 });
 
 test("holds a trail that crosses a corner without either end being on the frame", () => {
-  // Head off the right edge and climbing, so the tip it trails — the
-  // reflection of where it is heading — is off the bottom, and the line
-  // between the two clips the corner. The test has to answer for the middle of
-  // a segment, not only for its ends.
-  expect(trailOnFrame({ left: 105, top: 80 }, { left: 135, top: 30 })).toBe(true);
+  // Head off the right edge, tip off the bottom, and the line between the two
+  // clips the corner. The test has to answer for the middle of a stretch, not
+  // only for its ends.
+  expect(trailOnFrame({ left: 105, top: 80 }, [{ left: 75, top: 130 }])).toBe(true);
   // The same shape carried out past the corner: nothing of it is in view.
-  expect(trailOnFrame({ left: 130, top: 105 }, { left: 160, top: 55 })).toBe(false);
+  expect(trailOnFrame({ left: 130, top: 105 }, [{ left: 100, top: 155 }])).toBe(false);
 });
 
 test("keeps the label clearance in layout pixels, not in frame percent", () => {

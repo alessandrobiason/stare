@@ -1,4 +1,4 @@
-import { BLOOM_FADE, CORE_FADE, FadeStop, GLOW_FADE, TAIL_FADE } from "./markerScene";
+import { BLOOM_FADE, COMET_FADE, CORE_FADE, FadeStop, GLOW_FADE, TAIL_FADE } from "./markerScene";
 import { Skia, TileMode } from "./skia";
 import type { SkColor, SkShader } from "./skia";
 
@@ -14,10 +14,11 @@ import type { SkColor, SkShader } from "./skia";
 
 /** The fades drawn out from a mark's centre, by the scene's name for each. */
 export type RadialFade = "glow" | "bloom" | "core";
-export type Fade = RadialFade | "tail";
+export type Fade = RadialFade | "tail" | "comet";
 
 const FADES: Record<Fade, readonly FadeStop[]> = {
   tail: TAIL_FADE,
+  comet: COMET_FADE,
   glow: GLOW_FADE,
   bloom: BLOOM_FADE,
   core: CORE_FADE
@@ -46,7 +47,7 @@ export function skiaColor(color: string): SkColor {
  * a bloom or a point.
  *
  * Built once per kind and colour, bounded for the reason `skiaColor` is. The
- * fade itself is the scene's (`TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE`,
+ * fade itself is the scene's (`TAIL_FADE`, `COMET_FADE`, `GLOW_FADE`, `BLOOM_FADE`,
  * `CORE_FADE`); the paint's own alpha is what scales it for the mark being
  * drawn, and the canvas is what places it.
  */
@@ -64,7 +65,7 @@ export function fadeShader(kind: Fade, color: string): SkShader {
   const offsets = stops.map((stop) => stop.at);
   const origin = Skia.Point(0, 0);
   const made =
-    kind === "tail"
+    kind === "tail" || kind === "comet"
       ? Skia.Shader.MakeLinearGradient(origin, Skia.Point(1, 0), ramp, offsets, TileMode.Clamp)
       : Skia.Shader.MakeRadialGradient(origin, 1, ramp, offsets, TileMode.Clamp);
   shaders.set(key, made);

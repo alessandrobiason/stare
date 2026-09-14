@@ -67,14 +67,16 @@ export type SatelliteFix = {
   parked: boolean;
   position: EnuPosition;
   /**
-   * Where the same object will be a few seconds later, in the same frame.
+   * Where the same object was over the trail window, in the same frame:
+   * `SATELLITE_MARKERS.trailPoints` positions, evenly spaced in time, nearest
+   * first. Empty for an object that holds station.
    *
-   * Carried alongside the position because the marker's trail has to show how
-   * fast the *orbit* is moving, and a difference taken between two drawn
-   * frames would show the hand holding the phone instead. Two positions
-   * resolved against one attitude cancel the camera out and leave the motion.
+   * Carried alongside the position because the marker's trail has to show the
+   * *orbit*, and a history of drawn frames would show the hand holding the
+   * phone instead. Positions resolved against one attitude cancel the camera
+   * out and leave the path.
    */
-  nextPosition: EnuPosition;
+  trail: EnuPosition[];
   /**
    * Whether the sun is on it, which is whether there is anything to see.
    *

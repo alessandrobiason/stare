@@ -254,8 +254,8 @@ function drawRim(
 }
 
 /**
- * The comet's tail, faded from the point to its tip: in the mark's colour, or — `outset`
- * wider on every side — in the edge's ink under it.
+ * The trail, faded from the point to its tip: its runs stroked in the mark's
+ * colour, or — `outset` wider on every side — in the edge's ink under it.
  */
 function drawTail(
   context: CanvasRenderingContext2D,
@@ -266,26 +266,15 @@ function drawTail(
   outset: number
 ): void {
   if (!(alpha > 0)) return;
-  const alongX = Math.cos(tail.angle);
-  const alongY = Math.sin(tail.angle);
-  const length = tail.length + outset;
-  const half = tail.width / 2 + outset;
-  const tipX = glyph.x + alongX * length;
-  const tipY = glyph.y + alongY * length;
-
-  const fade = context.createLinearGradient(glyph.x, glyph.y, tipX, tipY);
+  const fade = context.createLinearGradient(glyph.x, glyph.y, tail.tipX, tail.tipY);
   for (const stop of TAIL_FADE) {
     fade.addColorStop(stop.at, cssColor({ color, alpha: stop.strength }));
   }
-  const acrossX = -alongY * half;
-  const acrossY = alongX * half;
-  const [leftX, leftY] = [glyph.x + acrossX, glyph.y + acrossY];
-  const [rightX, rightY] = [glyph.x - acrossX, glyph.y - acrossY];
-  trace(context, [[tipX, tipY, leftX, leftY, rightX, rightY]]);
-  context.closePath();
+  trace(context, tail.runs);
   context.globalAlpha = alpha;
-  context.fillStyle = fade;
-  context.fill();
+  context.strokeStyle = fade;
+  context.lineWidth = tail.width + 2 * outset;
+  context.stroke();
 }
 
 /**

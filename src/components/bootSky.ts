@@ -10,7 +10,7 @@ import { MARK_BLOOM, MARK_COLOR } from "./palette";
  * point of light on a wide arc over a horizon, trailing a tail that fades to
  * nothing; this is that pass, moving. And the light is the overlay's own — the
  * same white point in the same cool bloom, faded by the same stops
- * (`TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`) — so what a person is
+ * (`COMET_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`) — so what a person is
  * about to read against the real sky is already in front of them while it
  * loads.
  *
@@ -211,7 +211,7 @@ export type SkyLight = {
      * nothing, so it is neither a stroke nor a triangle.
      */
     points: number[];
-    /** The point it tapers to, which is where `TAIL_FADE` reaches nothing. */
+    /** The point it tapers to, which is where `COMET_FADE` reaches nothing. */
     tipX: number;
     tipY: number;
     alpha: number;

@@ -193,7 +193,7 @@ describe("the marks are shown rather than described", () => {
         expect(glyph.y - reach).toBeGreaterThanOrEqual(0);
         expect(glyph.y + reach).toBeLessThanOrEqual(MARK_TILE.height);
 
-        const tail = glyph.tail?.points ?? [];
+        const tail = glyph.tail?.runs.flat() ?? [];
         for (let index = 0; index < tail.length; index += 2) {
           expect(tail[index]).toBeGreaterThanOrEqual(0);
           expect(tail[index]).toBeLessThanOrEqual(MARK_TILE.width);

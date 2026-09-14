@@ -12,7 +12,7 @@ import {
   starAlpha
 } from "./bootSky";
 import { FrameSize } from "./markerGeometry";
-import { BLOOM_FADE, CORE_FADE, FadeStop, GLOW_FADE, TAIL_FADE } from "./markerScene";
+import { BLOOM_FADE, COMET_FADE, CORE_FADE, FadeStop, GLOW_FADE } from "./markerScene";
 import { cssColor } from "./palette";
 
 type Props = {
@@ -110,7 +110,7 @@ function draw(
 
   const { tail } = light;
   const fade = context.createLinearGradient(light.x, light.y, tail.tipX, tail.tipY);
-  for (const stop of TAIL_FADE) {
+  for (const stop of COMET_FADE) {
     fade.addColorStop(stop.at, cssColor({ color: light.color, alpha: stop.strength }));
   }
   context.globalAlpha = tail.alpha * pose.alpha;

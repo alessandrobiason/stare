@@ -162,7 +162,7 @@ function record(
       glow(canvas, paint, light, light.bloom.radius, "bloom", light.bloomColor, light.bloom.alpha * pose.alpha);
       glow(canvas, paint, light, light.glow.radius, "glow", light.color, light.glow.alpha * pose.alpha);
 
-      paint.setShader(fadeShader("tail", light.color));
+      paint.setShader(fadeShader("comet", light.color));
       paint.setAlphaf(light.tail.alpha * pose.alpha);
       canvas.save();
       canvas.translate(light.x, light.y);

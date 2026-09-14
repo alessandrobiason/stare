@@ -11,8 +11,9 @@
  * Positions are percentages of the camera frame, which is what the projection
  * hands the overlay (`FramePoint`), and ranges are kilometres, which is what
  * decides how large a mark is drawn. `travelPct` is how much of the frame's
- * width the object covers in the twelve seconds a trail is long — the tail is
- * drawn backwards along `headingDeg`, as the app draws it.
+ * width the object covers in twelve seconds — its speed across the frame; the
+ * trail is that speed over the app's minute and a half, drawn backwards along
+ * `headingDeg`.
  */
 
 /** A row of geostationary satellites: parked, small, and all at one declination. */

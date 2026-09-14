@@ -11,8 +11,7 @@ import {
   markerDiameterPx,
   pointOnFrame,
   rangeShare,
-  trailReach,
-  TrailReach
+  trailPixels
 } from "./markerGeometry";
 import { Ink, MARK_COLOR, MarkerPalette } from "./palette";
 
@@ -141,37 +140,46 @@ export type Circle = {
 export type FadeStop = { at: number; strength: number };
 
 /**
- * The trail, as a tapered shape faded from the mark to its tip.
+ * The trail, as a line along the object's own path: solid where it leaves the
+ * mark, then broken into dashes that grow shorter and further apart the further
+ * back they are, fading as they go.
  *
- * A polygon rather than a stroke because the shape narrows along its length,
- * which no single stroke width can express; the same reason the boot screen's
- * tail is a polygon. Three points is all it takes here, though, where the
- * boot screen needs dozens: over the few seconds a trail covers, an orbit's path
- * across the frame is straight to well inside a pixel, so the taper is a
- * triangle rather than an arc.
+ * The line runs through where the object really was (`SatelliteFix.trail`), so
+ * it bends as the orbit does rather than being a straight streak laid behind
+ * the mark. A stroke of one width rather than the taper it replaced: a taper
+ * over a minute and a half of orbit is a wedge across the frame, where a fine
+ * line is a path. What says which end is the object is the strength instead —
+ * solid and bright at the mark, a scatter of faint dots at the far end — which
+ * is how a trail left in the sky looks: there, then less and less there.
  *
- * Edged like the point it comes out of — the same taper, `rim` wider on every
- * side, in the edge's ink and faded along with it. A pale tail on a bright sky
- * is otherwise invisible, and it is the one part of a mark that says which way
- * the object is going.
+ * Edged like the point it comes out of — the same runs stroked `rim` wider on
+ * every side, in the edge's ink and faded along with it. A pale line on a bright
+ * sky is otherwise invisible, and it is the one part of a mark that says which
+ * way the object is going.
  */
 export type TailShape = {
   /**
-   * The closed polygon, as flat `x, y` pairs in layout pixels: the tip it
-   * tapers to, then the two corners of its head. The head is the marker's own
-   * centre, so the widest part of the tail is under the body and what shows is
-   * the taper coming out from behind it.
+   * What to stroke, as runs of flat `x, y` pairs in layout pixels: the solid
+   * stretch from the mark's centre first, then each dash in order back along
+   * the path. The solid stretch starts under the point, so what shows is the
+   * line coming out from behind it.
    */
-  points: number[];
-  /** From the mark's centre to the tip, in layout pixels. */
+  runs: number[][];
+  /**
+   * The trail's far end, where `TAIL_FADE` reaches nothing. The fade is laid
+   * straight from the mark's centre to here: over the window a trail covers the
+   * path bends by a few pixels in hundreds, and a fade along the chord is a
+   * fade along the path to well inside that.
+   */
+  tipX: number;
+  tipY: number;
+  /** Along the path, from the mark's centre to the tip, in layout pixels. */
   length: number;
-  /** Which way the tip lies from the centre, in radians clockwise from `+x`. */
-  angle: number;
-  /** Across the head, where the tail meets the point. */
+  /** The line's width. */
   width: number;
-  /** How strong the tail is at its head, before `TAIL_FADE` takes it to its tip. */
+  /** How strong the line is at the mark, before `TAIL_FADE` takes it to its tip. */
   alpha: number;
-  /** How far the edge under the tail reaches past it on every side, in layout pixels. */
+  /** How far the edge under the line reaches past it on every side, in layout pixels. */
   rim: number;
 };
 
@@ -424,7 +432,7 @@ export function buildMarkerScene(
     const color = palette.categories[marker.category];
     const landmark = marker.category === "LANDMARK";
 
-    const reach = marker.next ? trailReach(marker.point, marker.next, box) : null;
+    const path = marker.trail ? trailPixels(marker.point, marker.trail, box) : null;
 
     // A parked object is a small ring rather than a point, and a shade larger
     // than one, since a ring the size of a point is a point. Either way the rim
@@ -438,8 +446,14 @@ export function buildMarkerScene(
       x,
       y,
       tail:
-        reach &&
-        tailFor(x, y, reach, diameter * TRAIL_WIDTH_RATIO, TAIL_ALPHA * strength, outline),
+        path &&
+        tailFor(
+          path,
+          Math.max(MIN_TRAIL_WIDTH_PX * scale, diameter * TRAIL_WIDTH_RATIO),
+          TAIL_ALPHA * strength,
+          outline,
+          scale
+        ),
       rim:
         ring === null
           ? { radius: diameter / 2 + outline, width: null }
@@ -657,47 +671,76 @@ function pathOpacity(lead: number): number {
 }
 
 /**
- * The tail for a marker at `x, y` that is travelling `reach`.
+ * The tail along a trail already laid out in pixels (`trailPixels`).
  *
- * Laid backwards along that direction: the head is the marker's own centre and
- * the tip is where the object was `trailSeconds` ago, taken as the reflection
- * of where it will be rather than propagated. That is not a rough stand-in. The
- * frame is a rectilinear projection, so an object moving in a straight line
- * crosses it at a constant rate — equal times are equal distances along the
- * path, whatever the angles do — and what is left over a window this short is
- * the curvature of the orbit itself: a couple of hundredths of a pixel for a
- * low pass, against a marker eight to seventeen wide. A third propagated state
- * per satellite per frame would buy nothing with it.
+ * The solid stretch is a share of the trail, capped (`TAIL_DASH.solidPx`), so a
+ * short trail is mostly line and a long one does not run a solid bar across the
+ * frame. Past it the dashes are measured in pixels from the mark rather than as
+ * shares of the trail, so the pattern is the same on every mark and does not
+ * stretch as a pass swings nearer: each dash a little shorter than the one
+ * before and each gap a little longer, until what is left is dots with sky
+ * between them. The pattern travels with the mark, so it is still while the
+ * object moves; only the far end changes, as the trail lengthens and shortens.
  */
 function tailFor(
-  x: number,
-  y: number,
-  reach: TrailReach,
+  path: { points: number[]; length: number },
   width: number,
   alpha: number,
-  rim: number
+  rim: number,
+  scale: number
 ): TailShape {
-  // Along the direction of travel, and across it.
-  const alongX = reach.dx / reach.length;
-  const alongY = reach.dy / reach.length;
-  const acrossX = -alongY * (width / 2);
-  const acrossY = alongX * (width / 2);
+  const { points, length } = path;
+  const { solidShare, solidPx, dashPx, gapPx, dashGrowth, gapGrowth, maxDashes } = TAIL_DASH;
+  const spans: [number, number][] = [[0, Math.min(length * solidShare, solidPx * scale)]];
+  let dash = dashPx * scale;
+  let gap = gapPx * scale;
+  let at = spans[0][1] + gap;
+  while (at < length && spans.length <= maxDashes) {
+    spans.push([at, Math.min(length, at + dash)]);
+    at += dash;
+    dash *= dashGrowth;
+    gap *= gapGrowth;
+    at += gap;
+  }
 
   return {
-    points: [
-      x - alongX * reach.length,
-      y - alongY * reach.length,
-      x + acrossX,
-      y + acrossY,
-      x - acrossX,
-      y - acrossY
-    ],
-    length: reach.length,
-    angle: Math.atan2(-reach.dy, -reach.dx),
+    runs: spans.map(([from, to]) => stretchOf(points, from, to)),
+    tipX: points[points.length - 2],
+    tipY: points[points.length - 1],
+    length,
     width,
     alpha,
     rim
   };
+}
+
+/**
+ * The part of a polyline between two distances along it, as flat `x, y` pairs:
+ * the point at `from`, every corner in between, and the point at `to`. A dash
+ * that spans a corner turns it, which is what keeps the dashes on the curve.
+ */
+function stretchOf(points: number[], from: number, to: number): number[] {
+  const run: number[] = [];
+  let walked = 0;
+  for (let index = 2; index < points.length; index += 2) {
+    const [x0, y0, x1, y1] = [points[index - 2], points[index - 1], points[index], points[index + 1]];
+    const step = Math.hypot(x1 - x0, y1 - y0);
+    const next = walked + step;
+    if (next >= from && step > 0) {
+      if (run.length === 0) {
+        const share = (from - walked) / step;
+        run.push(x0 + (x1 - x0) * share, y0 + (y1 - y0) * share);
+      }
+      if (next >= to) {
+        const share = (to - walked) / step;
+        run.push(x0 + (x1 - x0) * share, y0 + (y1 - y0) * share);
+        return run;
+      }
+      run.push(x1, y1);
+    }
+    walked = next;
+  }
+  return run;
 }
 
 /**
@@ -722,17 +765,55 @@ function depthStrength(range: number): number {
 /**
  * How a tail falls away from the mark to its tip.
  *
- * Fast at first and slow after: most of its strength is spent in the first
- * third, next to the point, so what reads is a bright streak coming out of the
- * mark and thinning into the sky — and the tip, where the object was twelve
- * seconds ago, is nothing at all rather than a hard end.
+ * Gently near the mark, where the line is solid and is what says which way the
+ * object is going, and steadily after: the dashes carry most of the thinning
+ * out already, so the fade only has to take the last of them to nothing — and
+ * the tip, where the object was a minute and a half ago, is nothing at all
+ * rather than a hard end.
  */
 export const TAIL_FADE: readonly FadeStop[] = [
+  { at: 0, strength: 1 },
+  { at: 0.12, strength: 0.8 },
+  { at: 0.45, strength: 0.32 },
+  { at: 1, strength: 0 }
+];
+
+/**
+ * How the logo's tail falls away: the tapered comet the boot screen and
+ * `assets/icon.svg` draw, which is what the marks' tails were before they
+ * became dashed lines along the orbit.
+ *
+ * Fast at first and slow after: most of its strength is spent in the first
+ * third, next to the point, so what reads is a bright streak coming out of the
+ * light and thinning into the sky. Kept apart from `TAIL_FADE` so the logo does
+ * not change when the marks do.
+ */
+export const COMET_FADE: readonly FadeStop[] = [
   { at: 0, strength: 1 },
   { at: 0.3, strength: 0.5 },
   { at: 0.65, strength: 0.15 },
   { at: 1, strength: 0 }
 ];
+
+/**
+ * How a tail breaks up along its length, in pixels at the design width.
+ *
+ * Solid for the first stretch (`solidShare` of the trail, up to `solidPx`),
+ * then a dash of `dashPx` after a gap of `gapPx`, each dash `dashGrowth` times
+ * the last and each gap `gapGrowth` times the last. The gaps grow faster than
+ * the dashes shrink, so the line reads as dissolving rather than as a uniform
+ * dotted rule, and with round caps the last dashes are dots. Capped at
+ * `maxDashes`, which a trail across the whole frame does not reach.
+ */
+export const TAIL_DASH = {
+  solidShare: 0.3,
+  solidPx: 64,
+  dashPx: 11,
+  gapPx: 4,
+  dashGrowth: 0.82,
+  gapGrowth: 1.34,
+  maxDashes: 32
+} as const;
 
 /**
  * How a mark's glow, or a landmark's halo, falls away from its centre.
@@ -862,14 +943,16 @@ const FAR_STRENGTH = 0.5;
  */
 const SELECTED_GROWTH = 1.25;
 /**
- * Trail width where it meets the point, as a fraction of the point's diameter.
+ * Trail width, as a fraction of the point's diameter.
  *
- * Half the point's width: the point's softened rim (`CORE_FADE`) hides the
- * join, so the tail still comes out of the light rather than being stuck to it,
- * and a streak this fine reads as the path of a light rather than as the body
- * of a comet.
+ * Under a third of the point's width: the point's softened rim (`CORE_FADE`)
+ * hides the join, so the line still comes out of the light rather than being
+ * stuck to it, and a line this fine reads as the path of a light rather than as
+ * the body of a comet.
  */
-const TRAIL_WIDTH_RATIO = 0.5;
+const TRAIL_WIDTH_RATIO = 0.3;
+/** The thinnest a trail is drawn, in pixels at the design width. */
+const MIN_TRAIL_WIDTH_PX = 1.4;
 /** Edge thickness, as a fraction of the point's diameter. */
 const OUTLINE_RATIO = 0.16;
 /** The thinnest a line's rim is drawn, in layout pixels. */

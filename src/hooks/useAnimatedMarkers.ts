@@ -39,11 +39,13 @@ export type SatelliteMarker = {
   /** Distance to the observer, in kilometres. Sets the marker's size. */
   rangeKm: number;
   /**
-   * Where the object will be at the end of the trail window, in frame
-   * coordinates — outside the frame if that is where it is heading. `null`
-   * when the projection cannot place it, which is the same thing as no trail.
+   * Where the object has been over the trail window, in frame coordinates,
+   * nearest first — outside the frame wherever that is where it was. Stops at
+   * the first point the projection cannot place (behind the camera). `null` for
+   * an object that holds station, and for one with no point that could be
+   * placed, which is the same thing as no trail.
    */
-  next: FramePoint | null;
+  trail: FramePoint[] | null;
   /**
    * How opaque to draw it, in `(0, 1]`. Terrain is not a switch: the mask makes
    * up its mind about an edge once a second, so a marker crossing one fades
@@ -162,6 +164,27 @@ const EMPTY_FRAME: MarkerFrame = { markers: [], paths: [], rollDeg: 0 };
  * reason the attitude readings arrive this way (`AttitudeSource`).
  */
 export type MarkerSource = (listener: (frame: MarkerFrame) => void) => () => void;
+
+/**
+ * A satellite's trail on the frame: its past positions projected in order,
+ * stopping at the first one behind the camera. A trail runs from the mark
+ * outwards, so everything after that point is on the far side of it too — and a
+ * trail with a gap in it would be two trails. `null` when not one point could
+ * be placed.
+ */
+function projectTrail(
+  trail: readonly EnuPosition[],
+  axes: CameraAxes,
+  lens: FrameLens
+): FramePoint[] | null {
+  const points: FramePoint[] = [];
+  for (const position of trail) {
+    const point = projectWithAxes(position, axes, lens);
+    if (!point) break;
+    points.push(point);
+  }
+  return points.length > 0 ? points : null;
+}
 
 /** Painter's order: far before near, and landmarks over everything. */
 function drawOrder(marker: SatelliteMarker): number {
@@ -834,13 +857,12 @@ export function useAnimatedMarkers({
           const offCentre = Math.max(Math.abs(point.left - 50), Math.abs(point.top - 50));
           if (offCentre > 50 * (1 + MARKER_WARMING_MARGIN)) continue;
 
-          // Where the object is heading, resolved against the same attitude as
-          // the marker itself, so what is left between the two points is the
-          // orbit rather than the hand holding the phone. Taken before the
-          // frame test rather than after it, because it is what that test asks
-          // about: the trail is drawn backwards from the mark, and a mark that
-          // has left the frame can still have most of its trail on it.
-          const next = fix.parked ? null : projectWithAxes(fix.nextPosition, axes, lens);
+          // Where the object has been, resolved against the same attitude as
+          // the marker itself, so what is left between the points is the orbit
+          // rather than the hand holding the phone. Taken before the frame test
+          // rather than after it, because it is what that test asks about: a
+          // mark that has left the frame can still have most of its trail on it.
+          const trail = fix.parked ? null : projectTrail(fix.trail, axes, lens);
 
           let confidence: number | null = 1;
           let fromMemory = false;
@@ -864,7 +886,7 @@ export function useAnimatedMarkers({
           // The warming margin above is not in the way of that: it is a whole
           // frame width, which no trail this window is long enough to cross.
           const onFrame = pointOnFrame(point);
-          if (!onFrame && !(next && trailOnFrame(point, next))) continue;
+          if (!onFrame && !(trail && trailOnFrame(point, trail))) continue;
           if (confidence === null) unmapped += 1;
           else if (fromMemory) remembered += 1;
           if (opacity <= MARKER_VISIBILITY.minimumDrawnOpacity) {
@@ -889,7 +911,7 @@ export function useAnimatedMarkers({
             notable: notable.roleOf(fix.name),
             // Allowed off-frame: a trail about to leave the view is the one
             // whose direction says the most.
-            next
+            trail
           });
         }
         visibility.endFrame();

@@ -49,7 +49,7 @@ type Placed = {
   rangeKm: number;
   /** Where it is going, in degrees anticlockwise from the right; `null` holds station. */
   headingDeg: number | null;
-  /** How far it goes in the trail window, in points — which is how long its tail is. */
+  /** How far it went over the trail window, in points — which is how long its tail is. */
   travel?: number;
   sunlit?: SunlitState;
 };
@@ -80,6 +80,9 @@ const MARK_SAMPLES: Record<MarkSample, readonly Placed[]> = {
   ]
 };
 
+/** Where along its trail each point of a tile's trail lies, as shares of `travel`. */
+const TILE_TRAIL_STEPS = [0.25, 0.5, 0.75, 1];
+
 /** The frame a tile draws: one kind of mark, as the overlay would place it. */
 export function markSampleFrame(sample: MarkSample): MarkerFrame {
   return {
@@ -98,12 +101,18 @@ function markerFor(box: FrameSize, placed: Placed): SatelliteMarker {
     parked: heading === null,
     point: pointIn(box, placed.x, placed.y),
     rangeKm: placed.rangeKm,
-    // Where it will be a trail window from now. The renderer lays the tail the
-    // same distance behind the mark, as it does on the sky.
-    next:
+    // Where it has been over a trail window, straight back along its heading:
+    // at a tile's size an orbit's bend is nothing, so the sample is a line.
+    trail:
       heading === null
         ? null
-        : pointIn(box, placed.x + travel * Math.cos(heading), placed.y - travel * Math.sin(heading)),
+        : TILE_TRAIL_STEPS.map((share) =>
+            pointIn(
+              box,
+              placed.x - travel * share * Math.cos(heading),
+              placed.y + travel * share * Math.sin(heading)
+            )
+          ),
     opacity: 1,
     sunlit: placed.sunlit ?? "sunlit"
   };

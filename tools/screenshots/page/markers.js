@@ -8,7 +8,9 @@
  * point of these frames is that what the store shows is what the phone draws.
  *
  * The one thing it does not do is propagate an orbit. Positions arrive from the
- * scene file as frame percentages, as they would from the projection.
+ * scene file as frame percentages, as they would from the projection, and a
+ * trail is laid straight back along the scene's heading — which over a minute
+ * and a half is what a real orbit on this lens is, to a pixel or two.
  */
 
 const SATELLITE_MARKERS = {
@@ -29,7 +31,26 @@ const BLOOM_ALPHA = 0.35;
 const TAIL_ALPHA = 0.8;
 const FAR_STRENGTH = 0.5;
 const SELECTED_GROWTH = 1.25;
-const TRAIL_WIDTH_RATIO = 0.5;
+const TRAIL_WIDTH_RATIO = 0.3;
+const MIN_TRAIL_WIDTH_PX = 1.4;
+/**
+ * `trailSeconds` over the twelve seconds a scene's `travelPct` is quoted in: a
+ * scene says how fast an object crosses the frame, and the trail is that speed
+ * over the app's own window.
+ */
+const TRAIL_WINDOWS = 90 / 12;
+const TRAIL_POINTS = 12;
+/** `TAIL_DASH`: solid from the mark, then dashes that shorten as their gaps widen. */
+const TAIL_DASH = {
+  solidShare: 0.3,
+  solidPx: 64,
+  dashPx: 11,
+  gapPx: 4,
+  dashGrowth: 0.82,
+  gapGrowth: 1.34,
+  maxDashes: 32
+};
+const MINIMUM_TRAIL_PX = 4;
 const OUTLINE_RATIO = 0.16;
 const MIN_OUTLINE_PX = 1;
 const MIN_EDGE_PX = 1.25;
@@ -44,8 +65,8 @@ const ARC_LABEL_GAP_PX = 10;
 /** `TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE` and `CORE_FADE`. */
 const TAIL_FADE = [
   { at: 0, strength: 1 },
-  { at: 0.3, strength: 0.5 },
-  { at: 0.65, strength: 0.15 },
+  { at: 0.12, strength: 0.8 },
+  { at: 0.45, strength: 0.32 },
   { at: 1, strength: 0 }
 ];
 const GLOW_FADE = [
@@ -162,37 +183,73 @@ function depthStrength(range) {
 }
 
 /**
- * Where the object was a trail-window ago, as the app has it: the reflection of
- * where it is heading. The scenes quote a heading and how much of the frame the
- * object covers, which is the same two numbers in the form a human can place.
+ * Where the object has been over the trail window, as `trailPixels` lays it
+ * out: the mark's centre, then the points behind it. The scenes quote a heading
+ * and how much of the frame the object covers in twelve seconds, which is the
+ * same two numbers in the form a human can place.
  */
-function reachFor(marker, box) {
+function trailFor(marker, x, y, box) {
   if (marker.parked || !marker.travelPct) return null;
   const radians = (marker.headingDeg ?? 90) * (Math.PI / 180);
-  const length = (marker.travelPct / 100) * box.width;
-  return { dx: Math.cos(radians) * length, dy: -Math.sin(radians) * length, length };
+  const length = (marker.travelPct / 100) * box.width * TRAIL_WINDOWS;
+  if (!(length > MINIMUM_TRAIL_PX)) return null;
+  const points = [x, y];
+  for (let index = 1; index <= TRAIL_POINTS; index += 1) {
+    const along = (length * index) / TRAIL_POINTS;
+    points.push(x - Math.cos(radians) * along, y + Math.sin(radians) * along);
+  }
+  return { points, length };
 }
 
-function tailFor(x, y, reach, width, alpha, rim) {
-  const alongX = reach.dx / reach.length;
-  const alongY = reach.dy / reach.length;
-  const acrossX = -alongY * (width / 2);
-  const acrossY = alongX * (width / 2);
+/** `tailFor`: the solid stretch from the mark, then the dashes. */
+function tailFor(path, width, alpha, rim, scale) {
+  const { points, length } = path;
+  const { solidShare, solidPx, dashPx, gapPx, dashGrowth, gapGrowth, maxDashes } = TAIL_DASH;
+  const spans = [[0, Math.min(length * solidShare, solidPx * scale)]];
+  let dash = dashPx * scale;
+  let gap = gapPx * scale;
+  let at = spans[0][1] + gap;
+  while (at < length && spans.length <= maxDashes) {
+    spans.push([at, Math.min(length, at + dash)]);
+    at += dash;
+    dash *= dashGrowth;
+    gap *= gapGrowth;
+    at += gap;
+  }
   return {
-    points: [
-      x - alongX * reach.length,
-      y - alongY * reach.length,
-      x + acrossX,
-      y + acrossY,
-      x - acrossX,
-      y - acrossY
-    ],
-    length: reach.length,
-    angle: Math.atan2(-reach.dy, -reach.dx),
+    runs: spans.map(([from, to]) => stretchOf(points, from, to)),
+    tipX: points[points.length - 2],
+    tipY: points[points.length - 1],
+    length,
     width,
     alpha,
     rim
   };
+}
+
+/** `stretchOf`: the part of a polyline between two distances along it. */
+function stretchOf(points, from, to) {
+  const run = [];
+  let walked = 0;
+  for (let index = 2; index < points.length; index += 2) {
+    const [x0, y0, x1, y1] = [points[index - 2], points[index - 1], points[index], points[index + 1]];
+    const step = Math.hypot(x1 - x0, y1 - y0);
+    const next = walked + step;
+    if (next >= from && step > 0) {
+      if (run.length === 0) {
+        const share = (from - walked) / step;
+        run.push(x0 + (x1 - x0) * share, y0 + (y1 - y0) * share);
+      }
+      if (next >= to) {
+        const share = (to - walked) / step;
+        run.push(x0 + (x1 - x0) * share, y0 + (y1 - y0) * share);
+        return run;
+      }
+      run.push(x1, y1);
+    }
+    walked = next;
+  }
+  return run;
 }
 
 /**
@@ -284,7 +341,7 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
     const size = selected ? footprint * SELECTED_GROWTH : footprint;
     const strength = selected ? 1 : depthStrength(marker.rangeKm);
     const landmark = marker.category === "LANDMARK";
-    const reach = reachFor(marker, box);
+    const path = trailFor(marker, x, y, box);
     const diameter = size * (marker.parked ? RING_DIAMETER_RATIO : CORE_DIAMETER_RATIO);
     const outline = Math.max(MIN_EDGE_PX, diameter * OUTLINE_RATIO);
     const ring = marker.parked ? Math.max(MIN_RING_PX, diameter * RING_RATIO) : null;
@@ -297,7 +354,15 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
     glyphs.push({
       x,
       y,
-      tail: reach && tailFor(x, y, reach, diameter * TRAIL_WIDTH_RATIO, TAIL_ALPHA * strength, outline),
+      tail:
+        path &&
+        tailFor(
+          path,
+          Math.max(MIN_TRAIL_WIDTH_PX * scale, diameter * TRAIL_WIDTH_RATIO),
+          TAIL_ALPHA * strength,
+          outline,
+          scale
+        ),
       rim:
         ring === null
           ? { radius: diameter / 2 + outline, width: null }
@@ -376,24 +441,18 @@ function trace(context, runs) {
   }
 }
 
-/** The comet's tail, faded to its tip: in white, or `outset` wider in the edge's ink. */
+/** The trail, faded to its tip: its runs stroked in the mark's colour, or `outset` wider in the edge's ink. */
 function drawTail(context, glyph, tail, color, alpha, outset) {
   if (!(alpha > 0)) return;
-  const alongX = Math.cos(tail.angle);
-  const alongY = Math.sin(tail.angle);
-  const length = tail.length + outset;
-  const half = tail.width / 2 + outset;
-  const tipX = glyph.x + alongX * length;
-  const tipY = glyph.y + alongY * length;
-  const fade = context.createLinearGradient(glyph.x, glyph.y, tipX, tipY);
+  const fade = context.createLinearGradient(glyph.x, glyph.y, tail.tipX, tail.tipY);
   for (const stop of TAIL_FADE) fade.addColorStop(stop.at, cssColor(color, stop.strength));
-  const acrossX = -alongY * half;
-  const acrossY = alongX * half;
-  trace(context, [[tipX, tipY, glyph.x + acrossX, glyph.y + acrossY, glyph.x - acrossX, glyph.y - acrossY]]);
-  context.closePath();
+  trace(context, tail.runs);
   context.globalAlpha = alpha;
-  context.fillStyle = fade;
-  context.fill();
+  context.strokeStyle = fade;
+  context.lineWidth = tail.width + 2 * outset;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.stroke();
 }
 
 /** The dark edge under a mark and under its tail. */

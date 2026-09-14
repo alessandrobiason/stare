@@ -11,7 +11,7 @@ import {
   skyPass,
   starAlpha
 } from "../src/components/bootSky";
-import { BLOOM_FADE, CORE_FADE, FadeStop, GLOW_FADE, TAIL_FADE } from "../src/components/markerScene";
+import { BLOOM_FADE, COMET_FADE, CORE_FADE, FadeStop, GLOW_FADE } from "../src/components/markerScene";
 import { MARK_BLOOM, MARK_COLOR } from "../src/components/palette";
 
 const PHONE = { width: 390, height: 844 };
@@ -224,7 +224,7 @@ test("the committed logo is this sky, held at its first frame", () => {
   );
 
   // And in the overlay's own fades.
-  expect(svg).toContain(stopsOf(TAIL_FADE, MARK_COLOR));
+  expect(svg).toContain(stopsOf(COMET_FADE, MARK_COLOR));
   expect(svg).toContain(stopsOf(GLOW_FADE, MARK_COLOR));
   expect(svg).toContain(stopsOf(BLOOM_FADE, MARK_BLOOM));
   expect(svg).toContain(stopsOf(CORE_FADE, MARK_COLOR));

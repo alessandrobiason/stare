@@ -32,7 +32,7 @@ import { dirname, join } from "node:path";
  * No third-party imports on purpose, in keeping with the other generators here.
  */
 
-/** Must match TAIL_FADE, GLOW_FADE, BLOOM_FADE and CORE_FADE in src/components/markerScene.ts. */
+/** Must match COMET_FADE (as `tail`), GLOW_FADE, BLOOM_FADE and CORE_FADE in src/components/markerScene.ts. */
 const FADES = {
   tail: [
     { at: 0, strength: 1 },
