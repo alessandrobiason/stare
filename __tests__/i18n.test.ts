@@ -58,16 +58,16 @@ function width(text: string, fontSize: number, letterSpacing = 0): number {
 
 describe("which language the app opens in", () => {
   test("the phone's own preference, matched on the language and not the region", () => {
-    expect(resolveLocale(["pt-BR"])).toBe("pt");
-    expect(resolveLocale(["zh-Hans-CN"])).toBe("zh");
+    expect(resolveLocale(["it-CH"])).toBe("it");
+    expect(resolveLocale(["en-GB"])).toBe("en");
     // Apple's underscore form, which is what `AppleLocale` reports.
-    expect(resolveLocale(["de_DE"])).toBe("de");
+    expect(resolveLocale(["it_IT"])).toBe("it");
   });
 
   test("the first supported entry in the list, not the first entry", () => {
-    // A phone set to Catalan with Spanish behind it should read Spanish, not
+    // A phone set to Catalan with Italian behind it should read Italian, not
     // English: walking the whole preference list is the point of having one.
-    expect(resolveLocale(["ca-ES", "es-ES", "en"])).toBe("es");
+    expect(resolveLocale(["ca-ES", "it-IT", "en"])).toBe("it");
   });
 
   test("English when the phone asks for something the app does not speak", () => {
@@ -371,8 +371,8 @@ describe("the figures follow the reader's conventions", () => {
 
   test("and the other way round where that is what a number means", () => {
     // `1.240` is one and a quarter to an English reader and twelve hundred to
-    // a German one. Getting this backwards is a factor of a thousand.
-    setLocaleForTesting("de");
+    // an Italian one. Getting this backwards is a factor of a thousand.
+    setLocaleForTesting("it");
     expect(kilometres(35786)).toBe("35.786 km");
     expect(speed(7.58)).toBe("7,6 km/s");
   });
@@ -428,10 +428,9 @@ describe("the figures follow the reader's conventions", () => {
   });
 
   test("and in the reader's own units", () => {
-    setLocaleForTesting("de");
-    expect(timeUntil(14 * 60_000)).toBe("14 Min.");
-    setLocaleForTesting("ja");
-    expect(timeUntil(14 * 60_000)).toBe("14 分");
+    setLocaleForTesting("it");
+    expect(lookDirection({ azimuthDeg: 143.2, elevationDeg: 27.4 })).toBe("SE 143° · 27° sopra");
+    expect(lookDirection({ azimuthDeg: 143.2, elevationDeg: -8.2 })).toContain("sotto");
   });
 
   test("a row about a pass says where to stand before it says anything else", () => {
@@ -440,9 +439,9 @@ describe("the figures follow the reader's conventions", () => {
     // to be outside and which way to face, and the way to face is the way the
     // object appears from. The height beside it is what the pass is worth.
     expect(passDirection({ riseAzimuthDeg: 247, peakElevationDeg: 68 })).toBe("SW · 68° up");
-    // The local compass, as everywhere else: German turns east into O.
-    setLocaleForTesting("de");
-    expect(passDirection({ riseAzimuthDeg: 90, peakElevationDeg: 12 })).toBe("O · 12° hoch");
+    // The local compass, as everywhere else: Italian turns west into O.
+    setLocaleForTesting("it");
+    expect(passDirection({ riseAzimuthDeg: 270, peakElevationDeg: 12 })).toBe("O · 12° sopra");
   });
 
   test("the row's verdict is the card's, in the space a row has", () => {
@@ -528,11 +527,11 @@ describe("the figures follow the reader's conventions", () => {
       peakAtMs: atMs
     } as const;
 
-    setLocaleForTesting("de");
-    // A 24-hour clock, a comma for the decimal, and the German short verdict.
-    expect(seeingOnPass(pass)).toContain("Beim Überflug um");
-    expect(seeingOnPass(pass)).toContain("mit bloßem Auge sichtbar");
-    expect(seeingOnPass(pass)).toContain("Magnitude -2,2");
+    setLocaleForTesting("it");
+    // A 24-hour clock, a comma for the decimal, and the Italian short verdict.
+    expect(seeingOnPass(pass)).toContain("Quando passerà");
+    expect(seeingOnPass(pass)).toContain("visibile a occhio nudo");
+    expect(seeingOnPass(pass)).toContain("magnitudine -2,2");
   });
 
   test("the panel says what the count cannot", () => {
@@ -555,28 +554,18 @@ describe("the figures follow the reader's conventions", () => {
   });
 
   test("the magnitude follows the reader's decimal convention", () => {
-    // Minus one point eight to an English reader, minus one comma eight to a
-    // German one — the same argument as the speeds and distances above.
-    setLocaleForTesting("de");
+    // Minus one point eight to an English reader, minus one comma eight to an
+    // Italian one — the same argument as the speeds and distances above.
+    setLocaleForTesting("it");
     expect(
       seeing({ nakedEye: "visible", apparentMagnitude: -1.83, magnitudeMeasured: true })
-    ).toContain("Magnitude -1,8");
+    ).toContain("magnitudine -1,8");
   });
 
   test("the compass is the one that language uses", () => {
-    setLocaleForTesting("de");
-    // German turns east into O, so N/E/S/W would be read as north/?/south/west.
-    expect(lookDirection({ azimuthDeg: 90, elevationDeg: 10 })).toContain("O 90°");
-    setLocaleForTesting("nl");
-    expect(lookDirection({ azimuthDeg: 180, elevationDeg: 10 })).toContain("Z 180°");
-  });
-
-  test("digits stay Latin, including in Arabic", () => {
-    // The marker count in the corner is a bare number and always will be; one
-    // screen counting in 12 while its card measures in ١٢٤٠ is worse than
-    // either convention held to throughout.
-    setLocaleForTesting("ar");
-    expect(kilometres(35786)).toMatch(/35.786/);
+    setLocaleForTesting("it");
+    // Italian turns west into O, so N/E/S/W would be read as north/east/south/?.
+    expect(lookDirection({ azimuthDeg: 270, elevationDeg: 10 })).toContain("O 270°");
   });
 
   test("the clock written on the sky is the one the phone keeps", () => {
@@ -587,15 +576,11 @@ describe("the figures follow the reader's conventions", () => {
     // what these assert against.
     const when = new Date(2026, 7, 29, 22, 13, 0);
 
-    setLocaleForTesting("de");
+    setLocaleForTesting("it");
     expect(clockTime(when)).toBe("22:13");
 
     setLocaleForTesting("en");
     expect(clockTime(when)).toMatch(/^\d{1,2}:13\s?(AM|PM)$/i);
-
-    // And Latin digits in Arabic, as everywhere else.
-    setLocaleForTesting("ar");
-    expect(clockTime(when)).toMatch(/[0-9]{1,2}:[0-9]{2}/);
   });
 
   test("an orbit with no period is a dash rather than a wrong figure", () => {
@@ -617,10 +602,10 @@ describe("the satellite descriptions", () => {
   );
 
   test("a description with no translation still says something", () => {
-    // The tables are partial by design: a fleet added to `briefing.ts` should
+    // The table is partial by design: a fleet added to `briefing.ts` should
     // reach every language the same day, in English, rather than leaving a
-    // blank space in eleven of them until someone gets round to it.
-    setLocaleForTesting("fr");
+    // blank space in Italian until someone gets round to it.
+    setLocaleForTesting("it");
     const briefing = briefingFor({
       name: "SOMETHING UNRECOGNISED 3",
       noradId: 99999,
@@ -644,8 +629,8 @@ test("the console is the one thing that stays in English", () => {
   // Its rows are the names of things in this codebase, read against the source
   // by whoever is diagnosing a phone that is drawing the sky in the wrong
   // place. The intro says as much on the page that keys the panels.
-  setLocaleForTesting("ja");
-  expect(strings().intro.corners.console.meaning).toMatch(/英語/);
+  setLocaleForTesting("it");
+  expect(strings().intro.corners.console.meaning).toMatch(/inglese/);
 });
 
 /**
@@ -762,27 +747,20 @@ describe("the intro's pages fit the smallest screen", () => {
 describe("the prompts the operating system shows", () => {
   const DIRECTORY = path.join(__dirname, "..", "locales");
 
-  /**
-   * Apple names bundle localizations by script, so Simplified Chinese is
-   * `zh-Hans` in a `.lproj` and `zh` everywhere else. The one place the two
-   * naming schemes have to be reconciled is here.
-   */
-  const APPLE_CODE: Partial<Record<Locale, string>> = { zh: "zh-Hans" };
-  const appleCode = (locale: Locale) => APPLE_CODE[locale] ?? locale;
-
   /** The keys iOS reads, matching the English pair in `app.json`. */
   const KEYS = ["NSCameraUsageDescription", "NSLocationWhenInUseUsageDescription"];
 
   function read(locale: Locale): Record<string, string> {
-    return JSON.parse(
-      fs.readFileSync(path.join(DIRECTORY, `${appleCode(locale)}.json`), "utf8")
-    ) as Record<string, string>;
+    return JSON.parse(fs.readFileSync(path.join(DIRECTORY, `${locale}.json`), "utf8")) as Record<
+      string,
+      string
+    >;
   }
 
   test("app.json points at one file per language the app speaks", () => {
     const declared = (appJson as { expo: { locales: Record<string, string> } }).expo.locales;
 
-    expect(Object.keys(declared).sort()).toEqual(LOCALES.map(appleCode).sort());
+    expect(Object.keys(declared).sort()).toEqual([...LOCALES].sort());
     for (const [code, file] of Object.entries(declared)) {
       expect(file).toBe(`./locales/${code}.json`);
     }

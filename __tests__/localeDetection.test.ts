@@ -50,14 +50,14 @@ describe("reading the phone's preferred languages", () => {
   });
 
   test("the old architecture spreads them onto the module, and still works", () => {
-    withNativeModule("SettingsManager", { settings: { AppleLanguages: ["de-DE"] } }, () => {
-      expect(activeLocale()).toBe("de");
+    withNativeModule("SettingsManager", { settings: { AppleLanguages: ["it-CH"] } }, () => {
+      expect(activeLocale()).toBe("it");
     });
   });
 
   test("a phone that reports only one locale rather than a list", () => {
-    withNativeModule("SettingsManager", { getConstants: () => ({ settings: { AppleLocale: "fr_FR" } }) }, () => {
-      expect(activeLocale()).toBe("fr");
+    withNativeModule("SettingsManager", { getConstants: () => ({ settings: { AppleLocale: "it_IT" } }) }, () => {
+      expect(activeLocale()).toBe("it");
     });
   });
 
@@ -92,12 +92,12 @@ describe("reading the phone's preferred languages", () => {
   test("what answered is on the console page, not left to be guessed at", () => {
     withNativeModule(
       "SettingsManager",
-      { getConstants: () => ({ settings: { AppleLanguages: ["ja-JP", "en"] } }) },
+      { getConstants: () => ({ settings: { AppleLanguages: ["it-IT", "en"] } }) },
       () => {
         expect(localeReport()).toEqual({
-          locale: "ja",
+          locale: "it",
           source: "settingsManager",
-          tags: ["ja-JP", "en"]
+          tags: ["it-IT", "en"]
         });
       }
     );
@@ -107,22 +107,22 @@ describe("reading the phone's preferred languages", () => {
     // The panels read it on every frame, and nothing but the picker moves it —
     // iOS restarts an app whose own language setting changed. See
     // `setLocale`, and `languageChoice.test.tsx` for the picker's half of it.
-    withNativeModule("SettingsManager", { getConstants: () => ({ settings: { AppleLanguages: ["ko-KR"] } }) }, () => {
-      expect(activeLocale()).toBe("ko");
+    withNativeModule("SettingsManager", { getConstants: () => ({ settings: { AppleLanguages: ["it-IT"] } }) }, () => {
+      expect(activeLocale()).toBe("it");
       const modules = NativeModules as unknown as Record<string, unknown>;
-      modules.SettingsManager = { getConstants: () => ({ settings: { AppleLanguages: ["ru-RU"] } }) };
-      expect(activeLocale()).toBe("ko");
+      modules.SettingsManager = { getConstants: () => ({ settings: { AppleLanguages: ["en-GB"] } }) };
+      expect(activeLocale()).toBe("it");
     });
   });
 });
 
 describe("matching a preference list to what the app speaks", () => {
-  test("Apple's underscore form and script subtags both reduce to a language", () => {
+  test("Apple's underscore form and region subtags both reduce to a language", () => {
     expect(resolveLocale(["en_US"])).toBe("en");
-    expect(resolveLocale(["zh-Hans-CN"])).toBe("zh");
+    expect(resolveLocale(["it-CH"])).toBe("it");
   });
 
   test("the first supported entry wins, not the first entry", () => {
-    expect(resolveLocale(["ca-ES", "es-ES", "en"])).toBe("es");
+    expect(resolveLocale(["ca-ES", "it-IT", "en"])).toBe("it");
   });
 });

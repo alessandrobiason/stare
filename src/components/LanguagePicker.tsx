@@ -67,7 +67,7 @@ export const LanguagePicker: React.FC = () => {
         {open && (
           <View style={styles.menu}>
             <Text style={styles.menuTitle}>{t.title}</Text>
-            {/* Twelve rows is taller than the top half of a small phone, and
+            {/* A scroll view rather than a fixed list even at two rows, since
                 the list hangs from a corner rather than filling the screen. */}
             <ScrollView
               accessibilityRole="radiogroup"
@@ -80,8 +80,8 @@ export const LanguagePicker: React.FC = () => {
                   <Pressable
                     key={option}
                     // What matters about one of these is which is the case,
-                    // which is a radio; twelve buttons announce twelve labels
-                    // and leave the current language unsaid.
+                    // which is a radio; two buttons announcing two labels
+                    // would leave the current language unsaid.
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
                     style={[styles.option, on && styles.optionOn]}
@@ -159,12 +159,13 @@ const styles = StyleSheet.create({
   },
   list: {
     // Four fifths of the shortest screen this ships to, less the corner it
-    // hangs from: enough for eight of the twelve, and the rest are a scroll.
+    // hangs from — more room than the two rows in it need, but a fixed cap
+    // rather than growing the menu with the list.
     maxHeight: 380,
     flexGrow: 0
   },
   option: {
-    // A thumb-sized row, which is what makes a list of twelve usable at all.
+    // A thumb-sized row.
     minHeight: 40,
     justifyContent: "center",
     paddingHorizontal: 12,

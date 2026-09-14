@@ -10,8 +10,8 @@
  * **Proper nouns only.** A fleet is listed here when it has a name someone
  * could repeat: Starlink, Iridium, the ISS. It is deliberately *not* listed
  * when the only honest description of it is a phrase — "Russian military
- * comms", "a cubesat" — because this panel is translated into twelve languages
- * and a row of untranslated English in the middle of an Italian list is worse
+ * comms", "a cubesat" — because this panel is translated into Italian too, and
+ * a row of untranslated English in the middle of an Italian list is worse
  * than no row at all. Everything unnamed falls into the residual, which the
  * panel labels in the reader's own language (`scene.breakdown.other`).
  *

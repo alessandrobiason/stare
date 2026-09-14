@@ -85,8 +85,8 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
                   <Pressable
                     key={option}
                     // What matters about one of these is which is the case,
-                    // which is a radio; twelve buttons announce twelve labels
-                    // and leave the current language unsaid.
+                    // which is a radio; two buttons announcing two labels
+                    // would leave the current language unsaid.
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
                     style={styles.language}
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // A thumb-sized row, which is what makes a list of twelve usable at all.
+    // A thumb-sized row.
     minHeight: 44,
     paddingHorizontal: 18
   },

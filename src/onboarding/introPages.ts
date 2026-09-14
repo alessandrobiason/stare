@@ -56,7 +56,7 @@ import type { MarkSample } from "./introFigures";
  *
  * The words are in `src/i18n`, per language; the structure — which pages, in
  * what order, with which pictures and badges — is here, so that it cannot
- * drift between twelve translations. The pager only has to lay it out.
+ * drift between the two translations. The pager only has to lay it out.
  */
 
 /**

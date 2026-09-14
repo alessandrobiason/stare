@@ -276,11 +276,11 @@ test("the page about what is coming draws the panel itself, shut and then open",
 });
 
 test("and in the reader's language, since it is the panel's own words", () => {
-  setLocaleForTesting("de");
+  setLocaleForTesting("it");
   const text = textOf(React.createElement(PassesPicture));
 
-  expect(text).toContain("14 Min.");
-  expect(text).toContain("ALS NÄCHSTES");
+  expect(text).toContain("14 min");
+  expect(text).toContain("IN ARRIVO");
 });
 
 test("the corners page keys the controls the pictures do not show", () => {

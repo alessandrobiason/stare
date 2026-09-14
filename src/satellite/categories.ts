@@ -75,7 +75,7 @@ export const SUBCATEGORIES_OF: Record<SatelliteCategory, readonly SatelliteSubca
 /*
  * What the legend calls each category and subcategory is user-facing text and
  * lives in `src/i18n` with the rest of it (`Strings["filter"]`), in words a
- * non-specialist can use, in twelve languages. The names in the unions above
+ * non-specialist can use, in both languages. The names in the unions above
  * are keys and are never shown.
  */
 

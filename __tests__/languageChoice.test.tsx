@@ -83,18 +83,17 @@ describe("the picker in the corner of the intro", () => {
     setLocaleForTesting("it");
     expect(textOf(<LanguagePicker />)).toContain("Italiano");
 
-    setLocaleForTesting("ja");
-    expect(textOf(<LanguagePicker />)).toContain("日本語");
+    setLocaleForTesting("en");
+    expect(textOf(<LanguagePicker />)).toContain("English");
   });
 
-  test("is a list of twelve that is only a list when it is asked for", () => {
+  test("is a list of two that is only a list when it is asked for", () => {
     // Closed, it is one pill in a corner of a screen whose whole middle is the
     // sky the app is about to draw.
     const closed = textOf(<LanguagePicker />);
 
     expect(closed).toContain("English");
-    expect(closed).not.toContain("Nederlands");
-    expect(closed).not.toContain("العربية");
+    expect(closed).not.toContain("Italiano");
   });
 
   test("is on the intro itself, which is the screen that most needs it", () => {
@@ -119,16 +118,16 @@ describe("what the choice is worth after it is made", () => {
     const store = fakeStore();
     setLocaleStoreForTesting(store);
 
-    setLocale("de");
+    setLocale("it");
 
-    expect(store.contents).toBe('{"locale":"de"}');
+    expect(store.contents).toBe('{"locale":"it"}');
   });
 
   test("and read back ahead of whatever the phone says its language is", () => {
-    setLocaleStoreForTesting(fakeStore('{"locale":"ko"}'));
+    setLocaleStoreForTesting(fakeStore('{"locale":"it"}'));
     setLocaleForTesting(undefined);
 
-    expect(localeReport()).toEqual({ locale: "ko", source: "chosen", tags: ["ko"] });
+    expect(localeReport()).toEqual({ locale: "it", source: "chosen", tags: ["it"] });
   });
 
   test("nonsense in storage is no choice at all, not a broken launch", () => {
@@ -154,15 +153,15 @@ describe("what the choice is worth after it is made", () => {
       remove: () => undefined
     });
 
-    expect(() => setLocale("es")).not.toThrow();
-    expect(activeLocale()).toBe("es");
+    expect(() => setLocale("it")).not.toThrow();
+    expect(activeLocale()).toBe("it");
   });
 
   test("forgetting it follows the phone again", () => {
-    const store = fakeStore('{"locale":"ru"}');
+    const store = fakeStore('{"locale":"it"}');
     setLocaleStoreForTesting(store);
     setLocaleForTesting(undefined);
-    expect(activeLocale()).toBe("ru");
+    expect(activeLocale()).toBe("it");
 
     clearChosenLocale();
 
@@ -178,11 +177,11 @@ describe("what the choice is worth after it is made", () => {
     const heard: string[] = [];
     const unsubscribe = subscribeLocale(() => heard.push(activeLocale()));
 
-    setLocale("nl");
-    setLocale("pt");
+    setLocale("it");
+    setLocale("en");
     unsubscribe();
-    setLocale("zh");
+    setLocale("it");
 
-    expect(heard).toEqual(["nl", "pt"]);
+    expect(heard).toEqual(["it", "en"]);
   });
 });

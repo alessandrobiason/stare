@@ -3,14 +3,14 @@ import type { SatelliteCategory, SatelliteSubcategory } from "../satellite/categ
 /**
  * Everything the app says, as data.
  *
- * One shape, twelve implementations. Pure data rather than functions —
+ * One shape, two implementations. Pure data rather than functions —
  * placeholders are written `{like_this}` and filled by `fill` — so a language
  * file is a thing to read and diff rather than a thing to run, and so the
  * suite can walk every table and check that what each one says still fits the
  * space the panel gives it.
  *
  * The type is exhaustive on purpose: a new string added here fails to compile
- * in eleven files until it has been written in all of them. That is the whole
+ * in the other file until it has been written there too. That is the whole
  * mechanism keeping the translations from drifting into a half-English screen.
  */
 export type Strings = {

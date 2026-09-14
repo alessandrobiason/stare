@@ -167,7 +167,7 @@ export const IntroScreen: React.FC<Props> = ({ onDone, mode = "intro" }) => {
                   <View key={index} style={[styles.page, { width: safeBox.width }]}>
                     {/* The card scrolls if it has to. Its height is a title, a
                         paragraph and a picture's worth of translated rows, and
-                        the longest of the twelve languages comes within a few
+                        the longer of the two languages comes within a few
                         lines of a 667pt screen — bottom-aligned, a page that
                         outgrew the screen would walk off the top of it with no
                         way to reach the rest. `flexShrink` is what caps it at

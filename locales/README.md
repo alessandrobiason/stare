@@ -21,10 +21,8 @@ line to justify.
 ## Two constraints
 
 **One file per language the app speaks**, matching `LOCALES` in
-`src/i18n/locale.ts`, with one exception: Chinese is `zh-Hans` here and `zh`
-there. Apple's bundle localizations are named by script, and a `zh.lproj` is
-not what a phone set to Simplified Chinese looks for. The suite in
-`__tests__/i18n.test.ts` checks the two lists against each other.
+`src/i18n/locale.ts`. The suite in `__tests__/i18n.test.ts` checks the two
+lists against each other.
 
 **No double quotes, backslashes or newlines in a value.** Expo writes these
 into a `.strings` file as `KEY = "value";` without escaping anything, so a

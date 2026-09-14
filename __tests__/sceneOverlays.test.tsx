@@ -238,11 +238,9 @@ describe("the compass strip", () => {
   });
 
   test("is the letters that language's compass uses", () => {
-    // German turns east into O and Dutch turns south into Z; the strip reads
-    // from the same table the card's bearings do.
+    // Italian turns west into O; the strip reads from the same table the
+    // card's bearings do.
     setLocaleForTesting("it");
-    expect(compassMarks(strings().compass, 1).map((mark) => mark.label)).toContain("O");
-    setLocaleForTesting("de");
     expect(compassMarks(strings().compass, 1).map((mark) => mark.label)).toContain("O");
   });
 

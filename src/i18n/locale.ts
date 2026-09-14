@@ -39,25 +39,12 @@ import { PersistentStore, persistentStore } from "../data/persistentStore";
 /**
  * The languages the app is written in, English first.
  *
- * One entry per *language* rather than per region: `pt-BR` and `pt-PT` both
- * read the Portuguese file, and there is no separate Traditional Chinese set,
- * so `zh-Hant` reads the Simplified one. That is a real compromise and the
- * honest place to note it, rather than pretending a region tag is handled.
+ * One entry per *language* rather than per region: `pt-BR` and `pt-PT` would
+ * both read the Portuguese file, if there were one. That is a real compromise
+ * and the honest place to note it, rather than pretending a region tag is
+ * handled.
  */
-export const LOCALES = [
-  "en",
-  "it",
-  "es",
-  "fr",
-  "de",
-  "pt",
-  "nl",
-  "ru",
-  "zh",
-  "ja",
-  "ko",
-  "ar"
-] as const;
+export const LOCALES = ["en", "it"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -67,31 +54,12 @@ export const FALLBACK_LOCALE: Locale = "en";
  * Each language in its own words, for the picker.
  *
  * Endonyms, and untranslated: someone looking for their language in a list is
- * looking for the word they would write it with, and "Japanese" is no use to
- * anyone who cannot already read the language the list is currently in. This
- * is the one list in the app that reads the same in all twelve.
+ * looking for the word they would write it with.
  */
 export const LANGUAGE_NAMES: Record<Locale, string> = {
   en: "English",
-  it: "Italiano",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-  pt: "Português",
-  nl: "Nederlands",
-  ru: "Русский",
-  zh: "中文",
-  ja: "日本語",
-  ko: "한국어",
-  ar: "العربية"
+  it: "Italiano"
 };
-
-/** Locales written right to left, which is the one layout question a language asks. */
-const RIGHT_TO_LEFT = new Set<Locale>(["ar"]);
-
-export function isRightToLeft(locale: Locale): boolean {
-  return RIGHT_TO_LEFT.has(locale);
-}
 
 /**
  * The best supported match for an ordered list of BCP-47 tags.
