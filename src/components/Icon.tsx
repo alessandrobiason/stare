@@ -155,10 +155,10 @@ export const Icon: React.FC<Props> = ({
                 style={{
                   position: "absolute",
                   left: `${knob * 100}%`,
-                  marginLeft: -size * 0.14,
-                  width: size * 0.28,
-                  height: size * 0.28,
-                  borderRadius: size * 0.14,
+                  marginLeft: -size * 0.13,
+                  width: size * 0.26,
+                  height: size * 0.26,
+                  borderRadius: size * 0.13,
                   backgroundColor: color
                 }}
               />
@@ -306,11 +306,16 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   sliders: {
-    justifyContent: "space-around",
+    // `space-between` rather than `space-around`: with two items, `around`
+    // spends most of its free space as the two outer half-gaps and leaves
+    // almost none between the sliders themselves — which is the one gap that
+    // reads as "two of them" rather than one smudge. `between` puts all of it
+    // there.
+    justifyContent: "space-between",
     paddingVertical: "10%"
   },
   slider: {
-    height: "30%",
+    height: "26%",
     justifyContent: "center"
   },
   button: {
