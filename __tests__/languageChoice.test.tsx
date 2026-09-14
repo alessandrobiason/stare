@@ -1,8 +1,3 @@
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { IntroScreen } from "../src/components/IntroScreen";
-import { LanguagePicker } from "../src/components/LanguagePicker";
 import { PersistentStore } from "../src/data/persistentStore";
 import {
   activeLocale,
@@ -15,45 +10,14 @@ import {
 } from "../src/i18n/locale";
 
 /**
- * A whole screen, mounted the way the app mounts one.
- *
- * Anything that lays its panels out in the safe area needs the provider that
- * knows where the notch is (`SafeAreaLayer`), and it needs to be told the
- * insets rather than left to measure them: a static render runs no effects, so
- * a provider that has not been handed any would render nothing at all. Zero on
- * every edge, which is what a browser reports and what the harness runs
- * against.
- */
-function onAScreen(screen: React.ReactElement): React.ReactElement {
-  return (
-    <SafeAreaProvider
-      initialMetrics={{
-        insets: { top: 0, left: 0, right: 0, bottom: 0 },
-        frame: { x: 0, y: 0, width: 390, height: 844 }
-      }}
-    >
-      {screen}
-    </SafeAreaProvider>
-  );
-}
-
-/**
  * Changing the language from inside the app.
  *
  * The phone decides it, and is right nearly always — but the launch where it
  * is wrong is the launch where every word on screen is in a language the
  * reader may not have, including the words that would explain how to fix it.
- * The way out is the intro's corner (`LanguagePicker`), and a choice that
- * outlives the launch it was made in.
+ * The way out is the language row in settings, and a choice that outlives the
+ * launch it was made in.
  */
-
-/** The rendered element as plain text, the way someone reads it. */
-function textOf(element: React.ReactElement): string {
-  return renderToStaticMarkup(element)
-    .replace(/<[^>]+>/g, " ")
-    .replace(/ +/g, " ")
-    .trim();
-}
 
 /** A device's storage, in memory: what was written to it, and nothing else. */
 function fakeStore(initial: string | null = null): PersistentStore & { contents: string | null } {
@@ -73,44 +37,6 @@ function fakeStore(initial: string | null = null): PersistentStore & { contents:
 afterEach(() => {
   setLocaleStoreForTesting(undefined);
   setLocaleForTesting(undefined);
-});
-
-describe("the picker in the corner of the intro", () => {
-  test("says the language it is currently in, in that language", () => {
-    // Not the word "Language" translated: someone looking for their own
-    // language is looking for the word they write it with, and the label of a
-    // control they cannot read is no help at all.
-    setLocaleForTesting("it");
-    expect(textOf(<LanguagePicker />)).toContain("Italiano");
-
-    setLocaleForTesting("en");
-    expect(textOf(<LanguagePicker />)).toContain("English");
-  });
-
-  test("is a list of two that is only a list when it is asked for", () => {
-    // Closed, it is one pill in a corner of a screen whose whole middle is the
-    // sky the app is about to draw.
-    const closed = textOf(<LanguagePicker />);
-
-    expect(closed).toContain("English");
-    expect(closed).not.toContain("Italiano");
-  });
-
-  test("is on the intro itself, which is the screen that most needs it", () => {
-    // Six pages to be read, and no way past them but reading one: a wrongly
-    // detected language costs the whole of onboarding at once.
-    setLocaleForTesting("it");
-    const markup = renderToStaticMarkup(onAScreen(<IntroScreen onDone={() => undefined} />));
-
-    expect(markup).toContain('aria-label="Lingua: Italiano"');
-  });
-
-  test("names itself in the reader's own language for anyone not seeing it", () => {
-    setLocaleForTesting("it");
-    const markup = renderToStaticMarkup(<LanguagePicker />);
-
-    expect(markup).toContain('aria-label="Lingua: Italiano"');
-  });
 });
 
 describe("what the choice is worth after it is made", () => {

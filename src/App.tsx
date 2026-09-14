@@ -8,19 +8,16 @@ import { BootScreen } from "./components/BootScreen";
 import { CameraLab } from "./debug/CameraLab";
 import { DeviceScene } from "./components/DeviceScene";
 import { FatalErrorBoundary } from "./components/FatalErrorBoundary";
-import { IntroScreen } from "./components/IntroScreen";
 import { useAppBoot } from "./hooks/useAppBoot";
-import { useIntro } from "./hooks/useIntro";
 
 /**
  * Stare: draws the live satellite catalog over the iPhone's rear camera,
  * placed by GPS and aimed by the phone's own motion sensors.
  *
- * The first launch on a device opens on the intro (`IntroScreen`): what the app
- * does, how to hold it, and the two things the phone is about to ask
- * permission for. Every launch after it opens straight on the boot screen and
- * stays there until everything the view needs is in hand, so nothing below has
- * a loading state of its own. Anything fatal — during start-up or after it —
+ * Every launch opens on the boot screen and stays there until everything the
+ * view needs is in hand, so nothing below has a loading state of its own. The
+ * first launch on a device then runs a short tour over the view itself
+ * (`GuideTour`) rather than explaining a screen nobody has seen yet. Anything fatal — during start-up or after it —
  * comes back to that same screen with the reason and a way to try again.
  *
  * This is the whole of the product. `testing/replay/App.tsx` is the same view
@@ -40,8 +37,7 @@ const CAMERA_LAB = false;
  * The whole of the screen, and the clock and battery over the top of it.
  *
  * There is no chrome around this app any more: the camera is the background,
- * edge to edge, and every screen before it — the intro, the boot sky — fills
- * the same space. What used to inset all of them was a `SafeAreaView` at this
+ * edge to edge, and the boot sky before it fills the same space. What used to inset all of them was a `SafeAreaView` at this
  * root, which is the wrong place for one: it insets the picture along with the
  * panels, and a camera with the notch's height of black above it is a smaller
  * camera rather than a safer one. The insets moved to where the writing is
@@ -49,7 +45,7 @@ const CAMERA_LAB = false;
  *
  * The status bar is over the picture now rather than over a background of the
  * app's own, hence the style. Every screen here is dark — the boot sky, the
- * intro's card, the panels over the camera — and the default is black text,
+ * panels over the camera — and the default is black text,
  * which was already the wrong half of a choice that has no answer good for
  * both a bright sky and a dark one. Set from JavaScript rather than in
  * `app.json`, which the plist Expo generates allows
@@ -60,8 +56,8 @@ const Screen: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   /*
    * The provider is what knows where the notch and the home indicator are, and
    * it is mounted here rather than around one screen because every screen the
-   * app has now reaches the edges: the intro, the boot sky and the camera all
-   * pass through this.
+   * app has now reaches the edges: the boot sky and the camera both pass
+   * through this.
    *
    * `initialMetrics` is the insets the platform already knew at launch, handed
    * over synchronously. Without it the provider renders nothing at all until
@@ -85,16 +81,13 @@ export default function App() {
    * is drawn on it — minutes at a time without a touch — which is exactly what
    * the idle timer reads as an idle phone. Left alone it dims and then locks
    * mid-pass, and coming back costs the sensor fusion its settled attitude and
-   * the segmentation its current mask. The intro is inside it too: that screen
-   * is there to be read before anything is granted.
+   * the segmentation its current mask.
    *
    * This is only the *idle* timer, and only while the app is the thing on
    * screen: the lock button still locks, and a backgrounded phone sleeps on its
    * own schedule as it always did.
    */
   useKeepAwake();
-
-  const intro = useIntro();
 
   if (CAMERA_LAB) {
     return (
@@ -104,27 +97,11 @@ export default function App() {
     );
   }
 
-  if (intro.pending) {
-    return (
-      <Screen>
-        <IntroScreen onDone={intro.complete} />
-      </Screen>
-    );
-  }
-
-  return <BootedApp wordmark={!intro.firstRun} />;
+  return <BootedApp />;
 }
 
-/**
- * The app proper, from boot onwards.
- *
- * Split from the root above so that boot *starts* here rather than at launch:
- * its first two steps ask for the camera and a fix (`bootTasks`), and mounted
- * alongside the intro they would put the system's prompts over the screen that
- * explains them. Mounting this only once the intro is done is what orders the
- * two.
- */
-const BootedApp: React.FC<{ wordmark: boolean }> = ({ wordmark }) => {
+/** The app proper, from boot onwards. */
+const BootedApp: React.FC = () => {
   const boot = useAppBoot((onProgress, { force }) =>
     runBootSequence(bootTasks({ force }), onProgress)
   );
@@ -143,7 +120,6 @@ const BootedApp: React.FC<{ wordmark: boolean }> = ({ wordmark }) => {
           error={boot.error}
           retryable={boot.retryable}
           onRetry={boot.retry}
-          wordmark={wordmark}
         />
       )}
     </Screen>

@@ -3,15 +3,14 @@
  * it on either platform.
  *
  * Two things are stored: the downloaded TLE catalog with the timestamp that
- * makes its refresh interval real (`tleStore.ts`), and whether the intro has
- * been shown (`src/onboarding/introStore.ts`). They are unrelated, but the
+ * makes its refresh interval real (`tleStore.ts`), and whether the tour has
+ * been shown (`src/onboarding/tourStore.ts`). They are unrelated, but the
  * question "where does a phone put a few bytes, and where does a browser" has
  * one answer, so it is answered once here.
  *
- * Everything is synchronous. Both readers run before the first frame — the
- * catalog to decide whether to download, the intro flag to decide which screen
- * the app opens on — and an asynchronous read means opening on a screen that is
- * replaced a moment later.
+ * Everything is synchronous. Both readers run as their screen mounts — the
+ * catalog to decide whether to download, the tour flag to decide whether the
+ * tour starts — and an asynchronous read means a decision that lands late.
  */
 
 /** The handful of operations a cache needs from whatever storage exists. */
@@ -51,7 +50,7 @@ function browserStore(key: string): PersistentStore | null {
  *
  * The document directory rather than the cache directory: iOS evicts the latter
  * whenever it is short of space, which would silently reset the catalog's
- * refresh interval and show a returning user the intro again. And a file rather
+ * refresh interval and show a returning user the tour again. And a file rather
  * than a key-value store, because the active catalog runs to a couple of
  * megabytes.
  */

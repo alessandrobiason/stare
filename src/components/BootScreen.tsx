@@ -16,13 +16,6 @@ type Props = {
   /** Whether trying again could help; a missing sensor is not going to appear. */
   retryable?: boolean;
   onRetry: () => void;
-  /**
-   * Whether to name the app in the middle of the sky while it loads.
-   *
-   * Off for the launch that has just come out of the intro, which said the name
-   * on its own first page a moment ago (`src/App.tsx`, `useIntro`).
-   */
-  wordmark?: boolean;
 };
 
 /**
@@ -45,11 +38,10 @@ export const BootScreen: React.FC<Props> = ({
   failed,
   error,
   retryable = true,
-  onRetry,
-  wordmark = true
+  onRetry
 }) => {
-  // Subscribed to, because this screen outlives a language change: the intro's
-  // picker is one screen away, and boot is what comes after it. See `useLocale`.
+  // Subscribed to, so a failure is written in the language the app is in. See
+  // `useLocale`.
   useLocale();
   const t = strings().boot;
   const [frame, setFrame] = useState<FrameSize | null>(null);
@@ -69,7 +61,7 @@ export const BootScreen: React.FC<Props> = ({
     <View style={styles.root} onLayout={measure}>
       <BootSky frame={frame} turning={!failed} />
 
-      {!failed && wordmark && (
+      {!failed && (
         <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>
       )}
 
@@ -137,9 +129,6 @@ const styles = StyleSheet.create({
    * the box is a space wider than the word in it and the letters sit half a
    * space left of the middle. A margin shifts a centred box by half of itself,
    * which is why the correction is the whole space rather than half of it.
-   *
-   * `IntroScreen` sets the same word in the same place on its first page, and
-   * its style is this one: change both.
    */
   wordmark: {
     color: theme.color.textBright,

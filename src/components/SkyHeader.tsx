@@ -6,6 +6,7 @@ import { fill, strings } from "../i18n";
 import { sunlightSummary } from "../i18n/format";
 import { Icon, IconButton } from "./Icon";
 import { glass, lift, theme } from "./theme";
+import { useTourTarget } from "./tourTargets";
 import { APP_NAME } from "./wordmark";
 
 type Props = {
@@ -37,8 +38,8 @@ type Props = {
  *
  * **The button is the filter**, and it is a button rather than a labelled pill
  * because the word FILTER over a photograph is a word over a photograph. What
- * it opens says what it is (`CategoryLegend`), and the intro's page about the
- * screen says it once beside a copy of the icon.
+ * it opens says what it is (`CategoryLegend`), and the tour points at it once
+ * (`GuideTour`).
  *
  * A degraded boot is not reported here: it tints the settings tab, which is
  * where the console that explains it now lives. This line is about the sky,
@@ -53,6 +54,8 @@ export const SkyHeader: React.FC<Props> = React.memo(({ sky, filterOpen, onToggl
   useLocale();
   const t = strings().scene;
   const [expanded, setExpanded] = useState(false);
+  const countRef = useTourTarget("count");
+  const filterRef = useTourTarget("filter");
   const { count, fleets } = sky;
   const empty = fleets.rows.length === 0 && fleets.other === 0;
   const counted = fill(t.visibleSatellites, { count });
@@ -64,6 +67,7 @@ export const SkyHeader: React.FC<Props> = React.memo(({ sky, filterOpen, onToggl
           <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>
 
           <Pressable
+            ref={countRef}
             accessibilityRole="button"
             // Still what it always said, because it is still the same thing:
             // the number, spelled out for anyone not reading the screen. The
@@ -87,12 +91,15 @@ export const SkyHeader: React.FC<Props> = React.memo(({ sky, filterOpen, onToggl
           </Pressable>
         </View>
 
-        <IconButton
-          icon="layers"
-          label={strings().filter.open}
-          on={filterOpen}
-          onPress={onToggleFilter}
-        />
+        {/* Wrapped so the tour can find it: the button itself takes no ref. */}
+        <View ref={filterRef} collapsable={false}>
+          <IconButton
+            icon="layers"
+            label={strings().filter.open}
+            on={filterOpen}
+            onPress={onToggleFilter}
+          />
+        </View>
       </View>
 
       {expanded && (

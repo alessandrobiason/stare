@@ -16,7 +16,7 @@ const GITHUB_URL = "https://github.com/alessandrobiason/stare";
 const AUTHOR_NAME = "Alessandro Biason";
 
 type Props = {
-  /** Opens the guide over the sky: the intro's pages about the screen. */
+  /** Starts the tour over the sky. */
   onOpenGuide: () => void;
   /** Opens the console over the sky, which is a tab away from here. */
   onOpenConsole: () => void;
@@ -27,8 +27,8 @@ type Props = {
 /**
  * Everything about the app rather than about the sky.
  *
- * Four rows: the `?` that brings back the pages about the screen, the
- * language, the console, and the link to where this is built. None of them is
+ * Four rows: Help, which runs the tour of the sky view again, the language,
+ * the console, and the link to where this is built. None of them is
  * about what is overhead, none is touched more than once in a session, and the
  * first three used to spend a corner of a photograph saying so. A tab is where
  * they belong.
@@ -39,9 +39,8 @@ type Props = {
  * lands on a view that never stopped.
  *
  * **The language is a list rather than a link.** It is the one setting here
- * that somebody may need without being able to read the row above it, which is
- * why the intro carries the same choice in its corner (`LanguagePicker`); a
- * list of endonyms is legible whichever language the app is currently in.
+ * that somebody may need without being able to read the row above it; a list
+ * of endonyms is legible whichever language the app is currently in.
  *
  * **The console keeps its English name** — see `CONSOLE_LABEL` — and its row
  * carries the warning dot when boot reported something degraded, because the
@@ -66,8 +65,8 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
 
         <View style={styles.group}>
           <Row
-            label={t.guide.open}
-            detail={t.intro.corners.guide.meaning}
+            label={t.tour.open}
+            detail={t.tour.about}
             onPress={onOpenGuide}
           />
 
@@ -104,7 +103,7 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
 
           <Row
             label={CONSOLE_LABEL}
-            detail={t.intro.corners.console.meaning}
+            detail={t.console.detail}
             warned={warned}
             onPress={onOpenConsole}
           />

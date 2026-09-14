@@ -160,11 +160,11 @@ describe("what the phone is asked for, and when", () => {
     };
   }
 
-  test("one prompt at a time, in the order the intro names them", async () => {
+  test("one prompt at a time: the camera, then the location", async () => {
     // Two system alerts raised together are two alerts the operating system
     // orders as it likes, and one raised while another is up may never be
     // presented — which is a boot waiting forever on an answer to a question
-    // nobody was asked. The intro says camera, then location; so does this.
+    // nobody was asked.
     const log: string[] = [];
     await runBootSequence(
       asking(log, {

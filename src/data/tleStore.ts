@@ -10,7 +10,7 @@ import { PersistentStore, persistentStore } from "./persistentStore";
  * a client blocked.
  *
  * Where a phone and a browser each put it is `persistentStore.ts`, which is
- * shared with the intro flag; what is written and how a bad entry is handled is
+ * shared with the tour flag; what is written and how a bad entry is handled is
  * here.
  */
 

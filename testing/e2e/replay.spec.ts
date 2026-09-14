@@ -20,7 +20,6 @@ const PASSES = '[aria-label="Upcoming passes"]';
 const CARD = '[aria-label="Satellite details"]';
 const FILTER = '[aria-label="Category filter"]';
 const GUIDE_ROW = '[aria-label="Help"]';
-const GUIDE_CLOSE = '[aria-label="Close help"]';
 const COMPASS = '[aria-label^="Facing"]';
 
 /**
@@ -260,32 +259,32 @@ test.describe("what is coming", () => {
   });
 });
 
-test.describe("the guide", () => {
+test.describe("the tour", () => {
   /**
-   * The wiring no unit test can reach. A static render cannot press the `?`,
-   * and what matters about the guide is what pressing it does to the view
-   * underneath — which is nothing: it opens over a scene that keeps running,
-   * and closes back onto that same scene rather than onto a fresh boot.
+   * The wiring no unit test can reach: that the Help row brings the sky back,
+   * that each step finds its control on the running view, and that closing the
+   * tour leaves that same view rather than a fresh boot.
    */
-  test("opens the pages about the screen over the view, and closes back onto it", async ({
-    page
-  }) => {
+  test("runs over the sky from the Help row, and closes back onto it", async ({ page }) => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
 
     await page.locator(SETTINGS_TAB).click();
     await page.locator(GUIDE_ROW).click();
-    // The first of the pages about the screen, and nothing about starting the
-    // app: no button asking for access that was granted long ago.
-    await expect(page.getByText("What you'll see").first()).toBeVisible();
-    await expect(page.getByText("ALLOW ACCESS")).toHaveCount(0);
 
-    await page.locator(GUIDE_CLOSE).click();
-    await expect(page.getByText("What you'll see")).toHaveCount(0);
-    // Back on the settings tab it was opened from, with the scene still up
-    // behind it.
-    await expect(page.locator(GUIDE_ROW)).toBeVisible();
-    await page.locator(SKY_TAB).click();
+    // The first step is the key to the marks, over the sky rather than settings.
+    await expect(page.getByText("On the sky")).toBeVisible();
+    await expect(page.getByText("1 of ", { exact: false })).toBeVisible();
+
+    // Then the controls, one at a time.
+    await page.getByRole("button", { name: "Next" }).last().click();
+    await expect(page.getByText("In view")).toBeVisible();
+    await page.getByRole("button", { name: "Next" }).last().click();
+    await expect(page.getByText("Choose which kinds of satellite to show.")).toBeVisible();
+
+    await page.getByText("Skip").click();
+    await expect(page.getByText("Choose which kinds of satellite to show.")).toHaveCount(0);
     await expect(page.locator(BOOTED).first()).toBeVisible();
+    await expect(page.locator(SKY_TAB)).toHaveAttribute("aria-selected", "true");
   });
 });

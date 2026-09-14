@@ -370,9 +370,9 @@ export type LabelPlacement = {
  * the frame actually being drawn into, so the overlay is the same picture on a
  * phone and in the replay harness's window.
  *
- * `scale` is for a box that is not a camera frame: the intro's pictures of a
+ * `scale` is for a box that is not a camera frame: the tour's pictures of a
  * mark are a few dozen points across, and scaled to their own width the marks
- * in them would be a pixel or two. See `introFigures.ts`.
+ * in them would be a pixel or two. See `markSamples.ts`.
  */
 export function buildMarkerScene(
   frame: MarkerFrame,

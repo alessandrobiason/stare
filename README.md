@@ -11,7 +11,7 @@ The view opens in **normal** mode: the camera picture, the markers, the app's
 name over a count of what is above you, one button for the category filter, a
 strip of cardinal points along the bottom of the frame, a card carrying the next
 landmark due over you, and a bar of three tabs — the sky, a catalog that is not
-built yet, and the settings the guide and the console now live in.
+built yet, and the settings that hold Help (the tour) and the console.
 **A marker is a point of light**: a pastel point a few pixels across
 in a soft glow and a bloom of its own colour, trailing a fine line along the
 path it has really flown — solid where it leaves the point, then broken into
@@ -167,42 +167,25 @@ into `assets/logo-extended.svg`). Its crossing is the only progress report,
 because the steps behind it are not ones anyone can act on; a failure stops the
 light where it is, takes the name off the sky and says what went wrong.
 
-**The first launch is not that** (`src/onboarding/`, `src/components/IntroScreen.tsx`).
-Boot asks for the camera and then for a GPS fix within a second of the app
-opening — two system prompts, back to back, over a screen that has explained
-nothing, each of them fatal to the view if refused. So a device that has not seen
-the app before opens on six pages instead: what it does; what a mark means, each
-kind beside a drawing of it; the line a landmark carries across the sky; what is
-coming over; the controls around the sky, each named beside a copy of the badge
-or the glyph it wears, since a bare `12` under the app's name says nothing about
-what it counts and a button drawn as three stacked planes says nothing about
-what it filters; and what it is about to ask for and why. The pictures are drawn by the
-app rather than of it — the sky's own renderer over a made-up frame, and the
-passes card's own code over a made-up plan (`src/onboarding/introFigures.ts`) —
-so the key cannot drift from what it keys, and the suite measures every page
-against a 4.7-inch screen in all twelve languages. Two prompts, not three: the
-motion sensors the view is aimed by are read without one — iOS gates the
-pedometer behind "Motion & Fitness", not `CMMotionManager` — and asking anyway
-meant a phone with that setting off refused to aim at all
-(`src/device/deviceOrientation.ts`).
-Nothing boots until the last page is accepted, which is why `src/App.tsx` mounts
-the app proper only then. A flag in the document directory keeps it to
-that one launch, alongside the catalog cache and through the same storage
-(`src/data/persistentStore.ts`); the launch after it opens straight on the name.
+**The first launch adds a tour, over the view itself** (`src/components/GuideTour.tsx`,
+`src/onboarding/`). There are no pages before boot any more: the app opens on the
+boot sky like every other launch, the operating system's camera and location
+prompts carry their own reasons (`locales/`), and a moment after the sky view
+appears a short tour runs over it. Each step dims the view, lights up one real
+control — the count, the filter, the passes card, the settings tab — with an
+arrow to it, and says the one thing about it that is not obvious from looking.
+The first step has nothing to point at, since the marks are wherever the sky
+puts them, so it is a key instead: each kind of mark drawn by the sky's own
+renderer beside a line about it (`src/onboarding/markSamples.ts`). Steps whose
+control is not on screen (no passes coming) are skipped. The controls hand the
+tour their views (`useTourTarget`) and it measures them as it goes, so it follows
+the layout when the layout moves. Finishing or skipping it is remembered on the
+device (`src/onboarding/tourStore.ts`, through `src/data/persistentStore.ts`).
 
-**Four of those pages are read again** (`src/components/SettingsScreen.tsx`). What
-a mark means, what a line means, what the card along the bottom says and what the
-controls around the sky do are as true on the hundredth launch as on the first,
-and more likely to be wanted on the hundredth — the evening somebody has
-forgotten what a ring is. So a **Help** row in the settings tab opens those four
-over the running view, dimmed rather than replaced. The view's own controls are
-put away while it is up, so the only ones on screen are the guide's; the camera,
-the fusion and the mask carry on underneath, and closing it lands on a sky that
-is still aimed. Nothing of the first launch comes with them — no welcome, no
-permissions page, and the last button says BACK TO THE SKY where the intro's says
-ALLOW ACCESS. It is the intro screen in a second mode rather than a second
-screen, so the guide cannot drift from the pages it repeats, and which pages
-those are is marked on each of them (`src/onboarding/introPages.ts`).
+**Help, in the settings tab, runs the same tour again** (`src/components/SettingsScreen.tsx`).
+It brings the sky back first — the tour points at the sky's controls — and the
+camera, the fusion and the mask carry on underneath it, so closing it lands on a
+sky that is still aimed.
 
 It is a row in a tab rather than a `?` on the picture, and so is the console
 beside it. Both are controls about the app rather than about the sky, neither is

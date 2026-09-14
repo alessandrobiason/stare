@@ -7,8 +7,7 @@
  * phone that is not the reader's: a shared one, a work one set to the language
  * of the company that issued it, or one whose owner reads a language the app
  * does not ship and would rather have their second than English. So there is a
- * picker, in the two places it can be found without hunting — the top right
- * corner of the intro, and the console's STATUS page — and what it chooses is
+ * picker, in the settings tab — and what it chooses is
  * remembered on the device (`chosenLocale`) and beats every source below.
  *
  * **Resolved once and then held, and changed only by that picker.** Nothing
@@ -283,7 +282,7 @@ export function setLocaleForTesting(locale: Locale | undefined): void {
  * platform, so a language chosen once stays chosen: an app that reverted to
  * the phone's setting on the next launch would be a picker that does not work.
  *
- * A file of two dozen bytes beside the intro flag and the catalogue — see
+ * A file of two dozen bytes beside the tour flag and the catalogue — see
  * `persistentStore` for where that lands on each platform. Anything unreadable,
  * unparseable, or naming a language this build does not ship reads as no
  * choice at all, and the phone is asked as it always was.
@@ -316,8 +315,8 @@ function chosenLocale(): Locale | null {
  * Whoever is holding the phone says what language it should be in.
  *
  * Takes effect on the frame after this returns rather than at the next launch:
- * the components that render words subscribe below, and the intro's pages are
- * rebuilt from the new table. Storage is best effort — a device that cannot be
+ * the components that render words subscribe below, and rebuild from the new
+ * table. Storage is best effort — a device that cannot be
  * written to still changes language for this session, and asks the phone again
  * next launch, which is a better failure than a picker that appears to do
  * nothing.

@@ -14,29 +14,16 @@ import type { SatelliteCategory, SatelliteSubcategory } from "../satellite/categ
  * mechanism keeping the translations from drifting into a half-English screen.
  */
 export type Strings = {
-  intro: IntroStrings;
   /**
-   * The intro's pages about the screen, read again from the Help row in the
-   * settings tab (`SettingsScreen`).
+   * The tour of the sky view: a few steps over the live screen, each pointing at
+   * the control it is about (`GuideTour`). Shown on the first launch, and again
+   * from the Help row in the settings tab.
    *
-   * The pages say what they said the first time, in `intro`'s own words: the
-   * guide is those pages, not a second telling of them that could come to
-   * disagree. These are only the three things it has that the intro does not —
-   * the button that opens it, a way out from any page, and a last button that
-   * closes it rather than asking for anything.
+   * Short on purpose. Every step is read with the thing it describes lit up
+   * beside it, so a step says what is not obvious from looking — never what the
+   * control is called or where it is.
    */
-  guide: {
-    /** What the settings row that opens these pages is called. */
-    open: string;
-    /** The corner control that closes the guide from whichever page it is on. */
-    close: string;
-    /**
-     * The last page's button, in place of `intro.allowAccess`. Closes the
-     * guide back to settings — where it was opened from, not the sky — so it
-     * says "Close" rather than the intro's "back to the sky".
-     */
-    done: string;
-  };
+  tour: TourStrings;
   /**
    * The three tabs along the bottom: the sky, the catalog, and everything
    * about the app rather than about the sky.
@@ -322,18 +309,19 @@ export type Strings = {
     soon: string;
   };
   /**
-   * The language picker: the intro's top right corner, and the console.
+   * The language row in the settings tab.
    *
-   * Two words, because the languages themselves are not translated — a list of
+   * One word, because the languages themselves are not translated — a list of
    * endonyms is the one list that reads the same whichever language it is
-   * currently in (`LANGUAGE_NAMES`). These are what say what the list is *for*,
-   * and they are mostly read by a screen reader rather than seen.
+   * currently in (`LANGUAGE_NAMES`). This is what says what the list is *for*.
    */
   language: {
-    /** Names the control, and heads the list it opens. */
+    /** Names the settings row, and heads the list it opens. */
     title: string;
-    /** Dismissing that list without choosing. */
-    close: string;
+  };
+  /** The line under the console's row in settings. The console itself is English only. */
+  console: {
+    detail: string;
   };
 };
 
@@ -350,111 +338,53 @@ type Notice = { title: string; detail: string };
  */
 type PassSeeing = "visible" | "binoculars" | "tooFaint" | "eclipsed" | "daylight" | "unknown";
 
-export type IntroStrings = {
-  /** The first page: the app's name is in the sky above it, so there is no title. */
-  what: { body: string };
+export type TourStrings = {
+  /** The settings row that opens the tour again, and the line under it. */
+  open: string;
+  about: string;
+  /** Which step this is. `{step}`, `{count}`. */
+  step: string;
+  next: string;
+  skip: string;
+  /** The last step's button. */
+  done: string;
   /**
-   * The second: what a mark on the sky says, beside a drawing of each kind.
-   *
-   * This used to be a paragraph — size for distance, a tail, a ring, a
-   * fainter mark — and that many channels in one paragraph is not something
-   * anyone carries to the sky. So each is a row with the mark itself beside it,
-   * drawn by the overlay's own code (`introFigures.ts`), and `name` is the word
-   * for the row rather than a place on the screen.
+   * The one step with nothing to point at: the marks are wherever the sky puts
+   * them. So it is a key instead, each kind of mark drawn by the sky's own
+   * renderer beside what it means (`MarkTile`).
    */
   marks: {
     title: string;
     body: string;
-    /** A body and its tail, near and far: which way it goes, and how far off. */
-    moving: IntroKeyStrings;
+    /** A body and its tail, near and far. */
+    moving: TourKeyStrings;
     /** The geostationary belt: rings that never move. */
-    parked: IntroKeyStrings;
+    parked: TourKeyStrings;
     /** The same mark in sunlight and in the Earth's shadow. */
-    shadow: IntroKeyStrings;
-    /** A landmark: the halo, and the name under it. */
-    landmark: IntroKeyStrings;
+    shadow: TourKeyStrings;
+    /** A landmark: the halo, the name, and the dashed line of its pass. */
+    landmark: TourKeyStrings;
   };
-  /**
-   * The third: a landmark's line across the sky, drawn as the overlay draws it.
-   *
-   * The callouts are numbered on the picture in this order: the arrowheads, the
-   * name and time written on the line, and the line coming up from behind the
-   * roofs before its object does.
-   */
-  paths: {
-    title: string;
-    body: string;
-    minutes: string;
-    time: string;
-    follow: string;
-    /** Under the callouts: the name on the line is a target. */
-    footnote: string;
-  };
-  /**
-   * The fourth: what is coming, as the bottom-left panel says it.
-   *
-   * The panel is drawn twice over a made-up plan, shut and then open, numbered
-   * like the line on the page before. `footnote` is the panel's one surprise:
-   * with nothing due it is not on the screen at all. See `UpcomingPasses`.
-   */
-  passes: {
-    title: string;
-    body: string;
-    shut: string;
-    open: string;
-    footnote: string;
-  };
-  /**
-   * The fifth: the controls around the sky, each beside a copy of the badge or
-   * the glyph it wears — a bare number under the app's name says nothing about
-   * what it counts, and a button drawn as three stacked planes says nothing
-   * about what it filters — with `where` naming the place, since that is how
-   * someone finds it again afterwards.
-   */
-  corners: {
-    title: string;
-    body: string;
-    count: IntroElementStrings;
-    filter: IntroElementStrings;
-    /**
-     * The `?` above the console, which brings these pages back. Its `where` is
-     * the console's, since that is the corner the two share.
-     */
-    guide: IntroElementStrings;
-    console: IntroElementStrings;
-  };
-  /** The last: what the phone is about to ask the operating system for. */
-  access: {
-    title: string;
-    body: string;
-    camera: IntroAccessStrings;
-    location: IntroAccessStrings;
-    footnote: string;
-  };
-  next: string;
-  /** The last page's button, which is the one that lets the system prompts begin. */
-  allowAccess: string;
+  /** The count under the app's name, which opens into what those marks are. */
+  count: TourStepStrings;
+  /** The layers button in the header. */
+  filter: TourStepStrings;
+  /** The passes card over the tab bar. Skipped when there is none on screen. */
+  passes: TourStepStrings;
+  /** The settings tab. */
+  settings: TourStepStrings;
 };
 
-export type IntroElementStrings = {
-  /**
-   * Where to look for it: "top left" for the two controls that are on the sky
-   * itself, and the settings tab's own name for the two that live behind it.
-   */
-  where: string;
-  /** What it is and what it is worth. */
-  meaning: string;
+export type TourStepStrings = {
+  /** A word or two. */
+  title: string;
+  /** One sentence, two at most. */
+  body: string;
 };
 
-export type IntroKeyStrings = {
-  /** A word or two for the kind of mark. Short: it heads a row beside a drawing. */
+export type TourKeyStrings = {
+  /** A word or two for the kind of mark. It heads a row beside a drawing. */
   name: string;
   /** What that kind of mark means. */
   meaning: string;
-};
-
-export type IntroAccessStrings = {
-  /** As the system's own prompt names it, so the two read as the same request. */
-  name: string;
-  reason: string;
 };

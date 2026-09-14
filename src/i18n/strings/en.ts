@@ -1,97 +1,56 @@
 import type { Strings } from "../types";
 
 /**
- * English: the language the app is written in, and the one every other file
+ * English: the language the app is written in, and the one the Italian file
  * is a translation of.
  *
- * When a string here changes, the eleven others are stale until they change
- * too — there is no marker for that beyond the diff, so keep the edits small
- * and do them together.
+ * When a string here changes, the Italian one is stale until it changes too —
+ * there is no marker for that beyond the diff, so do the two together.
  */
 export const en: Strings = {
-  intro: {
-    what: {
-      body:
-        "Point your phone at the sky and move it slowly. You'll see the satellites above " +
-        "you, right where they are."
-    },
+  tour: {
+    open: "Help",
+    about: "A quick tour of the screen.",
+    step: "{step} of {count}",
+    next: "Next",
+    skip: "Skip",
+    done: "Done",
     marks: {
-      title: "What you'll see",
-      body: "Every dot is a satellite. Tap one to find out what it is.",
+      title: "On the sky",
+      body: "Every mark is a satellite. Tap one to see what it is.",
       moving: {
         name: "Moving",
-        meaning: "The tail shows where it came from. The bigger the dot, the closer it is."
+        meaning: "The tail shows where it came from. Bigger means closer."
       },
       parked: {
         name: "Ring",
-        meaning: "Stays in the same spot in the sky."
+        meaning: "Geostationary: it stays in the same spot."
       },
       shadow: {
         name: "Faint",
         meaning: "In the Earth's shadow, so you can't see it."
       },
       landmark: {
-        name: "Highlights",
-        meaning: "Space stations and big telescopes, shown with their name."
+        name: "Named",
+        meaning: "Space stations and big telescopes. The dashed line shows where they'll pass."
       }
     },
-    paths: {
-      title: "When and where to look",
-      body:
-        "Space stations and telescopes show the path they'll take, even before they " +
-        "appear.",
-      minutes: "One arrow per minute, pointing the way it's going.",
-      time: "Its name, and the time it will be there.",
-      follow: "Follow the line to find where it will appear.",
-      footnote: "Tap the name to learn more."
+    count: {
+      title: "In view",
+      body: "How many satellites are on screen. Tap to see which ones."
+    },
+    filter: {
+      title: "Filter",
+      body: "Choose which kinds of satellite to show."
     },
     passes: {
       title: "Coming up",
-      body: "The card at the bottom of the sky shows what will pass over you next.",
-      shut: "The next one, and how long until it appears.",
-      open: "Tap to see the next few hours: where to look, how high it gets and whether you'll see it.",
-      footnote: "If nothing is coming, the card is not there at all."
+      body: "What will pass over you next. Tap to see the next few hours."
     },
-    corners: {
-      title: "Around the edges",
-      body: "Four more things you can tap.",
-      count: {
-        where: "Top left",
-        meaning: "How many satellites are on screen. Tap to see which ones."
-      },
-      filter: {
-        where: "Top right",
-        meaning: "Choose which kinds of satellite to show."
-      },
-      guide: {
-        where: "Settings",
-        meaning: "Shows these pages again, whenever you need them."
-      },
-      console: {
-        where: "Settings",
-        meaning: "Technical readings, in English. You won't need them."
-      }
-    },
-    access: {
-      title: "Two permissions",
-      body: "Your phone will ask for them next.",
-      camera: {
-        name: "Camera",
-        reason: "To show the sky in front of you."
-      },
-      location: {
-        name: "Location",
-        reason: "To know which satellites are above you."
-      },
-      footnote: "Your location never leaves your phone."
-    },
-    next: "NEXT",
-    allowAccess: "ALLOW ACCESS"
-  },
-  guide: {
-    open: "Help",
-    close: "Close help",
-    done: "CLOSE"
+    settings: {
+      title: "Settings",
+      body: "Change the language, or see this tour again."
+    }
   },
   tabs: {
     sky: "Sky",
@@ -217,7 +176,9 @@ export const en: Strings = {
       "Look up any object in the catalog, whether or not it is over you right now. Not built yet."
   },
   language: {
-    title: "Language",
-    close: "Close the language list"
+    title: "Language"
+  },
+  console: {
+    detail: "Technical readings, in English only."
   }
 };

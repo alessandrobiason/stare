@@ -17,8 +17,8 @@ import {
   timeUntil
 } from "../src/i18n/format";
 import { LABEL_BOX_PX } from "../src/components/markerScene";
-import { MARK_TILE, PATH_FIGURE_HEIGHT, SAMPLE_PASSES } from "../src/onboarding/introFigures";
-import { introPages } from "../src/onboarding/introPages";
+import { MARK_TILE } from "../src/onboarding/markSamples";
+import { BUBBLE_MARGIN, BUBBLE_MAX_WIDTH, tourSteps } from "../src/onboarding/tourSteps";
 import {
   FALLBACK_LOCALE,
   fill,
@@ -188,10 +188,10 @@ describe("and says it in the space it is given", () => {
     expect(width(t.tabs.settings, 27)).toBeLessThan(375 - 18 * 2);
     // A row's label, and — on the language row — the value beside it. The
     // longest endonym is the one this has to leave room for.
-    expect(width(t.guide.open, 14)).toBeLessThan(ROW / 2);
+    expect(width(t.tour.open, 14)).toBeLessThan(ROW / 2);
     expect(width(t.language.title, 14) + width("Português", 13)).toBeLessThan(ROW);
     // The line under a row's label, which wraps rather than being cut off.
-    for (const detail of [t.intro.corners.guide.meaning, t.intro.corners.console.meaning]) {
+    for (const detail of [t.tour.about, t.console.detail]) {
       expect(width(detail, 11)).toBeLessThan(3 * ROW);
     }
 
@@ -316,17 +316,12 @@ describe("and says it in the space it is given", () => {
     const t = stringsFor(locale);
     // Full-width buttons inside a card of at most 380, less 20 either side.
     expect(width(t.boot.tryAgain, 11, 1.5)).toBeLessThan(320);
-    expect(width(t.intro.next, 11, 1.5)).toBeLessThan(320);
-    expect(width(t.intro.allowAccess, 11, 1.5)).toBeLessThan(320);
-    // The guide's last button, in the same place on the same card.
-    expect(width(t.guide.done, 11, 1.5)).toBeLessThan(320);
-  });
-
-  test.each(LOCALES)("%s fits the language picker", (locale) => {
-    // The heading over the list the corner of the intro opens: a 150pt menu,
-    // less 12 of padding either side. The languages under it are endonyms and
-    // the same in every locale, so this line is the only one that can grow.
-    expect(width(stringsFor(locale).language.title, 10, 1)).toBeLessThan(126);
+    // The tour's two buttons share a row in a bubble of at most 320, less 16
+    // either side: Skip on the left, Next or Done on the right with its own 16
+    // of padding either side.
+    for (const label of [t.tour.next, t.tour.done]) {
+      expect(width(t.tour.skip, 13) + width(label, 13, 0) + 32).toBeLessThan(320 - 32 - 24);
+    }
   });
 
   test.each(LOCALES)("%s fits the compass notice", (locale) => {
@@ -628,109 +623,46 @@ describe("the satellite descriptions", () => {
 test("the console is the one thing that stays in English", () => {
   // Its rows are the names of things in this codebase, read against the source
   // by whoever is diagnosing a phone that is drawing the sky in the wrong
-  // place. The intro says as much on the page that keys the panels.
+  // place. Its row in settings says as much.
   setLocaleForTesting("it");
-  expect(strings().intro.corners.console.meaning).toMatch(/inglese/);
+  expect(strings().console.detail).toMatch(/inglese/);
 });
 
 /**
- * How tall the intro's pages come out, per language.
+ * How tall the tour's bubbles come out, per language.
  *
- * The pages in the app whose height is not bounded by their own design: a
- * title, a paragraph, and then rows beside pictures, numbered explanations
- * under them, or explained badges — every one of which is a translated string
- * that can run a line longer than the English it replaced. The card is
- * bottom-aligned and grows upwards into the sky, so a page that outgrows the
- * screen does not stay a card — it walks off the top.
- *
- * The pictures are fixed heights, or the panel's own rows: those are measured
- * the way the panel's own checks measure them.
- *
- * The figures are read off `IntroScreen`'s stylesheet. The card now scrolls if
- * it has to (see `styles.card`), so overrunning this is a degraded page rather
- * than a broken one — which is why the budget is the *smallest* screen the app
- * ships to rather than the one it is designed on.
+ * The key to the marks is the tallest of them — a title, a sentence and four
+ * rows beside their tiles — and it is laid over the middle of the screen, so it
+ * has the whole height of the smallest phone less the status bar and a margin.
+ * The others sit beside a control and have to fit in what is left beside it,
+ * which on the passes card is still most of the screen: they are held to a
+ * third of it, which is what keeps them a sentence rather than a page.
  */
-describe("the intro's pages fit the smallest screen", () => {
+describe("the tour fits the smallest screen", () => {
   /** Layout points of text, wrapped into a column of `column` points. */
   function blockHeight(text: string, fontSize: number, lineHeight: number, column: number): number {
     return Math.max(1, Math.ceil(width(text, fontSize) / column)) * lineHeight;
   }
 
-  /**
-   * The card's own width on a 375pt phone: the screen, less the page's 20pt
-   * gutters and the card's 20pt padding, either side.
-   */
-  const CARD_COLUMN = 375 - 20 * 2 - 20 * 2;
-  /** The same, less the 74pt badge and the 10pt after it. */
-  const ELEMENT_COLUMN = CARD_COLUMN - 74 - 10;
-
-  /**
-   * What the pager has to spend, on the shortest screen the app runs on.
-   *
-   * A 375 x 667 phone, less the footer under the pager — 18 of padding, the
-   * 6pt dots, the button's 18pt margin, its 28 of padding and 13pt label, and
-   * 26 of padding under it — and the status bar inset above.
-   */
-  const PAGER_HEIGHT = 667 - (18 + 6 + 18 + 28 + 13 + 26) - 20;
-
-  /** The callouts' column: the card's, less the 16pt number and the 8 after it. */
-  const CALLOUT_COLUMN = CARD_COLUMN - 16 - 8;
-
-  /** Numbered explanations under a picture, each 8 below the one before. */
-  function calloutsHeight(callouts: readonly string[]): number {
-    return callouts.reduce(
-      (sum, text) => sum + 8 + blockHeight(text, 11.5, 16, CALLOUT_COLUMN),
-      0
-    );
-  }
-
-  /**
-   * The passes picture: 10 of padding around the panel shut and the panel open,
-   * and 10 between them. A panel is its border, a header of 6 above an 11pt
-   * line and 6 below it (2, open) — and open, a row per pass: 12 of rule and
-   * gap, the name, 2, and the line under it wrapped into the rows' 170pt.
-   */
-  function passesPictureHeight(): number {
-    const LINE = 14;
-    const shut = 2 + 6 + LINE + 6;
-    const rows = SAMPLE_PASSES.reduce((sum, pass) => {
-      const meta = `${passDirection(pass)} · ${passSeeing(pass.nakedEye)}`;
-      return sum + 7 + 5 + LINE + 2 + blockHeight(meta, 9, 13, 170);
-    }, 0);
-    const open = 2 + 6 + LINE + 2 + rows + 10;
-    return 10 + shut + 10 + open + 10;
-  }
+  const SCREEN = { width: 375, height: 667 };
+  /** The bubble's own text column: its width, less 16 of padding either side. */
+  const COLUMN = Math.min(BUBBLE_MAX_WIDTH, SCREEN.width - BUBBLE_MARGIN * 2) - 16 * 2;
+  /** The same, less a tile and the 10 after it. */
+  const MARK_COLUMN = COLUMN - MARK_TILE.width - 10;
+  /** Padding, the title row, and the row of buttons under everything. */
+  const FRAME = 16 * 2 + 20 + (14 + 36);
 
   test.each(LOCALES)("%s", (locale) => {
     setLocaleForTesting(locale);
-    // Every page but the last: the permissions page lists what the system will
-    // ask for, and that list is two names and two reasons whatever the language.
-    for (const page of introPages().filter((one) => !one.access)) {
-      let height = 20 * 2; // The card's own padding.
-      height += blockHeight(page.title ?? "", 19, 23, CARD_COLUMN);
-      height += 10 + blockHeight(page.body, 13, 19, CARD_COLUMN);
-      for (const mark of page.marks ?? []) {
-        // A tile and its words share a middle, so the row is the taller of them.
-        const words =
-          blockHeight(mark.name, 10, 13, ELEMENT_COLUMN) +
-          2 +
-          blockHeight(mark.meaning, 11.5, 16, ELEMENT_COLUMN);
-        height += 12 + Math.max(MARK_TILE.height, words);
+    for (const step of tourSteps()) {
+      let height = FRAME + 6 + blockHeight(step.body, 13, 18, COLUMN);
+      for (const mark of step.marks ?? []) {
+        const words = 14 + 1 + blockHeight(mark.meaning, 11.5, 15, MARK_COLUMN);
+        height += 10 + Math.max(MARK_TILE.height, words);
       }
-      if (page.path) {
-        height += 14 + PATH_FIGURE_HEIGHT + calloutsHeight(page.path.callouts);
-      }
-      if (page.passes) {
-        height += 14 + passesPictureHeight() + calloutsHeight(page.passes.callouts);
-      }
-      for (const element of page.elements ?? []) {
-        height += 12 + blockHeight(element.where, 10, 13, ELEMENT_COLUMN);
-        height += 2 + blockHeight(element.meaning, 11.5, 16, ELEMENT_COLUMN);
-      }
-      if (page.footnote) height += 16 + blockHeight(page.footnote, 11, 16, CARD_COLUMN);
 
-      expect(height).toBeLessThan(PAGER_HEIGHT);
+      if (step.marks) expect(height).toBeLessThan(SCREEN.height - 20 - BUBBLE_MARGIN * 2);
+      else expect(height).toBeLessThan(SCREEN.height / 3);
     }
   });
 });
@@ -742,7 +674,7 @@ describe("the intro's pages fit the smallest screen", () => {
  * before a line of JavaScript runs — see `locales/README.md` — so they live
  * outside `src/i18n` and nothing in the app can fall back for them. A language
  * the app speaks with no file here gets an English system prompt over a
- * translated screen, seconds after the intro promised the prompt was coming.
+ * translated screen.
  */
 describe("the prompts the operating system shows", () => {
   const DIRECTORY = path.join(__dirname, "..", "locales");

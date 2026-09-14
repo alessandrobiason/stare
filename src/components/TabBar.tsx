@@ -5,6 +5,7 @@ import { strings } from "../i18n";
 import { SceneTab } from "../hooks/useSceneControls";
 import { Icon, IconName } from "./Icon";
 import { glass, theme } from "./theme";
+import { useTourTarget } from "./tourTargets";
 
 type Props = {
   tab: SceneTab;
@@ -44,6 +45,7 @@ export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = fal
   // console's picker changes the language. See `useLocale`.
   useLocale();
   const t = strings().tabs;
+  const settingsRef = useTourTarget("settings");
 
   return (
     <View style={styles.bar} accessibilityRole="tablist">
@@ -52,6 +54,7 @@ export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = fal
         return (
           <Pressable
             key={id}
+            ref={id === "settings" ? settingsRef : undefined}
             accessibilityRole="tab"
             accessibilityLabel={t[id]}
             // The `aria-` form rather than `accessibilityState`, which is what

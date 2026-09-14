@@ -117,7 +117,7 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
           — or a phone's own larger text size — is exactly the margin that tips
           it over. Scrolling here is what keeps SHOW ALL below the last row on
           every phone instead of past the bottom of the screen on some of them,
-          the same fix `DebugPanel` and `LanguagePicker` use for the same
+          the same fix `DebugPanel` uses for the same
           reason. */}
       <ScrollView style={styles.rows} showsVerticalScrollIndicator={false}>
         {SATELLITE_CATEGORIES.map((category) => {

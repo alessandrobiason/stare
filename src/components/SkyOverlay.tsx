@@ -38,6 +38,7 @@ import { CatalogScreen } from "./CatalogScreen";
 import { strings } from "../i18n";
 import { toDegrees } from "../math/angles";
 import { DebugPanel } from "./DebugPanel";
+import { GuideTour } from "./GuideTour";
 import { HorizonCompass } from "./HorizonCompass";
 import {
   frameBoxFor,
@@ -49,6 +50,7 @@ import {
 } from "./markerGeometry";
 import { namesUnder } from "./markerHitTest";
 import { pressPoint } from "./pressPoint";
+import { TourTargetsProvider } from "./tourTargets";
 import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SatelliteCard } from "./SatelliteCard";
 import { SatelliteMarkers } from "./SatelliteMarkers";
@@ -170,15 +172,12 @@ type Props = {
   /** Opens the console from the settings tab, which is where it is listed. */
   onOpenConsole: () => void;
   /**
-   * Whether the guide is open over the view — the intro's pages about this
-   * screen — and how to open it, from the row in the settings tab
-   * (`SettingsScreen`). The guide itself is the scene's to draw, because it
-   * goes over the scene's own panels as well as these; what the overlay does
-   * about it is put its panels away while it is up (`SafeAreaLayer`'s
-   * `hidden`).
+   * Whether the tour is running over the view (`GuideTour`), how to start it
+   * again from the Help row in the settings tab, and how it ends.
    */
   guide: boolean;
   onOpenGuide: () => void;
+  onCloseGuide: () => void;
   /** Whether boot reported anything degraded; dots the settings tab. */
   warned?: boolean;
   /**
@@ -288,6 +287,7 @@ export const SkyOverlay: React.FC<Props> = ({
   onOpenConsole,
   guide,
   onOpenGuide,
+  onCloseGuide,
   warned = false,
   skyMaskFiltering,
   onToggleSkyMaskFiltering,
@@ -535,138 +535,144 @@ export const SkyOverlay: React.FC<Props> = ({
   if (fatal) throw fatal;
 
   return (
-    <View style={styles.sky} onLayout={onLayout}>
-      <View style={[styles.frame, frameStyle]}>
-        {frame.render({ onDiscontinuity })}
+    // The provider is where the controls the tour points at leave their views
+    // for it to measure. See `useTourTarget`.
+    <TourTargetsProvider>
+      <View style={styles.sky} onLayout={onLayout}>
+        <View style={[styles.frame, frameStyle]}>
+          {frame.render({ onDiscontinuity })}
 
-        {/* Not while it is switched off: the mask drawn over the picture is
-            the reason a marker is missing, and with nothing being hidden it
-            would be a red grid explaining markers that are all still there. */}
-        {debug && skyMaskFiltering && segmentation.mask && (
-          <SkyMaskOverlay
-            mask={segmentation.mask}
-            orientationFilterRef={smoothed.filterRef}
-            lens={frame.lens}
-            frame={frameStyle}
-          />
-        )}
-
-        {/* A subscription rather than a value: the loop publishes at display
-            rate, and this view has nothing to redraw when it does. */}
-        <SatelliteMarkers
-          markers={markers}
-          frame={frameStyle}
-          palette={palette}
-          selectedName={selection?.selected ?? null}
-        />
-
-        {/* The picture itself is the control: over the markers, which are drawn
-            into a canvas that takes no touches, and under every panel, which
-            are laid over this box rather than inside it. Not while the debug
-            overlays are up — there the picture is the mask's, and a card would
-            be reading out satellites over a page of figures about them. */}
-        {!debug && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={strings().scene.markers}
-            accessibilityHint="Tap a marker to see what it is"
-            style={StyleSheet.absoluteFill}
-            onPress={onTapSky}
-          />
-        )}
-      </View>
-
-      {/* The control layer, inset off the notch and the home indicator while
-          the picture underneath it is not. A title and one button at the top,
-          a stack at the bottom, and nothing at all in the middle: what is in
-          the middle is the sky. Put away while the guide is over it, rather
-          than left to show through it. See `SafeAreaLayer`. */}
-      <SafeAreaLayer hidden={guide}>
-        {tab === "sky" && (
-          <>
-            <SkyHeader sky={sky} filterOpen={filterOpen} onToggleFilter={onToggleFilter} />
-
-            <CategoryLegend
-              open={filterOpen}
-              enabledCategories={enabledCategories}
-              onToggleCategory={onToggleCategory}
-              enabledSubcategories={enabledSubcategories}
-              onToggleSubcategory={onToggleSubcategory}
-              onEnableAll={onEnableAll}
+          {/* Not while it is switched off: the mask drawn over the picture is
+              the reason a marker is missing, and with nothing being hidden it
+              would be a red grid explaining markers that are all still there. */}
+          {debug && skyMaskFiltering && segmentation.mask && (
+            <SkyMaskOverlay
+              mask={segmentation.mask}
+              orientationFilterRef={smoothed.filterRef}
+              lens={frame.lens}
+              frame={frameStyle}
             />
-          </>
-        )}
+          )}
 
-        {/* The other two tabs are sheets over the camera rather than screens
-            the app has navigated to: the view underneath keeps running, and
-            coming back is one tap onto a sky that never stopped. */}
-        {tab === "catalog" && <CatalogScreen />}
-        {tab === "settings" && (
-          <SettingsScreen
-            onOpenGuide={onOpenGuide}
-            onOpenConsole={onOpenConsole}
-            warned={warned}
+          {/* A subscription rather than a value: the loop publishes at display
+              rate, and this view has nothing to redraw when it does. */}
+          <SatelliteMarkers
+            markers={markers}
+            frame={frameStyle}
+            palette={palette}
+            selectedName={selection?.selected ?? null}
           />
-        )}
 
-        {/* The bottom of the screen, as one column rather than four things each
-            pinned to a corner of it. Laying it out means the strip rises when a
-            card grows a photograph, and a notice appearing pushes everything
-            below it down instead of landing on top of it — which is what the
-            old corners did to each other, and why the passes panel used to be
-            taken off the screen whenever the compass notice was up. */}
-        <View style={styles.bottom}>
+          {/* The picture itself is the control: over the markers, which are drawn
+              into a canvas that takes no touches, and under every panel, which
+              are laid over this box rather than inside it. Not while the debug
+              overlays are up — there the picture is the mask's, and a card would
+              be reading out satellites over a page of figures about them. */}
+          {!debug && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={strings().scene.markers}
+              accessibilityHint="Tap a marker to see what it is"
+              style={StyleSheet.absoluteFill}
+              onPress={onTapSky}
+            />
+          )}
+        </View>
+
+        {/* The control layer, inset off the notch and the home indicator while
+            the picture underneath it is not. A title and one button at the top,
+            a stack at the bottom, and nothing at all in the middle: what is in
+            the middle is the sky. See `SafeAreaLayer`. */}
+        <SafeAreaLayer>
           {tab === "sky" && (
             <>
-              {notice ? <View style={styles.inset}>{notice}</View> : null}
+              <SkyHeader sky={sky} filterOpen={filterOpen} onToggleFilter={onToggleFilter} />
 
-              {/* Where the camera is pointing, as a rule under the picture.
-                  Drawn under the debug overlays too: it is a fact about the
-                  view rather than a panel over it. */}
-              <HorizonCompass
-                orientationFilterRef={smoothed.filterRef}
-                halfFovDeg={halfFovDeg}
+              <CategoryLegend
+                open={filterOpen}
+                enabledCategories={enabledCategories}
+                onToggleCategory={onToggleCategory}
+                enabledSubcategories={enabledSubcategories}
+                onToggleSubcategory={onToggleSubcategory}
+                onEnableAll={onEnableAll}
               />
-
-              {/* One card at a time, and always the thing most worth reading:
-                  the satellite somebody tapped, or — with nothing tapped — the
-                  next pass. Neither under the debug overlays, where the picture
-                  is the mask's and the sheet is the console's. */}
-              {!debug && selection && (
-                <SatelliteCard
-                  style={styles.inset}
-                  names={selection.names}
-                  selected={selection.selected}
-                  onSelect={(name) => setSelection({ names: selection.names, selected: name })}
-                  onClose={() => setSelection(null)}
-                  describeRef={describeRef}
-                  pass={passAhead(upcoming, selection.selected)}
-                />
-              )}
-
-              {!debug && !selection && (
-                <UpcomingPasses
-                  style={styles.inset}
-                  passes={upcoming}
-                  epochRef={epochRef}
-                  onSelect={selectPass}
-                />
-              )}
-
-              {debug && (
-                <DebugPanel
-                  style={styles.inset}
-                  sourceRef={debugSourceRef}
-                  onClose={onToggleDebug}
-                />
-              )}
             </>
           )}
 
-          <TabBar tab={tab} onSelect={onSelectTab} warned={warned} />
-        </View>
-      </SafeAreaLayer>
-    </View>
+          {/* The other two tabs are sheets over the camera rather than screens
+              the app has navigated to: the view underneath keeps running, and
+              coming back is one tap onto a sky that never stopped. */}
+          {tab === "catalog" && <CatalogScreen />}
+          {tab === "settings" && (
+            <SettingsScreen
+              onOpenGuide={onOpenGuide}
+              onOpenConsole={onOpenConsole}
+              warned={warned}
+            />
+          )}
+
+          {/* The bottom of the screen, as one column rather than four things each
+              pinned to a corner of it. Laying it out means the strip rises when a
+              card grows a photograph, and a notice appearing pushes everything
+              below it down instead of landing on top of it — which is what the
+              old corners did to each other, and why the passes panel used to be
+              taken off the screen whenever the compass notice was up. */}
+          <View style={styles.bottom}>
+            {tab === "sky" && (
+              <>
+                {notice ? <View style={styles.inset}>{notice}</View> : null}
+
+                {/* Where the camera is pointing, as a rule under the picture.
+                    Drawn under the debug overlays too: it is a fact about the
+                    view rather than a panel over it. */}
+                <HorizonCompass
+                  orientationFilterRef={smoothed.filterRef}
+                  halfFovDeg={halfFovDeg}
+                />
+
+                {/* One card at a time, and always the thing most worth reading:
+                    the satellite somebody tapped, or — with nothing tapped — the
+                    next pass. Neither under the debug overlays, where the picture
+                    is the mask's and the sheet is the console's. */}
+                {!debug && selection && (
+                  <SatelliteCard
+                    style={styles.inset}
+                    names={selection.names}
+                    selected={selection.selected}
+                    onSelect={(name) => setSelection({ names: selection.names, selected: name })}
+                    onClose={() => setSelection(null)}
+                    describeRef={describeRef}
+                    pass={passAhead(upcoming, selection.selected)}
+                  />
+                )}
+
+                {!debug && !selection && (
+                  <UpcomingPasses
+                    style={styles.inset}
+                    passes={upcoming}
+                    epochRef={epochRef}
+                    onSelect={selectPass}
+                  />
+                )}
+
+                {debug && (
+                  <DebugPanel
+                    style={styles.inset}
+                    sourceRef={debugSourceRef}
+                    onClose={onToggleDebug}
+                  />
+                )}
+              </>
+            )}
+
+            <TabBar tab={tab} onSelect={onSelectTab} warned={warned} />
+          </View>
+        </SafeAreaLayer>
+
+        {/* Last, so it is over every panel: it lights up the real ones. */}
+        {guide && <GuideTour onDone={onCloseGuide} />}
+      </View>
+    </TourTargetsProvider>
   );
 };
 

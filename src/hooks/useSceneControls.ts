@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { hasSeenTour, markTourSeen } from "../onboarding/tourStore";
 import {
   allCategories,
   allSubcategories,
@@ -58,13 +59,12 @@ export type SceneControls = {
    */
   openConsole: () => void;
   /**
-   * Whether the guide is open over the view: the intro's pages about reading
-   * the screen, brought back by the `?` above the console toggle
-   * (`GuideToggle`). Shut on open, like the console — it is something asked for.
+   * Whether the tour is running over the sky (`GuideTour`).
    *
-   * Opened and closed rather than toggled, because no one control does both:
-   * the `?` is underneath the guide while it is up, and the ways out are the
-   * guide's own corner and its last page.
+   * Opened from the Help row in settings, which brings the sky back first — the
+   * tour points at the sky's own controls — and, on a device that has not seen
+   * it, on its own shortly after the view opens (`tourOnFirstRun`). Closing it,
+   * finished or skipped, is what records it as seen.
    */
   guide: boolean;
   openGuide: () => void;
@@ -92,7 +92,7 @@ export type SceneControls = {
 /**
  * The controls both scenes carry: which tab is up, which categories are drawn,
  * whether the filter panel is open, whether the debug overlays are up, and
- * whether the guide is open over all of it. The same sky either way, so the
+ * whether the tour is running over all of it. The same sky either way, so the
  * same controls — a phone and the replay behave identically.
  *
  * What the sky itself is showing is not here. The count and its breakdown are
@@ -100,7 +100,22 @@ export type SceneControls = {
  * (`SkyOverlay`, `SkyHeader`), so they never leave the view that produces
  * them.
  */
-export function useSceneControls(): SceneControls {
+export type SceneControlOptions = {
+  /**
+   * Start the tour by itself on a device that has not been through it. The
+   * phone's scene does; the replay harness does not, so its end-to-end suite
+   * opens on the sky rather than on a tour.
+   */
+  tourOnFirstRun?: boolean;
+};
+
+/**
+ * How long the sky is left alone before the first launch's tour comes up: long
+ * enough to see the view arrive, so the tour is over something.
+ */
+export const FIRST_TOUR_DELAY_MS = 1200;
+
+export function useSceneControls({ tourOnFirstRun = false }: SceneControlOptions = {}): SceneControls {
   const [tab, setTabState] = useState<SceneTab>("sky");
   const [enabledCategories, setEnabledCategories] =
     useState<Set<SatelliteCategory>>(allCategories);
@@ -147,8 +162,23 @@ export function useSceneControls(): SceneControls {
     setTabState("sky");
     setDebug(true);
   }, []);
-  const openGuide = useCallback(() => setGuide(true), []);
-  const closeGuide = useCallback(() => setGuide(false), []);
+  const openGuide = useCallback(() => {
+    setTabState("sky");
+    setFilterOpen(false);
+    setGuide(true);
+  }, []);
+  const closeGuide = useCallback(() => {
+    markTourSeen();
+    setGuide(false);
+  }, []);
+  // Read once, when the view opens: a tour seen during this launch is marked
+  // seen by closing it, and must not start again on a re-render.
+  const [firstRun] = useState(() => tourOnFirstRun && !hasSeenTour());
+  useEffect(() => {
+    if (!firstRun) return;
+    const timer = setTimeout(() => setGuide(true), FIRST_TOUR_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [firstRun]);
   const toggleSkyMaskFiltering = useCallback(() => setSkyMaskFiltering((on) => !on), []);
   const toggleCelestialAlignment = useCallback(() => setCelestialAlignment((on) => !on), []);
 

@@ -7,6 +7,7 @@ import { UpcomingPass } from "../satellite/upcomingPasses";
 import { OrbitEpoch } from "../types";
 import { Icon } from "./Icon";
 import { glass, lift, theme } from "./theme";
+import { useTourTarget } from "./tourTargets";
 
 type Props = {
   /**
@@ -60,7 +61,7 @@ type Props = {
  * sky where none of the landmarks clear the roofline for three hours — which at
  * high latitudes is most of them, most of the time — and the card is not drawn.
  * A permanent card saying "nothing" is a piece of the picture spent on the
- * absence of news, and the intro says the card comes and goes for that reason.
+ * absence of news.
  *
  * A row is a target, like the names written along the paths (`namesUnder`): it
  * opens the same details the object's own mark would, which for a pass that has
@@ -77,6 +78,7 @@ export const UpcomingPasses: React.FC<Props> = React.memo(({
   useLocale();
   const [expanded, setExpanded] = useState(false);
   const nowMs = useEpochSeconds(epochRef);
+  const viewRef = useTourTarget("passes");
 
   return (
     <PassesPanel
@@ -86,6 +88,7 @@ export const UpcomingPasses: React.FC<Props> = React.memo(({
       onToggle={() => setExpanded((open) => !open)}
       onSelect={onSelect}
       style={style}
+      viewRef={viewRef}
     />
   );
 });
@@ -99,16 +102,15 @@ type PanelProps = {
   expanded: boolean;
   onToggle: () => void;
   onSelect: (name: string) => void;
-  /** Laid over the card's own: the intro lays it out, the sky view does not. */
   style?: StyleProp<ViewStyle>;
+  /** Where the tour finds the card on screen. See `useTourTarget`. */
+  viewRef?: React.Ref<View>;
 };
 
 /**
  * The card as it is drawn, with nothing of its own to remember or to tick.
  *
- * Apart from `UpcomingPasses` for the intro, which shows it shut and open over
- * a plan made up for the picture (`introFigures.ts`). Drawn by this code rather
- * than copied, so the page is a picture of the card and cannot drift from it.
+ * Apart from `UpcomingPasses` so it can be rendered against a fixed clock.
  */
 export const PassesPanel: React.FC<PanelProps> = ({
   passes,
@@ -116,14 +118,15 @@ export const PassesPanel: React.FC<PanelProps> = ({
   expanded,
   onToggle,
   onSelect,
-  style
+  style,
+  viewRef
 }) => {
   const t = strings().scene.passes;
   const next = passes[0];
   if (!next) return null;
 
   return (
-    <View style={[styles.card, style]}>
+    <View ref={viewRef} style={[styles.card, style]}>
       {/* The grip. It is not a drag handle — nothing here is dragged — it is
           the mark every sheet on this platform wears to say it opens, and it
           is what makes a tap on the card an obvious thing to try. */}

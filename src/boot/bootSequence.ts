@@ -91,7 +91,7 @@ type Access = {
 
 /**
  * Everything boot needs the operating system's permission for, asked for one
- * prompt at a time and in the order the intro names them.
+ * prompt at a time: the camera, then the location.
  *
  * One at a time because two prompts are two system alerts: asked together, the
  * order they arrive in is the operating system's to decide, and one raised

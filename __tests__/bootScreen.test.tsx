@@ -21,12 +21,6 @@ test("the loading screen says the app's name, and nothing else at all", () => {
   expect(textOf(screen())).toBe("STARE");
 });
 
-test("the launch out of the intro leaves the name off", () => {
-  // The intro has just spent a page on it. See `useIntro`: the second launch
-  // onwards is the one that opens on the name.
-  expect(textOf(screen({ wordmark: false }))).toBe("");
-});
-
 test("a failure takes the screen from the name rather than sharing it", () => {
   const text = textOf(screen({ failed: true, error: "Your location could not be found." }));
 

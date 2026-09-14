@@ -15,7 +15,6 @@ import { AttitudeSource } from "../hooks/useSmoothedOrientation";
 import { cameraFrameGrabber } from "../vision/cameraFrameGrabber";
 import { CameraBackground } from "./CameraBackground";
 import { CompassNotice } from "./CompassNotice";
-import { IntroScreen } from "./IntroScreen";
 import { SceneFrame, SkyOverlay } from "./SkyOverlay";
 
 type Props = {
@@ -49,7 +48,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
   // when the platform regrades its compass — a handful of times a session
   // rather than twenty times a second. See `useCompassAccuracy`.
   const compass = useCompassAccuracy(orientation);
-  const controls = useSceneControls();
+  const controls = useSceneControls({ tourOnFirstRun: true });
   /**
    * What the sky mask is doing, for the status page: in a ref rather than state.
    *
@@ -187,6 +186,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onOpenConsole={controls.openConsole}
         guide={controls.guide}
         onOpenGuide={controls.openGuide}
+        onCloseGuide={controls.closeGuide}
         warned={boot.warnings.length > 0}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
@@ -222,11 +222,6 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
           })
         ]}
       />
-
-      {/* Last, so it is over every panel on the screen rather than between
-          them. The view keeps running under it, so closing the guide is back
-          to a sky that never stopped. */}
-      {controls.guide && <IntroScreen mode="guide" onDone={controls.closeGuide} />}
     </View>
   );
 };

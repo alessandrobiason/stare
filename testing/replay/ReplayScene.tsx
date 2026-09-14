@@ -4,7 +4,6 @@ import { statusSection } from "../../src/debug/sections";
 import { useDeviceOrientation } from "../../src/hooks/useDeviceOrientation";
 import { useSceneControls } from "../../src/hooks/useSceneControls";
 import { AttitudeSource } from "../../src/hooks/useSmoothedOrientation";
-import { IntroScreen } from "../../src/components/IntroScreen";
 import { SceneFrame, SkyOverlay } from "../../src/components/SkyOverlay";
 import {
   MAGNETIC_DECLINATION_DEG,
@@ -144,6 +143,7 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onOpenConsole={controls.openConsole}
         guide={controls.guide}
         onOpenGuide={controls.openGuide}
+        onCloseGuide={controls.closeGuide}
         warned={boot.warnings.length > 0}
         skyMaskFiltering={controls.skyMaskFiltering}
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
@@ -181,10 +181,6 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
           ];
         }}
       />
-
-      {/* Last, as on the phone: over the transport and every panel, with the
-          recording still playing underneath. */}
-      {controls.guide && <IntroScreen mode="guide" onDone={controls.closeGuide} />}
     </View>
   );
 };
