@@ -8,7 +8,8 @@ import { dirname, join } from "node:path";
  * Draws the app's logo, in the two shapes it is kept in:
  *
  * - `assets/icon.svg`, the mark on its own — one satellite as a point of light
- *   on a wide arc over a horizon, trailing a tail that fades to nothing — and
+ *   on a wide arc over a horizon, trailing a line along the arc that breaks
+ *   into dashes and fades to nothing — and
  *   `assets/icon.png`, the same picture rasterised: the app icon proper,
  *   because `app.json` can only point iOS at a PNG.
  * - `assets/logo-extended.svg`, the boot screen held still — the night, the
@@ -17,11 +18,11 @@ import { dirname, join } from "node:path";
  *
  *     node tools/make-logo.mjs
  *
- * Both are drawn in the overlay's own light: a white point, a tight white glow
- * and a wide cool bloom, faded by the stops `src/components/markerScene.ts`
- * fades every mark by. The satellites on the sky became light rather than paint,
- * and a logo that stayed a disc with a solid trail was a picture of a different
- * app.
+ * Both are drawn in the overlay's own light: a landmark's champagne point, a
+ * tight glow of the same colour and a wide bloom of its deeper hue, trailing
+ * the overlay's solid-then-dashed line, faded by the stops and broken by the
+ * pattern `src/components/markerScene.ts` draws every mark with. A logo in
+ * another light, or with a different tail, is a picture of a different app.
  *
  * The numbers below are `src/components/bootSky.ts`'s and `markerScene.ts`'s,
  * restated: a build tool cannot import TypeScript, and the alternative is a
@@ -32,12 +33,12 @@ import { dirname, join } from "node:path";
  * No third-party imports on purpose, in keeping with the other generators here.
  */
 
-/** Must match COMET_FADE (as `tail`), GLOW_FADE, BLOOM_FADE and CORE_FADE in src/components/markerScene.ts. */
+/** Must match TAIL_FADE, GLOW_FADE, BLOOM_FADE and CORE_FADE in src/components/markerScene.ts. */
 const FADES = {
   tail: [
     { at: 0, strength: 1 },
-    { at: 0.3, strength: 0.5 },
-    { at: 0.65, strength: 0.15 },
+    { at: 0.12, strength: 0.8 },
+    { at: 0.45, strength: 0.32 },
     { at: 1, strength: 0 }
   ],
   glow: [
@@ -58,9 +59,19 @@ const FADES = {
     { at: 1, strength: 0 }
   ]
 };
-/** Must match MARK_COLOR and MARK_BLOOM in src/components/palette.ts. */
-const MARK_COLOR = "#ffffff";
-const MARK_BLOOM = "#a9c9ff";
+/** Must match TAIL_DASH in src/components/markerScene.ts. */
+const TAIL_DASH = {
+  solidShare: 0.3,
+  solidPx: 64,
+  dashPx: 11,
+  gapPx: 4,
+  dashGrowth: 0.82,
+  gapGrowth: 1.34,
+  maxDashes: 32
+};
+/** Must match CATEGORY_COLORS.LANDMARK and CATEGORY_BLOOMS.LANDMARK in src/satellite/categories.ts. */
+const LIGHT_COLOR = "#fbe6af";
+const LIGHT_BLOOM = "#e6c77c";
 
 /**
  * Must match BOOT_SKY_DESIGN, SKY, BOOT_PASSES[0], PASS_TIMING, LIGHT, STARS and
@@ -81,7 +92,7 @@ const LIGHT = {
   coreRadius: 2.6,
   glow: { radius: 14, alpha: 0.8 },
   bloom: { radius: 40, alpha: 0.35 },
-  tail: { width: 2.6, length: 130, alpha: 0.85 }
+  tail: { width: 1.7, length: 170, alpha: 0.85, dashScale: 0.75 }
 };
 const STARS = {
   seed: 7,
@@ -106,8 +117,9 @@ const EXTENDED_SCALE = 3;
  * square, the same light made of the same fades.
  *
  * The one fade it does not share is the tail's. The overlay's spends most of a
- * tail's strength in its first third, which at sixty points across is a stub;
+ * tail's strength in its first half, which at sixty points across is a stub;
  * the icon's holds on further along so the arc still reads as an arc there.
+ * The dashes are the overlay's pattern at `dashScale` pixels to its one.
  */
 const ICON = {
   size: 1024,
@@ -125,11 +137,11 @@ const ICON = {
   coreRadius: 34,
   glow: { radius: 150, alpha: 0.8 },
   bloom: { radius: 320, alpha: 0.45 },
-  tail: { width: 42, alpha: 0.9 },
+  tail: { width: 15, alpha: 0.95, dashScale: 4.4 },
   tailFade: [
     { at: 0, strength: 1 },
-    { at: 0.35, strength: 0.5 },
-    { at: 0.75, strength: 0.12 },
+    { at: 0.35, strength: 0.7 },
+    { at: 0.75, strength: 0.25 },
     { at: 1, strength: 0 }
   ]
 };
@@ -142,23 +154,61 @@ function pointAt(cx, cy, radius, degrees) {
   return [cx + radius * Math.cos(radians), cy + radius * Math.sin(radians)];
 }
 
-/**
- * A tail laid back along an arc from a head at `headDeg`: full width under the
- * head, tapering to nothing at its tip. Out along the far edge and back along
- * the near one, so the polygon closes on the point it started at.
- */
-function tailOnArc(cx, cy, radius, headDeg, sweepDeg, width, direction) {
-  const steps = Math.max(16, Math.round(sweepDeg / 1.5));
-  const outer = [];
-  const inner = [];
-  for (let step = 0; step <= steps; step += 1) {
-    const along = step / steps;
-    const degrees = headDeg - direction * sweepDeg * along;
-    const half = (width / 2) * (1 - along);
-    outer.push(pointAt(cx, cy, radius + half, degrees));
-    inner.push(pointAt(cx, cy, radius - half, degrees));
+/** `stretchOf`: the part of a polyline between two distances along it. */
+function stretchOf(points, from, to) {
+  const run = [];
+  let walked = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const [x0, y0] = points[index - 1];
+    const [x1, y1] = points[index];
+    const step = Math.hypot(x1 - x0, y1 - y0);
+    const next = walked + step;
+    if (next >= from && step > 0) {
+      if (run.length === 0) {
+        const share = (from - walked) / step;
+        run.push([x0 + (x1 - x0) * share, y0 + (y1 - y0) * share]);
+      }
+      if (next >= to) {
+        const share = (to - walked) / step;
+        run.push([x0 + (x1 - x0) * share, y0 + (y1 - y0) * share]);
+        return run;
+      }
+      run.push([x1, y1]);
+    }
+    walked = next;
   }
-  return { points: [...outer, ...inner.reverse()], tip: outer[outer.length - 1] };
+  return run;
+}
+
+/** `dashedRuns`: the solid stretch from the head, then the dashes. */
+function dashedRuns(points, length, scale) {
+  const { solidShare, solidPx, dashPx, gapPx, dashGrowth, gapGrowth, maxDashes } = TAIL_DASH;
+  const spans = [[0, Math.min(length * solidShare, solidPx * scale)]];
+  let dash = dashPx * scale;
+  let gap = gapPx * scale;
+  let at = spans[0][1] + gap;
+  while (at < length && spans.length <= maxDashes) {
+    spans.push([at, Math.min(length, at + dash)]);
+    at += dash;
+    dash *= dashGrowth;
+    gap *= gapGrowth;
+    at += gap;
+  }
+  return spans.map(([from, to]) => stretchOf(points, from, to));
+}
+
+/**
+ * A tail laid back along an arc from a head at `headDeg`, `length` long: the
+ * arc as points, then broken into the runs that are stroked.
+ */
+function tailOnArc(cx, cy, radius, headDeg, length, direction, dashScale) {
+  const sweepDeg = (length / radius) * (180 / Math.PI);
+  const steps = Math.max(16, Math.round(sweepDeg / 1.5));
+  const arc = [];
+  for (let step = 0; step <= steps; step += 1) {
+    arc.push(pointAt(cx, cy, radius, headDeg - direction * sweepDeg * (step / steps)));
+  }
+  return { runs: dashedRuns(arc, length, dashScale), tip: arc[arc.length - 1] };
 }
 
 function crossingDeg(cx, radius, x) {
@@ -189,8 +239,15 @@ function bootStill() {
   };
 
   const [x, y] = pointAt(cx, cy, radius, -90);
-  const sweepDeg = ((LIGHT.tail.length * scale) / radius) * (180 / Math.PI);
-  const tail = tailOnArc(cx, cy, radius, -90, sweepDeg, LIGHT.tail.width * scale, pass.direction);
+  const tail = tailOnArc(
+    cx,
+    cy,
+    radius,
+    -90,
+    LIGHT.tail.length * scale,
+    pass.direction,
+    LIGHT.tail.dashScale * scale
+  );
 
   return {
     width,
@@ -204,7 +261,7 @@ function bootStill() {
       coreRadius: LIGHT.coreRadius * scale,
       glow: { radius: LIGHT.glow.radius * scale, alpha: LIGHT.glow.alpha },
       bloom: { radius: LIGHT.bloom.radius * scale, alpha: LIGHT.bloom.alpha },
-      tail: { ...tail, alpha: LIGHT.tail.alpha },
+      tail: { ...tail, width: LIGHT.tail.width * scale, alpha: LIGHT.tail.alpha },
       tailFade: FADES.tail
     }
   };
@@ -247,12 +304,14 @@ function stopsSvg(fade, color) {
 
 /**
  * One light, as the four shapes every backend draws it with: bloom, glow, tail
- * and point, each filled with its fade. Gradients in user space, so a light
- * inside a turned group turns with its gradients.
+ * and point, each filled or stroked with its fade. Gradients in user space, so
+ * a light inside a turned group turns with its gradients.
  */
 function lightSvg(id, light, alpha, transform = "") {
   const { x, y, tail } = light;
-  const path = tail.points.map(([px, py]) => `${round(px)} ${round(py)}`).join(" L ");
+  const path = tail.runs
+    .map((run) => `M ${run.map(([px, py]) => `${round(px)} ${round(py)}`).join(" L ")}`)
+    .join(" ");
   const radial = (name, radius, fade, color) => `    <radialGradient id="${id}-${name}" gradientUnits="userSpaceOnUse" cx="${round(x)}" cy="${round(
     y
   )}" r="${round(radius)}">
@@ -260,13 +319,13 @@ ${stopsSvg(fade, color)}
     </radialGradient>`;
 
   const defs = `  <defs>
-${radial("bloom", light.bloom.radius, FADES.bloom, MARK_BLOOM)}
-${radial("glow", light.glow.radius, FADES.glow, MARK_COLOR)}
-${radial("core", light.coreRadius, FADES.core, MARK_COLOR)}
+${radial("bloom", light.bloom.radius, FADES.bloom, LIGHT_BLOOM)}
+${radial("glow", light.glow.radius, FADES.glow, LIGHT_COLOR)}
+${radial("core", light.coreRadius, FADES.core, LIGHT_COLOR)}
     <linearGradient id="${id}-tail" gradientUnits="userSpaceOnUse" x1="${round(x)}" y1="${round(y)}" x2="${round(
       tail.tip[0]
     )}" y2="${round(tail.tip[1])}">
-${stopsSvg(light.tailFade, MARK_COLOR)}
+${stopsSvg(light.tailFade, LIGHT_COLOR)}
     </linearGradient>
   </defs>`;
 
@@ -277,7 +336,7 @@ ${stopsSvg(light.tailFade, MARK_COLOR)}
     <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.glow.radius)}" fill="url(#${id}-glow)" opacity="${round(
       light.glow.alpha * alpha
     )}"/>
-    <path d="M ${path} Z" fill="url(#${id}-tail)" opacity="${round(tail.alpha * alpha)}"/>
+    <path d="${path}" fill="none" stroke="url(#${id}-tail)" stroke-width="${round(tail.width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${round(tail.alpha * alpha)}"/>
     <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.coreRadius)}" fill="url(#${id}-core)" opacity="${round(alpha)}"/>
   </g>`;
 
@@ -319,14 +378,15 @@ function iconLight() {
   const cx = ICON.arc.cx * S;
   const cy = ICON.arc.cy * S;
   const [x, y] = pointAt(cx, cy, ICON.arc.radius, ICON.headDeg);
-  const tail = tailOnArc(cx, cy, ICON.arc.radius, ICON.headDeg, ICON.sweepDeg, ICON.tail.width, ICON.direction);
+  const length = ICON.arc.radius * ICON.sweepDeg * (Math.PI / 180);
+  const tail = tailOnArc(cx, cy, ICON.arc.radius, ICON.headDeg, length, ICON.direction, ICON.tail.dashScale);
   return {
     x,
     y,
     coreRadius: ICON.coreRadius,
     glow: ICON.glow,
     bloom: ICON.bloom,
-    tail: { ...tail, alpha: ICON.tail.alpha },
+    tail: { ...tail, width: ICON.tail.width, alpha: ICON.tail.alpha },
     tailFade: ICON.tailFade
   };
 }
@@ -365,12 +425,10 @@ ${lightSvg("light", light, 1)}
  * The SVG is two gradient-filled rectangles and a light, and every one of those
  * is a formula per pixel, so a compositor that evaluates each layer's gradient
  * the way SVG defines it and lays it over the last is the whole renderer — the
- * one edge that needs antialiasing, the tail's, gets a scanline coverage map.
+ * one edge that needs antialiasing, the tail's, gets a coverage map from each
+ * pixel's distance to the stroked runs.
  * Cheaper than a dependency, and it keeps the file's no-imports rule.
  */
-
-/** Coverage is exact across a row and sampled down it, so this is what the arc's diagonals cost. */
-const SUBSAMPLES = 16;
 
 function rgb(hex) {
   const value = Number.parseInt(hex.slice(1), 16);
@@ -391,31 +449,37 @@ function fadeAt(fade, t) {
   return fade[fade.length - 1].strength;
 }
 
-/** Adds a horizontal run's exact per-pixel overlap into one row of the coverage map. */
-function addSpan(coverage, row, size, start, end) {
-  for (let x = Math.max(0, Math.floor(start)); x < Math.min(size, Math.ceil(end)); x += 1) {
-    const overlap = Math.min(end, x + 1) - Math.max(start, x);
-    if (overlap > 0) coverage[row + x] += overlap / SUBSAMPLES;
-  }
-}
-
-/** Coverage of a polygon, in [0, 1] per pixel, by even-odd scanline fill. */
-function rasterise(size, polygon) {
+/**
+ * Coverage of round-capped strokes of `width` along `runs`, in [0, 1] per pixel:
+ * how far inside the stroke each pixel's centre is, a pixel's width of ramp at
+ * the edge. Only the box around each segment is visited.
+ */
+function strokeCoverage(size, runs, width) {
   const coverage = new Float64Array(size * size);
-  for (let step = 0; step < size * SUBSAMPLES; step += 1) {
-    const y = (step + 0.5) / SUBSAMPLES;
-    const crossings = [];
-    for (let i = 0; i < polygon.length; i += 1) {
-      const [x0, y0] = polygon[i];
-      const [x1, y1] = polygon[(i + 1) % polygon.length];
-      // Half-open in y: a vertex on the scanline is counted once, not twice.
-      if (y0 <= y === y1 <= y) continue;
-      crossings.push(x0 + ((y - y0) / (y1 - y0)) * (x1 - x0));
-    }
-    crossings.sort((a, b) => a - b);
-    const row = Math.floor(y) * size;
-    for (let i = 0; i + 1 < crossings.length; i += 2) {
-      addSpan(coverage, row, size, crossings[i], crossings[i + 1]);
+  const half = width / 2;
+  for (const run of runs) {
+    const segments = run.length > 1 ? run.length - 1 : 1;
+    for (let index = 0; index < segments; index += 1) {
+      const [x0, y0] = run[index];
+      const [x1, y1] = run[Math.min(index + 1, run.length - 1)];
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const lengthSquared = dx * dx + dy * dy;
+      const fromX = Math.max(0, Math.floor(Math.min(x0, x1) - half - 1));
+      const toX = Math.min(size - 1, Math.ceil(Math.max(x0, x1) + half + 1));
+      const fromY = Math.max(0, Math.floor(Math.min(y0, y1) - half - 1));
+      const toY = Math.min(size - 1, Math.ceil(Math.max(y0, y1) + half + 1));
+      for (let y = fromY; y <= toY; y += 1) {
+        for (let x = fromX; x <= toX; x += 1) {
+          const px = x + 0.5 - x0;
+          const py = y + 0.5 - y0;
+          const t = lengthSquared > 0 ? clamp((px * dx + py * dy) / lengthSquared, 0, 1) : 0;
+          const distance = Math.hypot(px - t * dx, py - t * dy);
+          const covered = clamp(half - distance + 0.5, 0, 1);
+          const at = y * size + x;
+          if (covered > coverage[at]) coverage[at] = covered;
+        }
+      }
     }
   }
   return coverage;
@@ -448,7 +512,7 @@ function iconPng(light) {
   const top = rgb(ICON.night[0].color);
   const bottom = rgb(ICON.night[1].color);
   const horizon = { ...ICON.horizon, x: ICON.horizon.x * S, y: ICON.horizon.y * S, radius: ICON.horizon.radius * S };
-  const tail = rasterise(S, light.tail.points);
+  const tail = strokeCoverage(S, light.tail.runs, light.tail.width);
   const [tipX, tipY] = light.tail.tip;
   const alongX = tipX - light.x;
   const alongY = tipY - light.y;
@@ -457,8 +521,8 @@ function iconPng(light) {
     const distance = Math.hypot(px - light.x, py - light.y);
     if (distance < radius) over(index, color, alpha * fadeAt(fade, distance / radius));
   };
-  const white = rgb(MARK_COLOR);
-  const bloom = rgb(MARK_BLOOM);
+  const white = rgb(LIGHT_COLOR);
+  const bloom = rgb(LIGHT_BLOOM);
   const breath = rgb(horizon.color);
 
   for (let y = 0; y < S; y += 1) {

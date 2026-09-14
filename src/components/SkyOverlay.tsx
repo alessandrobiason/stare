@@ -27,7 +27,7 @@ import { SceneTab } from "../hooks/useSceneControls";
 import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrientation";
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
-import { SatelliteCategory } from "../satellite/categories";
+import { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { BackdropBrightness, brightnessGrid } from "../vision/backdropBrightness";
@@ -139,9 +139,9 @@ type Props = {
   attitude: AttitudeSource;
   enabledCategories: Set<SatelliteCategory>;
   onToggleCategory: (category: SatelliteCategory) => void;
-  /** Whether Starlink is drawn, which is its own switch. See `isStarlink`. */
-  starlink: boolean;
-  onToggleStarlink: () => void;
+  /** Which subcategories are drawn, each its own switch. See `SUBCATEGORIES_OF`. */
+  enabledSubcategories: Set<SatelliteSubcategory>;
+  onToggleSubcategory: (subcategory: SatelliteSubcategory) => void;
   onEnableAll: () => void;
   /** Which tab is showing, and how to change it. See `TabBar`. */
   tab: SceneTab;
@@ -274,8 +274,8 @@ export const SkyOverlay: React.FC<Props> = ({
   attitude,
   enabledCategories,
   onToggleCategory,
-  starlink,
-  onToggleStarlink,
+  enabledSubcategories,
+  onToggleSubcategory,
   onEnableAll,
   tab,
   onSelectTab,
@@ -416,7 +416,7 @@ export const SkyOverlay: React.FC<Props> = ({
     backdropRef,
     maskFiltering: skyMaskFiltering,
     enabledCategories,
-    starlink,
+    enabledSubcategories,
     viewport,
     onSkyChange: setSky
   });
@@ -590,8 +590,8 @@ export const SkyOverlay: React.FC<Props> = ({
               open={filterOpen}
               enabledCategories={enabledCategories}
               onToggleCategory={onToggleCategory}
-              starlink={starlink}
-              onToggleStarlink={onToggleStarlink}
+              enabledSubcategories={enabledSubcategories}
+              onToggleSubcategory={onToggleSubcategory}
               onEnableAll={onEnableAll}
             />
           </>

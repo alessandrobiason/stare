@@ -4,8 +4,12 @@ import {
   classifySatellite,
   isDuplicateEntry,
   isParked,
-  isStarlink,
-  noradId
+  noradId,
+  parentOf,
+  SATELLITE_CATEGORIES,
+  SATELLITE_SUBCATEGORIES,
+  subcategoryOf,
+  SUBCATEGORIES_OF
 } from "../src/satellite/categories";
 import { Tle } from "../src/types";
 
@@ -73,27 +77,55 @@ test("reads the catalogue number from either element line", () => {
 test("classifies satellites by purpose, falling back to the residual", () => {
   expect(classifySatellite("GPS BIIR-2")).toBe("NAVIGATION");
   expect(classifySatellite("SENTINEL-2A")).toBe("EARTH");
-  expect(classifySatellite("STARLINK-1234")).toBe("COMMS");
-  expect(classifySatellite("IRIDIUM 106")).toBe("COMMS");
+  expect(classifySatellite("STARLINK-1234")).toBe("INTERNET");
+  expect(classifySatellite("ONEWEB-0012")).toBe("INTERNET");
+  expect(classifySatellite("IRIDIUM 106")).toBe("TELECOM");
   expect(classifySatellite("SOMETHING ELSE")).toBe("OTHER");
 });
 
-test("singles Starlink out without moving it out of communications", () => {
-  // The filter's one special case: still comms, still that colour, but with a
-  // switch of its own because it is about half of what is over any given head.
-  expect(classifySatellite("STARLINK-1234")).toBe("COMMS");
-  expect(isStarlink("STARLINK-1234")).toBe(true);
-  expect(isStarlink("Starlink-1234")).toBe(true);
-
-  // Anchored, so it is the fleet rather than anything with the word in it.
-  expect(isStarlink("STARLINER")).toBe(false);
-  expect(isStarlink("ONEWEB-0012")).toBe(false);
-  expect(isStarlink("SOME STARLINK LOOKALIKE")).toBe(false);
+test("keeps the internet constellations apart from television and telephony", () => {
+  // What used to be one category: ten thousand broadband satellites in low
+  // orbit, and the television satellites parked over the equator with them.
+  expect(classifySatellite("KUIPER-00012")).toBe("INTERNET");
+  expect(classifySatellite("O3B MPOWER 7")).toBe("INTERNET");
+  expect(classifySatellite("EUTELSAT 10B", parkedLine2)).toBe("TELECOM");
+  expect(classifySatellite("INMARSAT 6-F1", parkedLine2)).toBe("TELECOM");
+  expect(classifySatellite("GLOBALSTAR M087")).toBe("TELECOM");
 });
 
-test("treats an unrecognised parked object as communications", () => {
-  expect(classifySatellite("MYSTERY SAT", parkedLine2)).toBe("COMMS");
+test("splits a category into subcategories, one of which takes the rest", () => {
+  expect(subcategoryOf("STARLINK-1234", "INTERNET")).toBe("STARLINK");
+  expect(subcategoryOf("Starlink-1234", "INTERNET")).toBe("STARLINK");
+  expect(subcategoryOf("ONEWEB-0012", "INTERNET")).toBe("CONSTELLATIONS");
+  // Anchored, so it is the fleet rather than anything with the word in it.
+  expect(subcategoryOf("SOME STARLINK LOOKALIKE", "INTERNET")).toBe("CONSTELLATIONS");
+
+  expect(subcategoryOf("IRIDIUM 106", "TELECOM")).toBe("MOBILE");
+  expect(subcategoryOf("INTELSAT 901", "TELECOM")).toBe("BROADCAST");
+  expect(subcategoryOf("NOAA 20", "EARTH")).toBe("WEATHER");
+  expect(subcategoryOf("SENTINEL-2A", "EARTH")).toBe("IMAGING");
+  expect(subcategoryOf("GPS BIIR-2", "NAVIGATION")).toBeNull();
+
+  for (const category of SATELLITE_CATEGORIES) {
+    for (const subcategory of SUBCATEGORIES_OF[category]) {
+      expect(parentOf(subcategory)).toBe(category);
+    }
+  }
+  expect(SATELLITE_CATEGORIES.flatMap((category) => SUBCATEGORIES_OF[category])).toEqual([
+    ...SATELLITE_SUBCATEGORIES
+  ]);
+});
+
+test("treats an unrecognised parked object as television and data", () => {
+  expect(classifySatellite("MYSTERY SAT", parkedLine2)).toBe("TELECOM");
+  expect(subcategoryOf("MYSTERY SAT", "TELECOM")).toBe("BROADCAST");
   expect(classifySatellite("MYSTERY SAT", SAMPLE_TLE.line2)).toBe("OTHER");
+});
+
+test("does not file the military series in the belt as television", () => {
+  expect(classifySatellite("USA 230", parkedLine2)).toBe("OTHER");
+  expect(classifySatellite("SBIRS GEO-5 (USA 315)", parkedLine2)).toBe("OTHER");
+  expect(classifySatellite("TJS-11", parkedLine2)).toBe("OTHER");
 });
 
 test("recognises landmarks by catalogue number, not by name", () => {

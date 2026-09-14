@@ -6,7 +6,7 @@ import { EciPosition, EciState } from "../types";
  *
  * The marker's trail is the ground the object has just covered, and it is long
  * enough (`SATELLITE_MARKERS.trailSeconds`) that the straight line a velocity
- * alone gives is no longer the path: over a minute and a half a low orbit turns
+ * alone gives is no longer the path: over three quarters of a minute a low orbit turns
  * through five or six degrees, and it is that turn which bends the trail on the
  * frame. SGP4 would place every point exactly, but at a dozen points for every
  * satellite on every frame it is the one cost this loop cannot carry. Gravity

@@ -132,8 +132,17 @@ export const ar: Strings = {
       LANDMARK: "الأشهر",
       NAVIGATION: "ملاحة",
       EARTH: "رصد الأرض",
-      COMMS: "إنترنت وتلفزيون",
+      INTERNET: "إنترنت فضائي",
+      TELECOM: "بث واتصالات",
       OTHER: "أخرى"
+    },
+    subcategories: {
+      WEATHER: "طقس",
+      IMAGING: "تصوير ورادار",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "شبكات أخرى",
+      BROADCAST: "تلفزيون وبيانات",
+      MOBILE: "هواتف وأجهزة"
     }
   },
   card: {

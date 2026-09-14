@@ -201,7 +201,7 @@ test("gives an object that holds station no trail at all", () => {
 test("objects in low orbit draw a trail across a real part of the frame", () => {
   const tracker = primedTracker();
   const moving = tracker.fixesAt(WHEN, observer).filter((fix) => !fix.parked);
-  // A degree is twenty pixels; over a minute and a half the fastest low passes
+  // A degree is twenty pixels; over three quarters of a minute the fastest low passes
   // cover a good part of the sky.
   const arcs = moving.map((fix) => separationDeg(fix.position, fix.trail[fix.trail.length - 1]));
   expect(Math.max(...arcs)).toBeGreaterThan(10);

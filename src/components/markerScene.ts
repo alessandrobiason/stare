@@ -87,7 +87,7 @@ import { Ink, MARK_COLOR, MarkerPalette } from "./palette";
  * gone.
  *
  * By day the pale fill alone would vanish into the sky, so every mark, tail
- * included, gains a near-black edge a pixel or so wide and loses its light: by
+ * included, gains a fine edge in a deep shade of its own hue and loses its light: by
  * day the edge is what reads. Both are the palette's business (`glow`, `edge`),
  * and they cross over together at dusk. At night the same happens to a single
  * mark over anything in the picture as bright as it is — the moon, a street
@@ -147,7 +147,7 @@ export type FadeStop = { at: number; strength: number };
  * The line runs through where the object really was (`SatelliteFix.trail`), so
  * it bends as the orbit does rather than being a straight streak laid behind
  * the mark. A stroke of one width rather than the taper it replaced: a taper
- * over a minute and a half of orbit is a wedge across the frame, where a fine
+ * over three quarters of a minute of orbit is a wedge across the frame, where a fine
  * line is a path. What says which end is the object is the strength instead —
  * solid and bright at the mark, a scatter of faint dots at the far end — which
  * is how a trail left in the sky looks: there, then less and less there.
@@ -210,6 +210,11 @@ export type GlyphShape = {
   bloom: Glow;
   /** The bloom's colour: the category's own hue, deeper. See `CATEGORY_BLOOMS`. */
   bloomColor: string;
+  /**
+   * The colour of the edge under the mark and its tail: the category's own hue
+   * in a deep shade (`CATEGORY_EDGES`), drawn at `edgeAlpha`.
+   */
+  edgeColor: string;
   /** Radius of the landmark halo, or `null` for everything else. Faded like a glow. */
   halo: number | null;
   /** The mark's fill, as `#rrggbb`: its category's colour. */
@@ -430,6 +435,7 @@ export function buildMarkerScene(
     const edge = Math.max(palette.edge, backdropEdge(marker));
     const light = Math.min(palette.glow, 1 - edge);
     const color = palette.categories[marker.category];
+    const edgeColor = palette.edges[marker.category];
     const landmark = marker.category === "LANDMARK";
 
     const path = marker.trail ? trailPixels(marker.point, marker.trail, box) : null;
@@ -465,6 +471,7 @@ export function buildMarkerScene(
       glow: { radius: size * GLOW_RATIO, alpha: GLOW_ALPHA * strength * light },
       bloom: { radius: size * BLOOM_RATIO, alpha: BLOOM_ALPHA * strength * light },
       bloomColor: palette.blooms[marker.category],
+      edgeColor,
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
       color,
       alpha: marker.opacity * sunlightAlpha(marker),
@@ -606,18 +613,23 @@ function pathShapeFor(
     rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO),
     pastWidth,
     pastRimWidth: pastWidth + 2 * Math.max(MIN_OUTLINE_PX, pastWidth * OUTLINE_RATIO),
-    rim: edgeInk(palette)
+    rim: edgeInk(palette, palette.edge, palette.edges[path.category])
   };
 }
 
 /**
- * The dark edge under a line or a ring, at the strength the sky calls for: the
- * palette's outline, times its `edge` — or times `edge` given, for the ring
- * round a mark that is over something bright. The marks carry the same factor
- * on `edgeAlpha` instead, since theirs also fades with the mark.
+ * The dark edge under a line or a ring, at the strength the sky calls for: in
+ * `color` — a landmark path's is its category's shade — at the palette's
+ * outline strength, times its `edge`, or times `edge` given, for the ring round
+ * a mark that is over something bright. The marks carry the same factor on
+ * `edgeAlpha` instead, since theirs also fades with the mark.
  */
-function edgeInk(palette: MarkerPalette, edge: number = palette.edge): Ink {
-  return { color: palette.outline.color, alpha: palette.outline.alpha * edge };
+function edgeInk(
+  palette: MarkerPalette,
+  edge: number = palette.edge,
+  color: string = palette.outline.color
+): Ink {
+  return { color, alpha: palette.outline.alpha * edge };
 }
 
 /**
@@ -670,18 +682,7 @@ function pathOpacity(lead: number): number {
   return nearOpacity + (farOpacity - nearOpacity) * lead;
 }
 
-/**
- * The tail along a trail already laid out in pixels (`trailPixels`).
- *
- * The solid stretch is a share of the trail, capped (`TAIL_DASH.solidPx`), so a
- * short trail is mostly line and a long one does not run a solid bar across the
- * frame. Past it the dashes are measured in pixels from the mark rather than as
- * shares of the trail, so the pattern is the same on every mark and does not
- * stretch as a pass swings nearer: each dash a little shorter than the one
- * before and each gap a little longer, until what is left is dots with sky
- * between them. The pattern travels with the mark, so it is still while the
- * object moves; only the far end changes, as the trail lengthens and shortens.
- */
+/** The tail along a trail already laid out in pixels (`trailPixels`). */
 function tailFor(
   path: { points: number[]; length: number },
   width: number,
@@ -690,6 +691,34 @@ function tailFor(
   scale: number
 ): TailShape {
   const { points, length } = path;
+  return {
+    runs: dashedRuns(points, length, scale),
+    tipX: points[points.length - 2],
+    tipY: points[points.length - 1],
+    length,
+    width,
+    alpha,
+    rim
+  };
+}
+
+/**
+ * A trail broken into what is stroked: the solid stretch from its head, then
+ * the dashes (`TAIL_DASH`), each as a run of flat `x, y` pairs along `points`.
+ *
+ * The solid stretch is a share of the trail, capped, so a short trail is
+ * mostly line and a long one does not run a solid bar across the frame. Past it
+ * the dashes are measured in pixels from the head rather than as shares of the
+ * trail, so the pattern is the same on every mark and does not stretch as a
+ * pass swings nearer: each dash a little shorter than the one before and each
+ * gap a little longer, until what is left is dots with sky between them. The
+ * pattern travels with the head, so it is still while the object moves; only
+ * the far end changes, as the trail lengthens and shortens.
+ *
+ * Exported for the boot screen and the logo, whose one light trails the same
+ * line along its arc; `scale` is pixels per design pixel of `TAIL_DASH`.
+ */
+export function dashedRuns(points: number[], length: number, scale: number): number[][] {
   const { solidShare, solidPx, dashPx, gapPx, dashGrowth, gapGrowth, maxDashes } = TAIL_DASH;
   const spans: [number, number][] = [[0, Math.min(length * solidShare, solidPx * scale)]];
   let dash = dashPx * scale;
@@ -702,16 +731,7 @@ function tailFor(
     gap *= gapGrowth;
     at += gap;
   }
-
-  return {
-    runs: spans.map(([from, to]) => stretchOf(points, from, to)),
-    tipX: points[points.length - 2],
-    tipY: points[points.length - 1],
-    length,
-    width,
-    alpha,
-    rim
-  };
+  return spans.map(([from, to]) => stretchOf(points, from, to));
 }
 
 /**
@@ -768,30 +788,13 @@ function depthStrength(range: number): number {
  * Gently near the mark, where the line is solid and is what says which way the
  * object is going, and steadily after: the dashes carry most of the thinning
  * out already, so the fade only has to take the last of them to nothing — and
- * the tip, where the object was a minute and a half ago, is nothing at all
+ * the tip, where the object was three quarters of a minute ago, is nothing at all
  * rather than a hard end.
  */
 export const TAIL_FADE: readonly FadeStop[] = [
   { at: 0, strength: 1 },
   { at: 0.12, strength: 0.8 },
   { at: 0.45, strength: 0.32 },
-  { at: 1, strength: 0 }
-];
-
-/**
- * How the logo's tail falls away: the tapered comet the boot screen and
- * `assets/icon.svg` draw, which is what the marks' tails were before they
- * became dashed lines along the orbit.
- *
- * Fast at first and slow after: most of its strength is spent in the first
- * third, next to the point, so what reads is a bright streak coming out of the
- * light and thinning into the sky. Kept apart from `TAIL_FADE` so the logo does
- * not change when the marks do.
- */
-export const COMET_FADE: readonly FadeStop[] = [
-  { at: 0, strength: 1 },
-  { at: 0.3, strength: 0.5 },
-  { at: 0.65, strength: 0.15 },
   { at: 1, strength: 0 }
 ];
 
@@ -953,18 +956,25 @@ const SELECTED_GROWTH = 1.25;
 const TRAIL_WIDTH_RATIO = 0.3;
 /** The thinnest a trail is drawn, in pixels at the design width. */
 const MIN_TRAIL_WIDTH_PX = 1.4;
-/** Edge thickness, as a fraction of the point's diameter. */
-const OUTLINE_RATIO = 0.16;
+/**
+ * Edge thickness, as a fraction of the point's diameter.
+ *
+ * A tenth: enough to part a pale mark from a bright sky, and no more. The edge
+ * used to be half again as thick and near-black, and read as an outline drawn
+ * round the mark rather than as the mark's own shading.
+ */
+const OUTLINE_RATIO = 0.1;
 /** The thinnest a line's rim is drawn, in layout pixels. */
 const MIN_OUTLINE_PX = 1;
 /**
  * The thinnest a mark's edge is drawn, in layout pixels.
  *
- * Thicker than a line's rim, because by day the edge is most of what is seen of
- * a pale mark on a bright sky, and at a single pixel that is a grey smudge
- * rather than a ring.
+ * Under a pixel, because on the phone a layout pixel is two or three real
+ * ones: nine tenths of one is still a continuous ring at the far end of the
+ * range scale, and it is in the mark's own hue (`CATEGORY_EDGES`), so it reads
+ * as the rim of a coloured light rather than as a grey smudge round it.
  */
-const MIN_EDGE_PX = 1.25;
+const MIN_EDGE_PX = 0.9;
 /** Thickness of the parked ring, as a fraction of its diameter. */
 const RING_RATIO = 0.2;
 const MIN_RING_PX = 1;

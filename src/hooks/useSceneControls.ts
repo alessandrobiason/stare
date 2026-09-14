@@ -1,5 +1,10 @@
 import { useCallback, useState } from "react";
-import { allCategories, SatelliteCategory } from "../satellite/categories";
+import {
+  allCategories,
+  allSubcategories,
+  SatelliteCategory,
+  SatelliteSubcategory
+} from "../satellite/categories";
 
 /**
  * Which of the three tabs the app is showing.
@@ -17,16 +22,16 @@ export type SceneControls = {
   enabledCategories: Set<SatelliteCategory>;
   toggleCategory: (category: SatelliteCategory) => void;
   /**
-   * Whether Starlink is drawn. Its own switch rather than a sixth category,
-   * because it is not a sixth purpose — see `isStarlink`.
+   * Which subcategories are drawn, on top of whether their category is: a
+   * switch each under the categories that are split (`SUBCATEGORIES_OF`).
    *
-   * On, because the default view is the sky as it is rather than an edited one,
-   * and a constellation missing from a sky nobody has filtered is a bug from
-   * where the person holding the phone is standing.
+   * All on, because the default view is the sky as it is rather than an edited
+   * one, and a constellation missing from a sky nobody has filtered is a bug
+   * from where the person holding the phone is standing.
    */
-  starlink: boolean;
-  toggleStarlink: () => void;
-  /** Everything back on: the five categories and Starlink with them. */
+  enabledSubcategories: Set<SatelliteSubcategory>;
+  toggleSubcategory: (subcategory: SatelliteSubcategory) => void;
+  /** Everything back on: every category and every subcategory with them. */
   enableAllCategories: () => void;
   /**
    * Whether the filter panel is down from its button in the header.
@@ -99,7 +104,8 @@ export function useSceneControls(): SceneControls {
   const [tab, setTabState] = useState<SceneTab>("sky");
   const [enabledCategories, setEnabledCategories] =
     useState<Set<SatelliteCategory>>(allCategories);
-  const [starlink, setStarlink] = useState(true);
+  const [enabledSubcategories, setEnabledSubcategories] =
+    useState<Set<SatelliteSubcategory>>(allSubcategories);
   const [filterOpen, setFilterOpen] = useState(false);
   const [debug, setDebug] = useState(false);
   const [guide, setGuide] = useState(false);
@@ -114,11 +120,17 @@ export function useSceneControls(): SceneControls {
     });
   }, []);
 
-  const toggleStarlink = useCallback(() => setStarlink((on) => !on), []);
+  const toggleSubcategory = useCallback((subcategory: SatelliteSubcategory) => {
+    setEnabledSubcategories((current) => {
+      const next = new Set(current);
+      if (!next.delete(subcategory)) next.add(subcategory);
+      return next;
+    });
+  }, []);
 
   const enableAllCategories = useCallback(() => {
     setEnabledCategories(allCategories());
-    setStarlink(true);
+    setEnabledSubcategories(allSubcategories());
   }, []);
   const toggleFilter = useCallback(() => setFilterOpen((open) => !open), []);
   /**
@@ -145,8 +157,8 @@ export function useSceneControls(): SceneControls {
     setTab,
     enabledCategories,
     toggleCategory,
-    starlink,
-    toggleStarlink,
+    enabledSubcategories,
+    toggleSubcategory,
     enableAllCategories,
     filterOpen,
     toggleFilter,

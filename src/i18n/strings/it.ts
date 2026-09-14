@@ -134,8 +134,17 @@ export const it: Strings = {
       LANDMARK: "IMPORTANTI",
       NAVIGATION: "NAVIGAZIONE",
       EARTH: "METEO E MAPPE",
-      COMMS: "INTERNET E TV",
+      INTERNET: "INTERNET",
+      TELECOM: "TV E TELEFONIA",
       OTHER: "ALTRO"
+    },
+    subcategories: {
+      WEATHER: "METEO",
+      IMAGING: "IMMAGINI E RADAR",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "ALTRE COSTELLAZIONI",
+      BROADCAST: "TV E DATI",
+      MOBILE: "TELEFONI E IOT"
     }
   },
   card: {

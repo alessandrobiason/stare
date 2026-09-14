@@ -136,8 +136,17 @@ export const nl: Strings = {
       LANDMARK: "HOOGTEPUNTEN",
       NAVIGATION: "NAVIGATIE",
       EARTH: "AARDOBSERVATIE",
-      COMMS: "INTERNET & TV",
+      INTERNET: "INTERNET",
+      TELECOM: "TV & TELEFONIE",
       OTHER: "OVERIG"
+    },
+    subcategories: {
+      WEATHER: "WEER",
+      IMAGING: "BEELDEN & RADAR",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "ANDERE NETWERKEN",
+      BROADCAST: "TV & DATA",
+      MOBILE: "TELEFOONS & IOT"
     }
   },
   card: {

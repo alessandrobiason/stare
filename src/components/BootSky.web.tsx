@@ -12,7 +12,7 @@ import {
   starAlpha
 } from "./bootSky";
 import { FrameSize } from "./markerGeometry";
-import { BLOOM_FADE, COMET_FADE, CORE_FADE, FadeStop, GLOW_FADE } from "./markerScene";
+import { BLOOM_FADE, CORE_FADE, FadeStop, GLOW_FADE, TAIL_FADE } from "./markerScene";
 import { cssColor } from "./palette";
 
 type Props = {
@@ -110,18 +110,22 @@ function draw(
 
   const { tail } = light;
   const fade = context.createLinearGradient(light.x, light.y, tail.tipX, tail.tipY);
-  for (const stop of COMET_FADE) {
+  for (const stop of TAIL_FADE) {
     fade.addColorStop(stop.at, cssColor({ color: light.color, alpha: stop.strength }));
   }
   context.globalAlpha = tail.alpha * pose.alpha;
-  context.fillStyle = fade;
+  context.strokeStyle = fade;
+  context.lineWidth = tail.width;
+  context.lineCap = "round";
+  context.lineJoin = "round";
   context.beginPath();
-  context.moveTo(tail.points[0], tail.points[1]);
-  for (let index = 2; index < tail.points.length; index += 2) {
-    context.lineTo(tail.points[index], tail.points[index + 1]);
+  for (const run of tail.runs) {
+    context.moveTo(run[0], run[1]);
+    for (let index = 2; index < run.length; index += 2) {
+      context.lineTo(run[index], run[index + 1]);
+    }
   }
-  context.closePath();
-  context.fill();
+  context.stroke();
 
   glow(context, light.x, light.y, light.coreRadius, CORE_FADE, light.color, pose.alpha);
   context.restore();

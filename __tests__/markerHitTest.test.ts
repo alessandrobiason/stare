@@ -10,7 +10,7 @@ const FRAME = { width: DESIGN_FRAME_WIDTH_PX, height: 1280 };
 function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
   return {
     name: "SAT",
-    category: "COMMS",
+    category: "INTERNET",
     parked: false,
     point: { left: 50, top: 50 },
     rangeKm: 1200,

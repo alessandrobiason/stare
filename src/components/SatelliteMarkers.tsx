@@ -120,8 +120,8 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
         const { tail } = glyph;
         const edge = ink.alpha * glyph.edgeAlpha;
         if (!(edge > 0)) continue;
-        if (tail) drawTail(canvas, paint, glyph, tail, ink.color, edge, tail.rim);
-        circle(canvas, paint, glyph, glyph.rim, ink.color, edge);
+        if (tail) drawTail(canvas, paint, glyph, tail, glyph.edgeColor, edge, tail.rim);
+        circle(canvas, paint, glyph, glyph.rim, glyph.edgeColor, edge);
       }
       for (const glyph of scene.glyphs) drawGlyph(canvas, paint, glyph, scene.palette);
       // Over every mark, including the ones in front of the selected satellite:

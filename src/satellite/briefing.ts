@@ -838,9 +838,13 @@ const CATEGORY_BRIEFINGS = {
     id: "category.EARTH",
     text: "An Earth-observation satellite, pointed back down at us — imaging land and sea, tracking weather, or measuring ice, crops, fires and pollution."
   },
-  COMMS: {
-    id: "category.COMMS",
-    text: "A communications satellite: it moves bits. Television, telephony, broadband or machine-to-machine messages, between points on the ground that have no cable between them."
+  INTERNET: {
+    id: "category.INTERNET",
+    text: "A satellite in one of the internet constellations: hundreds or thousands of identical satellites in low orbit, handing a dish on the ground from one to the next as they pass, so that some part of the network is always overhead."
+  },
+  TELECOM: {
+    id: "category.TELECOM",
+    text: "A telecommunications satellite: television and data relayed between points on the ground with no cable between them, or calls and short messages from satellite phones and small devices far from any mast."
   },
   OTHER: {
     id: "category.OTHER",

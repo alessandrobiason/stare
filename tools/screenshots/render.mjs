@@ -175,20 +175,28 @@ function backgroundFor(scene) {
 /* ---- The phone screen. --------------------------------------------------- */
 
 const CATEGORY_LABELS = {
-  LANDMARK: "LANDMARKS",
+  LANDMARK: "HIGHLIGHTS",
   NAVIGATION: "NAVIGATION",
   EARTH: "EARTH WATCH",
-  COMMS: "INTERNET &amp; TV",
+  INTERNET: "INTERNET",
+  TELECOM: "TV &amp; PHONES",
   OTHER: "OTHER"
 };
-const CATEGORY_ORDER = ["LANDMARK", "NAVIGATION", "EARTH", "COMMS", "OTHER"];
-/** `CATEGORY_COLORS`: one pastel per purpose, day and night. */
+const CATEGORY_ORDER = ["LANDMARK", "NAVIGATION", "EARTH", "INTERNET", "TELECOM", "OTHER"];
+/** `SUBCATEGORIES_OF`, with the English names the rows carry. */
+const SUBCATEGORY_LABELS = {
+  EARTH: ["WEATHER", "IMAGING &amp; RADAR"],
+  INTERNET: ["STARLINK", "OTHER NETWORKS"],
+  TELECOM: ["TV &amp; DATA", "PHONES &amp; IOT"]
+};
+/** `CATEGORY_COLORS`: one pastel per category, day and night. */
 const CATEGORY_COLORS = {
   LANDMARK: "#fbe6af",
-  NAVIGATION: "#fba8a0",
-  EARTH: "#90e1c5",
-  COMMS: "#bfa4f0",
-  OTHER: "#92a9b4"
+  NAVIGATION: "#faa29f",
+  EARTH: "#a1e4ae",
+  INTERNET: "#c09aeb",
+  TELECOM: "#85d0ee",
+  OTHER: "#a9a49e"
 };
 
 /** A colour as `rgba()`, for the thinned-out band a swatch glows in. */
@@ -319,13 +327,24 @@ function filterPanel(scene) {
   if (scene.panels.filter !== "open") return "";
   return `<div class="filter">
       <div class="filter-head"><span class="panel-title">FILTER</span></div>
-      ${CATEGORY_ORDER.map(
-        (category) => `<div class="row">
-        <span class="swatch" style="background:${CATEGORY_COLORS[category]};border-color:${thinned(CATEGORY_COLORS[category], 0.3)}"></span>
-        <span class="name">${CATEGORY_LABELS[category]}</span>
+      ${CATEGORY_ORDER.map((category) => {
+        const swatch = `background:${CATEGORY_COLORS[category]};border-color:${thinned(CATEGORY_COLORS[category], 0.3)}`;
+        const subs = (SUBCATEGORY_LABELS[category] ?? []).map(
+          (name) => `<div class="row sub">
+        <span class="swatch" style="${swatch}"></span>
+        <span class="name">${name}</span>
         <span class="toggle on"><span class="knob"></span></span>
       </div>`
-      ).join("\n      ")}
+        );
+        return [
+          `<div class="row">
+        <span class="swatch" style="${swatch}"></span>
+        <span class="name">${CATEGORY_LABELS[category]}</span>
+        <span class="toggle on"><span class="knob"></span></span>
+      </div>`,
+          ...subs
+        ].join("\n      ");
+      }).join("\n      ")}
       <div class="key"><span class="ring"></span><span>RING = PARKED OVER THE EQUATOR</span></div>
       <div class="show-all">SHOW ALL</div>
     </div>`;

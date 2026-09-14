@@ -16,15 +16,15 @@ built yet, and the settings the guide and the console now live in.
 in a soft glow and a bloom of its own colour, trailing a fine line along the
 path it has really flown — solid where it leaves the point, then broken into
 dashes that shorten and spread apart until they are faint dots — and the app's
-logo is that same light, on a wide arc over a horizon (`assets/icon.svg`, drawn
+logo is that same light in a landmark's champagne, on a wide arc over a horizon (`assets/icon.svg`, drawn
 by `tools/make-logo.mjs` with the overlay's own fades). Solid discs a couple of dozen pixels across covered the picture they
 were marking. Nearer objects are larger *and* brighter, glow and tail alike, on
 the same log scale as their size. A mark carries five channels at once —
 **colour for purpose**, one pastel per category (champagne for landmarks, coral
-blush for navigation, sage for Earth watch, lavender for communications, a misted
-slate for the rest), the same by day and by night and the same in the filter and
-on the card; shape for whether the object holds station (a
-geostationary ring, or a body trailing the minute and a half of orbit it has
+blush for navigation, mint sage for Earth observation, lavender for the internet
+constellations, sky blue for television and telephony, a stone grey for the rest),
+the same by day and by night and the same in the filter and on the card; shape for whether the object holds station (a
+geostationary ring, or a body trailing the three quarters of a minute of orbit it has
 just flown, integrated back from its state under gravity and projected point by
 point, so the line bends where the orbit does), size for range on a log scale from 400 km to 40,000 km, a label,
 spent only on a couple of dozen landmarks, and **strength for whether the sun is
@@ -93,14 +93,25 @@ the time it takes to read them.
 
 Every mark is a light pastel — its point, glow, bloom and tail all in its
 category's colour — because a photograph of the sky is either far brighter or
-far darker than any fill, and a pale fill with a near-black edge reads against
-both. At night the colour is what is seen, as light with no edge; by day the edge
-is, a dark ring with a light tinted centre, tail included, and it holds over
+far darker than any fill, and a pale fill inside a fine edge of its own hue in a
+deep shade reads against both. At night the colour is what is seen, as light
+with no edge; by day, or over the moon or a street lamp, the edge is — one colour
+throughout, a dark rim round a light centre, tail included — and it holds over
 cloud. A mark in the Earth's shadow fades its light and keeps its edge. The two
 ladders the marks were once coloured in — light by night, dark by day — never
 read at both ends of the day, and the all-white marks that replaced them said
 nothing about purpose; pastels keep what white bought and put purpose back
-(`src/satellite/categories.ts`). What does
+(`src/satellite/categories.ts`).
+
+The categories are split once more where one of them is two things to somebody
+looking up, and the filter lists the parts as switches under their category:
+Earth observation into weather and imaging; the internet constellations into
+Starlink — half the catalogue on its own — and the rest; and television and
+telephony into the broadcast and data satellites of the geostationary belt and
+the phone and machine-messaging fleets. Communications used to be one category
+that put ten thousand low-orbit broadband satellites in with the television
+satellites parked over the equator. The parts share their category's colour,
+since six is about as many as pastels can keep apart, and the card names both. What does
 follow the sun is what is around a mark: it glows at night and not by day, and
 the landmark names are light text at night and dark by day, crossing over a
 two-degree band of solar altitude inside civil twilight — worked out from the GPS

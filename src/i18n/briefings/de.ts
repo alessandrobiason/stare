@@ -115,7 +115,8 @@ export const de: BriefingTexts = {
   "category.LANDMARK": "Eines der wenigen Objekte, für die es sich lohnt, nach draußen zu gehen: eine bemannte Station, ein Besuchsfahrzeug oder eines der großen Observatorien.",
   "category.NAVIGATION": "Ein Navigationssatellit. Er sendet die Zeit von einer Atomuhr und wo er beim Senden war; ein Empfänger, der vier davon gleichzeitig hört, kann daraus seine eigene Position berechnen.",
   "category.EARTH": "Ein Erdbeobachtungssatellit, zurück auf uns gerichtet — er bildet Land und Meer ab, verfolgt das Wetter oder misst Eis, Feldfrüchte, Brände und Verschmutzung.",
-  "category.COMMS": "Ein Kommunikationssatellit: er bewegt Bits. Fernsehen, Telefonie, Breitband oder Maschinennachrichten, zwischen Punkten am Boden, zwischen denen kein Kabel liegt.",
+  "category.INTERNET": "Ein Satellit einer der Internet-Konstellationen: Hunderte oder Tausende gleicher Satelliten in niedriger Umlaufbahn, die eine Antenne am Boden im Vorbeiziehen von einem zum nächsten weiterreichen, sodass immer ein Teil des Netzes über uns steht.",
+  "category.TELECOM": "Ein Telekommunikationssatellit: Fernsehen und Daten, weitergeleitet zwischen Punkten am Boden ohne Kabel dazwischen, oder Anrufe und Kurznachrichten von Satellitentelefonen und kleinen Geräten weit weg von jedem Sendemast.",
   "category.OTHER": "Ein aktiver Satellit, den der Katalog benennt, aber nicht einordnet. Die meisten Objekte dieser Größe dort oben sind Technologieerprobungen, Universitäts-Cubesats oder kleine kommerzielle Nutzlasten.",
   parked: "Ein Satellit, 35.786 km über dem Äquator geparkt, wo ein Umlauf genau einen Tag dauert und er still zu stehen scheint. Deshalb kann die Schüssel auf dem Dach einmal festgeschraubt und nie wieder bewegt werden."
 };

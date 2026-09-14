@@ -1,4 +1,4 @@
-import type { SatelliteCategory } from "../satellite/categories";
+import type { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories";
 
 /**
  * Everything the app says, as data.
@@ -190,6 +190,12 @@ export type Strings = {
      */
     shadowKey: string;
     categories: Record<SatelliteCategory, string>;
+    /**
+     * The parts a split category is divided into, each a row under its
+     * category. Upper-cased like the categories. `STARLINK` is the operator's
+     * own name and the same in every language.
+     */
+    subcategories: Record<SatelliteSubcategory, string>;
   };
   card: {
     details: string;

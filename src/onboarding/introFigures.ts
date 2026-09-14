@@ -64,9 +64,9 @@ const MARK_SAMPLES: Record<MarkSample, readonly Placed[]> = {
   // A stretch of the geostationary belt, which is how rings are met on the sky:
   // several in a row, small, and none of them moving.
   parked: [
-    { category: "COMMS", x: 15, y: 25, rangeKm: 37000, headingDeg: null },
-    { category: "COMMS", x: 37, y: 20, rangeKm: 38200, headingDeg: null },
-    { category: "COMMS", x: 59, y: 25, rangeKm: 36800, headingDeg: null }
+    { category: "TELECOM", x: 15, y: 25, rangeKm: 37000, headingDeg: null },
+    { category: "TELECOM", x: 37, y: 20, rangeKm: 38200, headingDeg: null },
+    { category: "TELECOM", x: 59, y: 25, rangeKm: 36800, headingDeg: null }
   ],
   // The same mark twice, in sunlight and in the Earth's shadow: the difference
   // is the only thing there is to read.

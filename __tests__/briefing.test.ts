@@ -137,7 +137,7 @@ describe("what a tapped satellite says it is", () => {
     const parked = briefingFor({
       name: "UNRECOGNISED GEO",
       noradId: 999998,
-      category: "COMMS",
+      category: "TELECOM",
       parked: true
     });
 

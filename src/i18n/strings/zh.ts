@@ -132,8 +132,17 @@ export const zh: Strings = {
       LANDMARK: "著名航天器",
       NAVIGATION: "导航",
       EARTH: "对地观测",
-      COMMS: "上网与电视",
+      INTERNET: "卫星互联网",
+      TELECOM: "广播与通信",
       OTHER: "其他"
+    },
+    subcategories: {
+      WEATHER: "气象",
+      IMAGING: "成像与雷达",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "其他星座",
+      BROADCAST: "电视与数据",
+      MOBILE: "卫星电话与物联网"
     }
   },
   card: {

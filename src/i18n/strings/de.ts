@@ -136,8 +136,17 @@ export const de: Strings = {
       LANDMARK: "HIGHLIGHTS",
       NAVIGATION: "NAVIGATION",
       EARTH: "ERDBEOBACHTUNG",
-      COMMS: "INTERNET & TV",
+      INTERNET: "INTERNET",
+      TELECOM: "TV & TELEFON",
       OTHER: "ANDERE"
+    },
+    subcategories: {
+      WEATHER: "WETTER",
+      IMAGING: "BILDER & RADAR",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "WEITERE NETZE",
+      BROADCAST: "TV & DATEN",
+      MOBILE: "TELEFON & IOT"
     }
   },
   card: {

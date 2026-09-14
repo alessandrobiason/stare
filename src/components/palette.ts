@@ -1,6 +1,11 @@
 import { sunAltitudeDeg } from "../coordinates/sunAltitude";
 import { clamp } from "../math/angles";
-import { CATEGORY_BLOOMS, CATEGORY_COLORS, SatelliteCategory } from "../satellite/categories";
+import {
+  CATEGORY_BLOOMS,
+  CATEGORY_COLORS,
+  CATEGORY_EDGES,
+  SatelliteCategory
+} from "../satellite/categories";
 import { ObserverLocation } from "../types";
 
 /**
@@ -13,13 +18,15 @@ import { ObserverLocation } from "../types";
  * the mark is drawn as one — a hot centre in light of its own colour that falls
  * away to nothing, with no outline at all. A dark ring round it read as a disc
  * cut out and laid on the picture rather than as something giving off light. By
- * day the pale fill would vanish, so the mark gains a near-black edge and loses
- * its light: a dark ring with a light, tinted centre, which reads over cloud as
- * well as over blue.
+ * day the pale fill would vanish, so the mark gains a fine edge in a deep shade
+ * of its own hue (`CATEGORY_EDGES`) and loses its light: a dark ring with a
+ * light centre, one colour throughout, which reads over cloud as well as over
+ * blue.
  *
  * The marks were once coloured in two ladders of five — light marks in a dark
  * rim at night, dark marks in a light rim by day — and then all white, because
- * white on a dark edge read at both ends of the day and neither ladder did.
+ * white on a near-black edge read at both ends of the day and neither ladder
+ * did.
  * Pastels keep what white bought, being most of the way to it, and put the
  * purpose back on the sky: the same colour at noon and at midnight, and the same
  * colour in the filter and on the card.
@@ -55,11 +62,12 @@ export type Ink = {
 export const MARK_COLOR = "#ffffff";
 
 /**
- * The edge under every mark, tail, path and selection ring.
+ * The edge under the selection ring, and the strength every edge is drawn at.
  *
  * Near-black rather than the night sky's own dark blue, which by day is close
- * enough to a blue sky to lose most of what the edge is for. At night the two
- * cannot be told apart.
+ * enough to a blue sky to lose most of what the edge is for. The ring is the
+ * app's own white and has no hue to take a shade of; the marks and their paths
+ * do, and are edged in it instead (`CATEGORY_EDGES`) at this alpha.
  */
 export const MARK_EDGE: Ink = { color: "#05070a", alpha: 0.9 };
 
@@ -83,10 +91,17 @@ export type MarkerPalette = {
   /** The bloom a mark's glow sits in, by the same key: `CATEGORY_BLOOMS`. */
   blooms: Record<SatelliteCategory, string>;
   /**
-   * The edge under every mark: `MARK_EDGE`, whatever the sky.
+   * The edge a mark, its tail and a landmark's path are drawn inside by day or
+   * over something bright, by the same key: `CATEGORY_EDGES`, drawn at
+   * `outline`'s strength.
+   */
+  edges: Record<SatelliteCategory, string>;
+  /**
+   * The selection ring's edge, and the strength of every edge: `MARK_EDGE`,
+   * whatever the sky.
    *
-   * A shape under the fill rather than a border inside it, so the mark keeps
-   * its full width.
+   * An edge is a shape under the fill rather than a border inside it, so the
+   * mark keeps its full width.
    */
   outline: Ink;
   /** The glow that says this one is worth looking up for. Landmarks only. */
@@ -121,6 +136,7 @@ export type MarkerPalette = {
 export const NIGHT_PALETTE: MarkerPalette = {
   categories: CATEGORY_COLORS,
   blooms: CATEGORY_BLOOMS,
+  edges: CATEGORY_EDGES,
   outline: MARK_EDGE,
   halo: { color: "#ffffff", alpha: 0.18 },
   glow: 1,
@@ -132,6 +148,7 @@ export const NIGHT_PALETTE: MarkerPalette = {
 export const DAYLIGHT_PALETTE: MarkerPalette = {
   categories: CATEGORY_COLORS,
   blooms: CATEGORY_BLOOMS,
+  edges: CATEGORY_EDGES,
   outline: MARK_EDGE,
   halo: { color: "#04121f", alpha: 0.2 },
   glow: 0,
@@ -191,6 +208,7 @@ export function blendPalettes(fraction: number): MarkerPalette {
   return {
     categories: CATEGORY_COLORS,
     blooms: CATEGORY_BLOOMS,
+    edges: CATEGORY_EDGES,
     outline: MARK_EDGE,
     halo: mixInk(night.halo, day.halo, fraction),
     glow: night.glow + (day.glow - night.glow) * fraction,

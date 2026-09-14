@@ -331,6 +331,25 @@ body {
   flex: none;
 }
 
+/* A subcategory: stepped in under its category, tighter, with a smaller dot. */
+.filter .row.sub {
+  margin-top: -4px;
+  padding-left: 14px;
+  min-height: 28px;
+}
+
+.filter .row.sub .swatch {
+  width: 7px;
+  height: 7px;
+  border-width: 1.5px;
+  margin-right: 10.5px;
+}
+
+.filter .row.sub .name {
+  color: var(--text-dim);
+  letter-spacing: 0;
+}
+
 .filter .row .name {
   flex: 1;
   margin-right: 8px;

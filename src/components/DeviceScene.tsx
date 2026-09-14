@@ -172,8 +172,8 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         epochRef={epochRef}
         attitude={attitude}
         enabledCategories={controls.enabledCategories}
-        starlink={controls.starlink}
-        onToggleStarlink={controls.toggleStarlink}
+        enabledSubcategories={controls.enabledSubcategories}
+        onToggleSubcategory={controls.toggleSubcategory}
         onToggleCategory={controls.toggleCategory}
         onEnableAll={controls.enableAllCategories}
         tab={controls.tab}

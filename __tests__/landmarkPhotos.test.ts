@@ -75,7 +75,7 @@ describe("which objects get a photograph", () => {
     // A photograph of Starlink 4321 would be a photograph of a satellite that
     // looks like all eight thousand of the others.
     expect(
-      landmarkPhotoFile(subject({ name: "STARLINK-1234", noradId: 44713, category: "COMMS" }))
+      landmarkPhotoFile(subject({ name: "STARLINK-1234", noradId: 44713, category: "INTERNET" }))
     ).toBeNull();
     expect(
       landmarkPhotoFile(subject({ name: "GJZ 01", noradId: 57489, category: "EARTH" }))

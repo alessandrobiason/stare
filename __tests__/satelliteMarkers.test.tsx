@@ -12,7 +12,7 @@ import {
 import { DAYLIGHT_PALETTE, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
-import { CATEGORY_BLOOMS, CATEGORY_COLORS } from "../src/satellite/categories";
+import { CATEGORY_BLOOMS, CATEGORY_COLORS, CATEGORY_EDGES } from "../src/satellite/categories";
 import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../src/constants";
 import { setLocaleForTesting } from "../src/i18n";
 
@@ -21,7 +21,7 @@ const FRAME = { width: 720, height: 1280 };
 function marker(overrides: Partial<SatelliteMarker> = {}): SatelliteMarker {
   return {
     name: "SAT",
-    category: "COMMS",
+    category: "INTERNET",
     parked: false,
     point: { left: 50, top: 50 },
     rangeKm: 1200,
@@ -100,6 +100,13 @@ test("colours a marker by its category and nothing else, bloom included", () => 
     CATEGORY_BLOOMS.LANDMARK,
     CATEGORY_BLOOMS.OTHER
   ]);
+  // And so is the edge it is drawn inside by day: the same hue, in a deep shade.
+  expect(glyphs.map((glyph) => glyph.edgeColor)).toEqual([
+    CATEGORY_EDGES.NAVIGATION,
+    CATEGORY_EDGES.EARTH,
+    CATEGORY_EDGES.LANDMARK,
+    CATEGORY_EDGES.OTHER
+  ]);
 });
 
 test("draws the same coloured mark on the same dark edge by day as by night", () => {
@@ -134,7 +141,7 @@ test("sizes the marker by distance, not by category", () => {
 test("outlines every marker so it survives a bright sky", () => {
   // White cannot be read against a bright sky, so by day the dark edge is what
   // is actually being read.
-  for (const category of ["LANDMARK", "COMMS", "OTHER"] as const) {
+  for (const category of ["LANDMARK", "INTERNET", "OTHER"] as const) {
     const { glyphs } = scene([marker({ category, trail: null })]);
     // The rim is a larger shape under the mark, so the colour keeps its full
     // diameter — drawn as a border inside it, it ate the middle instead.
@@ -349,13 +356,16 @@ describe("a moving mark", () => {
     expect(glyph.glow.alpha).toBeLessThan(1);
   });
 
-  test("has an edge thick enough to read as a ring on a bright sky", () => {
-    // By day the edge is most of what is seen of a white mark, and a single
-    // pixel of it is a grey smudge rather than a ring.
+  test("has a fine edge, but never so fine it breaks up", () => {
+    // By day the edge is most of what separates a pale mark from a bright sky.
+    // Fine, so it reads as the mark's own shading rather than an outline drawn
+    // round it — a tenth of the point — and never under nine tenths of a layout
+    // pixel, which on a phone is still two or three real ones.
     for (const rangeKm of [400, 40000]) {
       const small = { width: 360, height: 640 };
       const [glyph] = scene([marker({ rangeKm, trail: null })], 0, small).glyphs;
-      expect(glyph.rim.radius - glyph.core.radius).toBeGreaterThanOrEqual(1.25);
+      expect(glyph.rim.radius - glyph.core.radius).toBeCloseTo(Math.max(0.9, glyph.core.radius * 2 * 0.1), 9);
+      expect(glyph.rim.radius - glyph.core.radius).toBeLessThan(glyph.core.radius);
     }
   });
 
@@ -753,7 +763,8 @@ describe("a landmark's path across the sky", () => {
     ).paths[0];
 
     expect(night.rim.alpha).toBe(0);
-    expect(day.rim).toEqual(MARK_EDGE);
+    // In a deep shade of its own colour, at the strength every edge is drawn at.
+    expect(day.rim).toEqual({ color: CATEGORY_EDGES.LANDMARK, alpha: MARK_EDGE.alpha });
   });
 
   test("places the dashes in pixels on the frame it is drawn into", () => {

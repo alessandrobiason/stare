@@ -11,8 +11,18 @@ import {
   skyPass,
   starAlpha
 } from "../src/components/bootSky";
-import { BLOOM_FADE, COMET_FADE, CORE_FADE, FadeStop, GLOW_FADE } from "../src/components/markerScene";
-import { MARK_BLOOM, MARK_COLOR } from "../src/components/palette";
+import {
+  BLOOM_FADE,
+  CORE_FADE,
+  FadeStop,
+  GLOW_FADE,
+  TAIL_FADE
+} from "../src/components/markerScene";
+import { CATEGORY_BLOOMS, CATEGORY_COLORS } from "../src/satellite/categories";
+
+/** The colours the one light is drawn in: a landmark's. */
+const LIGHT_COLOR = CATEGORY_COLORS.LANDMARK;
+const LIGHT_BLOOM = CATEGORY_BLOOMS.LANDMARK;
 
 const PHONE = { width: 390, height: 844 };
 /** The smallest screen this ships to, and a current large one. */
@@ -36,11 +46,12 @@ const everyPass = (frame: typeof PHONE) => {
 };
 
 test("the satellite is drawn in the overlay's own light", () => {
-  // The marks a person will read against the real sky are a white point in a
-  // cool bloom, and so is the satellite on the screen they wait on.
+  // The marks a person will read against the real sky are a pastel point in a
+  // bloom of its own hue, and so is the satellite on the screen they wait on —
+  // in the colour of the objects worth going outside for.
   for (const pass of everyPass(PHONE)) {
-    expect(pass.light.color).toBe(MARK_COLOR);
-    expect(pass.light.bloomColor).toBe(MARK_BLOOM);
+    expect(pass.light.color).toBe(LIGHT_COLOR);
+    expect(pass.light.bloomColor).toBe(LIGHT_BLOOM);
   }
 });
 
@@ -91,25 +102,26 @@ test("a pass fades in and out at its ends rather than appearing and vanishing", 
   expect(passPose(pass, 0.5).alpha).toBe(1);
 });
 
-test("a tail tapers from under the light to a point, behind it", () => {
-  // A comet's tail is behind it, and nobody has to be told which way it is
-  // going. Two of the passes run right to left, and "behind" for them is the
-  // other way round the arc.
+test("a tail runs back along the arc from under the light, solid and then dashed", () => {
+  // Behind the light, as the marks' are, and nobody has to be told which way
+  // it is going. Two of the passes run right to left, and "behind" for them is
+  // the other way round the arc.
   for (const pass of everyPass(PHONE)) {
     const { light } = pass;
-    const { points } = light.tail;
-    const count = points.length / 2;
-    const at = (index: number): [number, number] => [points[index * 2], points[index * 2 + 1]];
+    const { runs } = light.tail;
 
-    // Walked out along one edge and back along the other: the first and last
-    // points are the two edges at the head, a full width apart across it.
-    const [headX, headY] = at(0);
-    const [backX, backY] = at(count - 1);
-    expect(Math.hypot(headX - backX, headY - backY)).toBeGreaterThan(0);
-    expect(Math.hypot((headX + backX) / 2 - light.x, (headY + backY) / 2 - light.y)).toBeCloseTo(0);
-
-    // And it tapers to a single point.
-    expect(Math.hypot(at(count / 2 - 1)[0] - at(count / 2)[0], at(count / 2 - 1)[1] - at(count / 2)[1])).toBeCloseTo(0);
+    // It starts under the light's own centre, and every point of it is on the
+    // arc the light is flying.
+    expect(runs[0][0]).toBeCloseTo(light.x);
+    expect(runs[0][1]).toBeCloseTo(light.y);
+    for (const run of runs) {
+      for (let index = 0; index < run.length; index += 2) {
+        // To well inside a pixel: a dash's ends fall between the arc's samples.
+        expect(Math.abs(Math.hypot(run[index] - pass.cx, run[index + 1] - pass.cy) - pass.radius)).toBeLessThan(0.1);
+      }
+    }
+    // Broken into dashes after the solid stretch.
+    expect(runs.length).toBeGreaterThan(4);
 
     // The tip lies back the way the light has come.
     expect(Math.sign(light.x - light.tail.tipX)).toBe(pass.direction);
@@ -209,7 +221,7 @@ test("the committed logo is this sky, held at its first frame", () => {
   expect(svg).toContain(`r="${round(light.glow.radius)}"`);
   expect(svg).toContain(`r="${round(light.bloom.radius)}"`);
   // The tail too, or its shape can drift while the light agrees.
-  const [tailX, tailY] = light.tail.points;
+  const [tailX, tailY] = light.tail.runs[0];
   expect(svg).toContain(`d="M ${round(tailX)} ${round(tailY)} L `);
   expect(svg).toContain(`x2="${round(light.tail.tipX)}" y2="${round(light.tail.tipY)}"`);
 
@@ -224,10 +236,10 @@ test("the committed logo is this sky, held at its first frame", () => {
   );
 
   // And in the overlay's own fades.
-  expect(svg).toContain(stopsOf(COMET_FADE, MARK_COLOR));
-  expect(svg).toContain(stopsOf(GLOW_FADE, MARK_COLOR));
-  expect(svg).toContain(stopsOf(BLOOM_FADE, MARK_BLOOM));
-  expect(svg).toContain(stopsOf(CORE_FADE, MARK_COLOR));
+  expect(svg).toContain(stopsOf(TAIL_FADE, LIGHT_COLOR));
+  expect(svg).toContain(stopsOf(GLOW_FADE, LIGHT_COLOR));
+  expect(svg).toContain(stopsOf(BLOOM_FADE, LIGHT_BLOOM));
+  expect(svg).toContain(stopsOf(CORE_FADE, LIGHT_COLOR));
 });
 
 test("the icon is drawn in the overlay's own light", () => {
@@ -236,7 +248,7 @@ test("the icon is drawn in the overlay's own light", () => {
   // point is the overlay's.
   const svg = asset("icon.svg");
 
-  expect(svg).toContain(stopsOf(GLOW_FADE, MARK_COLOR));
-  expect(svg).toContain(stopsOf(BLOOM_FADE, MARK_BLOOM));
-  expect(svg).toContain(stopsOf(CORE_FADE, MARK_COLOR));
+  expect(svg).toContain(stopsOf(GLOW_FADE, LIGHT_COLOR));
+  expect(svg).toContain(stopsOf(BLOOM_FADE, LIGHT_BLOOM));
+  expect(svg).toContain(stopsOf(CORE_FADE, LIGHT_COLOR));
 });

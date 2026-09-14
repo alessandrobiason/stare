@@ -11,6 +11,7 @@ import {
 import {
   CATEGORY_BLOOMS,
   CATEGORY_COLORS,
+  CATEGORY_EDGES,
   SATELLITE_CATEGORIES,
   SatelliteCategory
 } from "../src/satellite/categories";
@@ -132,6 +133,7 @@ describe("the marks themselves", () => {
       const palette = blendPalettes(fraction);
       expect(palette.categories).toEqual(CATEGORY_COLORS);
       expect(palette.blooms).toEqual(CATEGORY_BLOOMS);
+      expect(palette.edges).toEqual(CATEGORY_EDGES);
       expect(palette.outline).toEqual(MARK_EDGE);
     }
   });
@@ -139,16 +141,33 @@ describe("the marks themselves", () => {
   test("are pastels: light enough to read on a night sky and inside the daytime edge", () => {
     for (const category of SATELLITE_CATEGORIES) {
       const fill = luminance(CATEGORY_COLORS[category]);
-      // Over seven to one against the night sky's own dark, and against the edge.
+      // Over seven to one against the night sky's own dark, and over four to
+      // one against their own edge, which is the contrast body text is held to.
       expect((fill + 0.05) / (luminance("#0b1422") + 0.05)).toBeGreaterThan(7);
-      expect((fill + 0.05) / (luminance(MARK_EDGE.color) + 0.05)).toBeGreaterThan(7);
+      expect((fill + 0.05) / (luminance(CATEGORY_EDGES[category]) + 0.05)).toBeGreaterThan(4.3);
       // And none of them a signal colour: well short of full chroma.
       const [, a, b] = oklab(CATEGORY_COLORS[category]);
-      expect(Math.hypot(a, b)).toBeLessThan(0.12);
+      expect(Math.hypot(a, b)).toBeLessThan(0.13);
     }
   });
 
-  test("keep the five categories apart", () => {
+  test("are edged in a deep shade of their own hue, which holds against a daylit sky", () => {
+    for (const category of SATELLITE_CATEGORIES) {
+      const [fillL, fillA, fillB] = oklab(CATEGORY_COLORS[category]);
+      const [edgeL, edgeA, edgeB] = oklab(CATEGORY_EDGES[category]);
+      expect(edgeL).toBeLessThan(0.42);
+      expect(edgeL).toBeLessThan(fillL - 0.3);
+      // The same hue, for every category with a hue to keep.
+      if (Math.hypot(fillA, fillB) > 0.03) {
+        const turn = Math.atan2(edgeB, edgeA) - Math.atan2(fillB, fillA);
+        expect(Math.abs(Math.atan2(Math.sin(turn), Math.cos(turn)))).toBeLessThan(0.2);
+      }
+      // Five to one against a pale blue daytime sky.
+      expect((luminance("#9fc3e6") + 0.05) / (luminance(CATEGORY_EDGES[category]) + 0.05)).toBeGreaterThan(5);
+    }
+  });
+
+  test("keep the six categories apart", () => {
     // Pastels give up distance for softness: every pair is still at least
     // 0.11 apart in OKLab, which reads as a different colour side by side and
     // at a glance.

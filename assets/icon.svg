@@ -13,33 +13,33 @@
   <rect width="1024" height="1024" fill="url(#horizon)"/>
   <defs>
     <radialGradient id="light-bloom" gradientUnits="userSpaceOnUse" cx="684.36" cy="445.15" r="320">
-      <stop offset="0%" stop-color="#a9c9ff" stop-opacity="1"/>
-      <stop offset="20%" stop-color="#a9c9ff" stop-opacity="0.45"/>
-      <stop offset="50%" stop-color="#a9c9ff" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#a9c9ff" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#e6c77c" stop-opacity="1"/>
+      <stop offset="20%" stop-color="#e6c77c" stop-opacity="0.45"/>
+      <stop offset="50%" stop-color="#e6c77c" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#e6c77c" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="light-glow" gradientUnits="userSpaceOnUse" cx="684.36" cy="445.15" r="150">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="12%" stop-color="#ffffff" stop-opacity="0.7"/>
-      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="12%" stop-color="#fbe6af" stop-opacity="0.7"/>
+      <stop offset="35%" stop-color="#fbe6af" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#fbe6af" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="light-core" gradientUnits="userSpaceOnUse" cx="684.36" cy="445.15" r="34">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="50%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#fbe6af" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="light-tail" gradientUnits="userSpaceOnUse" x1="684.36" y1="445.15" x2="104.8" y2="495.86">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="75%" stop-color="#ffffff" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="35%" stop-color="#fbe6af" stop-opacity="0.7"/>
+      <stop offset="75%" stop-color="#fbe6af" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#fbe6af" stop-opacity="0"/>
     </linearGradient>
   </defs>
   <g>
     <circle cx="684.36" cy="445.15" r="320" fill="url(#light-bloom)" opacity="0.45"/>
     <circle cx="684.36" cy="445.15" r="150" fill="url(#light-glow)" opacity="0.8"/>
-    <path d="M 692.9 425.97 L 677.89 420.1 L 662.74 414.63 L 647.47 409.56 L 632.08 404.89 L 616.59 400.63 L 601.01 396.78 L 585.35 393.33 L 569.62 390.29 L 553.82 387.67 L 537.98 385.46 L 522.1 383.66 L 506.2 382.28 L 490.27 381.32 L 474.35 380.76 L 458.42 380.62 L 442.51 380.9 L 426.63 381.59 L 410.79 382.69 L 394.99 384.2 L 379.25 386.11 L 363.58 388.44 L 347.99 391.16 L 332.49 394.29 L 317.09 397.82 L 301.8 401.74 L 286.63 406.06 L 271.59 410.76 L 256.69 415.85 L 241.95 421.32 L 227.36 427.17 L 212.94 433.38 L 198.7 439.97 L 184.65 446.91 L 170.8 454.21 L 157.15 461.86 L 143.72 469.86 L 130.51 478.2 L 117.54 486.86 L 104.8 495.86 L 104.8 495.86 L 118.12 487.77 L 131.62 480.04 L 145.31 472.67 L 159.18 465.66 L 173.2 459.03 L 187.39 452.76 L 201.72 446.87 L 216.18 441.36 L 230.77 436.24 L 245.47 431.49 L 260.28 427.14 L 275.19 423.18 L 290.18 419.6 L 305.24 416.42 L 320.36 413.64 L 335.54 411.25 L 350.77 409.26 L 366.02 407.67 L 381.3 406.47 L 396.59 405.67 L 411.88 405.28 L 427.16 405.27 L 442.42 405.67 L 457.66 406.46 L 472.85 407.64 L 488 409.22 L 503.08 411.19 L 518.09 413.55 L 533.03 416.3 L 547.87 419.43 L 562.62 422.94 L 577.25 426.83 L 591.77 431.09 L 606.15 435.73 L 620.4 440.73 L 634.5 446.1 L 648.44 451.82 L 662.22 457.91 L 675.82 464.34 Z" fill="url(#light-tail)" opacity="0.9"/>
+    <path d="M 684.36 445.15 L 670.05 439 L 655.59 433.23 L 640.98 427.83 L 626.24 422.81 L 611.37 418.18 L 596.39 413.93 L 581.3 410.08 L 566.12 406.62 L 550.85 403.55 L 535.51 400.88 L 520.1 398.61 L 509.27 397.3 M 491.76 395.52 L 489.14 395.27 L 473.6 394.2 L 458.04 393.54 L 443.43 393.3 M 419.85 393.68 L 411.33 393.98 L 395.79 394.93 L 380.27 396.29 L 380.26 396.29 M 348.91 400.29 L 334.02 402.77 L 318.73 405.73 L 316.9 406.13 M 275.8 416.3 L 273.39 416.97 L 258.49 421.5 L 250.32 424.21 M 197.42 444.68 L 186.02 449.84 L 177.58 453.92 M 111.52 491.46 L 104.8 495.86" fill="none" stroke="url(#light-tail)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
     <circle cx="684.36" cy="445.15" r="34" fill="url(#light-core)" opacity="1"/>
   </g>
 </svg>

@@ -136,8 +136,17 @@ export const ru: Strings = {
       LANDMARK: "ИЗВЕСТНЫЕ",
       NAVIGATION: "НАВИГАЦИЯ",
       EARTH: "СЪЁМКА ЗЕМЛИ",
-      COMMS: "ИНТЕРНЕТ И ТВ",
+      INTERNET: "ИНТЕРНЕТ",
+      TELECOM: "ТВ И СВЯЗЬ",
       OTHER: "ПРОЧИЕ"
+    },
+    subcategories: {
+      WEATHER: "ПОГОДА",
+      IMAGING: "СЪЁМКА И РАДАР",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "ДРУГИЕ СЕТИ",
+      BROADCAST: "ТВ И ДАННЫЕ",
+      MOBILE: "ТЕЛЕФОНЫ И IOT"
     }
   },
   card: {

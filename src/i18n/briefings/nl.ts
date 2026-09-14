@@ -115,7 +115,8 @@ export const nl: BriefingTexts = {
   "category.LANDMARK": "Een van de handvol objecten waarvoor je naar buiten gaat: een bemand station, een bezoekend voertuig, of een van de grote observatoria.",
   "category.NAVIGATION": "Een navigatiesatelliet. Hij zendt de tijd van een atoomklok uit en waar hij was toen hij die verstuurde; een ontvanger die er vier tegelijk hoort, kan uitrekenen waar hij zelf is.",
   "category.EARTH": "Een aardobservatiesatelliet, terug op ons gericht — hij brengt land en zee in beeld, volgt het weer, of meet ijs, gewassen, branden en vervuiling.",
-  "category.COMMS": "Een communicatiesatelliet: hij verplaatst bits. Televisie, telefonie, breedband of berichten tussen machines, tussen punten op de grond waartussen geen kabel ligt.",
+  "category.INTERNET": "Een satelliet uit een van de internetconstellaties: honderden of duizenden gelijke satellieten in een lage baan, die een schotel op de grond tijdens hun overgang aan elkaar doorgeven, zodat er altijd een deel van het netwerk boven ons staat.",
+  "category.TELECOM": "Een telecommunicatiesatelliet: televisie en data doorgegeven tussen punten op de grond zonder kabel ertussen, of gesprekken en korte berichten van satelliettelefoons en kleine apparaten ver van elke zendmast.",
   "category.OTHER": "Een actieve satelliet die de catalogus wel noemt maar niet indeelt. De meeste objecten van deze grootte daarboven zijn technologiedemonstraties, universiteitscubesats of kleine commerciële ladingen.",
   parked: "Een satelliet die 35.786 km boven de evenaar geparkeerd staat, waar één omloop precies een dag duurt en hij stil lijkt te hangen. Daarom kan de schotel op een dak vastgezet worden en nooit meer verschoven."
 };

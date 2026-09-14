@@ -14,7 +14,7 @@ import { elevationDeg, rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { clamp } from "../math/angles";
 import { SatelliteCatalog } from "../satellite/catalog";
-import { isStarlink, SatelliteCategory } from "../satellite/categories";
+import { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories";
 import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
 import { SunlitState } from "../satellite/illumination";
 import { SkyDarkness, skyDarknessAt } from "../satellite/nakedEye";
@@ -598,13 +598,13 @@ type AnimatedMarkerOptions = {
   maskFiltering: boolean;
   enabledCategories: Set<SatelliteCategory>;
   /**
-   * Whether Starlink is drawn, on top of whether communications satellites are.
+   * Which subcategories are drawn, on top of whether their category is.
    *
-   * Separate from the categories because the constellation is roughly half the
-   * active catalogue on its own, so folding it into `COMMS` leaves no way to
-   * ask what else is up there. See `isStarlink`.
+   * Starlink is the one that most needs it: roughly half the active catalogue
+   * on its own, so filtered only through `INTERNET` there is no way to ask what
+   * else is up there. See `SUBCATEGORIES_OF`.
    */
-  starlink: boolean;
+  enabledSubcategories: Set<SatelliteSubcategory>;
   /**
    * The part of the frame that is on screen, which is not all of it once the
    * picture covers the screen rather than fitting inside it (`frameBoxFor`).
@@ -653,7 +653,7 @@ export function useAnimatedMarkers({
   backdropRef,
   maskFiltering,
   enabledCategories,
-  starlink,
+  enabledSubcategories,
   viewport = WHOLE_FRAME,
   onSkyChange
 }: AnimatedMarkerOptions): AnimatedMarkers {
@@ -680,7 +680,7 @@ export function useAnimatedMarkers({
   // being dragged — and the loop must not be torn down and rebuilt for one.
   const viewportRef = useLatestRef(viewport);
   const enabledCategoriesRef = useLatestRef(enabledCategories);
-  const starlinkRef = useLatestRef(starlink);
+  const enabledSubcategoriesRef = useLatestRef(enabledSubcategories);
   const onSkyChangeRef = useLatestRef(onSkyChange);
   const previousFrameRef = useRef<number | null>(null);
   const markerStatsRef = useRef<MarkerStats>({
@@ -734,7 +734,7 @@ export function useAnimatedMarkers({
       const currentMask = maskRef.current;
       const filtering = maskFilteringRef.current;
       const categories = enabledCategoriesRef.current;
-      const starlinkDrawn = starlinkRef.current;
+      const subcategories = enabledSubcategoriesRef.current;
       const visibility = visibilityRef.current;
       const notable = notableRef.current;
       // Once a second rather than per frame, and from everything above the
@@ -799,10 +799,10 @@ export function useAnimatedMarkers({
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
-          // The one filter that is not a category. Read only while the switch
-          // is off, so the default sky pays nothing for it: a name test per
-          // satellite per frame is cheap, and skipped entirely is cheaper.
-          if (!starlinkDrawn && isStarlink(fix.name)) continue;
+          // And the switch under it, for a category that is split. Settled when
+          // the catalogue was read (`subcategoryOf`), so this is a set lookup
+          // rather than a name test per satellite per frame.
+          if (fix.subcategory !== null && !subcategories.has(fix.subcategory)) continue;
 
           const range = rangeKm(fix.position);
           if (choosingNotable) {
@@ -980,7 +980,7 @@ export function useAnimatedMarkers({
   }, [
     brightnessRef,
     enabledCategoriesRef,
-    starlinkRef,
+    enabledSubcategoriesRef,
     epochRef,
     lens,
     maskFilteringRef,

@@ -9,8 +9,8 @@
  *
  * The one thing it does not do is propagate an orbit. Positions arrive from the
  * scene file as frame percentages, as they would from the projection, and a
- * trail is laid straight back along the scene's heading — which over a minute
- * and a half is what a real orbit on this lens is, to a pixel or two.
+ * trail is laid straight back along the scene's heading — which over three
+ * quarters of a minute is what a real orbit on this lens is, to a pixel or two.
  */
 
 const SATELLITE_MARKERS = {
@@ -38,8 +38,8 @@ const MIN_TRAIL_WIDTH_PX = 1.4;
  * scene says how fast an object crosses the frame, and the trail is that speed
  * over the app's own window.
  */
-const TRAIL_WINDOWS = 90 / 12;
-const TRAIL_POINTS = 12;
+const TRAIL_WINDOWS = 45 / 12;
+const TRAIL_POINTS = 9;
 /** `TAIL_DASH`: solid from the mark, then dashes that shorten as their gaps widen. */
 const TAIL_DASH = {
   solidShare: 0.3,
@@ -51,9 +51,9 @@ const TAIL_DASH = {
   maxDashes: 32
 };
 const MINIMUM_TRAIL_PX = 4;
-const OUTLINE_RATIO = 0.16;
+const OUTLINE_RATIO = 0.1;
 const MIN_OUTLINE_PX = 1;
-const MIN_EDGE_PX = 1.25;
+const MIN_EDGE_PX = 0.9;
 const RING_RATIO = 0.2;
 const MIN_RING_PX = 1;
 const HALO_MARGIN_PX = 6;
@@ -112,20 +112,30 @@ const LANDMARK_PATHS = {
   farOpacity: 0.25
 };
 
-/** `CATEGORY_COLORS`, `CATEGORY_BLOOMS` and `MARK_EDGE`: every mark, day and night. */
+/** `CATEGORY_COLORS`, `CATEGORY_BLOOMS`, `CATEGORY_EDGES` and `MARK_EDGE`: every mark, day and night. */
 const CATEGORY_COLORS = {
   LANDMARK: "#fbe6af",
-  NAVIGATION: "#fba8a0",
-  EARTH: "#90e1c5",
-  COMMS: "#bfa4f0",
-  OTHER: "#92a9b4"
+  NAVIGATION: "#faa29f",
+  EARTH: "#a1e4ae",
+  INTERNET: "#c09aeb",
+  TELECOM: "#85d0ee",
+  OTHER: "#a9a49e"
 };
 const CATEGORY_BLOOMS = {
-  LANDMARK: "#e9c67d",
-  NAVIGATION: "#eb827b",
-  EARTH: "#52caa5",
-  COMMS: "#9d80e7",
-  OTHER: "#7598ad"
+  LANDMARK: "#e6c77c",
+  NAVIGATION: "#ea7d76",
+  EARTH: "#6bc987",
+  INTERNET: "#a573da",
+  TELECOM: "#46b2dd",
+  OTHER: "#8e8479"
+};
+const CATEGORY_EDGES = {
+  LANDMARK: "#564519",
+  NAVIGATION: "#632d2a",
+  EARTH: "#255032",
+  INTERNET: "#482f62",
+  TELECOM: "#09495f",
+  OTHER: "#413c38"
 };
 const MARK_EDGE = { color: "#05070a", alpha: 0.9 };
 
@@ -316,7 +326,7 @@ function pathShapeFor(path, box, scale, palette) {
     alpha: pathOpacity(path.lead ?? 0),
     width,
     rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO),
-    rim: { color: palette.outline.color, alpha: palette.outline.alpha * palette.edge }
+    rim: { color: CATEGORY_EDGES[path.category ?? "LANDMARK"], alpha: palette.outline.alpha * palette.edge }
   };
 }
 
@@ -375,6 +385,7 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
       bloom: { radius: size * BLOOM_RATIO, alpha: BLOOM_ALPHA * strength * light },
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
       bloomColor: palette.blooms[marker.category],
+      edgeColor: CATEGORY_EDGES[marker.category],
       color: palette.categories[marker.category],
       alpha,
       edgeAlpha: opacity * edge
@@ -459,16 +470,16 @@ function drawTail(context, glyph, tail, color, alpha, outset) {
 function drawRim(context, glyph, palette) {
   const ink = palette.outline;
   if (!(glyph.edgeAlpha > 0)) return;
-  if (glyph.tail) drawTail(context, glyph, glyph.tail, ink.color, ink.alpha * glyph.edgeAlpha, glyph.tail.rim);
+  if (glyph.tail) drawTail(context, glyph, glyph.tail, glyph.edgeColor, ink.alpha * glyph.edgeAlpha, glyph.tail.rim);
   const { rim } = glyph;
   context.globalAlpha = ink.alpha * glyph.edgeAlpha;
   context.beginPath();
   context.arc(glyph.x, glyph.y, Math.max(0, rim.radius), 0, TWO_PI);
   if (rim.width === null) {
-    context.fillStyle = ink.color;
+    context.fillStyle = glyph.edgeColor;
     context.fill();
   } else {
-    context.strokeStyle = ink.color;
+    context.strokeStyle = glyph.edgeColor;
     context.lineWidth = rim.width;
     context.stroke();
   }

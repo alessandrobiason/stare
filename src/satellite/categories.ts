@@ -7,32 +7,75 @@
  * so a new category cannot be added in one place and forgotten in another.
  *
  * The categories answer "what is that, and why would I care?" rather than
- * naming an operator or an orbit. That matters because the two are not the
- * same question: an earlier split mixed a brand (Starlink), two purposes
- * (navigation, communications), an orbit (geostationary) and a residual, so
- * the entries were not alternatives to each other — Starlink *is*
- * communications, and a geostationary satellite almost always is too.
+ * naming an operator or an orbit. Where one of them is still two quite
+ * different things to somebody looking up, it is split once more into
+ * subcategories (`SUBCATEGORIES_OF`): each is a switch of its own in the filter
+ * and a word on the card, but not a colour of its own — six colours is already
+ * about the limit of what pastels alone can keep apart.
  *
- * Colour carries the purpose and nothing else (`CATEGORY_COLORS`). Whether an
+ * Communications used to be one category, and it was the one that made no
+ * sense: ten thousand Starlinks and the rest of the internet constellations
+ * sweeping across low orbit, filed together with the television satellites
+ * parked over the equator and the handful of fleets that carry phone calls and
+ * sensor messages. So it is two now, by what the service is:
+ *
+ * - `INTERNET`, the broadband constellations — mostly low orbit, and most of
+ *   the marks on any sky. Starlink on its own, being half the catalogue, and
+ *   the rest (OneWeb, Kuiper, Qianfan, Guowang, O3b) beside it.
+ * - `TELECOM`, the older industry: television and data relayed from the
+ *   geostationary belt, and satellite phones and machine messaging (Iridium,
+ *   Globalstar, Orbcomm, Inmarsat…) wherever they fly.
+ *
+ * Earth observation splits the same way, into weather — a few dozen satellites
+ * anyone has heard the output of — and the imaging and radar fleets that are
+ * most of the category.
+ *
+ * Colour carries the category and nothing else (`CATEGORY_COLORS`). Whether an
  * object is parked over the equator is drawn as a shape instead (see
  * `isParked`), because that is a behaviour someone can see rather than a
- * purpose they have to be told, and because five is about the limit of what
- * colour alone can separate.
+ * purpose they have to be told.
  */
 export const SATELLITE_CATEGORIES = [
   "LANDMARK",
   "NAVIGATION",
   "EARTH",
-  "COMMS",
+  "INTERNET",
+  "TELECOM",
   "OTHER"
 ] as const;
 
 export type SatelliteCategory = (typeof SATELLITE_CATEGORIES)[number];
 
+/** Every subcategory, in legend order. */
+export const SATELLITE_SUBCATEGORIES = [
+  "WEATHER",
+  "IMAGING",
+  "STARLINK",
+  "CONSTELLATIONS",
+  "BROADCAST",
+  "MOBILE"
+] as const;
+
+export type SatelliteSubcategory = (typeof SATELLITE_SUBCATEGORIES)[number];
+
+/**
+ * Which subcategories a category is split into, in the order the legend lists
+ * them. Empty for a category that is one thing already. Every object in a split
+ * category belongs to exactly one of its subcategories (`subcategoryOf`).
+ */
+export const SUBCATEGORIES_OF: Record<SatelliteCategory, readonly SatelliteSubcategory[]> = {
+  LANDMARK: [],
+  NAVIGATION: [],
+  EARTH: ["WEATHER", "IMAGING"],
+  INTERNET: ["STARLINK", "CONSTELLATIONS"],
+  TELECOM: ["BROADCAST", "MOBILE"],
+  OTHER: []
+};
+
 /*
- * What the legend calls each category is user-facing text and lives in
- * `src/i18n` with the rest of it (`Strings["filter"]["categories"]`), in words
- * a non-specialist can use, in twelve languages. The names in the union above
+ * What the legend calls each category and subcategory is user-facing text and
+ * lives in `src/i18n` with the rest of it (`Strings["filter"]`), in words a
+ * non-specialist can use, in twelve languages. The names in the unions above
  * are keys and are never shown.
  */
 
@@ -41,32 +84,34 @@ export type SatelliteCategory = (typeof SATELLITE_CATEGORIES)[number];
  * its tail, on the sky, in the filter and on the card.
  *
  * Pastels, and one set for the whole day. The marks were white for a while,
- * because white on a dark edge reads at both ends of the day and no one fill
- * of the old two ladders did; a pastel is most of the way to white, so it keeps
- * that — light on a night sky, a light centre inside the near-black edge on a
- * daylit one (`palette.ts`) — and spends what is left on a hue. Nothing here is
+ * because white reads at both ends of the day and no one fill of the old two
+ * ladders did; a pastel is most of the way to white, so it keeps that — light
+ * on a night sky, a light centre inside a dark edge on a daylit one
+ * (`CATEGORY_EDGES`) — and spends what is left on a hue. Nothing here is
  * saturated: seventy marks in signal colours over a photograph of the sky read
  * as an instrument panel rather than as lights in it.
  *
  * Set in OKLCH and converted, so the hues are spaced by eye rather than by RGB:
  *
  * - `LANDMARK` champagne, the lightest and warmest, for the couple of dozen
- *   objects worth looking up for — nearest the white they carry a halo and a
- *   name beside.
- * - `NAVIGATION` a coral blush, `EARTH` a sage, `COMMS` a lavender.
- * - `OTHER` a misted slate, the least chroma and the least light, since it is
- *   most of the catalogue and should be the quietest thing on the frame.
+ *   objects worth looking up for.
+ * - `NAVIGATION` a coral blush, `EARTH` a mint sage.
+ * - `INTERNET` a lavender, and `TELECOM` a sky blue: the two halves of what was
+ *   one category, on either side of the wheel from the warm hues.
+ * - `OTHER` a warm stone grey, with next to no chroma and the least light, so
+ *   the residual is the quietest thing on the frame.
  *
- * No two are closer than 0.11 in OKLab, which is as far apart as five colours
+ * No two are closer than 0.11 in OKLab, which is as far apart as six colours
  * can get while all staying pastel; every one is over seven to one against a
- * night sky and against the edge it sits in by day.
+ * night sky.
  */
 export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
   LANDMARK: "#fbe6af",
-  NAVIGATION: "#fba8a0",
-  EARTH: "#90e1c5",
-  COMMS: "#bfa4f0",
-  OTHER: "#92a9b4"
+  NAVIGATION: "#faa29f",
+  EARTH: "#a1e4ae",
+  INTERNET: "#c09aeb",
+  TELECOM: "#85d0ee",
+  OTHER: "#a9a49e"
 };
 
 /**
@@ -78,15 +123,47 @@ export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
  * in the air around it.
  */
 export const CATEGORY_BLOOMS: Record<SatelliteCategory, string> = {
-  LANDMARK: "#e9c67d",
-  NAVIGATION: "#eb827b",
-  EARTH: "#52caa5",
-  COMMS: "#9d80e7",
-  OTHER: "#7598ad"
+  LANDMARK: "#e6c77c",
+  NAVIGATION: "#ea7d76",
+  EARTH: "#6bc987",
+  INTERNET: "#a573da",
+  TELECOM: "#46b2dd",
+  OTHER: "#8e8479"
+};
+
+/**
+ * The edge a mark is drawn inside by day, or over anything bright in the
+ * picture: the same hue again, taken most of the way down to dark.
+ *
+ * Near-black was the obvious edge and it was a heavy one — every mark a
+ * sticker with a black outline. The same colour in a deep shade does the same
+ * work, since what separates a pale fill from a bright sky is the drop in
+ * lightness rather than the absence of hue, and it keeps the mark one object
+ * in one colour rather than a coloured centre in a black ring. Every one is at
+ * OKLCH lightness 0.36 to 0.40, which is dark enough to hold against cloud.
+ */
+export const CATEGORY_EDGES: Record<SatelliteCategory, string> = {
+  LANDMARK: "#564519",
+  NAVIGATION: "#632d2a",
+  EARTH: "#255032",
+  INTERNET: "#482f62",
+  TELECOM: "#09495f",
+  OTHER: "#413c38"
 };
 
 export function allCategories(): Set<SatelliteCategory> {
   return new Set(SATELLITE_CATEGORIES);
+}
+
+export function allSubcategories(): Set<SatelliteSubcategory> {
+  return new Set(SATELLITE_SUBCATEGORIES);
+}
+
+/** The category a subcategory belongs to. */
+export function parentOf(subcategory: SatelliteSubcategory): SatelliteCategory {
+  return SATELLITE_CATEGORIES.find((category) =>
+    SUBCATEGORIES_OF[category].includes(subcategory)
+  )!;
 }
 
 /**
@@ -182,42 +259,57 @@ const NAVIGATION_NAME = /GPS|NAVSTAR|GALILEO|GLONASS|BEIDOU|QZSS|IRNSS|NAVIC|CEN
 const EARTH_NAME =
   /YAOGAN|FLOCK|LEMUR|ICEYE|GAOFEN|JILIN|SENTINEL|NOAA|LANDSAT|TERRA|AQUA|SUOMI|METEOR|METOP|SKYSAT|CAPELLA|UMBRA|HAWK|SITRO|GEESAT|IRIDE|TIANMU|PLANET|DOVE|SPOT|PLEIADES|WORLDVIEW|RADARSAT|COSMO-SKYMED|TERRASAR|PAZ|KOMPSAT|CARTOSAT|CBERS|NUSAT|BLACKSKY|ZHUHAI|SHIYAN|YUNHAI|FENGYUN|GOES|ELEKTRO|HIMAWARI|ARKTIKA|TIANHUI|GRUS|GHGSAT|HAIYANG|TOMORROW|GRACE|ICESAT|SWOT|AMAZONIA|RESOURCESAT|OCEANSAT|EROS|FORMOSAT|SUPERVIEW/;
 
-/**
- * Anything that moves bits: the internet constellations, the phone and
- * messaging fleets, and the broadcast satellites parked over the equator.
- * They share a colour because they are one industry; the ring that marks a
- * parked object is what separates the television satellite from the internet
- * one on screen.
- */
-const COMMS_NAME =
-  /STARLINK|ONEWEB|KUIPER|QIANFAN|HULIANWANG|GUOWANG|TELESAT|IRIDIUM|GLOBALSTAR|ORBCOMM|SES-|O3B|INMARSAT|THURAYA|ASTROCAST|SWARM|KINEIS|GONETS|LYNK|BLUEBIRD|CONNECTA|TIANQI|EUTELSAT|INTELSAT|ASTRA|HOTBIRD|VIASAT|ECHOSTAR|DIRECTV|YAMAL|EXPRESS-|CHINASAT|APSTAR|MEASAT|NILESAT|ARABSAT|TURKSAT|HISPASAT|AMOS-|BADR|SKYNET|WGS|MUOS|SICRAL|SYRACUSE|GSAT|JCSAT|OPTUS|NSS-|TELSTAR|GALAXY|ANIK|BSAT|SUPERBIRD|KOREASAT|THAICOM|VINASAT|PALAPA|BELINTERSAT|ABS-|AZERSPACE|ANGOSAT|NIGCOMSAT|RASCOM/;
+/** Weather and climate: the part of Earth observation whose output is on the news every night. */
+const WEATHER_NAME =
+  /NOAA|METEOR|METOP|FENGYUN|GOES|ELEKTRO|HIMAWARI|ARKTIKA|GEO-KOMPSAT|EWS-G|TOMORROW|DMSP|SUOMI|JPSS|MTG-|MSG-|INSAT-3D|GRACE|ICESAT|SWOT|GHGSAT/;
 
 /**
- * Starlink, which is a filter of its own rather than a category.
+ * The broadband constellations: internet from space, mostly from low orbit.
+ * O3b is the exception, a few thousand kilometres up, and belongs here all the
+ * same — what it sells is the internet.
+ */
+const INTERNET_NAME = /STARLINK|ONEWEB|KUIPER|QIANFAN|HULIANWANG|GUOWANG|TELESAT|O3B/;
+
+/**
+ * Satellite phones and machine messaging: small terminals talking straight to
+ * the satellite, in low orbit or from the geostationary belt.
+ */
+const MOBILE_NAME =
+  /IRIDIUM|GLOBALSTAR|ORBCOMM|INMARSAT|THURAYA|ASTROCAST|SPACEBEE|KINEIS|GONETS|LYNK|BLUEBIRD|CONNECTA|TIANQI|SKYTERRA|TIANTONG/;
+
+/**
+ * Television, data and relays from the geostationary belt: the broadcasters,
+ * the telecom operators, the military communications fleets and the relay
+ * satellites that carry the space stations' own links.
+ */
+const BROADCAST_NAME =
+  /^SES-|EUTELSAT|INTELSAT|^ASTRA|HOTBIRD|VIASAT|ECHOSTAR|DIRECTV|^YAMAL|^EXPRESS-|CHINASAT|ZHONGXING|APSTAR|ASIASAT|MEASAT|NILESAT|ARABSAT|TURKSAT|HISPASAT|^AMOS-|^BADR|^SKYNET|^WGS|^MUOS|^AEHF|^SICRAL|^SYRACUSE|^GSAT|JCSAT|^OPTUS|^NSS-|^TELSTAR|^GALAXY|^ANIK|^BSAT|SUPERBIRD|KOREASAT|THAICOM|VINASAT|^PALAPA|BELINTERSAT|^ABS-|AZERSPACE|ANGOSAT|NIGCOMSAT|RASCOM|^TDRS|TIANLIAN|^LUCH/;
+
+/**
+ * Parked objects nothing else claims but which are plainly not a television
+ * service: early-warning and signals-intelligence satellites, experimental
+ * series, and the US, Russian and Chinese military payloads catalogued under
+ * anonymous series names. Without this they fell through to the parked rule
+ * below and were filed as television.
+ */
+const DEFENCE_NAME = /^USA|SBIRS|^TJS|^COSMOS|^KOSMOS|^DSP|^SHIJIAN/;
+
+/**
+ * Starlink, which is a subcategory of its own.
  *
- * It is communications and it is coloured as communications, because that is
- * what it is for and the taxonomy above is about purpose. But it is also
- * something no other name in that table is: a single operator holding a good
- * half of the active catalogue, and therefore a good half of the marks on any
- * given sky. Filtered only through `COMMS`, the two useful views are "most of
- * the sky is one constellation" and "no communications satellites at all", and
- * neither of those is the view someone wants when they ask what else is up
- * there.
+ * It is internet from space and coloured as that, because that is what it is
+ * for. But it is also something no other name in that table is: a single
+ * operator holding a good half of the active catalogue, and therefore a good
+ * half of the marks on any given sky. Filtered only through `INTERNET`, the two
+ * useful views are "most of the sky is one constellation" and "no internet
+ * satellites at all", and neither is the view someone wants when they ask what
+ * else is up there.
  *
- * So it gets a switch beside the five, and nothing else about it changes: same
- * colour, same category on the card, same row in the breakdown. `^` anchored
- * because the name is the fleet's — `STARLINK-1007` — and an unanchored test
- * would be a substring match on a catalogue nobody controls the names in. Case
- * insensitive rather than upper-casing the name first: this is asked per
- * satellite per frame, and an anchored test costs nothing where a new string
- * does.
+ * `^` anchored because the name is the fleet's — `STARLINK-1007` — and an
+ * unanchored test would be a substring match on a catalogue nobody controls
+ * the names in.
  */
 const STARLINK_NAME = /^STARLINK/i;
-
-/** Whether an entry belongs to the constellation the filter singles out. */
-export function isStarlink(name: string): boolean {
-  return STARLINK_NAME.test(name);
-}
 
 /** Mean motion (revolutions per day) occupies columns 53-63 of TLE line 2. */
 const MEAN_MOTION_COLUMNS: [number, number] = [52, 63];
@@ -261,8 +353,8 @@ export function isDuplicateEntry(line1?: string): boolean {
  * Landmarks are matched by catalogue number first, then crew vehicles by name;
  * the rest is name matching, because CelesTrak's "active" catalog carries no
  * purpose field. A parked object that nothing else claimed is treated as
- * communications, which is what the great majority of the geostationary belt
- * is.
+ * television and data, which is what the great majority of the geostationary
+ * belt is — once the military series that are not have been set aside.
  */
 export function classifySatellite(name: string, line2?: string, line1?: string): SatelliteCategory {
   const idLine = line1 ?? line2;
@@ -271,9 +363,33 @@ export function classifySatellite(name: string, line2?: string, line1?: string):
   const normalized = name.toUpperCase();
   if (CREWED_VEHICLE_NAME.test(normalized)) return "LANDMARK";
   if (NAVIGATION_NAME.test(normalized)) return "NAVIGATION";
-  if (EARTH_NAME.test(normalized)) return "EARTH";
-  if (COMMS_NAME.test(normalized)) return "COMMS";
-  if (isParked(line2)) return "COMMS";
+  // Before Earth observation, whose table is loose enough that `SKYTERRA`
+  // would be read as `TERRA`.
+  if (MOBILE_NAME.test(normalized)) return "TELECOM";
+  if (EARTH_NAME.test(normalized) || WEATHER_NAME.test(normalized)) return "EARTH";
+  if (INTERNET_NAME.test(normalized)) return "INTERNET";
+  if (BROADCAST_NAME.test(normalized)) return "TELECOM";
+  if (DEFENCE_NAME.test(normalized)) return "OTHER";
+  if (isParked(line2)) return "TELECOM";
 
   return "OTHER";
+}
+
+/**
+ * Which subcategory of its category an entry is, or `null` for a category that
+ * is not split. Always one of `SUBCATEGORIES_OF[category]` otherwise: each split
+ * names one kind outright and takes the rest of the category as the other.
+ */
+export function subcategoryOf(name: string, category: SatelliteCategory): SatelliteSubcategory | null {
+  const normalized = name.toUpperCase();
+  switch (category) {
+    case "EARTH":
+      return WEATHER_NAME.test(normalized) ? "WEATHER" : "IMAGING";
+    case "INTERNET":
+      return STARLINK_NAME.test(normalized) ? "STARLINK" : "CONSTELLATIONS";
+    case "TELECOM":
+      return MOBILE_NAME.test(normalized) ? "MOBILE" : "BROADCAST";
+    default:
+      return null;
+  }
 }

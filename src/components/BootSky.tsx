@@ -19,6 +19,8 @@ import {
   PaintStyle,
   Skia,
   SkiaPictureView,
+  StrokeCap,
+  StrokeJoin,
   TileMode,
   createPicture
 } from "./skia";
@@ -99,11 +101,11 @@ function nightShaders(scene: BootSkyScene): NightShaders {
 type TailPlacement = { path: SkPath; angleDeg: number; length: number };
 
 /**
- * The tail's outline in its own unit frame: the head at the origin and the tip
+ * The tail's runs in their own unit frame: the head at the origin and the tip
  * at `(1, 0)`, which is the frame the overlay's tail shader fades along. The
  * canvas is turned and scaled onto the tail rather than a gradient made to
- * measure — see `SatelliteMarkers`'s `drawTail`, which places its triangle the
- * same way.
+ * measure — see `SatelliteMarkers`'s `drawTail`, which places a trail the same
+ * way.
  */
 function tailPath(light: SkyLight): TailPlacement {
   const { tail } = light;
@@ -113,15 +115,16 @@ function tailPath(light: SkyLight): TailPlacement {
   const cos = dx / length;
   const sin = dy / length;
   const path = Skia.Path.Make();
-  for (let index = 0; index < tail.points.length; index += 2) {
-    const x = tail.points[index] - light.x;
-    const y = tail.points[index + 1] - light.y;
-    const alongX = (x * cos + y * sin) / length;
-    const alongY = (y * cos - x * sin) / length;
-    if (index === 0) path.moveTo(alongX, alongY);
-    else path.lineTo(alongX, alongY);
+  for (const run of tail.runs) {
+    for (let index = 0; index < run.length; index += 2) {
+      const x = run[index] - light.x;
+      const y = run[index + 1] - light.y;
+      const alongX = (x * cos + y * sin) / length;
+      const alongY = (y * cos - x * sin) / length;
+      if (index === 0) path.moveTo(alongX, alongY);
+      else path.lineTo(alongX, alongY);
+    }
   }
-  path.close();
   return { path, angleDeg: Math.atan2(dy, dx) * (180 / Math.PI), length };
 }
 
@@ -162,14 +165,19 @@ function record(
       glow(canvas, paint, light, light.bloom.radius, "bloom", light.bloomColor, light.bloom.alpha * pose.alpha);
       glow(canvas, paint, light, light.glow.radius, "glow", light.color, light.glow.alpha * pose.alpha);
 
-      paint.setShader(fadeShader("comet", light.color));
+      paint.setShader(fadeShader("tail", light.color));
       paint.setAlphaf(light.tail.alpha * pose.alpha);
+      paint.setStyle(PaintStyle.Stroke);
+      paint.setStrokeCap(StrokeCap.Round);
+      paint.setStrokeJoin(StrokeJoin.Round);
+      paint.setStrokeWidth(light.tail.width / tail.length);
       canvas.save();
       canvas.translate(light.x, light.y);
       canvas.rotate(tail.angleDeg, 0, 0);
       canvas.scale(tail.length, tail.length);
       canvas.drawPath(tail.path, paint);
       canvas.restore();
+      paint.setStyle(PaintStyle.Fill);
 
       glow(canvas, paint, light, light.coreRadius, "core", light.color, pose.alpha);
       canvas.restore();

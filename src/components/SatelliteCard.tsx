@@ -241,8 +241,7 @@ export const SatelliteCard: React.FC<Props> = ({
           </Text>
           {detail && (
             <Text numberOfLines={1} style={styles.purposeLabel}>
-              {t.filter.categories[detail.category]}
-              {detail.parked ? ` · ${t.card.holdsStation}` : ""}
+              {purposeLabel(detail)}
             </Text>
           )}
         </View>
@@ -445,6 +444,25 @@ function answersForPass(
 
 const BADGE_SIZE = 38;
 const BADGE_MARK = 12;
+
+/**
+ * The line under the name: what the object is for, as the filter names it.
+ *
+ * The category and the part of it, where it is split — `INTERNET · STARLINK` —
+ * and the note that it holds station for one that does. One line, clipped
+ * rather than wrapped, and the three together do not fit it in most languages;
+ * so a parked object gives up the category for the note, since the part names
+ * the service on its own (`TV AND DATA`) and the badge beside it is already in
+ * the category's colour.
+ */
+function purposeLabel(detail: SatelliteDetail): string {
+  const t = strings();
+  const category = t.filter.categories[detail.category];
+  const part = detail.subcategory ? t.filter.subcategories[detail.subcategory] : null;
+  const parked = detail.parked ? t.card.holdsStation : null;
+  const words = part && parked ? [part, parked] : [category, part ?? parked];
+  return words.filter((word) => word !== null).join(" · ");
+}
 
 const styles = StyleSheet.create({
   sheet: {

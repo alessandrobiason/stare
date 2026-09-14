@@ -80,33 +80,33 @@
   </g>
   <defs>
     <radialGradient id="pass-bloom" gradientUnits="userSpaceOnUse" cx="645" cy="759" r="120">
-      <stop offset="0%" stop-color="#a9c9ff" stop-opacity="1"/>
-      <stop offset="20%" stop-color="#a9c9ff" stop-opacity="0.45"/>
-      <stop offset="50%" stop-color="#a9c9ff" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#a9c9ff" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#e6c77c" stop-opacity="1"/>
+      <stop offset="20%" stop-color="#e6c77c" stop-opacity="0.45"/>
+      <stop offset="50%" stop-color="#e6c77c" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#e6c77c" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="pass-glow" gradientUnits="userSpaceOnUse" cx="645" cy="759" r="42">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="12%" stop-color="#ffffff" stop-opacity="0.7"/>
-      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="12%" stop-color="#fbe6af" stop-opacity="0.7"/>
+      <stop offset="35%" stop-color="#fbe6af" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#fbe6af" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="pass-core" gradientUnits="userSpaceOnUse" cx="645" cy="759" r="7.8">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="50%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#fbe6af" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="pass-tail" gradientUnits="userSpaceOnUse" x1="645" y1="759" x2="257.96" y2="800.54">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="30%" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="65%" stop-color="#ffffff" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    <linearGradient id="pass-tail" gradientUnits="userSpaceOnUse" x1="645" y1="759" x2="141.62" y2="829.84">
+      <stop offset="0%" stop-color="#fbe6af" stop-opacity="1"/>
+      <stop offset="12%" stop-color="#fbe6af" stop-opacity="0.8"/>
+      <stop offset="45%" stop-color="#fbe6af" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#fbe6af" stop-opacity="0"/>
     </linearGradient>
   </defs>
   <g transform="rotate(-11.15 645 2583)">
     <circle cx="645" cy="759" r="120" fill="url(#pass-bloom)" opacity="0.35"/>
     <circle cx="645" cy="759" r="42" fill="url(#pass-glow)" opacity="0.8"/>
-    <path d="M 645 755.1 L 620.58 755.51 L 596.16 756.24 L 571.77 757.3 L 547.39 758.68 L 523.04 760.39 L 498.71 762.43 L 474.42 764.79 L 450.16 767.47 L 425.95 770.48 L 401.78 773.81 L 377.66 777.47 L 353.6 781.44 L 329.59 785.74 L 305.65 790.35 L 281.77 795.28 L 257.96 800.54 L 257.96 800.54 L 281.87 795.76 L 305.83 791.31 L 329.84 787.18 L 353.91 783.37 L 378.02 779.88 L 402.17 776.71 L 426.36 773.87 L 450.58 771.35 L 474.83 769.16 L 499.1 767.29 L 523.39 765.75 L 547.7 764.53 L 572.02 763.63 L 596.35 763.06 L 620.67 762.82 L 645 762.9 Z" fill="url(#pass-tail)" opacity="0.85"/>
+    <path d="M 645 759 L 613.13 759.28 L 581.26 760.11 L 549.42 761.51 L 517.6 763.45 L 501.15 764.75 M 492.18 765.46 L 485.83 765.96 L 467.54 767.72 M 455.53 768.88 L 454.1 769.02 L 435.36 771.15 M 419.31 773.04 L 402.82 775.22 M 381.37 778.21 L 367.87 780.23 M 339.23 784.88 L 328.2 786.73 M 289.99 793.93 L 280.99 795.76 M 230.09 806.85 L 222.77 808.61 M 155.18 826.07 L 149.23 827.72" fill="none" stroke="url(#pass-tail)" stroke-width="5.1" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
     <circle cx="645" cy="759" r="7.8" fill="url(#pass-core)" opacity="1"/>
   </g>
 </svg>

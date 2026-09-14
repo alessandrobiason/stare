@@ -309,7 +309,8 @@ export const SATELLITE_TRACKING = {
  * How the markers are drawn (`src/components/markerScene.ts`).
  *
  * The overlay has four channels to spend and only one of them is colour, which
- * is fortunate: five categories is already what colour alone can separate.
+ * is fortunate: six categories is already what pastels alone can separate, and
+ * the finer split below them is a switch in the filter rather than a colour.
  * Shape says whether the object holds station, size says how far away it is,
  * an outline keeps the mark readable against any sky, and a label is spent
  * only where it is worth the space.
@@ -344,21 +345,22 @@ export const SATELLITE_MARKERS = {
    * `twoBodyPath`), so a fast low pass draws a long line, a slow high one a
    * short one, and a parked satellite draws nothing at all.
    *
-   * A minute and a half, which is long for a trail and is so on purpose. The
-   * frame is a rectilinear projection, and over a few seconds any orbit crosses
-   * it as a straight line; it is only over a minute or more that the orbit's own
-   * turn bends it by more than a pixel or two. The far half of that is drawn
-   * dashed and faint (`TAIL_DASH`, `TAIL_FADE`), so what reads at a glance is
-   * still the stretch nearest the mark.
+   * Three quarters of a minute. The trail was a minute and a half, long enough
+   * for the orbit's own turn to bend it by a pixel or two on this rectilinear
+   * frame, and it was too much: a fast low pass drew a line across half the
+   * sky, and a full sky of them was a web of lines rather than a sky of lights.
+   * Halved, the fastest still cross a good part of the frame and the far half
+   * is drawn dashed and faint (`TAIL_DASH`, `TAIL_FADE`), so what reads at a
+   * glance is the stretch nearest the mark.
    */
-  trailSeconds: 90,
+  trailSeconds: 45,
   /**
-   * How many points the trail is resolved into. Each is a few seconds apart
-   * along the orbit: dense enough that the line between them is the curve to
-   * well inside a pixel, and few enough that a couple of hundred satellites
-   * cost a couple of thousand projections a frame.
+   * How many points the trail is resolved into. Five seconds apart along the
+   * orbit: dense enough that the line between them is the curve to well inside
+   * a pixel, and few enough that a couple of hundred satellites cost under two
+   * thousand projections a frame.
    */
-  trailPoints: 12,
+  trailPoints: 9,
   /** Trails shorter than this, in frame pixels, are not worth drawing. */
   minimumTrailPx: 4,
   /**

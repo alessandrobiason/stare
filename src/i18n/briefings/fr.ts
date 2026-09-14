@@ -115,7 +115,8 @@ export const fr: BriefingTexts = {
   "category.LANDMARK": "L'un des rares objets pour lesquels cela vaut la peine de sortir : une station habitée, un véhicule de visite, ou l'un des grands observatoires.",
   "category.NAVIGATION": "Un satellite de navigation. Il émet l'heure d'une horloge atomique et l'endroit où il se trouvait en l'envoyant ; un récepteur qui en entend quatre à la fois peut en déduire où il est.",
   "category.EARTH": "Un satellite d'observation de la Terre, pointé vers nous — il image les terres et les mers, suit la météo, ou mesure la glace, les cultures, les feux et la pollution.",
-  "category.COMMS": "Un satellite de communications : il déplace des bits. Télévision, téléphonie, haut débit ou messages entre machines, entre des points au sol qui n'ont pas de câble entre eux.",
+  "category.INTERNET": "Un satellite de l'une des constellations internet : des centaines ou des milliers de satellites identiques en orbite basse, qui se passent l'antenne au sol de l'un à l'autre en défilant, pour qu'une partie du réseau soit toujours au-dessus de nous.",
+  "category.TELECOM": "Un satellite de télécommunications : télévision et données relayées entre des points au sol qui n'ont pas de câble entre eux, ou appels et messages courts de téléphones satellites et de petits appareils loin de toute antenne.",
   "category.OTHER": "Un satellite actif que le catalogue nomme mais ne classe pas. La plupart des objets de cette taille là-haut sont des démonstrateurs technologiques, des cubesats universitaires ou de petites charges commerciales.",
   parked: "Un satellite garé à 35 786 km au-dessus de l'équateur, où une orbite dure exactement un jour et où il semble immobile. C'est pour cela que la parabole sur un toit peut être boulonnée une fois et ne plus jamais bouger."
 };

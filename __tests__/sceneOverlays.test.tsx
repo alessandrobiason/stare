@@ -16,7 +16,7 @@ import {
 } from "../src/satellite/landmarkPhotos";
 import { SkySummary } from "../src/hooks/useAnimatedMarkers";
 import { BREAKDOWN_ROWS, FleetBreakdown, tallyFleets } from "../src/satellite/fleets";
-import { allCategories } from "../src/satellite/categories";
+import { allCategories, allSubcategories } from "../src/satellite/categories";
 import { SatelliteDetail } from "../src/types";
 
 /** The rendered overlay as plain text, the way someone reads it. */
@@ -27,14 +27,14 @@ function textOf(element: React.ReactElement): string {
     .trim();
 }
 
-function legend(enabled = allCategories(), starlink = true, open = true) {
+function legend(enabled = allCategories(), subcategories = allSubcategories(), open = true) {
   return (
     <CategoryLegend
       open={open}
       enabledCategories={enabled}
       onToggleCategory={() => undefined}
-      starlink={starlink}
-      onToggleStarlink={() => undefined}
+      enabledSubcategories={subcategories}
+      onToggleSubcategory={() => undefined}
       onEnableAll={() => undefined}
     />
   );
@@ -45,7 +45,7 @@ describe("the category filter", () => {
     // The sky is what the screen is for; the list hangs off an icon in the
     // header, and until that is pressed there is nothing of it over the
     // picture at all — not even the word FILTER, which used to sit there.
-    const text = textOf(legend(allCategories(), true, false));
+    const text = textOf(legend(allCategories(), allSubcategories(), false));
 
     expect(text).toBe("");
   });
@@ -60,20 +60,32 @@ describe("the category filter", () => {
 
   test("says so when it is hiding something, so a thin sky reads as a setting", () => {
     const some = allCategories();
-    some.delete("COMMS");
+    some.delete("INTERNET");
     some.delete("OTHER");
 
-    // Six switches, not five: Starlink has one of its own in the list.
-    expect(textOf(legend(some))).toContain("3/6");
+    // Twelve switches, not six: every subcategory has one of its own in the
+    // list, and the two under a category that is off count as off with it.
+    expect(textOf(legend(some))).toContain("8/12");
     // Nothing to report while everything is drawn.
-    expect(textOf(legend())).not.toContain("6/6");
+    expect(textOf(legend())).not.toContain("12/12");
   });
 
   test("counts Starlink among what it is hiding, since it is half the sky", () => {
-    // The whole point of the switch: a sky with every category on but Starlink
-    // off is still an edited sky, and the closed pill has to say so or the
-    // missing half looks like a bug rather than a setting.
-    expect(textOf(legend(allCategories(), false))).toContain("5/6");
+    // A sky with every category on but Starlink off is still an edited sky,
+    // and the panel has to say so or the missing half looks like a bug rather
+    // than a setting.
+    const subcategories = allSubcategories();
+    subcategories.delete("STARLINK");
+    expect(textOf(legend(allCategories(), subcategories))).toContain("11/12");
+  });
+
+  test("lists each split category's parts under it", () => {
+    const text = textOf(legend());
+    expect(text.indexOf("INTERNET")).toBeLessThan(text.indexOf("STARLINK"));
+    expect(text.indexOf("STARLINK")).toBeLessThan(text.indexOf("OTHER NETWORKS"));
+    expect(text.indexOf("OTHER NETWORKS")).toBeLessThan(text.indexOf("TV &amp; PHONES"));
+    expect(text).toContain("PHONES &amp; IOT");
+    expect(text).toContain("WEATHER");
   });
 
   test("says what it is to anyone not seeing it", () => {
@@ -470,7 +482,8 @@ describe("the tapped satellite's card", () => {
     return {
       name: "STARLINK-1234",
       noradId: 44714,
-      category: "COMMS",
+      category: "INTERNET",
+      subcategory: "STARLINK",
       parked: false,
       rangeKm: 1240.4,
       altitudeKm: 547.8,

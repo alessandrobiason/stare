@@ -2,7 +2,7 @@ import { NOTABLE_SATELLITES } from "../src/constants";
 import { NotableCandidate, NotableSatellites } from "../src/satellite/notable";
 
 function sat(overrides: Partial<NotableCandidate> & { name: string }): NotableCandidate {
-  return { category: "COMMS", rangeKm: 1500, elevationDeg: 30, ...overrides };
+  return { category: "INTERNET", rangeKm: 1500, elevationDeg: 30, ...overrides };
 }
 
 const SECOND = 1000;

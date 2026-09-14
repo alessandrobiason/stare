@@ -179,6 +179,7 @@ export class SkyTracker {
       fixes.push({
         name: tracked.entry.name,
         category: tracked.entry.category,
+        subcategory: tracked.entry.subcategory,
         parked: tracked.entry.parked,
         position: enu,
         trail: tracked.entry.parked
@@ -254,6 +255,7 @@ export class SkyTracker {
       name: tracked.entry.name,
       noradId: tracked.entry.noradId,
       category: tracked.entry.category,
+      subcategory: tracked.entry.subcategory,
       parked: tracked.entry.parked,
       rangeKm: range,
       altitudeKm: geodeticAltitudeKm(state.position, gmst),
@@ -312,7 +314,7 @@ export class SkyTracker {
   /**
    * Where a tracked object was over the trail window before `whenMs`, nearest
    * first. Integrated from the stored state under gravity (`twoBodyPath`)
-   * rather than carried along its velocity: over a minute and a half the
+   * rather than carried along its velocity: over three quarters of a minute the
    * straight line is the one thing the trail must not be.
    */
   private trailOf(

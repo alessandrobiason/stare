@@ -1,18 +1,21 @@
 import { clamp } from "../math/angles";
+import { CATEGORY_BLOOMS, CATEGORY_COLORS } from "../satellite/categories";
 import { FrameSize } from "./markerGeometry";
-import { MARK_BLOOM, MARK_COLOR } from "./palette";
+import { dashedRuns } from "./markerScene";
 
 /**
  * The sky the app opens on: one satellite crossing the night above the app's
  * name, and nothing else.
  *
- * It is the logo rather than a decoration of it. `assets/icon.svg` is a single
+ * point of light on a wide arc over a horizon, trailing a line that breaks
  * point of light on a wide arc over a horizon, trailing a tail that fades to
- * nothing; this is that pass, moving. And the light is the overlay's own — the
- * same white point in the same cool bloom, faded by the same stops
- * (`COMET_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`) — so what a person is
- * about to read against the real sky is already in front of them while it
- * loads.
+ * off into dashes; this is that pass, moving. And the light is the overlay's
+ * own — a landmark's champagne point in a bloom of its own hue, trailing the
+ * same solid-then-dashed line along its path, faded by the same stops
+ * (`TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`) and broken by the same
+ * pattern (`dashedRuns`) — so what a person is about to read against the real
+ * sky is already in front of them while it loads. Champagne because the one
+ * light on this screen stands for the kind of object worth going outside for.
  *
  * It used to be five solid satellites turning on five orbits around the name.
  * That was the logo as it was then — a disc with a separate solid trail — and
@@ -129,16 +132,19 @@ export const PASS_TIMING = {
  * The overlay's own mark at the size a satellite would be drawn nearest, and a
  * little over — the boot screen has one light, not seventy, and can afford to
  * let it be seen. The alphas are the overlay's at full strength (`GLOW_ALPHA`,
- * `BLOOM_ALPHA` in `markerScene`); the tail is longer than a marker's twelve
- * seconds, since here it is the whole of what says which way the light is
- * going.
+ * `BLOOM_ALPHA` in `markerScene`). The tail is a fine line along the arc, as
+ * long as a fast pass's on the sky; `dashScale` is design pixels of `TAIL_DASH`
+ * per point, a little over the overlay's own on a phone, as the light is.
  */
 const LIGHT = {
   coreRadius: 2.6,
   glow: { radius: 14, alpha: 0.8 },
   bloom: { radius: 40, alpha: 0.35 },
-  tail: { width: 2.6, length: 130, alpha: 0.85 }
+  tail: { width: 1.7, length: 170, alpha: 0.85, dashScale: 0.75 }
 } as const;
+
+/** The category whose colours the light is drawn in. */
+export const BOOT_LIGHT_CATEGORY = "LANDMARK";
 
 /**
  * The star field, as the parameters that generate it.
@@ -206,14 +212,14 @@ export type SkyLight = {
   bloom: SkyGlow;
   tail: {
     /**
-     * A closed polygon as flat `x, y` pairs: out along one edge from the head
-     * to the tip, and back along the other. It follows the arc and tapers to
-     * nothing, so it is neither a stroke nor a triangle.
+     * What to stroke, as runs of flat `x, y` pairs along the arc: the solid
+     * stretch from under the light, then the dashes (`dashedRuns`).
      */
-    points: number[];
-    /** The point it tapers to, which is where `COMET_FADE` reaches nothing. */
+    runs: number[][];
+    /** Where the arc behind the light ends, which is where `TAIL_FADE` reaches nothing. */
     tipX: number;
     tipY: number;
+    width: number;
     alpha: number;
   };
 };
@@ -375,9 +381,7 @@ function pointAt(cx: number, cy: number, radius: number, degrees: number): [numb
  *
  * "Behind" is against the way the pass is flown, so a right-to-left pass's tail
  * lies at *increasing* angles from the head rather than decreasing ones. The
- * tail is full width at the head, under the point, and tapers to nothing at its
- * tip: the widest part is covered by the light, and what shows is a streak
- * thinning out of it.
+ * tail starts under the point, so what shows is the line coming out of it.
  */
 function lightAtRest(
   cx: number,
@@ -387,40 +391,29 @@ function lightAtRest(
   scale: number
 ): SkyLight {
   const [x, y] = pointAt(cx, cy, radius, REST_DEG);
-  const sweepDeg = ((LIGHT.tail.length * scale) / radius) * (180 / Math.PI);
+  const length = LIGHT.tail.length * scale;
+  const sweepDeg = (length / radius) * (180 / Math.PI);
   // About a degree and a half a segment: an arc this shallow is straight to
   // well inside a pixel over that.
   const steps = Math.max(16, Math.round(sweepDeg / 1.5));
-  const width = LIGHT.tail.width * scale;
-  const outer: number[] = [];
-  const inner: number[] = [];
-
+  const arc: number[] = [];
   for (let step = 0; step <= steps; step += 1) {
-    const along = step / steps;
-    const degrees = REST_DEG - direction * sweepDeg * along;
-    const half = (width / 2) * (1 - along);
-    outer.push(...pointAt(cx, cy, radius + half, degrees));
-    inner.push(...pointAt(cx, cy, radius - half, degrees));
-  }
-
-  // Back along the near edge, so the polygon closes on the head it started at.
-  const returning: number[] = [];
-  for (let index = inner.length - 2; index >= 0; index -= 2) {
-    returning.push(inner[index], inner[index + 1]);
+    arc.push(...pointAt(cx, cy, radius, REST_DEG - direction * sweepDeg * (step / steps)));
   }
 
   return {
     x,
     y,
-    color: MARK_COLOR,
-    bloomColor: MARK_BLOOM,
+    color: CATEGORY_COLORS[BOOT_LIGHT_CATEGORY],
+    bloomColor: CATEGORY_BLOOMS[BOOT_LIGHT_CATEGORY],
     coreRadius: LIGHT.coreRadius * scale,
     glow: { radius: LIGHT.glow.radius * scale, alpha: LIGHT.glow.alpha },
     bloom: { radius: LIGHT.bloom.radius * scale, alpha: LIGHT.bloom.alpha },
     tail: {
-      points: [...outer, ...returning],
-      tipX: outer[outer.length - 2],
-      tipY: outer[outer.length - 1],
+      runs: dashedRuns(arc, length, LIGHT.tail.dashScale * scale),
+      tipX: arc[arc.length - 2],
+      tipY: arc[arc.length - 1],
+      width: LIGHT.tail.width * scale,
       alpha: LIGHT.tail.alpha
     }
   };

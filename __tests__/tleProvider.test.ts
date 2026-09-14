@@ -19,7 +19,7 @@ test("skips stray lines instead of failing the whole catalog", () => {
   const parsed = parseTleCatalog(catalog);
   expect(parsed).toHaveLength(1);
   expect(parsed[0].name).toBe("STARLINK-1");
-  expect(parsed[0].category).toBe("COMMS");
+  expect(parsed[0].category).toBe("INTERNET");
 });
 
 test("flags a geostationary entry as parked", () => {

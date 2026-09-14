@@ -187,7 +187,7 @@ export function pointInViewport(point: FramePoint, viewport: FrameViewport): boo
  * is and where it has been.
  *
  * What this is for is the head that has *already* left. A trail is the ground
- * the object has just covered, and at a minute and a half of orbital motion the
+ * the object has just covered, and at three quarters of a minute of orbital motion the
  * long ones cross the whole frame — so dropping a satellite the moment its mark
  * passed the edge cut a trail that was still most of the way across the view,
  * and a phone turning at any speed did it several times a second. What the eye

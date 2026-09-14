@@ -29,7 +29,7 @@ import {
   stringsFor,
   strings
 } from "../src/i18n";
-import { SATELLITE_CATEGORIES } from "../src/satellite/categories";
+import { SATELLITE_CATEGORIES, SUBCATEGORIES_OF } from "../src/satellite/categories";
 
 afterEach(() => setLocaleForTesting(undefined));
 
@@ -143,13 +143,17 @@ describe("and says it in the space it is given", () => {
     // either side.
     const COLUMN = 248 - 14 * 2;
 
-    // The title shares its row with the `3/6` count and the gap after it.
+    // The title shares its row with the `9/12` count and the gap after it.
     expect(width(t.title, 10, 1.4)).toBeLessThan(COLUMN - 36);
-    // The label column of a row, less the switch and a swatch's width of
-    // margin — the rows carry none now, but the key rows under them do.
-    // Rows may grow, but every point of growth is sky the panel covers.
+    // The label column of a row, less its swatch and margin, the label's own
+    // margin and the switch. Rows may grow, but every point of growth is sky
+    // the panel covers.
     for (const category of SATELLITE_CATEGORIES) {
       expect(width(t.categories[category], 11, 0.3)).toBeLessThan(COLUMN - 10 - 9 - 8 - 36);
+      // A subcategory's row is stepped in by 14 and its label set tighter.
+      for (const part of SUBCATEGORIES_OF[category]) {
+        expect(width(t.subcategories[part], 11)).toBeLessThan(COLUMN - 14 - 10 - 9 - 8 - 36);
+      }
     }
     expect(width(t.showAll, 10, 1.2)).toBeLessThan(COLUMN);
     // Wraps to a second line if it has to, so this is two lines of the column
@@ -208,8 +212,23 @@ describe("and says it in the space it is given", () => {
     // The purpose line under the name: a category, a separator and this,
     // between the mark's badge and the close button. One line — it is clipped
     // rather than wrapped — so this is the whole of the room it has.
-    const purpose = `${stringsFor(locale).filter.categories.COMMS} · ${t.holdsStation}`;
-    expect(width(purpose, 10, 0.7)).toBeLessThan(375 - 12 * 2 - 14 - 8 - 38 - 12 - 12 - 38);
+    // Either shape it takes: a split category and its part, or a part and the
+    // note that the object holds station (`purposeLabel`).
+    const filter = stringsFor(locale).filter;
+    for (const category of SATELLITE_CATEGORIES) {
+      for (const part of SUBCATEGORIES_OF[category]) {
+        for (const purpose of [
+          `${filter.categories[category]} · ${filter.subcategories[part]}`,
+          `${filter.subcategories[part]} · ${t.holdsStation}`
+        ]) {
+          expect(width(purpose, 10, 0.7)).toBeLessThan(375 - 12 * 2 - 14 - 8 - 38 - 12 - 12 - 38);
+        }
+      }
+      if (SUBCATEGORIES_OF[category].length > 0) continue;
+      expect(width(`${filter.categories[category]} · ${t.holdsStation}`, 10, 0.7)).toBeLessThan(
+        375 - 12 * 2 - 14 - 8 - 38 - 12 - 12 - 38
+      );
+    }
   });
 
   test.each(LOCALES)("%s fits the reason line under a name on the sky", (locale) => {

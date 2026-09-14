@@ -115,7 +115,8 @@ export const es: BriefingTexts = {
   "category.LANDMARK": "Uno de los pocos objetos por los que merece la pena salir de casa: una estación tripulada, un vehículo de visita, o uno de los grandes observatorios.",
   "category.NAVIGATION": "Un satélite de navegación. Emite la hora de un reloj atómico y dónde estaba al enviarla; un receptor que oye cuatro a la vez puede calcular dónde se encuentra.",
   "category.EARTH": "Un satélite de observación de la Tierra, apuntado de vuelta hacia nosotros — fotografía tierra y mar, sigue el tiempo, o mide hielo, cultivos, incendios y contaminación.",
-  "category.COMMS": "Un satélite de comunicaciones: mueve bits. Televisión, telefonía, banda ancha o mensajes entre máquinas, entre puntos del suelo que no tienen un cable en medio.",
+  "category.INTERNET": "Un satélite de una de las constelaciones de internet: cientos o miles de satélites iguales en órbita baja que se pasan la antena del suelo de uno a otro al pasar, para que siempre haya una parte de la red sobre nosotros.",
+  "category.TELECOM": "Un satélite de telecomunicaciones: televisión y datos retransmitidos entre puntos del suelo que no tienen un cable en medio, o llamadas y mensajes cortos de teléfonos satelitales y pequeños dispositivos lejos de cualquier antena.",
   "category.OTHER": "Un satélite activo que el catálogo nombra pero no clasifica. Casi todo lo que hay ahí arriba de este tamaño son demostradores tecnológicos, cubesats universitarios o cargas comerciales pequeñas.",
   parked: "Un satélite aparcado a 35.786 km sobre el ecuador, donde una órbita dura exactamente un día y parece quedarse quieto. Por eso la antena del tejado se puede atornillar y no moverla nunca más."
 };

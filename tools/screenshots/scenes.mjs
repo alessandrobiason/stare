@@ -12,7 +12,7 @@
  * hands the overlay (`FramePoint`), and ranges are kilometres, which is what
  * decides how large a mark is drawn. `travelPct` is how much of the frame's
  * width the object covers in twelve seconds — its speed across the frame; the
- * trail is that speed over the app's minute and a half, drawn backwards along
+ * trail is that speed over the app's three quarters of a minute, drawn backwards along
  * `headingDeg`.
  */
 
@@ -25,7 +25,7 @@ function geostationaryBelt({ top, from, to, count, seed = 0 }) {
     // The belt is an arc across the frame rather than a line: it is a circle
     // over the equator seen from the side of the planet.
     const sag = Math.sin(along * Math.PI) * 3.4;
-    const category = index === 2 ? "EARTH" : index === 5 ? "OTHER" : "COMMS";
+    const category = index === 2 ? "EARTH" : index === 5 ? "OTHER" : "TELECOM";
     belt.push({
       left,
       top: top - sag,
@@ -46,7 +46,7 @@ function starlinkTrain({ from, to, count, rangeKm = 820, headingDeg = 28, travel
       left: from.left + (to.left - from.left) * along,
       top: from.top + (to.top - from.top) * along,
       rangeKm: rangeKm + index * 26,
-      category: "COMMS",
+      category: "INTERNET",
       headingDeg,
       travelPct
     });
@@ -259,9 +259,9 @@ const scenes = [
       { left: 66, top: 73, rangeKm: 2600, category: "OTHER", headingDeg: 160, travelPct: 3 },
       { left: 40, top: 38, rangeKm: 5200, category: "OTHER", headingDeg: 320, travelPct: 2.2 },
       { left: 91, top: 69, rangeKm: 4200, category: "OTHER", headingDeg: 250, travelPct: 2.4 },
-      { left: 18, top: 41, rangeKm: 1100, category: "COMMS", headingDeg: 38, travelPct: 5 },
-      { left: 55, top: 19, rangeKm: 1250, category: "COMMS", headingDeg: 122, travelPct: 4.7 },
-      { left: 77, top: 8, rangeKm: 1020, category: "COMMS", headingDeg: 96, travelPct: 5.2 }
+      { left: 18, top: 41, rangeKm: 1100, category: "INTERNET", headingDeg: 38, travelPct: 5 },
+      { left: 55, top: 19, rangeKm: 1250, category: "INTERNET", headingDeg: 122, travelPct: 4.7 },
+      { left: 77, top: 8, rangeKm: 1020, category: "INTERNET", headingDeg: 96, travelPct: 5.2 }
     ]
   },
 
@@ -282,7 +282,7 @@ const scenes = [
       names: ["ISS", "CREW DRAGON 9", "PROGRESS-MS 28"],
       selected: "ISS",
       category: "LANDMARK",
-      purpose: "LANDMARKS",
+      purpose: "HIGHLIGHTS",
       briefing:
         "The International Space Station: a laboratory the size of a football pitch, 400 km up, " +
         "crewed without a break since November 2000 by NASA, Roscosmos, ESA, JAXA and CSA. It is " +
@@ -315,7 +315,7 @@ const scenes = [
       { left: 68, top: 47, rangeKm: 3100, category: "OTHER", headingDeg: 300, travelPct: 2.7 },
       { left: 33, top: 52, rangeKm: 2400, category: "OTHER", headingDeg: 154, travelPct: 3.1 },
       { left: 90, top: 55, rangeKm: 4600, category: "OTHER", headingDeg: 246, travelPct: 2.3 },
-      { left: 47, top: 43, rangeKm: 1180, category: "COMMS", headingDeg: 34, travelPct: 4.9 }
+      { left: 47, top: 43, rangeKm: 1180, category: "INTERNET", headingDeg: 34, travelPct: 4.9 }
     ]
   },
 
@@ -351,7 +351,7 @@ const scenes = [
       // behind the building are simply not drawn. The line it was following is
       // what says they are missing.
       ...starlinkTrain({ from: { left: 10, top: 9 }, to: { left: 45, top: 26 }, count: 5, headingDeg: -26 }),
-      { left: 53.5, top: 30.5, rangeKm: 950, category: "COMMS", headingDeg: -26, travelPct: 5.4, opacity: 0.3 },
+      { left: 53.5, top: 30.5, rangeKm: 950, category: "INTERNET", headingDeg: -26, travelPct: 5.4, opacity: 0.3 },
       HUBBLE_CLEAR_OF_THE_TOWER,
       ...geostationaryBelt({ top: 24, from: 6, to: 44, count: 4, seed: 5 }),
       { left: 71, top: 14, rangeKm: 20600, category: "NAVIGATION", headingDeg: 286, travelPct: 1.4 },
@@ -360,13 +360,13 @@ const scenes = [
       { left: 33, top: 34, rangeKm: 1450, category: "EARTH", headingDeg: 210, travelPct: 4.1 },
       { left: 8, top: 52, rangeKm: 1900, category: "OTHER", headingDeg: 48, travelPct: 3.6 },
       { left: 41, top: 55, rangeKm: 2800, category: "OTHER", headingDeg: 320, travelPct: 2.9 },
-      { left: 27, top: 5, rangeKm: 1250, category: "COMMS", headingDeg: 128, travelPct: 4.7 },
+      { left: 27, top: 5, rangeKm: 1250, category: "INTERNET", headingDeg: 128, travelPct: 4.7 },
       // Clear sky on the far side of the tower, and a hand's width above two
       // roof lines: the marks go right up to what is in the way and stop.
       { left: 93, top: 47, rangeKm: 3600, category: "OTHER", headingDeg: 238, travelPct: 2.5 },
       { left: 91, top: 66, rangeKm: 1350, category: "EARTH", headingDeg: 208, travelPct: 4.3 },
       { left: 11, top: 58, rangeKm: 2200, category: "OTHER", headingDeg: 52, travelPct: 3.3 },
-      { left: 31, top: 61, rangeKm: 1600, category: "COMMS", headingDeg: 142, travelPct: 3.9 }
+      { left: 31, top: 61, rangeKm: 1600, category: "TELECOM", headingDeg: 142, travelPct: 3.9 }
     ]
   },
 
@@ -455,7 +455,7 @@ const scenes = [
       { left: 41, top: 24, rangeKm: 1750, category: "OTHER", headingDeg: 190, travelPct: 3.8 },
       { left: 66, top: 56, rangeKm: 4400, category: "OTHER", headingDeg: 332, travelPct: 2.3 },
       { left: 5, top: 70, rangeKm: 1050, category: "OTHER", headingDeg: 96, travelPct: 5.1 },
-      { left: 50, top: 6, rangeKm: 2200, category: "COMMS", headingDeg: 126, travelPct: 3.3 }
+      { left: 50, top: 6, rangeKm: 2200, category: "TELECOM", headingDeg: 126, travelPct: 3.3 }
     ]
   },
 
@@ -499,8 +499,8 @@ const scenes = [
       { left: 58, top: 63, rangeKm: 2900, category: "OTHER", headingDeg: 318, travelPct: 2.8 },
       { left: 90, top: 70, rangeKm: 1450, category: "OTHER", headingDeg: 148, travelPct: 4.1 },
       { left: 20, top: 78, rangeKm: 4300, category: "OTHER", headingDeg: 254, travelPct: 2.3 },
-      { left: 74, top: 46, rangeKm: 1120, category: "COMMS", headingDeg: 36, travelPct: 5 },
-      { left: 37, top: 12, rangeKm: 1280, category: "COMMS", headingDeg: 118, travelPct: 4.6 }
+      { left: 74, top: 46, rangeKm: 1120, category: "INTERNET", headingDeg: 36, travelPct: 5 },
+      { left: 37, top: 12, rangeKm: 1280, category: "INTERNET", headingDeg: 118, travelPct: 4.6 }
     ]
   }
 ];

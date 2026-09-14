@@ -1,8 +1,8 @@
-import type { SatelliteCategory } from "./satellite/categories";
+import type { SatelliteCategory, SatelliteSubcategory } from "./satellite/categories";
 import type { SunlitState } from "./satellite/illumination";
 import type { NakedEyeVerdict } from "./satellite/nakedEye";
 
-export type { SatelliteCategory };
+export type { SatelliteCategory, SatelliteSubcategory };
 
 export type Tle = {
   name: string;
@@ -64,6 +64,8 @@ export type ObserverLocation = {
 export type SatelliteFix = {
   name: string;
   category: SatelliteCategory;
+  /** Which part of a split category it is, or `null`. See `SUBCATEGORIES_OF`. */
+  subcategory: SatelliteSubcategory | null;
   parked: boolean;
   position: EnuPosition;
   /**
@@ -112,6 +114,8 @@ export type SatelliteDetail = {
    */
   noradId: number;
   category: SatelliteCategory;
+  /** Which part of a split category it is, or `null`. See `SUBCATEGORIES_OF`. */
+  subcategory: SatelliteSubcategory | null;
   /** Holds station over the equator, which is why its orbit takes a day. */
   parked: boolean;
   /** Distance from the observer to the satellite, in kilometres. */

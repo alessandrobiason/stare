@@ -132,8 +132,17 @@ export const ja: Strings = {
       LANDMARK: "注目の衛星",
       NAVIGATION: "測位",
       EARTH: "地球観測",
-      COMMS: "通信・放送",
+      INTERNET: "衛星インターネット",
+      TELECOM: "放送・通信",
       OTHER: "その他"
+    },
+    subcategories: {
+      WEATHER: "気象",
+      IMAGING: "画像・レーダー",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "その他の衛星網",
+      BROADCAST: "放送・データ",
+      MOBILE: "衛星電話・IoT"
     }
   },
   card: {

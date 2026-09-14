@@ -237,17 +237,17 @@ function drawRim(
   const ink = palette.outline;
   if (!(glyph.edgeAlpha > 0)) return;
   if (glyph.tail) {
-    drawTail(context, glyph, glyph.tail, ink.color, ink.alpha * glyph.edgeAlpha, glyph.tail.rim);
+    drawTail(context, glyph, glyph.tail, glyph.edgeColor, ink.alpha * glyph.edgeAlpha, glyph.tail.rim);
   }
   const { rim } = glyph;
   context.globalAlpha = ink.alpha * glyph.edgeAlpha;
   context.beginPath();
   context.arc(glyph.x, glyph.y, Math.max(0, rim.radius), 0, TWO_PI);
   if (rim.width === null) {
-    context.fillStyle = palette.outline.color;
+    context.fillStyle = glyph.edgeColor;
     context.fill();
   } else {
-    context.strokeStyle = palette.outline.color;
+    context.strokeStyle = glyph.edgeColor;
     context.lineWidth = rim.width;
     context.stroke();
   }

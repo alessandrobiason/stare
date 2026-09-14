@@ -132,8 +132,17 @@ export const ko: Strings = {
       LANDMARK: "주요 위성",
       NAVIGATION: "위성항법",
       EARTH: "지구 관측",
-      COMMS: "인터넷·TV",
+      INTERNET: "위성 인터넷",
+      TELECOM: "방송·통신",
       OTHER: "기타"
+    },
+    subcategories: {
+      WEATHER: "기상",
+      IMAGING: "영상·레이더",
+      STARLINK: "STARLINK",
+      CONSTELLATIONS: "기타 위성망",
+      BROADCAST: "방송·데이터",
+      MOBILE: "위성전화·IoT"
     }
   },
   card: {
