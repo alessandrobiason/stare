@@ -23,14 +23,18 @@ export type Strings = {
    * guide is those pages, not a second telling of them that could come to
    * disagree. These are only the three things it has that the intro does not —
    * the button that opens it, a way out from any page, and a last button that
-   * goes back to the sky rather than asking for anything.
+   * closes it rather than asking for anything.
    */
   guide: {
     /** What the settings row that opens these pages is called. */
     open: string;
     /** The corner control that closes the guide from whichever page it is on. */
     close: string;
-    /** The last page's button, in place of `intro.allowAccess`. */
+    /**
+     * The last page's button, in place of `intro.allowAccess`. Closes the
+     * guide back to settings — where it was opened from, not the sky — so it
+     * says "Close" rather than the intro's "back to the sky".
+     */
     done: string;
   };
   /**

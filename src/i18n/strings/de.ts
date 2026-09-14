@@ -83,7 +83,7 @@ export const de: Strings = {
   guide: {
     open: "Hilfe",
     close: "Hilfe schließen",
-    done: "ZURÜCK ZUM HIMMEL"
+    done: "SCHLIESSEN"
   },
   tabs: {
     sky: "Himmel",

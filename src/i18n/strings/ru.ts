@@ -83,7 +83,7 @@ export const ru: Strings = {
   guide: {
     open: "Справка",
     close: "Закрыть справку",
-    done: "ВЕРНУТЬСЯ К НЕБУ"
+    done: "ЗАКРЫТЬ"
   },
   tabs: {
     sky: "Небо",

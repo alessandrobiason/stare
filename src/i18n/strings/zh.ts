@@ -79,7 +79,7 @@ export const zh: Strings = {
   guide: {
     open: "帮助",
     close: "关闭帮助",
-    done: "回到天空"
+    done: "关闭"
   },
   tabs: {
     sky: "天空",

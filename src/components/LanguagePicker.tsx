@@ -19,10 +19,10 @@ import { theme } from "./theme";
  * is legible to whoever is looking for it, and the word behind it is on the
  * control for a screen reader.
  *
- * Once the intro is behind it, the same choice lives on the console's STATUS
- * page (`languageChoice`). This does not follow the app into the sky view: the
- * corners there are the marker count and the filter, and the language is not
- * something anyone changes twice.
+ * Once the intro is behind it, the same choice lives in Settings. This does
+ * not follow the app into the sky view: the corners there are the marker
+ * count and the filter, and the language is not something anyone changes
+ * twice.
  */
 export const LanguagePicker: React.FC = () => {
   const locale = useLocale();

@@ -91,7 +91,7 @@ export const en: Strings = {
   guide: {
     open: "Help",
     close: "Close help",
-    done: "BACK TO THE SKY"
+    done: "CLOSE"
   },
   tabs: {
     sky: "Sky",

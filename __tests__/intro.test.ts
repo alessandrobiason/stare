@@ -295,10 +295,9 @@ test("the corners page keys the controls the pictures do not show", () => {
     expect(elements.map((element) => element.badge ?? element.icon)).toEqual([
       "12",
       // The filter is an icon in the corner of the sky now, so the page keys
-      // the icon; the two rows behind the settings tab are found by looking
-      // for that tab, which is what their own glyph says.
+      // the icon; the guide and the console are both found behind the
+      // settings tab, so one row covers both rather than repeating it.
       "layers",
-      "settings",
       "settings"
     ]);
     for (const element of elements) {
@@ -323,7 +322,7 @@ test("the button says what it does: the last page is the one that starts the app
   }
 });
 
-describe("the guide the `?` in the sky view opens", () => {
+describe("the guide the Help row in settings opens", () => {
   test("is the intro's pages about the screen, in the intro's order", () => {
     // What a mark means, what a line means, what the bottom-left panel says and
     // what is in the corners: as true on the hundredth launch as on the first.
@@ -343,9 +342,9 @@ describe("the guide the `?` in the sky view opens", () => {
     expect(guide.some((page) => page.access)).toBe(false);
   });
 
-  test("ends by going back to the sky, never by asking for access", () => {
+  test("ends by closing back to settings, never by asking for access", () => {
     expect(introButtonLabel(0, "guide")).toBe("NEXT");
-    expect(introButtonLabel(introPages("guide").length - 1, "guide")).toBe("BACK TO THE SKY");
+    expect(introButtonLabel(introPages("guide").length - 1, "guide")).toBe("CLOSE");
 
     for (const locale of LOCALES) {
       setLocaleForTesting(locale);

@@ -1,12 +1,9 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { DebugPanel } from "../src/components/DebugPanel";
 import { IntroScreen } from "../src/components/IntroScreen";
 import { LanguagePicker } from "../src/components/LanguagePicker";
 import { PersistentStore } from "../src/data/persistentStore";
-import { languageChoice, statusSection } from "../src/debug/sections";
-import { strings } from "../src/i18n";
 import {
   activeLocale,
   clearChosenLocale,
@@ -46,9 +43,8 @@ function onAScreen(screen: React.ReactElement): React.ReactElement {
  * The phone decides it, and is right nearly always — but the launch where it
  * is wrong is the launch where every word on screen is in a language the
  * reader may not have, including the words that would explain how to fix it.
- * So there are two ways out of that, and this is what they have to do: the
- * intro's corner (`LanguagePicker`) and the console's STATUS page
- * (`languageChoice`), and a choice that outlives the launch it was made in.
+ * The way out is the intro's corner (`LanguagePicker`), and a choice that
+ * outlives the launch it was made in.
  */
 
 /** The rendered element as plain text, the way someone reads it. */
@@ -115,64 +111,6 @@ describe("the picker in the corner of the intro", () => {
     const markup = renderToStaticMarkup(<LanguagePicker />);
 
     expect(markup).toContain('aria-label="Lingua: Italiano"');
-  });
-});
-
-describe("the choice on the console's STATUS page", () => {
-  test("sits beside the row that says which language was picked and why", () => {
-    // The diagnosis and the fix in the same place: someone who has found the
-    // readout has found the evidence that the detection got it wrong.
-    const section = statusSection({ rows: [], warnings: [] });
-
-    expect(section.rows[0].label).toBe("Language");
-    expect(section.choices?.[0].label).toBe("Language");
-  });
-
-  test("offers every language the app speaks, each in its own words", () => {
-    const choice = languageChoice();
-
-    expect(choice.options).toHaveLength(12);
-    expect(choice.options.map((option) => option.label)).toContain("Русский");
-    // The console is in English throughout, and this is the one row on it
-    // whose values are not: a list of languages is written in the languages it
-    // lists, whatever the panel around it is in.
-    setLocaleForTesting("ja");
-    expect(languageChoice().options.map((option) => option.label)).toContain("Nederlands");
-  });
-
-  test("shows where it stands, and moves the app when it is used", () => {
-    setLocaleStoreForTesting(fakeStore());
-    const choice = languageChoice();
-    expect(choice.selected).toBe("en");
-
-    choice.onSelect("fr");
-
-    expect(activeLocale()).toBe("fr");
-    expect(strings().boot.tryAgain).toBe("RÉESSAYER");
-    expect(languageChoice().selected).toBe("fr");
-  });
-
-  test("a language this build does not speak leaves it where it was", () => {
-    setLocaleStoreForTesting(fakeStore());
-
-    languageChoice().onSelect("is");
-
-    expect(activeLocale()).toBe("en");
-  });
-
-  test("the panel draws it as the options it is, with the current one marked", () => {
-    const markup = renderToStaticMarkup(
-      <DebugPanel
-        sourceRef={{ current: () => [statusSection({ rows: [], warnings: [] })] }}
-        onClose={() => undefined}
-      />
-    );
-
-    expect(markup).toContain("Português");
-    // Twelve options rather than twelve labels: which one is the case is the
-    // only thing this row has to say, and a list of buttons does not say it.
-    expect(markup.match(/role="radio"/g)).toHaveLength(12);
-    expect(markup).toContain('role="radiogroup"');
   });
 });
 

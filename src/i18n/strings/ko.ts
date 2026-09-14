@@ -79,7 +79,7 @@ export const ko: Strings = {
   guide: {
     open: "도움말",
     close: "도움말 닫기",
-    done: "하늘로 돌아가기"
+    done: "닫기"
   },
   tabs: {
     sky: "하늘",

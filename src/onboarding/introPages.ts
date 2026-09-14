@@ -175,12 +175,15 @@ export function introPages(mode: IntroMode = "intro"): readonly IntroPage[] {
         // an icon in the corner of the sky now, and a page keying it to the
         // word FILTER would be keying it to something no longer on screen.
         { icon: "layers", ...intro.corners.filter },
-        // Both of these live behind the settings tab, so both are found by the
-        // same icon — which is what their `where` says in words.
-        { icon: "settings", ...intro.corners.guide },
-        // The console's row is the one thing in the app that stays in English,
-        // and the page says so. See `CONSOLE_LABEL`.
-        { icon: "settings", ...intro.corners.console }
+        // The guide and the console both live behind the settings tab. One
+        // row covers both rather than two rows each saying `where` is
+        // "Settings" — their `where` strings are the same word, so only the
+        // `meaning` is shown twice, joined into one line.
+        {
+          icon: "settings",
+          where: intro.corners.guide.where,
+          meaning: `${intro.corners.guide.meaning} ${intro.corners.console.meaning}`
+        }
       ]
     },
     {
@@ -196,7 +199,8 @@ export function introPages(mode: IntroMode = "intro"): readonly IntroPage[] {
 
 /**
  * The button under the pager: the last page is the one that starts the app — or,
- * in the guide, the one that goes back to it.
+ * in the guide, the one that closes it and goes back to settings, which is
+ * where the guide was opened from.
  */
 export function introButtonLabel(page: number, mode: IntroMode = "intro"): string {
   const t = strings();

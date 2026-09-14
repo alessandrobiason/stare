@@ -79,7 +79,7 @@ export const ja: Strings = {
   guide: {
     open: "ヘルプ",
     close: "ヘルプを閉じる",
-    done: "空に戻る"
+    done: "閉じる"
   },
   tabs: {
     sky: "空",

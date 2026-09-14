@@ -79,7 +79,7 @@ export const ar: Strings = {
   guide: {
     open: "مساعدة",
     close: "إغلاق المساعدة",
-    done: "العودة إلى السماء"
+    done: "إغلاق"
   },
   tabs: {
     sky: "السماء",
