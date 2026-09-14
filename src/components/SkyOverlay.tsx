@@ -1,4 +1,4 @@
-import React, { MutableRefObject, useCallback, useEffect, useMemo, useState } from "react";
+import React, { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GestureResponderEvent,
   LayoutChangeEvent,
@@ -22,7 +22,7 @@ import { SkySummary, useAnimatedMarkers } from "../hooks/useAnimatedMarkers";
 import { useCelestialAlignment } from "../hooks/useCelestialAlignment";
 import { useLatestRef } from "../hooks/useLatestRef";
 import { useSkyPalette } from "../hooks/useSkyPalette";
-import { useSkySegmentation } from "../hooks/useSkySegmentation";
+import { SegmentedFrameSample, useSkySegmentation } from "../hooks/useSkySegmentation";
 import { SceneTab } from "../hooks/useSceneControls";
 import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrientation";
 import { OrbitEpoch } from "../types";
@@ -30,6 +30,7 @@ import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory } from "../satellite/categories";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
+import { BackdropBrightness, brightnessGrid } from "../vision/backdropBrightness";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
@@ -367,7 +368,24 @@ export const SkyOverlay: React.FC<Props> = ({
 
   // Destructured, because the object's identity changes whenever a fix starts or
   // lapses and this is handed to the frame source, which redraws for it.
-  const { reset: resetCelestial } = celestial;
+  const { reset: resetCelestial, onFrame: onCelestialFrame } = celestial;
+
+  // How bright the picture is behind the marks, off the same frames: a mark
+  // over the moon or a street lamp gets its dark edge back at night, where
+  // light with no edge would vanish into it. A ref, because only the marker
+  // loop reads it and it lands once a second. See `backdropBrightness.ts`.
+  const backdropRef = useRef<BackdropBrightness | null>(null);
+  const onSegmentedFrame = useCallback(
+    (sample: SegmentedFrameSample) => {
+      backdropRef.current = {
+        grid: brightnessGrid(sample.pixels, sample.size),
+        attitude: sample.attitude,
+        capturedAtSeconds: sample.capturedAtSeconds
+      };
+      onCelestialFrame(sample);
+    },
+    [onCelestialFrame]
+  );
 
   const segmentation = useSkySegmentation(
     grabberRef,
@@ -377,7 +395,7 @@ export const SkyOverlay: React.FC<Props> = ({
     smoothed.readingRef,
     setFatal,
     frame.rebuild,
-    celestial.onFrame
+    onSegmentedFrame
   );
 
   const {
@@ -395,6 +413,7 @@ export const SkyOverlay: React.FC<Props> = ({
     epochRef,
     orientationFilterRef: smoothed.filterRef,
     mask: segmentation.mask,
+    backdropRef,
     maskFiltering: skyMaskFiltering,
     enabledCategories,
     starlink,
@@ -506,6 +525,7 @@ export const SkyOverlay: React.FC<Props> = ({
     segmentation.reset();
     smoothed.reset();
     resetCelestial();
+    backdropRef.current = null;
     resetMarkers();
   }, [resetCelestial, resetMarkers, segmentation, smoothed]);
 

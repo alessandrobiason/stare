@@ -5,14 +5,15 @@ import { ObserverLocation } from "../types";
 /**
  * What the overlay is drawn in, and which of the two sets that is right now.
  *
- * **Every mark is white on a near-black edge, day and night.** The markers sit
- * on a photograph of the sky, and that photograph is either far brighter or far
- * darker than any fill can be, so no one fill reads against both — but a fill
- * and an edge can, as long as they are the two ends of the scale. At night the
- * white is what is seen, and the edge is what keeps a mark legible over a
- * street lamp or the moon; by day the edge is what is seen, a dark ring with a
- * light centre, and it reads over cloud as well as over blue. So the mark
- * itself does not change with the sun at all.
+ * **Every mark is white, day and night.** The markers sit on a photograph of
+ * the sky, and that photograph is either far brighter or far darker than any
+ * fill can be, so no one fill reads against both. At night that is no problem:
+ * a white point on a dark sky is a star, and the mark is drawn as one — a hot
+ * centre in light that falls away to nothing, with no outline at all. A dark
+ * ring round it read as a white disc cut out and laid on the picture rather
+ * than as something giving off light. By day the white would vanish, so the
+ * mark gains a near-black edge and loses its light: a dark ring with a light
+ * centre, which reads over cloud as well as over blue.
  *
  * The marks used to be coloured by what each satellite is for, in two ladders
  * of five — light marks in a dark rim at night, dark marks in a light rim by
@@ -21,8 +22,9 @@ import { ObserverLocation } from "../types";
  * key. What an object is for is still one tap away, on its card, and still
  * what the filter sorts by.
  *
- * What does still turn over with the day is what is *around* a mark: how much
- * light it gives off (`glow`), the landmark halo, and the names, which are text
+ * What turns over with the day is therefore everything *around* the white: how
+ * much light a mark gives off (`glow`), how strongly its edge is drawn
+ * (`edge`), the landmark halo, and the names, which are text
  * rather than marks and read best as dark ink on a bright sky. The phone
  * auto-exposes, which flattens the difference between the two skies but does
  * not remove it, so the choice is made from the sun rather than from a light
@@ -54,6 +56,16 @@ export const MARK_COLOR = "#ffffff";
  */
 export const MARK_EDGE: Ink = { color: "#05070a", alpha: 0.9 };
 
+/**
+ * The outer bloom around a mark's light: a cool, faint blue-white.
+ *
+ * A star photographed at night is not a white disc but a white centre in a halo
+ * that goes slightly blue as it thins, and a little of that colour is most of
+ * what makes a point read as light rather than as paint. Faint enough that the
+ * mark itself is still white.
+ */
+export const MARK_BLOOM = "#a9c9ff";
+
 export type MarkerPalette = {
   /** The mark's fill: `MARK_COLOR`, whatever the sky. */
   mark: string;
@@ -74,6 +86,16 @@ export type MarkerPalette = {
    * and a white glow over a bright sky would only wash that edge out.
    */
   glow: number;
+  /**
+   * How strongly a mark's dark edge is drawn, in `[0, 1]`, on top of
+   * `outline`'s own alpha.
+   *
+   * None at night, where a dark ring round a point of light turns it back into
+   * a disc; all of it by day, where the edge is what is read. The same goes for
+   * the landmarks' paths and the selection ring, which are white on the same
+   * edge.
+   */
+  edge: number;
   /** The landmark names, which are drawn as text. */
   label: string;
   /**
@@ -89,6 +111,7 @@ export const NIGHT_PALETTE: MarkerPalette = {
   outline: MARK_EDGE,
   halo: { color: "#ffffff", alpha: 0.18 },
   glow: 1,
+  edge: 0,
   label: "#ffffff",
   labelShadow: { color: "#030911", alpha: 0.85 }
 };
@@ -98,6 +121,7 @@ export const DAYLIGHT_PALETTE: MarkerPalette = {
   outline: MARK_EDGE,
   halo: { color: "#04121f", alpha: 0.2 },
   glow: 0,
+  edge: 1,
   label: "#10161c",
   labelShadow: { color: "#f4f8fd", alpha: 0.9 }
 };
@@ -110,7 +134,8 @@ export const DAYLIGHT_PALETTE: MarkerPalette = {
  * Two degrees wide, which is about thirteen minutes at 51°N and eight at the
  * equator: long enough that nothing snaps, short enough that the overlay does
  * not spend the whole of dusk in between. What crosses over in it is the
- * glow, the halo and the names; the marks themselves are the same throughout.
+ * glow, the edge, the halo and the names; the white itself is the same
+ * throughout.
  */
 export const DAYLIGHT_BAND = {
   /** Below this altitude the night set is drawn unmixed. */
@@ -154,6 +179,7 @@ export function blendPalettes(fraction: number): MarkerPalette {
     outline: MARK_EDGE,
     halo: mixInk(night.halo, day.halo, fraction),
     glow: night.glow + (day.glow - night.glow) * fraction,
+    edge: night.edge + (day.edge - night.edge) * fraction,
     label: mixColors(night.label, day.label, fraction),
     labelShadow: mixInk(night.labelShadow, day.labelShadow, fraction)
   };

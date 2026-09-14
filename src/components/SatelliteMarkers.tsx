@@ -4,8 +4,11 @@ import { MarkerSource, useMarkerFrames } from "../hooks/useAnimatedMarkers";
 import { MarkerLabels } from "./MarkerLabels";
 import { FrameSize } from "./markerGeometry";
 import {
+  BLOOM_FADE,
   buildMarkerScene,
   Circle,
+  CORE_FADE,
+  FadeStop,
   GLOW_FADE,
   GlyphShape,
   MarkerScene,
@@ -14,7 +17,7 @@ import {
   TAIL_FADE,
   TailShape
 } from "./markerScene";
-import { MarkerPalette } from "./palette";
+import { MARK_BLOOM, MarkerPalette } from "./palette";
 import {
   PaintStyle,
   Skia,
@@ -110,7 +113,8 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
       const line = Skia.Path.Make();
       // Under the marks, and first: a path is what the marks are read against.
       for (const path of scene.paths) drawPath(canvas, paint, line, path, scene.palette);
-      // Every edge before any mark's light. Crew and cargo vehicles sit on the
+      // Every edge before any mark's light — by day, since at night a mark has
+      // none (`MarkerPalette.edge`). Crew and cargo vehicles sit on the
       // station they are docked to, so the station is several marks in one
       // place, and each edge laid over the glow of the marks under it cut a
       // dark ring through the brightest thing on the frame. An edge is a pixel
@@ -120,6 +124,7 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
       for (const glyph of scene.glyphs) {
         const { tail } = glyph;
         const edge = ink.alpha * glyph.edgeAlpha;
+        if (!(edge > 0)) continue;
         if (tail) drawTail(canvas, paint, glyph, tail, ink.color, edge, tail.rim);
         circle(canvas, paint, glyph, glyph.rim, ink.color, edge);
       }
@@ -133,8 +138,8 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
 }
 
 /**
- * One satellite, over the edges: its halo if it is a landmark, its glow, its
- * tail and its point.
+ * One satellite, over the edges: its halo if it is a landmark, its bloom and
+ * glow, its tail and its point.
  *
  * Drawn a marker at a time rather than a layer at a time, so the sort by range
  * holds — a nearer object's whole shape passes in front of a farther one's. The
@@ -153,17 +158,24 @@ function drawGlyph(
   palette: MarkerPalette
 ): void {
   if (glyph.halo !== null) {
-    glow(canvas, paint, glyph, glyph.halo, palette.halo.color, palette.halo.alpha * glyph.alpha);
+    glow(canvas, paint, glyph, glyph.halo, "glow", palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
-  glow(canvas, paint, glyph, glyph.glow.radius, glyph.color, glyph.glow.alpha * glyph.alpha);
+  glow(canvas, paint, glyph, glyph.bloom.radius, "bloom", MARK_BLOOM, glyph.bloom.alpha * glyph.alpha);
+  glow(canvas, paint, glyph, glyph.glow.radius, "glow", glyph.color, glyph.glow.alpha * glyph.alpha);
   if (glyph.tail) {
     drawTail(canvas, paint, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
   }
-  circle(canvas, paint, glyph, glyph.core, glyph.color, glyph.alpha);
+  // A moving mark's point is light too, soft at its rim (`CORE_FADE`); a parked
+  // ring is stroked, and stays sharp.
+  if (glyph.core.width === null) {
+    glow(canvas, paint, glyph, glyph.core.radius, "core", glyph.color, glyph.alpha);
+  } else {
+    circle(canvas, paint, glyph, glyph.core, glyph.color, glyph.alpha);
+  }
 }
 
 /**
- * Light fading out from a mark's centre to `radius`.
+ * Light fading out from a mark's centre to `radius`, at the rate `kind` fades.
  *
  * The canvas is moved and scaled onto a circle of radius one rather than a
  * gradient made to measure: a shader is a native object, and one per mark per
@@ -176,12 +188,13 @@ function glow(
   paint: SkPaint,
   glyph: GlyphShape,
   radius: number,
+  kind: RadialFade,
   color: string,
   alpha: number
 ): void {
   if (!(radius > 0) || !(alpha > 0)) return;
   paint.setStyle(PaintStyle.Fill);
-  paint.setShader(fadeShader("glow", color));
+  paint.setShader(fadeShader(kind, color));
   paint.setAlphaf(alpha);
   canvas.save();
   canvas.translate(glyph.x, glyph.y);
@@ -244,7 +257,7 @@ function drawPath(
   palette: MarkerPalette
 ): void {
   const draw = (runs: number[][], color: string, alpha: number, width: number) => {
-    if (runs.length === 0) return;
+    if (runs.length === 0 || !(alpha > 0)) return;
     trace(line, runs);
     stroke(paint, color, alpha, width);
     canvas.drawPath(line, paint);
@@ -255,7 +268,8 @@ function drawPath(
     paint.setStrokeCap(StrokeCap.Round);
   };
 
-  const ink = palette.outline;
+  // No edge at night (`PathShape.rim`), so these draw nothing then.
+  const ink = shape.rim;
   wake(ink.color, ink.alpha, shape.pastRimWidth);
   draw(shape.dashes, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
   draw(shape.arrows, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
@@ -266,8 +280,10 @@ function drawPath(
 
 /** The ring that says which satellite the info card is describing. */
 function drawSelection(canvas: SkCanvas, paint: SkPaint, ring: SelectionRing): void {
-  stroke(paint, ring.rim.color, ring.rim.alpha * ring.alpha, ring.rimWidth);
-  canvas.drawCircle(ring.x, ring.y, ring.radius, paint);
+  if (ring.rim.alpha > 0) {
+    stroke(paint, ring.rim.color, ring.rim.alpha * ring.alpha, ring.rimWidth);
+    canvas.drawCircle(ring.x, ring.y, ring.radius, paint);
+  }
   stroke(paint, ring.color, ring.alpha, ring.width);
   canvas.drawCircle(ring.x, ring.y, ring.radius, paint);
 }
@@ -330,21 +346,31 @@ function parsed(color: string): SkColor {
   return made;
 }
 
+/** The fades drawn out from a mark's centre, by the scene's name for each. */
+type RadialFade = "glow" | "bloom" | "core";
+const FADES: Record<RadialFade | "tail", readonly FadeStop[]> = {
+  tail: TAIL_FADE,
+  glow: GLOW_FADE,
+  bloom: BLOOM_FADE,
+  core: CORE_FADE
+};
+
 /**
  * A colour faded out along a unit of distance, as a shader: along `+x` from
- * nought to one for a tail, and out from the origin to radius one for a glow.
+ * nought to one for a tail, and out from the origin to radius one for a glow,
+ * a bloom or a point.
  *
  * Built once per kind and colour, bounded for the reason `parsed` is. The fade
- * itself is the scene's (`TAIL_FADE`, `GLOW_FADE`); the paint's own alpha is
- * what scales it for the mark being drawn.
+ * itself is the scene's (`TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`);
+ * the paint's own alpha is what scales it for the mark being drawn.
  */
 const shaders = new Map<string, SkShader>();
-function fadeShader(kind: "tail" | "glow", color: string): SkShader {
+function fadeShader(kind: RadialFade | "tail", color: string): SkShader {
   const key = `${kind}:${color}`;
   const known = shaders.get(key);
   if (known) return known;
 
-  const stops = kind === "tail" ? TAIL_FADE : GLOW_FADE;
+  const stops = FADES[kind];
   const base = parsed(color);
   const ramp = stops.map((stop) =>
     Float32Array.of(base[0], base[1], base[2], base[3] * stop.strength)

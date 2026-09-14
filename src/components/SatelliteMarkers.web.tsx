@@ -3,8 +3,11 @@ import { MarkerSource, useMarkerFrames } from "../hooks/useAnimatedMarkers";
 import { MarkerLabels } from "./MarkerLabels";
 import { FrameSize } from "./markerGeometry";
 import {
+  BLOOM_FADE,
   buildMarkerScene,
   Circle,
+  CORE_FADE,
+  FadeStop,
   GLOW_FADE,
   GlyphShape,
   MarkerScene,
@@ -13,7 +16,7 @@ import {
   TAIL_FADE,
   TailShape
 } from "./markerScene";
-import { cssColor, MarkerPalette } from "./palette";
+import { cssColor, MARK_BLOOM, MarkerPalette } from "./palette";
 
 type Props = {
   /** The drawn frames, as a subscription. See `MarkerSource`. */
@@ -100,7 +103,8 @@ function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
   context.lineCap = "round";
   // Under the marks, and first: a path is what the marks are read against.
   for (const path of scene.paths) drawPath(context, path, scene.palette);
-  // Every edge before any mark's light, as on the phone: the station is several
+  // Every edge before any mark's light, as on the phone — by day; at night a
+  // mark has none. the station is several
   // marks in one place, and each edge over the glow beneath it cut a dark ring.
   for (const glyph of scene.glyphs) drawRim(context, glyph, scene.palette);
   for (const glyph of scene.glyphs) drawGlyph(context, glyph, scene.palette);
@@ -124,7 +128,7 @@ function drawPath(
   palette: MarkerPalette
 ): void {
   const draw = (runs: number[][], color: string, alpha: number, width: number) => {
-    if (runs.length === 0) return;
+    if (runs.length === 0 || !(alpha > 0)) return;
     trace(context, runs);
     context.globalAlpha = alpha;
     context.strokeStyle = color;
@@ -137,7 +141,8 @@ function drawPath(
     context.lineCap = "round";
   };
 
-  const ink = palette.outline;
+  // No edge at night (`PathShape.rim`), so these draw nothing then.
+  const ink = shape.rim;
   wake(ink.color, ink.alpha, shape.pastRimWidth);
   draw(shape.dashes, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
   draw(shape.arrows, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
@@ -149,6 +154,7 @@ function drawPath(
 /** The ring that says which satellite the info card is describing. */
 function drawSelection(context: CanvasRenderingContext2D, ring: SelectionRing): void {
   const band = (color: string, alpha: number, width: number) => {
+    if (!(alpha > 0)) return;
     context.globalAlpha = alpha;
     context.strokeStyle = color;
     context.lineWidth = width;
@@ -162,8 +168,8 @@ function drawSelection(context: CanvasRenderingContext2D, ring: SelectionRing): 
 }
 
 /**
- * One satellite, over the edges: its halo if it is a landmark, its glow, its
- * tail and its point.
+ * One satellite, over the edges: its halo if it is a landmark, its bloom and
+ * glow, its tail and its point.
  *
  * Drawn a marker at a time rather than a layer at a time, so the sort by range
  * holds — a nearer object's whole shape passes in front of a farther one's. The
@@ -188,10 +194,15 @@ function drawGlyph(
       context.stroke();
     }
   };
-  const glow = (radius: number, color: string, alpha: number) => {
+  const glow = (
+    radius: number,
+    fade: readonly FadeStop[],
+    color: string,
+    alpha: number
+  ) => {
     if (!(radius > 0) || !(alpha > 0)) return;
     const light = context.createRadialGradient(glyph.x, glyph.y, 0, glyph.x, glyph.y, radius);
-    for (const stop of GLOW_FADE) {
+    for (const stop of fade) {
       light.addColorStop(stop.at, cssColor({ color, alpha: stop.strength }));
     }
     context.globalAlpha = alpha;
@@ -202,13 +213,19 @@ function drawGlyph(
   };
 
   if (glyph.halo !== null) {
-    glow(glyph.halo, palette.halo.color, palette.halo.alpha * glyph.alpha);
+    glow(glyph.halo, GLOW_FADE, palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
-  glow(glyph.glow.radius, glyph.color, glyph.glow.alpha * glyph.alpha);
+  glow(glyph.bloom.radius, BLOOM_FADE, MARK_BLOOM, glyph.bloom.alpha * glyph.alpha);
+  glow(glyph.glow.radius, GLOW_FADE, glyph.color, glyph.glow.alpha * glyph.alpha);
   if (glyph.tail) {
     drawTail(context, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
   }
-  circle(glyph.core, glyph.color, glyph.alpha);
+  // A moving mark's point is light too, soft at its rim; a parked ring stays sharp.
+  if (glyph.core.width === null) {
+    glow(glyph.core.radius, CORE_FADE, glyph.color, glyph.alpha);
+  } else {
+    circle(glyph.core, glyph.color, glyph.alpha);
+  }
 }
 
 /** The dark edge under a mark and under its tail: a disc, or a band under a ring. */
@@ -218,6 +235,7 @@ function drawRim(
   palette: MarkerPalette
 ): void {
   const ink = palette.outline;
+  if (!(glyph.edgeAlpha > 0)) return;
   if (glyph.tail) {
     drawTail(context, glyph, glyph.tail, ink.color, ink.alpha * glyph.edgeAlpha, glyph.tail.rim);
   }

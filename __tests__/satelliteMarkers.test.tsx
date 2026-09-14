@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MarkerLabels } from "../src/components/MarkerLabels";
 import {
   buildMarkerScene,
+  CORE_FADE,
   GlyphShape,
   shortName,
   TAIL_FADE
@@ -136,8 +137,14 @@ describe("a satellite with no sun on it", () => {
   test("keeps its edge whole, so by day it is still plainly a mark", () => {
     // The white fades; the dark edge, which is what a mark is read by on a
     // bright sky, does not. Terrain still fades both.
-    const dark = scene([marker({ sunlit: "eclipsed" })]).glyphs[0];
-    const hidden = scene([marker({ sunlit: "eclipsed", opacity: 0.4 })]).glyphs[0];
+    const daylit = (overrides: Partial<SatelliteMarker>) =>
+      buildMarkerScene(
+        { markers: [marker(overrides)], paths: [], rollDeg: 0 },
+        FRAME,
+        DAYLIGHT_PALETTE
+      ).glyphs[0];
+    const dark = daylit({ sunlit: "eclipsed" });
+    const hidden = daylit({ sunlit: "eclipsed", opacity: 0.4 });
 
     expect(dark.edgeAlpha).toBe(1);
     expect(hidden.edgeAlpha).toBeCloseTo(0.4, 6);
@@ -300,6 +307,62 @@ describe("a moving mark", () => {
     const [glyph] = scene([marker()]).glyphs;
     expect(glyph.tail!.rim).toBeGreaterThan(0);
     expect(glyph.tail!.rim).toBeCloseTo(glyph.rim.radius - glyph.core.radius, 6);
+  });
+
+  test("is light rather than a disc at night: no edge, and a bloom around its glow", () => {
+    // A dark ring round a point of light is what turned it into a sticker on
+    // the picture. At night the mark is drawn the way a star photographs.
+    const [glyph] = scene([marker()]).glyphs;
+
+    expect(glyph.edgeAlpha).toBe(0);
+    expect(glyph.bloom.radius).toBeGreaterThan(glyph.glow.radius);
+    expect(glyph.bloom.alpha).toBeGreaterThan(0);
+    expect(glyph.bloom.alpha).toBeLessThan(glyph.glow.alpha);
+    // The point's own fill softens out to nothing at its rim.
+    expect(CORE_FADE[0].strength).toBe(1);
+    expect(CORE_FADE[CORE_FADE.length - 1].strength).toBe(0);
+  });
+
+  test("gains its edge at night over something bright in the picture", () => {
+    // Light with no edge over the moon or a street lamp is not there at all, so
+    // over a bright patch the mark is drawn as it is by day: edged, and dark.
+    const dark = scene([marker({ backdrop: 0.1 })]).glyphs[0];
+    const lamp = scene([marker({ backdrop: 0.95 })]).glyphs[0];
+    const unread = scene([marker()]).glyphs[0];
+
+    expect(dark.edgeAlpha).toBe(0);
+    expect(unread.edgeAlpha).toBe(0);
+    expect(lamp.edgeAlpha).toBe(1);
+    expect(lamp.glow.alpha).toBe(0);
+    expect(lamp.bloom.alpha).toBe(0);
+    // The point, its size and its tail are the same mark either way.
+    expect(lamp.core).toEqual(dark.core);
+    expect(lamp.tail).toEqual(dark.tail);
+  });
+
+  test("eases into that edge rather than switching it on", () => {
+    const edges = [0.4, 0.5, 0.6, 0.75].map(
+      (backdrop) => scene([marker({ backdrop })]).glyphs[0].edgeAlpha
+    );
+
+    expect(edges[0]).toBe(0);
+    expect(edges[1]).toBeGreaterThan(0);
+    expect(edges[2]).toBeGreaterThan(edges[1]);
+    expect(edges[2]).toBeLessThan(1);
+    expect(edges[3]).toBe(1);
+  });
+
+  test("rings a selected mark over something bright with an edge as well", () => {
+    const { selection } = selectedScene([marker({ name: "SAT", backdrop: 0.95 })], "SAT");
+    expect(selection!.rim).toEqual(MARK_EDGE);
+  });
+
+  test("gains its edge by day, where the white alone would vanish", () => {
+    const frame: MarkerFrame = { markers: [marker()], paths: [], rollDeg: 0 };
+    const day = buildMarkerScene(frame, FRAME, DAYLIGHT_PALETTE).glyphs[0];
+
+    expect(day.edgeAlpha).toBe(1);
+    expect(day.bloom.alpha).toBe(0);
   });
 
   test("gives off no light by day, where a glow would wash out its edge", () => {
@@ -544,14 +607,22 @@ describe("the ring around a tapped satellite", () => {
     expect(selectedScene([landmark], "ISS").labels).toEqual(scene([landmark]).labels);
   });
 
-  test("is a bright band on a dark rim, like every other mark on the sky", () => {
-    // A photograph is not a background a single colour reads against, so the
-    // ring is rimmed exactly as the marks are, and flips with the day.
-    const { selection } = selectedScene([marker({ name: "SAT" })], "SAT");
+  test("is a bright band, edged by day and not at night, like the marks", () => {
+    // A photograph is not a background a single colour reads against, so by
+    // day the ring is rimmed exactly as the marks are; at night, as they do, it
+    // drops the edge that would make it a sticker on the sky.
+    const night = selectedScene([marker({ name: "SAT" })], "SAT").selection!;
+    const day = buildMarkerScene(
+      { markers: [marker({ name: "SAT" })], paths: [], rollDeg: 0 },
+      FRAME,
+      DAYLIGHT_PALETTE,
+      "SAT"
+    ).selection!;
 
-    expect(selection!.color).toBe(NIGHT_PALETTE.label);
-    expect(selection!.rim).toBe(NIGHT_PALETTE.outline);
-    expect(selection!.rimWidth).toBeGreaterThan(selection!.width);
+    expect(night.color).toBe(NIGHT_PALETTE.label);
+    expect(night.rim.alpha).toBe(0);
+    expect(day.rim).toEqual(MARK_EDGE);
+    expect(day.rimWidth).toBeGreaterThan(day.width);
   });
 
   test("fades with the marker it belongs to", () => {
@@ -610,6 +681,18 @@ describe("a landmark's path across the sky", () => {
     // photograph of the sky.
     expect(shape.width).toBeLessThan(SATELLITE_MARKERS.farDiameterPx);
     expect(shape.rimWidth).toBeGreaterThan(shape.width);
+  });
+
+  test("edges it by day only, as the marks are edged", () => {
+    const night = scene([], 0, FRAME, [path()]).paths[0];
+    const day = buildMarkerScene(
+      { markers: [], paths: [path()], rollDeg: 0 },
+      FRAME,
+      DAYLIGHT_PALETTE
+    ).paths[0];
+
+    expect(night.rim.alpha).toBe(0);
+    expect(day.rim).toEqual(MARK_EDGE);
   });
 
   test("places the dashes in pixels on the frame it is drawn into", () => {

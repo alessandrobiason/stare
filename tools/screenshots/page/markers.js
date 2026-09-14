@@ -22,12 +22,14 @@ const SATELLITE_MARKERS = {
 const DESIGN_FRAME_WIDTH_PX = 720;
 const CORE_DIAMETER_RATIO = 0.52;
 const RING_DIAMETER_RATIO = 0.8;
-const GLOW_RATIO = 0.9;
-const GLOW_ALPHA = 0.5;
-const TAIL_ALPHA = 0.85;
+const GLOW_RATIO = 1;
+const GLOW_ALPHA = 0.8;
+const BLOOM_RATIO = 2.6;
+const BLOOM_ALPHA = 0.35;
+const TAIL_ALPHA = 0.8;
 const FAR_STRENGTH = 0.5;
 const SELECTED_GROWTH = 1.25;
-const TRAIL_WIDTH_RATIO = 0.75;
+const TRAIL_WIDTH_RATIO = 0.5;
 const OUTLINE_RATIO = 0.16;
 const MIN_OUTLINE_PX = 1;
 const MIN_EDGE_PX = 1.25;
@@ -39,7 +41,7 @@ const SELECTION_WIDTH_PX = 1.5;
 const LABEL_GAP_PX = 5;
 const ARC_LABEL_GAP_PX = 10;
 
-/** `TAIL_FADE` and `GLOW_FADE`. */
+/** `TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE` and `CORE_FADE`. */
 const TAIL_FADE = [
   { at: 0, strength: 1 },
   { at: 0.3, strength: 0.5 },
@@ -48,8 +50,19 @@ const TAIL_FADE = [
 ];
 const GLOW_FADE = [
   { at: 0, strength: 1 },
-  { at: 0.25, strength: 0.6 },
-  { at: 0.55, strength: 0.2 },
+  { at: 0.12, strength: 0.7 },
+  { at: 0.35, strength: 0.22 },
+  { at: 1, strength: 0 }
+];
+const BLOOM_FADE = [
+  { at: 0, strength: 1 },
+  { at: 0.2, strength: 0.45 },
+  { at: 0.5, strength: 0.12 },
+  { at: 1, strength: 0 }
+];
+const CORE_FADE = [
+  { at: 0, strength: 1 },
+  { at: 0.5, strength: 1 },
   { at: 1, strength: 0 }
 ];
 
@@ -78,15 +91,17 @@ const LANDMARK_PATHS = {
   farOpacity: 0.25
 };
 
-/** `MARK_COLOR` and `MARK_EDGE`: every mark, day and night. */
+/** `MARK_COLOR`, `MARK_EDGE` and `MARK_BLOOM`: every mark, day and night. */
 const MARK_COLOR = "#ffffff";
 const MARK_EDGE = { color: "#05070a", alpha: 0.9 };
+const MARK_BLOOM = "#a9c9ff";
 
 const NIGHT_PALETTE = {
   mark: MARK_COLOR,
   outline: MARK_EDGE,
   halo: { color: "#ffffff", alpha: 0.18 },
   glow: 1,
+  edge: 0,
   label: "#ffffff",
   labelShadow: "rgba(3, 9, 17, 0.85)"
 };
@@ -96,6 +111,7 @@ const DAYLIGHT_PALETTE = {
   outline: MARK_EDGE,
   halo: { color: "#04121f", alpha: 0.2 },
   glow: 0,
+  edge: 1,
   label: "#10161c",
   labelShadow: "rgba(244, 248, 253, 0.9)"
 };
@@ -115,6 +131,15 @@ function rangeShare(range) {
 function markerDiameterPx(range) {
   const { nearDiameterPx, farDiameterPx } = SATELLITE_MARKERS;
   return nearDiameterPx - (nearDiameterPx - farDiameterPx) * rangeShare(range);
+}
+
+/** `BRIGHT_BACKDROP` and `backdropEdge`: how much edge a mark needs for what is behind it. */
+const BRIGHT_BACKDROP = { edgeFromLuminance: 0.45, edgeFullLuminance: 0.7 };
+function backdropEdge(backdrop) {
+  if (backdrop === undefined) return 0;
+  const { edgeFromLuminance, edgeFullLuminance } = BRIGHT_BACKDROP;
+  const along = Math.min(1, Math.max(0, (backdrop - edgeFromLuminance) / (edgeFullLuminance - edgeFromLuminance)));
+  return along * along * (3 - 2 * along);
 }
 
 /** `depthStrength`: how strongly a mark's glow and tail are drawn for its range. */
@@ -219,7 +244,8 @@ function pathShapeFor(path, box, scale, palette) {
     color: palette.mark,
     alpha: pathOpacity(path.lead ?? 0),
     width,
-    rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO)
+    rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO),
+    rim: { color: palette.outline.color, alpha: palette.outline.alpha * palette.edge }
   };
 }
 
@@ -249,6 +275,9 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
     const outline = Math.max(MIN_EDGE_PX, diameter * OUTLINE_RATIO);
     const ring = marker.parked ? Math.max(MIN_RING_PX, diameter * RING_RATIO) : null;
     const opacity = marker.opacity ?? 1;
+    // `backdropEdge`: a scene may say how bright the picture is behind a mark.
+    const edge = Math.max(palette.edge, backdropEdge(marker.backdrop));
+    const light = Math.min(palette.glow, 1 - edge);
     const alpha = opacity * (marker.sunlit === "eclipsed" ? 0.5 : 1);
 
     glyphs.push({
@@ -263,11 +292,12 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
         ring === null
           ? { radius: diameter / 2, width: null }
           : { radius: (diameter - ring) / 2, width: ring },
-      glow: { radius: size * GLOW_RATIO, alpha: GLOW_ALPHA * strength * palette.glow },
+      glow: { radius: size * GLOW_RATIO, alpha: GLOW_ALPHA * strength * light },
+      bloom: { radius: size * BLOOM_RATIO, alpha: BLOOM_ALPHA * strength * light },
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
       color: palette.mark,
       alpha,
-      edgeAlpha: opacity
+      edgeAlpha: opacity * edge
     });
 
     if (selected) {
@@ -278,7 +308,7 @@ function buildMarkerScene(markers, box, palette, selectedName, paths) {
         width: SELECTION_WIDTH_PX * scale,
         rimWidth: (SELECTION_WIDTH_PX + 2 * MIN_OUTLINE_PX) * scale,
         color: palette.mark,
-        rim: palette.outline,
+        rim: { color: palette.outline.color, alpha: palette.outline.alpha * edge },
         alpha: opacity
       };
     }
@@ -354,6 +384,7 @@ function drawTail(context, glyph, tail, color, alpha, outset) {
 /** The dark edge under a mark and under its tail. */
 function drawRim(context, glyph, palette) {
   const ink = palette.outline;
+  if (!(glyph.edgeAlpha > 0)) return;
   if (glyph.tail) drawTail(context, glyph, glyph.tail, ink.color, ink.alpha * glyph.edgeAlpha, glyph.tail.rim);
   const { rim } = glyph;
   context.globalAlpha = ink.alpha * glyph.edgeAlpha;
@@ -369,12 +400,12 @@ function drawRim(context, glyph, palette) {
   }
 }
 
-/** One satellite, over the edges: its halo, its glow, its tail and its point. */
+/** One satellite, over the edges: its halo, its bloom and glow, its tail and its point. */
 function drawGlyph(context, glyph, palette) {
-  const glow = (radius, color, alpha) => {
+  const glow = (radius, fade, color, alpha) => {
     if (!(radius > 0) || !(alpha > 0)) return;
     const light = context.createRadialGradient(glyph.x, glyph.y, 0, glyph.x, glyph.y, radius);
-    for (const stop of GLOW_FADE) light.addColorStop(stop.at, cssColor(color, stop.strength));
+    for (const stop of fade) light.addColorStop(stop.at, cssColor(color, stop.strength));
     context.globalAlpha = alpha;
     context.fillStyle = light;
     context.beginPath();
@@ -382,11 +413,16 @@ function drawGlyph(context, glyph, palette) {
     context.fill();
   };
 
-  if (glyph.halo !== null) glow(glyph.halo, palette.halo.color, palette.halo.alpha * glyph.alpha);
-  glow(glyph.glow.radius, glyph.color, glyph.glow.alpha * glyph.alpha);
+  if (glyph.halo !== null) glow(glyph.halo, GLOW_FADE, palette.halo.color, palette.halo.alpha * glyph.alpha);
+  glow(glyph.bloom.radius, BLOOM_FADE, MARK_BLOOM, glyph.bloom.alpha * glyph.alpha);
+  glow(glyph.glow.radius, GLOW_FADE, glyph.color, glyph.glow.alpha * glyph.alpha);
   if (glyph.tail) drawTail(context, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
 
   const { core } = glyph;
+  if (core.width === null) {
+    glow(core.radius, CORE_FADE, glyph.color, glyph.alpha);
+    return;
+  }
   context.globalAlpha = glyph.alpha;
   context.beginPath();
   context.arc(glyph.x, glyph.y, Math.max(0, core.radius), 0, TWO_PI);
@@ -408,14 +444,14 @@ function drawGlyph(context, glyph, palette) {
  */
 function drawPath(context, shape, palette) {
   const draw = (runs, color, alpha, width) => {
-    if (runs.length === 0) return;
+    if (runs.length === 0 || !(alpha > 0)) return;
     trace(context, runs);
     context.globalAlpha = alpha;
     context.strokeStyle = color;
     context.lineWidth = width;
     context.stroke();
   };
-  const ink = palette.outline;
+  const ink = shape.rim;
   draw(shape.dashes, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
   draw(shape.arrows, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
   draw(shape.dashes, shape.color, shape.alpha, shape.width);
@@ -424,6 +460,7 @@ function drawPath(context, shape, palette) {
 
 function drawSelection(context, ring) {
   const band = (color, alpha, width) => {
+    if (!(alpha > 0)) return;
     context.globalAlpha = alpha;
     context.strokeStyle = color;
     context.lineWidth = width;

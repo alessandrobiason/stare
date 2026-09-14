@@ -1239,6 +1239,40 @@ export const CELESTIAL_ALIGNMENT = {
 } as const;
 
 /**
+ * When a mark is drawn over something bright in the picture — the moon, a street
+ * lamp, a lit cloud, a window — and gets its dark edge back at night
+ * (`src/vision/backdropBrightness.ts`, `markerScene`).
+ *
+ * At night a mark is light with no edge, which is what makes it read as a star
+ * rather than a sticker, and it is also what loses it the moment it crosses
+ * anything as bright as it is. So the picture under each mark is read, off the
+ * frame the sky segmentation already captured, and a mark over a bright patch
+ * is drawn the way it is by day.
+ */
+export const BRIGHT_BACKDROP = {
+  /**
+   * Side of a brightness cell, in pixels of the frame the segmenter was given —
+   * a couple of degrees of sky, about the span of a near mark's glow.
+   *
+   * Each cell is the brightest of its four quarters rather than its plain mean,
+   * so a street lamp a few pixels across is not averaged away into the dark
+   * around it, while one hot pixel still is.
+   */
+  cellPx: 12,
+  /**
+   * Brightness under a mark, as the largest of its three channels in `[0, 1]`,
+   * at which its edge starts to come back, and at which it is back whole.
+   *
+   * A phone's night picture of open sky sits well under the first even with the
+   * exposure pushed up and a town's glow in it; the moon, a lamp and a floodlit
+   * wall are over the second. A band rather than a threshold, so a mark sliding
+   * off a lit cloud gains its edge gradually rather than blinking it on.
+   */
+  edgeFromLuminance: 0.45,
+  edgeFullLuminance: 0.7
+} as const;
+
+/**
  * How long a downloaded TLE catalog is served before a refresh is attempted.
  *
  * CelesTrak asks that the active catalog be pulled at most once every couple of

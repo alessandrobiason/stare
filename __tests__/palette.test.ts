@@ -115,6 +115,14 @@ describe("the marks themselves", () => {
     expect(DAYLIGHT_PALETTE.glow).toBe(0);
   });
 
+  test("are edged by day and not at night, where an edge makes a light a disc", () => {
+    expect(NIGHT_PALETTE.edge).toBe(0);
+    expect(DAYLIGHT_PALETTE.edge).toBe(1);
+    const half = blendPalettes(0.5);
+    expect(half.edge).toBeGreaterThan(0);
+    expect(half.edge).toBeLessThan(1);
+  });
+
   test("leave the names to flip: light on dark at night, dark on light by day", () => {
     expect(luminance(NIGHT_PALETTE.label)).toBeGreaterThan(
       luminance(NIGHT_PALETTE.labelShadow.color)

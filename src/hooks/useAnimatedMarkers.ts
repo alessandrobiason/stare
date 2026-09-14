@@ -24,6 +24,7 @@ import { EnuPosition, OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { AnchoredSkyMask, skyProbe } from "../vision/anchoredMask";
+import { backdropProbe, BackdropBrightness } from "../vision/backdropBrightness";
 import { MarkerVisibilityFilter } from "../vision/markerVisibility";
 import { SkyMemory } from "../vision/skyMemory";
 import { useLatestRef } from "./useLatestRef";
@@ -59,6 +60,14 @@ export type SatelliteMarker = {
    * geometry and `markerScene.ts` for what is done with it.
    */
   sunlit: SunlitState;
+  /**
+   * How bright the camera picture is behind it, in `[0, 1]`, or absent where
+   * nothing has been read — a picture that has not landed yet, or sky outside
+   * the frame it was read from. What brings a mark's dark edge back at night
+   * over the moon or a lamp, where light with no edge would vanish. See
+   * `backdropBrightness.ts` and `markerScene.ts`.
+   */
+  backdrop?: number;
   /**
    * Why a satellite that is not a landmark is named on the sky, if it is.
    * Decided over the whole sky rather than this frame: see `NotableSatellites`.
@@ -550,6 +559,12 @@ type AnimatedMarkerOptions = {
   /** The newest mask, with the attitude it was taken at. */
   mask: AnchoredSkyMask | null;
   /**
+   * How bright the picture is behind the sky, off the newest captured frame,
+   * with the attitude it was taken at. Optional: without it no mark is told
+   * what is behind it, and at night none is edged.
+   */
+  backdropRef?: MutableRefObject<BackdropBrightness | null>;
+  /**
    * Whether the mask is allowed to hide anything — the debug menu's switch.
    *
    * Off, every satellite above the elevation mask is drawn wherever it is, over
@@ -612,6 +627,7 @@ export function useAnimatedMarkers({
   epochRef,
   orientationFilterRef,
   mask,
+  backdropRef,
   maskFiltering,
   enabledCategories,
   starlink,
@@ -634,6 +650,8 @@ export function useAnimatedMarkers({
   });
 
   const maskRef = useLatestRef(mask);
+  const fallbackBackdropRef = useRef<BackdropBrightness | null>(null);
+  const brightnessRef = backdropRef ?? fallbackBackdropRef;
   const maskFilteringRef = useLatestRef(maskFiltering);
   // A ref, because it changes on a layout — a rotation, or the harness's window
   // being dragged — and the loop must not be torn down and rebuilt for one.
@@ -751,6 +769,10 @@ export function useAnimatedMarkers({
         // aimed at. Resolved once per frame rather than per satellite, like the
         // probe above it.
         const skyRemembered = filtering ? skyMemory.probe(now / 1000) : null;
+        // How bright the picture is behind each direction, read the same way
+        // and resolved once per frame like the two above. Asked only of the
+        // marks actually drawn, below.
+        const brightTowards = backdropProbe(brightnessRef.current, lens, now / 1000);
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
@@ -854,6 +876,7 @@ export function useAnimatedMarkers({
           // second pass over the drawn markers is an array a frame, sixty times
           // a second, for a figure only the debug page reads.
           if (fix.sunlit === "eclipsed") eclipsed += 1;
+          const backdrop = brightTowards?.(fix.position) ?? undefined;
           visible.push({
             name: fix.name,
             category: fix.category,
@@ -862,6 +885,7 @@ export function useAnimatedMarkers({
             rangeKm: range,
             opacity,
             sunlit: fix.sunlit,
+            ...(backdrop === undefined ? {} : { backdrop }),
             notable: notable.roleOf(fix.name),
             // Allowed off-frame: a trail about to leave the view is the one
             // whose direction says the most.
@@ -932,6 +956,7 @@ export function useAnimatedMarkers({
 
     return () => cancelAnimationFrame(handle);
   }, [
+    brightnessRef,
     enabledCategoriesRef,
     starlinkRef,
     epochRef,

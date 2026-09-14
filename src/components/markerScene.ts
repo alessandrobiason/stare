@@ -1,5 +1,5 @@
 import { FramePoint } from "../camera/projection";
-import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../constants";
+import { BRIGHT_BACKDROP, LANDMARK_PATHS, SATELLITE_MARKERS } from "../constants";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../hooks/useAnimatedMarkers";
 import { strings } from "../i18n";
 import { clockTime } from "../i18n/format";
@@ -39,10 +39,18 @@ import { Ink, MarkerPalette } from "./palette";
  * a body with a tapered trail sweeping back from it (`assets/icon.svg`), and
  * the marks kept that shape — but drawn as it was, an opaque disc a couple of
  * dozen pixels across in a solid tail, seventy of them covered the picture they
- * were marking. So the solid part is now a point about half of that, white on a
- * near-black edge, in a glow that fades to nothing; and the tail is the same
- * taper, faded from the point to its tip. What a satellite looks like in the
- * sky is a point of light moving, and that is what is drawn.
+ * were marking. So the solid part is now a point about half of that, in a glow
+ * that fades to nothing; and the tail is the same taper, faded from the point to
+ * its tip. What a satellite looks like in the sky is a point of light moving,
+ * and that is what is drawn.
+ *
+ * **At night a mark is drawn the way a star photographs.** Three layers of the
+ * same light, none of them with an edge: a white centre that is solid only in
+ * its middle and softens out (`CORE_FADE`), a tight white glow that falls away
+ * steeply from it (`GLOW_FADE`), and a wide, faint bloom going cool blue as it
+ * thins (`BLOOM_FADE`, `MARK_BLOOM`). The point was once a white disc on a
+ * near-black ring in a weak glow, and the ring is what made it read as a sticker
+ * on the picture rather than as light in it; so at night there is no ring.
  *
  * The tail is the ground the object has just covered: it tapers from nothing
  * into the point, so the shape has only one head and the eye finds it without
@@ -80,12 +88,13 @@ import { Ink, MarkerPalette } from "./palette";
  * a mark in shadow is a dark ring round a grey centre rather than a mark half
  * gone.
  *
- * Every mark, tail included, sits on a near-black edge a pixel or so wide,
- * because the background is a photograph of the sky and so is either much
- * brighter or much darker than any fill. At night the white is what reads and
- * the edge is what keeps it legible over a street lamp or the moon; by day it is
- * the other way round. How much a mark glows is the palette's business, and by
- * day it does not glow at all.
+ * By day the white alone would vanish into the sky, so every mark, tail
+ * included, gains a near-black edge a pixel or so wide and loses its light: by
+ * day the edge is what reads. Both are the palette's business (`glow`, `edge`),
+ * and they cross over together at dusk. At night the same happens to a single
+ * mark over anything in the picture as bright as it is — the moon, a street
+ * lamp, a lit cloud — where light with no edge would simply be gone
+ * (`backdropEdge`).
  */
 export type MarkerScene = {
   /**
@@ -185,8 +194,14 @@ export type GlyphShape = {
   rim: Circle;
   /** The mark itself: a point, or a small ring if the object holds station. */
   core: Circle;
-  /** The glow around it, stronger the nearer it is. */
+  /** The tight white glow around it, stronger the nearer it is. */
   glow: Glow;
+  /**
+   * The wide, faint bloom the glow sits in, in `MARK_BLOOM`: what makes the
+   * point read as light rather than as paint. Faded like the glow, by
+   * `BLOOM_FADE`, and given off only when the glow is.
+   */
+  bloom: Glow;
   /** Radius of the landmark halo, or `null` for everything else. Faded like a glow. */
   halo: number | null;
   /** The mark's fill, as `#rrggbb`: the palette's, which is white. */
@@ -199,7 +214,10 @@ export type GlyphShape = {
   alpha: number;
   /**
    * How strongly the edges — under the point and under the tail — are drawn:
-   * the fade alone, without the sun. See `sunlightAlpha`.
+   * the fade alone, without the sun (`sunlightAlpha`), times how much edge the
+   * sky calls for (`MarkerPalette.edge`) — none at night, all of it by day —
+   * or the picture behind the mark does, if that asks for more
+   * (`backdropEdge`).
    */
   edgeAlpha: number;
 };
@@ -214,8 +232,9 @@ export type GlyphShape = {
  * never says which of the four marks under the finger is the one now being
  * described.
  *
- * Two circles, like the marks themselves: a dark edge under a white ring, so it
- * reads against a photograph of the sky at either end of the day. Drawn clear of
+ * Two circles, like the marks themselves: a dark edge under a white ring — the
+ * edge by day only, as a mark's is (`MarkerPalette.edge`), since at night a
+ * dark band round a white one is the sticker the marks stopped being. Drawn clear of
  * the mark rather than over it — the mark's size and shape are channels the
  * overlay spends, and a selection must not paint over either.
  */
@@ -230,6 +249,7 @@ export type SelectionRing = {
   rimWidth: number;
   /** The ring's colour: the marks' own white. */
   color: string;
+  /** The edge under it, already at the strength the sky calls for: none at night. */
   rim: Ink;
   /** The fade the marker is in, so the ring goes with it rather than alone. */
   alpha: number;
@@ -289,6 +309,12 @@ export type PathShape = {
   /** The same, for the wake. */
   pastWidth: number;
   pastRimWidth: number;
+  /**
+   * The rim's ink, already at the strength the sky calls for: none at night,
+   * where a white line on a dark sky needs no edge and wears one as a stripe,
+   * and all of it by day, as the marks have it (`MarkerPalette.edge`).
+   */
+  rim: Ink;
 };
 
 /** A name, and the mark or piece of path it belongs to. */
@@ -388,6 +414,10 @@ export function buildMarkerScene(
     const footprint = markerDiameterPx(marker.rangeKm) * scale;
     const size = selected ? footprint * SELECTED_GROWTH : footprint;
     const strength = selected ? 1 : depthStrength(marker.rangeKm);
+    // How much of the daylight mark this one is drawn as: all of it by day, and
+    // at night as much as the picture behind it is bright (`backdropEdge`).
+    const edge = Math.max(palette.edge, backdropEdge(marker));
+    const light = Math.min(palette.glow, 1 - edge);
     const color = palette.mark;
     const landmark = marker.category === "LANDMARK";
 
@@ -415,11 +445,12 @@ export function buildMarkerScene(
         ring === null
           ? { radius: diameter / 2, width: null }
           : { radius: (diameter - ring) / 2, width: ring },
-      glow: { radius: size * GLOW_RATIO, alpha: GLOW_ALPHA * strength * palette.glow },
+      glow: { radius: size * GLOW_RATIO, alpha: GLOW_ALPHA * strength * light },
+      bloom: { radius: size * BLOOM_RATIO, alpha: BLOOM_ALPHA * strength * light },
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
       color,
       alpha: marker.opacity * sunlightAlpha(marker),
-      edgeAlpha: marker.opacity
+      edgeAlpha: marker.opacity * edge
     });
 
     if (selected) {
@@ -434,7 +465,7 @@ export function buildMarkerScene(
         width: SELECTION_WIDTH_PX * scale,
         rimWidth: (SELECTION_WIDTH_PX + 2 * MIN_OUTLINE_PX) * scale,
         color: palette.mark,
-        rim: palette.outline,
+        rim: edgeInk(palette, edge),
         alpha: marker.opacity
       };
     }
@@ -556,8 +587,45 @@ function pathShapeFor(
     width,
     rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO),
     pastWidth,
-    pastRimWidth: pastWidth + 2 * Math.max(MIN_OUTLINE_PX, pastWidth * OUTLINE_RATIO)
+    pastRimWidth: pastWidth + 2 * Math.max(MIN_OUTLINE_PX, pastWidth * OUTLINE_RATIO),
+    rim: edgeInk(palette)
   };
+}
+
+/**
+ * The dark edge under a line or a ring, at the strength the sky calls for: the
+ * palette's outline, times its `edge` — or times `edge` given, for the ring
+ * round a mark that is over something bright. The marks carry the same factor
+ * on `edgeAlpha` instead, since theirs also fades with the mark.
+ */
+function edgeInk(palette: MarkerPalette, edge: number = palette.edge): Ink {
+  return { color: palette.outline.color, alpha: palette.outline.alpha * edge };
+}
+
+/**
+ * How much of its dark edge a mark needs for what is behind it in the picture,
+ * in `[0, 1]`: none over a dark sky, all of it over the moon, a street lamp or a
+ * lit cloud.
+ *
+ * At night a mark is light with no edge, and light with no edge over something
+ * as bright as itself is not there at all. So over a bright patch it is drawn
+ * the way it is by day — edged, and without the glow that would wash the edge
+ * out — and it goes back to being light as it leaves. Eased across a band
+ * (`BRIGHT_BACKDROP`) rather than switched, so a mark sliding along the edge of
+ * a lit cloud does not blink between the two.
+ *
+ * Nothing read behind it counts as dark: the backdrop is only missing before
+ * the first frame lands or off the edge of the one that did, and a mark there
+ * is drawn as the sky's own palette says.
+ */
+function backdropEdge(marker: SatelliteMarker): number {
+  if (marker.backdrop === undefined) return 0;
+  const { edgeFromLuminance, edgeFullLuminance } = BRIGHT_BACKDROP;
+  const along = Math.min(
+    1,
+    Math.max(0, (marker.backdrop - edgeFromLuminance) / (edgeFullLuminance - edgeFromLuminance))
+  );
+  return along * along * (3 - 2 * along);
 }
 
 /**
@@ -662,11 +730,36 @@ export const TAIL_FADE: readonly FadeStop[] = [
   { at: 1, strength: 0 }
 ];
 
-/** How a glow, or a landmark's halo, falls away from its centre. */
+/**
+ * How a mark's glow, or a landmark's halo, falls away from its centre.
+ *
+ * Steeply: most of it is spent in the first third, hugging the point, which is
+ * how the light around a star falls off — bright right beside it and a long way
+ * down almost at once.
+ */
 export const GLOW_FADE: readonly FadeStop[] = [
   { at: 0, strength: 1 },
-  { at: 0.25, strength: 0.6 },
-  { at: 0.55, strength: 0.2 },
+  { at: 0.12, strength: 0.7 },
+  { at: 0.35, strength: 0.22 },
+  { at: 1, strength: 0 }
+];
+
+/** How the wide bloom a glow sits in thins out to nothing. See `MARK_BLOOM`. */
+export const BLOOM_FADE: readonly FadeStop[] = [
+  { at: 0, strength: 1 },
+  { at: 0.2, strength: 0.45 },
+  { at: 0.5, strength: 0.12 },
+  { at: 1, strength: 0 }
+];
+
+/**
+ * How a moving mark's point fills its own radius: solid through the middle and
+ * softening to nothing at its rim, so it is a hot centre rather than a disc with
+ * an edge. A parked ring is stroked and stays sharp — a soft ring is a smudge.
+ */
+export const CORE_FADE: readonly FadeStop[] = [
+  { at: 0, strength: 1 },
+  { at: 0.5, strength: 1 },
   { at: 1, strength: 0 }
 ];
 
@@ -730,19 +823,27 @@ const CORE_DIAMETER_RATIO = 0.52;
  */
 const RING_DIAMETER_RATIO = 0.8;
 /** How far the glow reaches, as a fraction of the footprint: its radius, not its span. */
-const GLOW_RATIO = 0.9;
+const GLOW_RATIO = 1;
 /**
  * How strong a glow is at its centre, at full depth strength.
  *
- * Half, which over the point's rim and the sky around it reads as light coming
- * off the mark rather than as a second, larger disc of colour.
+ * Most of the way to solid, since `GLOW_FADE` spends it within a few pixels of
+ * the point: what reads is the point burning brighter than its own size, not a
+ * second, larger disc of colour.
  */
-const GLOW_ALPHA = 0.5;
+const GLOW_ALPHA = 0.8;
+/** How far the bloom reaches, as a fraction of the footprint: its radius. */
+const BLOOM_RATIO = 2.6;
+/**
+ * How strong the bloom is at its centre, at full depth strength. Faint: it is
+ * the air around the light, and seventy of them must not haze the frame.
+ */
+const BLOOM_ALPHA = 0.35;
 /**
  * How strong a tail is where it leaves the point, at full depth strength. A
  * shade under the point itself, so the point stays the brightest thing on it.
  */
-const TAIL_ALPHA = 0.85;
+const TAIL_ALPHA = 0.8;
 /**
  * What is left of a mark's light at the far end of the range scale. See
  * `depthStrength`.
@@ -759,12 +860,12 @@ const SELECTED_GROWTH = 1.25;
 /**
  * Trail width where it meets the point, as a fraction of the point's diameter.
  *
- * Most of the point's own width, so the tail comes out from behind it as a
- * continuation of the mark rather than as a thread stuck to it — and, with the
- * point half the size the old discs were, about as wide in pixels as the tails
- * they trailed.
+ * Half the point's width: the point's softened rim (`CORE_FADE`) hides the
+ * join, so the tail still comes out of the light rather than being stuck to it,
+ * and a streak this fine reads as the path of a light rather than as the body
+ * of a comet.
  */
-const TRAIL_WIDTH_RATIO = 0.75;
+const TRAIL_WIDTH_RATIO = 0.5;
 /** Edge thickness, as a fraction of the point's diameter. */
 const OUTLINE_RATIO = 0.16;
 /** The thinnest a line's rim is drawn, in layout pixels. */
