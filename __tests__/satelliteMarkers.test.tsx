@@ -251,10 +251,10 @@ describe("a moving mark", () => {
     const [glyph] = scene([marker({ rangeKm: 400, next: null })]).glyphs;
     const footprint = SATELLITE_MARKERS.nearDiameterPx;
 
-    // The solid part is well under half the footprint the range scale gives
-    // it; the rest of that footprint is light fading to nothing.
-    expect(glyph.core.radius * 2).toBeLessThan(footprint / 2);
-    expect(glyph.rim.radius * 2).toBeLessThan(footprint / 2);
+    // The solid part, rim and all, is well under the disc the range scale used
+    // to fill with colour; the rest of that footprint is light fading to nothing.
+    expect(glyph.core.radius * 2).toBeLessThan(footprint * 0.6);
+    expect(glyph.rim.radius * 2).toBeLessThan(footprint * 0.7);
     expect(glyph.glow.radius).toBeGreaterThan(glyph.rim.radius);
     expect(glyph.glow.alpha).toBeGreaterThan(0);
     expect(glyph.glow.alpha).toBeLessThan(1);

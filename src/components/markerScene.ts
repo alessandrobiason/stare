@@ -36,7 +36,7 @@ import { Ink, MarkerPalette } from "./palette";
  * a body with a tapered trail sweeping back from it (`assets/icon.svg`), and
  * the marks kept that shape — but drawn as it was, an opaque disc a couple of
  * dozen pixels across in a solid tail, seventy of them covered the picture they
- * were marking. So the solid part is now a point about a third of that, with a
+ * were marking. So the solid part is now a point about half of that, with a
  * lit centre, in a glow of its own colour that fades to nothing; and the tail
  * is the same taper, faded from the point to its tip. What a satellite looks
  * like in the sky is a point of light moving, and that is what is drawn.
@@ -51,7 +51,6 @@ import { Ink, MarkerPalette } from "./palette";
  * and now brighter as well — its glow and its tail stronger, a farther one's
  * weaker (`depthStrength`). Restrained on purpose: both are read off the same
  * logarithmic range scale as the size, and the far end is still plainly drawn.
- *
  *
  * The channels are otherwise unchanged, because they are what the overlay is
  * for:
@@ -722,19 +721,20 @@ function sunlightAlpha(marker: SatelliteMarker): number {
 /**
  * The solid point, as a fraction of the footprint the range scale gives a mark.
  *
- * Three to six pixels at the design width, against the eight to seventeen the
- * whole mark used to be drawn at in solid colour: the smallest a point can be
- * and still carry its colour at the size a phone draws the frame, with the
- * rest of the footprint given over to its glow.
+ * Four to nine pixels at the design width, against the eight to seventeen the
+ * whole mark used to be drawn at in solid colour, with the rest of the
+ * footprint given over to its glow. A third of the footprint was tried first
+ * and was too small on a phone: the far end came out under three points, which
+ * is a speck rather than a mark, and the colour could not be read in it.
  */
-const CORE_DIAMETER_RATIO = 0.36;
+const CORE_DIAMETER_RATIO = 0.52;
 /**
  * A parked object's ring, likewise. Larger than a point — a ring the size of a
  * point is a point — and still well under the disc it replaced.
  */
-const RING_DIAMETER_RATIO = 0.7;
+const RING_DIAMETER_RATIO = 0.8;
 /** How far the glow reaches, as a fraction of the footprint: its radius, not its span. */
-const GLOW_RATIO = 0.75;
+const GLOW_RATIO = 0.9;
 /**
  * How strong a glow is at its centre, at full depth strength.
  *
@@ -767,8 +767,8 @@ const SELECTED_GROWTH = 1.25;
  *
  * Most of the point's own width, so the tail comes out from behind it as a
  * continuation of the mark rather than as a thread stuck to it — and, with the
- * point a third of the size it was, still thinner in pixels than the tails the
- * old discs trailed.
+ * point half the size the old discs were, about as wide in pixels as the tails
+ * they trailed.
  */
 const TRAIL_WIDTH_RATIO = 0.75;
 /** Rim thickness, as a fraction of the point's diameter. */
