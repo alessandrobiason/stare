@@ -14,4 +14,4 @@
  * that keys the panels says outright that what is behind this button is in
  * English, so the one untranslated word is explained rather than surprising.
  */
-export const CONSOLE_LABEL = "CONSOLE";
+export const CONSOLE_LABEL = "Console";
