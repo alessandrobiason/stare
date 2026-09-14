@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { describeBuild } from "../debug/buildIdentity";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
@@ -8,6 +8,12 @@ import { CONSOLE_LABEL } from "./consoleLabel";
 import { Icon } from "./Icon";
 import { theme } from "./theme";
 import { APP_NAME } from "./wordmark";
+
+/** Where the source lives, and whose name goes beside it. Kept in one place
+ * rather than in `i18n`, since a GitHub handle and an author's name are not
+ * words that translate. */
+const GITHUB_URL = "https://github.com/alessandrobiason/stare";
+const AUTHOR_NAME = "Alessandro Biason";
 
 type Props = {
   /** Opens the guide over the sky: the intro's pages about the screen. */
@@ -21,11 +27,11 @@ type Props = {
 /**
  * Everything about the app rather than about the sky.
  *
- * Three rows, and they are three things that used to be drawn on the camera
- * picture: the `?` that brings back the pages about the screen, the language,
- * and the console. None of them is about what is overhead, none is touched
- * more than once in a session, and all three were spending a corner of a
- * photograph to say so. A tab is where they belong.
+ * Four rows: the `?` that brings back the pages about the screen, the
+ * language, the console, and the link to where this is built. None of them is
+ * about what is overhead, none is touched more than once in a session, and the
+ * first three used to spend a corner of a photograph saying so. A tab is where
+ * they belong.
  *
  * It covers the sky while it is open — a list of settings read against a
  * moving camera picture is a list nobody can read — but the camera keeps
@@ -101,6 +107,12 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
             detail={t.intro.corners.console.meaning}
             warned={warned}
             onPress={onOpenConsole}
+          />
+
+          <Row
+            label="About"
+            detail={AUTHOR_NAME}
+            onPress={() => void Linking.openURL(GITHUB_URL).catch(() => undefined)}
             last
           />
         </View>

@@ -97,7 +97,13 @@ export const Icon: React.FC<Props> = ({
         </View>
       );
 
-    /** Three rows, each a marker and the line it names: a catalog. */
+    /**
+     * Three rows, each a marker and the line it names: a catalog.
+     *
+     * Bolder and further apart than the stroke elsewhere in this file — three
+     * hairlines this close together read as one smudge at a tab bar's size, on
+     * an actual screen rather than a vector preview.
+     */
     case "catalog":
       return (
         <View style={[box, styles.rows]}>
@@ -105,8 +111,8 @@ export const Icon: React.FC<Props> = ({
             <View key={row} style={[styles.row, { gap: stroke * 1.4 }]}>
               <View
                 style={{
-                  width: stroke * 1.6,
-                  height: stroke * 1.6,
+                  width: stroke * 2,
+                  height: stroke * 2,
                   borderRadius: stroke,
                   backgroundColor: color
                 }}
@@ -114,7 +120,7 @@ export const Icon: React.FC<Props> = ({
               <View
                 style={{
                   flex: 1,
-                  height: stroke,
+                  height: stroke * 1.3,
                   borderRadius: stroke,
                   backgroundColor: color
                 }}
@@ -139,7 +145,7 @@ export const Icon: React.FC<Props> = ({
                   position: "absolute",
                   left: 0,
                   right: 0,
-                  height: stroke,
+                  height: stroke * 1.3,
                   borderRadius: stroke,
                   backgroundColor: color,
                   opacity: 0.65
@@ -149,10 +155,10 @@ export const Icon: React.FC<Props> = ({
                 style={{
                   position: "absolute",
                   left: `${knob * 100}%`,
-                  marginLeft: -size * 0.11,
-                  width: size * 0.22,
-                  height: size * 0.22,
-                  borderRadius: size * 0.11,
+                  marginLeft: -size * 0.14,
+                  width: size * 0.28,
+                  height: size * 0.28,
+                  borderRadius: size * 0.14,
                   backgroundColor: color
                 }}
               />
@@ -293,7 +299,7 @@ const styles = StyleSheet.create({
   },
   rows: {
     justifyContent: "space-between",
-    paddingVertical: "12%"
+    paddingVertical: "6%"
   },
   row: {
     flexDirection: "row",
@@ -301,7 +307,7 @@ const styles = StyleSheet.create({
   },
   sliders: {
     justifyContent: "space-around",
-    paddingVertical: "16%"
+    paddingVertical: "10%"
   },
   slider: {
     height: "30%",

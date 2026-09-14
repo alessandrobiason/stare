@@ -63,7 +63,7 @@ export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = fal
             <View>
               <Icon
                 name={icon}
-                size={21}
+                size={23}
                 color={on ? theme.color.accent : theme.color.textDim}
               />
               {/* Boot's warnings last the whole session, so spelling them out
