@@ -23,8 +23,7 @@ export const ko: Strings = {
       landmark: {
         name: "주요 위성",
         meaning: "우주정거장과 대형 망원경으로, 이름이 함께 표시됩니다."
-      },
-      colors: "색은 용도를 나타냅니다:"
+      }
     },
     paths: {
       title: "언제, 어디를 볼까",

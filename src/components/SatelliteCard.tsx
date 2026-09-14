@@ -31,7 +31,7 @@ import {
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { SatelliteDetail } from "../types";
 import { Icon } from "./Icon";
-import { cssColor, MarkerPalette } from "./palette";
+import { cssColor, MARK_COLOR, MARK_EDGE } from "./palette";
 import { glass, lift, theme } from "./theme";
 
 type Props = {
@@ -64,8 +64,6 @@ type Props = {
    * plan them. See `seeingOnPass`.
    */
   pass?: UpcomingPass | null;
-  /** The colours the sky is drawn in, so the swatch is the mark on the frame. */
-  palette: MarkerPalette;
   /** Where it sits: laid over the card's own, by the stack that arranges it. */
   style?: StyleProp<ViewStyle>;
 };
@@ -128,7 +126,6 @@ export const SatelliteCard: React.FC<Props> = ({
   onClose,
   describeRef,
   pass = null,
-  palette,
   style
 }) => {
   const t = strings();
@@ -206,29 +203,13 @@ export const SatelliteCard: React.FC<Props> = ({
       )}
 
       <View style={styles.header}>
-        {/* The mark's own colour, as the thing the name hangs off. The sky
-            draws this object in that colour and this is the same swatch the
-            filter's list uses, so the card is tied to the dot that was tapped
-            rather than merely being about it. */}
-        <View
-          style={[
-            styles.badge,
-            detail && {
-              borderColor: palette.categories[detail.category],
-              backgroundColor: cssColor({ ...palette.outline, alpha: 0.25 })
-            }
-          ]}
-        >
+        {/* The mark that was tapped, as the thing the name hangs off: a white
+            point, or the ring the sky draws for an object parked over the
+            equator. What it is for is written beside it rather than coloured
+            in — every mark on the sky is white. */}
+        <View style={styles.badge}>
           {detail && (
-            <View
-              style={[
-                styles.badgeMark,
-                {
-                  backgroundColor: palette.categories[detail.category],
-                  borderColor: cssColor(palette.outline)
-                }
-              ]}
-            />
+            <View style={[styles.badgeMark, detail.parked && styles.badgeRing]} />
           )}
         </View>
 
@@ -522,8 +503,15 @@ const styles = StyleSheet.create({
     width: BADGE_MARK,
     height: BADGE_MARK,
     borderRadius: BADGE_MARK / 2,
-    // Rimmed like the marks on the sky are; the colour comes from the palette.
-    borderWidth: 1.5
+    // Edged like the marks on the sky are.
+    backgroundColor: MARK_COLOR,
+    borderWidth: 1.5,
+    borderColor: cssColor(MARK_EDGE)
+  },
+  badgeRing: {
+    backgroundColor: "transparent",
+    borderWidth: 2.5,
+    borderColor: MARK_COLOR
   },
   heading: {
     flex: 1,

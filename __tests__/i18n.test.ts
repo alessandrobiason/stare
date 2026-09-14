@@ -144,7 +144,8 @@ describe("and says it in the space it is given", () => {
 
     // The title shares its row with the `3/6` count and the gap after it.
     expect(width(t.title, 10, 1.4)).toBeLessThan(COLUMN - 36);
-    // The label column of a row, less the swatch, its margin and the switch.
+    // The label column of a row, less the switch and a swatch's width of
+    // margin — the rows carry none now, but the key rows under them do.
     // Rows may grow, but every point of growth is sky the panel covers.
     for (const category of SATELLITE_CATEGORIES) {
       expect(width(t.categories[category], 11, 0.3)).toBeLessThan(COLUMN - 10 - 9 - 8 - 36);
@@ -689,22 +690,6 @@ describe("the intro's pages fit the smallest screen", () => {
     return 10 + shut + 10 + open + 10;
   }
 
-  /** The colour chips, wrapped into the card's column: 21 tall and 6 apart either way. */
-  function swatchesHeight(names: readonly string[]): number {
-    let rows = 1;
-    let used = 0;
-    for (const name of names) {
-      const chip = 7 + 9 + 5 + width(name, 9, 0.4) + 7;
-      if (used > 0 && used + 6 + chip > CARD_COLUMN) {
-        rows += 1;
-        used = chip;
-      } else {
-        used += (used > 0 ? 6 : 0) + chip;
-      }
-    }
-    return rows * 21 + (rows - 1) * 6;
-  }
-
   test.each(LOCALES)("%s", (locale) => {
     setLocaleForTesting(locale);
     // Every page but the last: the permissions page lists what the system will
@@ -720,10 +705,6 @@ describe("the intro's pages fit the smallest screen", () => {
           2 +
           blockHeight(mark.meaning, 11.5, 16, ELEMENT_COLUMN);
         height += 12 + Math.max(MARK_TILE.height, words);
-      }
-      if (page.colors) {
-        height += 14 + blockHeight(page.colors.label, 11.5, 16, CARD_COLUMN);
-        height += 6 + swatchesHeight(page.colors.swatches.map((swatch) => swatch.name));
       }
       if (page.path) {
         height += 14 + PATH_FIGURE_HEIGHT + calloutsHeight(page.path.callouts);

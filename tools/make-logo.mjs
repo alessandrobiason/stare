@@ -11,8 +11,9 @@ import { dirname, join } from "node:path";
  *   and `assets/icon.png`, the same picture rasterised: the app icon proper,
  *   because `app.json` can only point iOS at a PNG.
  * - `assets/logo-extended.svg`, the boot screen held still — that same mark
- *   five times over, on five orbits, in the five colours the satellite overlay
- *   itself uses. It is the picture the app opens on; on the phone it turns.
+ *   five times over, on five orbits, in the white the satellite overlay itself
+ *   draws every mark in. It is the picture the app opens on; on the phone it
+ *   turns.
  *
  *     node tools/make-logo.mjs
  *
@@ -46,11 +47,11 @@ const GLOW = {
 };
 /** `direction` is the orbit's, and it is which side of the body the trail lies on. */
 const ORBITS = [
-  { radius: 175, phaseDeg: -30, sweepDeg: 120, trailWidth: 14, bodyRadius: 28, color: "#48515c", direction: 1 },
-  { radius: 300, phaseDeg: 150, sweepDeg: 104, trailWidth: 17, bodyRadius: 36, color: "#fdfdfd", direction: -1 },
-  { radius: 420, phaseDeg: -110, sweepDeg: 92, trailWidth: 24, bodyRadius: 50, color: "#5fd0d4", direction: 1 },
-  { radius: 500, phaseDeg: 60, sweepDeg: 84, trailWidth: 19, bodyRadius: 42, color: "#7a71cc", direction: -1 },
-  { radius: 620, phaseDeg: -100, sweepDeg: 76, trailWidth: 34, bodyRadius: 72, color: "#ffcf5c", direction: 1 }
+  { radius: 175, phaseDeg: -30, sweepDeg: 120, trailWidth: 14, bodyRadius: 28, color: "#ffffff", direction: 1 },
+  { radius: 300, phaseDeg: 150, sweepDeg: 104, trailWidth: 17, bodyRadius: 36, color: "#ffffff", direction: -1 },
+  { radius: 420, phaseDeg: -110, sweepDeg: 92, trailWidth: 24, bodyRadius: 50, color: "#ffffff", direction: 1 },
+  { radius: 500, phaseDeg: 60, sweepDeg: 84, trailWidth: 19, bodyRadius: 42, color: "#ffffff", direction: -1 },
+  { radius: 620, phaseDeg: -100, sweepDeg: 76, trailWidth: 34, bodyRadius: 72, color: "#ffffff", direction: 1 }
 ];
 const TRAIL_GAP = 0.35;
 const STARS = {
@@ -67,7 +68,7 @@ const STARS = {
  *
  * Its own numbers rather than one of `ORBITS`, because it is not a crop of the
  * composition — a square crop of that cuts the outermost orbit off entirely,
- * and that gold arc *is* the icon. What it shares with the five is the shape:
+ * and that arc *is* the icon. What it shares with the five is the shape:
  * same trail, same taper, same gap between trail and body.
  *
  * The orbit's centre is off the bottom of the square, so what the icon shows is
@@ -77,14 +78,18 @@ const STARS = {
 const ICON = {
   size: 1024,
   background: "#0b1220",
-  /** The navigation gold: the outermost orbit's colour, and the app's own. */
-  color: ORBITS[4].color,
+  /**
+   * The app's own gold. The boot sky's five were once the overlay's five
+   * category colours and this was the outermost of them; the sky's marks are
+   * all white now and so are the five, and the icon kept its colour.
+   */
+  color: "#ffcf5c",
   radius: 330,
   phaseDeg: -38,
   sweepDeg: 104,
   trailWidth: 46,
   bodyRadius: 100,
-  /** Clockwise, like the gold orbit it takes its colour from: trail below, body ahead. */
+  /** Clockwise, like the outermost orbit: trail below, body ahead. */
   direction: 1,
   /** How much of the square the drawing spans, the rest being margin. */
   coverage: 0.74

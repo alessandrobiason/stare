@@ -13,7 +13,7 @@ cannot have — `supportsTablet` is false.
 **The camera picture in these frames is drawn, not photographed.** Everything
 laid over it is the app: the panels are the app's own styles at the app's own
 sizes, and the markers come from a transcription of `markerScene.ts`, so a mark
-is the size, shape, colour and rim the phone would give an object at that range,
+is the size, shape, glow and edge the phone would give an object at that range,
 and a landmark's path is the line, the weight and the minute marks the app would
 draw along the arc that object is on. What no machine here can produce is a
 photograph of the sky with a building in it. See
@@ -29,7 +29,7 @@ listing: most people see one and a half frames.
 | 1 | `01-sky.png` | The plain view: a night sky over a city filling the screen, twenty-one marks on it, the app's name over what it counts, the filter button, the compass strip along the foot of the frame and the card saying the station is crossing now. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
 | 2 | `02-tap.png` | A tap on the ISS: the selection ring on the sky, the strip of names the tap covered, the briefing and the five figures. | **Tap a light, learn what it is** — What it is, who flies it, how far away — and the figures keep moving while you read. |
 | 3 | `03-occlusion.png` | A tower up the right of the frame. The Starlink train runs down to its corner, one mark mid-fade on the edge, and nothing over the building. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
-| 4 | `04-legend.png` | The same app at midday, filter open: the five categories, the parked ring, and the daylight palette on a bright sky. | **Colour is what it is for** — Size is how far away. A ring holds station over the equator. Day or night, the sky decides the ink. |
+| 4 | `04-legend.png` | The same app at midday, filter open: the five categories, the parked ring, and the same white marks read by their dark edges on a bright sky. | **Clear by day and by night** — White on a dark edge, readable against a bright sky or a dark one. Size is how far away; a ring holds station over the equator. |
 | 5 | `05-inview.png` | The count opened into the breakdown behind it: Starlink 6, SES 3, Galileo 2, GPS 2, ISS 1, six others. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
 | 6 | `06-pass.png` | Two landmark paths: CHEOPS crossing now, at full strength with an arrowhead on each of its minutes, and the station's next pass — no marker, since it has not risen — faded by how far off it is, named and timed where it will come up, with the card along the bottom counting it down. | **Know when to look up** — Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up. |
 
@@ -106,7 +106,7 @@ Where the numbers come from, if a frame has to be argued about:
 | The safe area the controls are inset by | `src/components/SafeAreaLayer.tsx` |
 | Marker sizes, rims, tails, rings, halos | `src/components/markerScene.ts`, `SATELLITE_MARKERS` in `src/constants.ts` |
 | The landmarks' paths, their marks and their fade | `src/satellite/orbitPath.ts`, `LANDMARK_PATHS` in `src/constants.ts` |
-| Marker colours, night and daylight | `src/satellite/categories.ts`, `src/components/palette.ts` |
+| Marker white and edge, and the day and night glow and names | `src/components/palette.ts` |
 | The header, the filter, the cards, the tab bar | `SkyHeader`, `CategoryLegend`, `SatelliteCard`, `UpcomingPasses`, `TabBar`, `theme.ts` |
 | The compass strip and its scale | `src/components/HorizonCompass.tsx` |
 | The glyphs on the buttons and the bar | `src/components/Icon.tsx` |

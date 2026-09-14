@@ -24,7 +24,6 @@ import {
   setIntroStoreForTesting
 } from "../src/onboarding/introStore";
 import { introButtonLabel, introPages } from "../src/onboarding/introPages";
-import { SATELLITE_CATEGORIES } from "../src/satellite/categories";
 
 /** Stands in for the device's file system, and survives a simulated restart. */
 function fakeDevice(): PersistentStore & { contents: string | null } {
@@ -150,16 +149,14 @@ describe("the marks are shown rather than described", () => {
     }
   });
 
-  test("the colour key is the filter's own, word for word", () => {
-    // Two keys to the same five colours in two different sets of words would be
-    // two taxonomies. The intro's is the one in the corner, said early.
-    setLocaleForTesting("it");
-    const colors = introPages().find((page) => page.colors)?.colors;
-
-    expect(colors?.swatches.map((swatch) => swatch.category)).toEqual([...SATELLITE_CATEGORIES]);
-    expect(colors?.swatches.map((swatch) => swatch.name)).toEqual(
-      SATELLITE_CATEGORIES.map((category) => strings().filter.categories[category])
-    );
+  test("keys no colours, since the sky draws every mark white", () => {
+    // The marks page used to end on a key to five colours. A key to colours
+    // the sky no longer draws would teach something false.
+    for (const locale of LOCALES) {
+      setLocaleForTesting(locale);
+      for (const page of introPages()) expect(Object.keys(page)).not.toContain("colors");
+      expect(Object.keys(strings().intro.marks)).not.toContain("colors");
+    }
   });
 
   test("each picture is drawn by the sky's renderer, and is the mark its row names", () => {

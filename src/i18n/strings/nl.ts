@@ -25,8 +25,7 @@ export const nl: Strings = {
       landmark: {
         name: "Hoogtepunten",
         meaning: "Ruimtestations en grote telescopen, met hun naam."
-      },
-      colors: "De kleur laat zien waarvoor hij dient:"
+      }
     },
     paths: {
       title: "Waar en wanneer kijken",

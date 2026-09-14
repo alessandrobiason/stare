@@ -25,8 +25,7 @@ export const de: Strings = {
       landmark: {
         name: "Highlights",
         meaning: "Raumstationen und große Teleskope, mit Namen."
-      },
-      colors: "Die Farbe zeigt, wofür er da ist:"
+      }
     },
     paths: {
       title: "Wann und wohin schauen",

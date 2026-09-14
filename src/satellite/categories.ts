@@ -1,5 +1,5 @@
 /**
- * The satellite taxonomy used for filtering and coloring markers.
+ * The satellite taxonomy the filter sorts by and the card names.
  *
  * `SATELLITE_CATEGORIES` is the single source of truth: the `SatelliteCategory`
  * union, the legend order and the "show all" default are all derived from it,
@@ -12,12 +12,13 @@
  * the entries were not alternatives to each other — Starlink *is*
  * communications, and a geostationary satellite almost always is too.
  *
- * Colour carries the purpose and nothing else. Whether an object is parked
- * over the equator is drawn as a shape instead (see `isParked`), because that
- * is a behaviour rather than a purpose, and because five is about the limit of
- * what colour alone can separate: searched numerically in OKLab, the best
- * achievable separation between marker colours falls from 0.24 at four to
- * 0.15 at six, and below roughly 0.15 two swatches start to be guessed at.
+ * It is not drawn on the sky. The marks used to be coloured by it, five colours
+ * in two ladders for night and day, and every mark is white now (`palette.ts`):
+ * white on a dark edge read better than any of the five at either end of the
+ * day, and what an object is for is one tap away on its card. Whether an object
+ * is parked over the equator *is* drawn, as a shape (see `isParked`), because
+ * that is a behaviour someone can see rather than a purpose they have to be
+ * told.
  */
 export const SATELLITE_CATEGORIES = [
   "LANDMARK",
@@ -35,61 +36,6 @@ export type SatelliteCategory = (typeof SATELLITE_CATEGORIES)[number];
  * a non-specialist can use, in twelve languages. The names in the union above
  * are keys and are never shown.
  */
-
-/**
- * Marker colours for a night sky, arranged as a descending lightness ladder:
- * white, gold, cyan, violet, slate.
- *
- * Two properties come out of that ordering. The palette still reads when the
- * hues collapse — every pair stays at least 0.116 apart in OKLab under
- * deuteranopia, protanopia and tritanopia alike, which is the best five
- * colours can do — and salience follows rarity rather than fighting it. The
- * two categories at the bottom are together 92% of the catalogue, so they are
- * the quietest things on a night sky; white, the loudest colour available
- * against it, is spent on the couple of dozen objects worth looking up for.
- *
- * None of them can be read against a *daylit* sky: at that end the ladder
- * contrasts between 1.2 and 6.6 to one, and the tier that matters most is the
- * worst of them — white on a bright sky is 1.2. That is a property of any
- * single set of fills rather than of these choices, since a bright sky needs a
- * dark mark and a dark sky needs a bright one, so there is a second set for the
- * other end of the day (`CATEGORY_COLORS_DAYLIGHT`) and a dark outline under
- * every mark in either.
- */
-export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
-  LANDMARK: "#fdfdfd",
-  NAVIGATION: "#ffcf5c",
-  EARTH: "#5fd0d4",
-  COMMS: "#7a71cc",
-  OTHER: "#48515c"
-};
-
-/**
- * The same five categories against a daylit sky: the ladder inverted, as ink
- * rather than as light.
- *
- * Same hues, so a category is recognisably itself at either end of the day, but
- * the ladder's two ends change places along with the reason for the ordering.
- * Salience on a bright sky is darkness rather than light, so the landmark tier
- * is near-black and reads at 15 to one against it, while the residual 92% is a
- * light slate at 3 to one and stays the quietest thing on the frame; the three
- * purposes in between clear 5 to one. The night ladder scores 1.2 to 6.6 there,
- * and the tier that matters most is its worst.
- *
- * Held to the same separation bar as the night set and searched numerically for
- * it: no two are closer than 0.169 in OKLab, or 0.123 under the three
- * dichromacies, against 0.185 and 0.116 for the night ladder. Read on a night
- * sky these are 1.0 to 5.2 to one — a near-black landmark on a night sky is
- * invisible, which is the mirror of white being invisible at noon, and why
- * which set is drawn is decided from the sun rather than left to a setting.
- */
-export const CATEGORY_COLORS_DAYLIGHT: Record<SatelliteCategory, string> = {
-  LANDMARK: "#121212",
-  NAVIGATION: "#745913",
-  EARTH: "#164547",
-  COMMS: "#4e1dbc",
-  OTHER: "#808790"
-};
 
 export function allCategories(): Set<SatelliteCategory> {
   return new Set(SATELLITE_CATEGORIES);

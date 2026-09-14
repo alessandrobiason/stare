@@ -1,5 +1,5 @@
-import { CATEGORY_COLORS } from "../satellite/categories";
 import { FrameSize } from "./markerGeometry";
+import { MARK_COLOR } from "./palette";
 
 /**
  * The sky the app opens on: five satellites turning around the middle of the
@@ -7,9 +7,9 @@ import { FrameSize } from "./markerGeometry";
  *
  * It is the logo rather than a decoration of it. `assets/icon.svg` is one
  * tapered trail with a body just ahead of it; this is that shape five times
- * over, on five orbits, in the five colours the overlay itself uses — one
- * satellite per category, so the palette a person will read against the real
- * sky is already in front of them while it loads.
+ * over, on five orbits, in the white every mark on the real sky is drawn in —
+ * so what a person is about to read against that sky is already in front of
+ * them while it loads. The icon alone keeps its gold, which is the app's own.
  *
  * The turning is the whole of the loading indicator. There is no spinner, no
  * progress bar and no step list, because none of them told anyone anything
@@ -80,8 +80,8 @@ type Orbit = {
  * The five orbits, inner to outer, drawn in that order so the largest body
  * passes in front rather than behind.
  *
- * Colour is `CATEGORY_COLORS` rather than a palette of its own: the gold arc
- * of the icon is the navigation colour, and the other four follow from it.
+ * All five in `MARK_COLOR`, the overlay's own white, rather than a palette of
+ * their own: the sky marks every satellite the same way, and so does this.
  */
 export const BOOT_ORBITS: readonly Orbit[] = [
   {
@@ -90,7 +90,7 @@ export const BOOT_ORBITS: readonly Orbit[] = [
     sweepDeg: 120,
     trailWidth: 14,
     bodyRadius: 28,
-    color: CATEGORY_COLORS.OTHER,
+    color: MARK_COLOR,
     periodSeconds: 5.5,
     direction: 1
   },
@@ -100,7 +100,7 @@ export const BOOT_ORBITS: readonly Orbit[] = [
     sweepDeg: 104,
     trailWidth: 17,
     bodyRadius: 36,
-    color: CATEGORY_COLORS.LANDMARK,
+    color: MARK_COLOR,
     periodSeconds: 8,
     direction: -1
   },
@@ -110,7 +110,7 @@ export const BOOT_ORBITS: readonly Orbit[] = [
     sweepDeg: 92,
     trailWidth: 24,
     bodyRadius: 50,
-    color: CATEGORY_COLORS.EARTH,
+    color: MARK_COLOR,
     periodSeconds: 10.5,
     direction: 1
   },
@@ -120,7 +120,7 @@ export const BOOT_ORBITS: readonly Orbit[] = [
     sweepDeg: 84,
     trailWidth: 19,
     bodyRadius: 42,
-    color: CATEGORY_COLORS.COMMS,
+    color: MARK_COLOR,
     periodSeconds: 14,
     direction: -1
   },
@@ -130,7 +130,7 @@ export const BOOT_ORBITS: readonly Orbit[] = [
     sweepDeg: 76,
     trailWidth: 34,
     bodyRadius: 72,
-    color: CATEGORY_COLORS.NAVIGATION,
+    color: MARK_COLOR,
     periodSeconds: 18.5,
     direction: 1
   }
@@ -301,7 +301,7 @@ function starsFor(scale: number, offsetX: number, offsetY: number): SkyStar[] {
   return stars;
 }
 
-/** The colour of a star, which is the sky's own light rather than a category. */
+/** The colour of a star, which is the sky's own light rather than a satellite's. */
 export const STAR_COLOR = "#dbe6f2";
 
 /**

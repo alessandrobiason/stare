@@ -1,30 +1,34 @@
 import { sunAltitudeDeg } from "../coordinates/sunAltitude";
 import { clamp } from "../math/angles";
-import {
-  CATEGORY_COLORS,
-  CATEGORY_COLORS_DAYLIGHT,
-  SatelliteCategory
-} from "../satellite/categories";
 import { ObserverLocation } from "../types";
 
 /**
  * What the overlay is drawn in, and which of the two sets that is right now.
  *
- * The markers sit on a photograph of the sky, and that photograph is either far
- * brighter or far darker than any fill can be — so one palette cannot serve
- * both. A night sky takes light marks in a dark outline; a daylit one takes
- * dark marks in a light outline, which is the same idea with the ink and the
- * paper the other way round. `CATEGORY_COLORS` and `CATEGORY_COLORS_DAYLIGHT`
- * are the two ladders, held to the same numeric separation bar; everything else
- * on the sky — the outline, the landmark halo, the names — flips with them.
+ * **Every mark is white on a near-black edge, day and night.** The markers sit
+ * on a photograph of the sky, and that photograph is either far brighter or far
+ * darker than any fill can be, so no one fill reads against both — but a fill
+ * and an edge can, as long as they are the two ends of the scale. At night the
+ * white is what is seen, and the edge is what keeps a mark legible over a
+ * street lamp or the moon; by day the edge is what is seen, a dark ring with a
+ * light centre, and it reads over cloud as well as over blue. So the mark
+ * itself does not change with the sun at all.
  *
- * The phone auto-exposes, which flattens the difference but does not remove it:
- * a daylit sky comes back near white however it is metered, and a night sky
- * runs the exposure into its ceiling and comes back dark and grainy. So the
- * choice is made from the sun rather than from a light meter, and from the sun
- * *here* rather than from a clock — 21:00 is broad daylight in Oslo in June and
- * the middle of the night in Oslo in December, and the app already knows where
- * it is standing to a few metres. See `sunAltitudeDeg`.
+ * The marks used to be coloured by what each satellite is for, in two ladders
+ * of five — light marks in a dark rim at night, dark marks in a light rim by
+ * day. White was clearer on the sky at both ends of the day than any of the
+ * five, and a mark that is the same object at noon and at midnight needs no
+ * key. What an object is for is still one tap away, on its card, and still
+ * what the filter sorts by.
+ *
+ * What does still turn over with the day is what is *around* a mark: how much
+ * light it gives off (`glow`), the landmark halo, and the names, which are text
+ * rather than marks and read best as dark ink on a bright sky. The phone
+ * auto-exposes, which flattens the difference between the two skies but does
+ * not remove it, so the choice is made from the sun rather than from a light
+ * meter, and from the sun *here* rather than from a clock — 21:00 is broad
+ * daylight in Oslo in June and the middle of the night in Oslo in December. See
+ * `sunAltitudeDeg`.
  *
  * Nothing here knows about Skia, a browser canvas or React, for the same reason
  * `markerScene` does not: what a marker looks like is decided in one place that
@@ -38,49 +42,64 @@ export type Ink = {
   alpha: number;
 };
 
+/** The fill every mark, tail, path and selection ring is drawn in. */
+export const MARK_COLOR = "#ffffff";
+
+/**
+ * The edge under every mark, tail, path and selection ring.
+ *
+ * Near-black rather than the night sky's own dark blue, which by day is close
+ * enough to a blue sky to lose most of what the edge is for. At night the two
+ * cannot be told apart.
+ */
+export const MARK_EDGE: Ink = { color: "#05070a", alpha: 0.9 };
+
 export type MarkerPalette = {
-  /** The mark's own colour, by what the satellite is for. */
-  categories: Record<SatelliteCategory, string>;
+  /** The mark's fill: `MARK_COLOR`, whatever the sky. */
+  mark: string;
   /**
-   * The rim under every mark and the tail behind it.
+   * The edge under every mark: `MARK_EDGE`, whatever the sky.
    *
-   * A shape under the colour rather than a border inside it, so the mark keeps
-   * its full width. Dark at night and light by day, because what it separates
-   * the mark from is whatever the camera happens to be pointed at: at night the
-   * bright things (a street lamp, the moon, a lit window), by day the dark ones
-   * (a roof line, a tree, a wall in shadow).
+   * A shape under the fill rather than a border inside it, so the mark keeps
+   * its full width.
    */
   outline: Ink;
   /** The glow that says this one is worth looking up for. Landmarks only. */
   halo: Ink;
   /**
-   * How much light a mark gives off, in `[0, 1]`: the glow around it and the
-   * lit centre of its point.
+   * How much light a mark gives off, in `[0, 1]`: the glow around it.
    *
    * All of it at night, where a satellite *is* a point of light and the marks
-   * are drawn as one. Only a trace by day, where the marks are ink on a bright
-   * sky: a glow in a dark colour is a smudge, and a lit centre in a dark point
-   * is a hole in it.
+   * are drawn as one. None by day, where what is read is a mark's dark edge
+   * and a white glow over a bright sky would only wash that edge out.
    */
   glow: number;
-  /** The landmark names, which are drawn as text and outlined by `outline`. */
+  /** The landmark names, which are drawn as text. */
   label: string;
+  /**
+   * The shadow under a name. Dark at night and light by day, the other way
+   * round from the name itself: text is not a mark, and on a bright sky the
+   * readable name is the dark one.
+   */
+  labelShadow: Ink;
 };
 
 export const NIGHT_PALETTE: MarkerPalette = {
-  categories: CATEGORY_COLORS,
-  outline: { color: "#030911", alpha: 0.85 },
+  mark: MARK_COLOR,
+  outline: MARK_EDGE,
   halo: { color: "#ffffff", alpha: 0.18 },
   glow: 1,
-  label: "#ffffff"
+  label: "#ffffff",
+  labelShadow: { color: "#030911", alpha: 0.85 }
 };
 
 export const DAYLIGHT_PALETTE: MarkerPalette = {
-  categories: CATEGORY_COLORS_DAYLIGHT,
-  outline: { color: "#f4f8fd", alpha: 0.9 },
+  mark: MARK_COLOR,
+  outline: MARK_EDGE,
   halo: { color: "#04121f", alpha: 0.2 },
-  glow: 0.3,
-  label: "#10161c"
+  glow: 0,
+  label: "#10161c",
+  labelShadow: { color: "#f4f8fd", alpha: 0.9 }
 };
 
 /**
@@ -90,16 +109,8 @@ export const DAYLIGHT_PALETTE: MarkerPalette = {
  * roughly the span in which a sky stops being one thing and becomes the other.
  * Two degrees wide, which is about thirteen minutes at 51°N and eight at the
  * equator: long enough that nothing snaps, short enough that the overlay does
- * not spend the whole of dusk in between.
- *
- * That last point is the reason the band is not the whole of twilight. The two
- * ladders run in opposite directions, so somewhere in the middle of any fade
- * the marks must pass each other, and while they do, two of the ten pairs come
- * closer than either palette allows — at worst the landmark tier and the
- * residual, both of which are near-neutral at the crossing and have no hue left
- * to tell them apart with. Nothing can remove that; only how long it lasts is a
- * choice. At two degrees it is about three minutes twice a day, and the tier it
- * affects is the one that also carries a halo and its own name.
+ * not spend the whole of dusk in between. What crosses over in it is the
+ * glow, the halo and the names; the marks themselves are the same throughout.
  */
 export const DAYLIGHT_BAND = {
   /** Below this altitude the night set is drawn unmixed. */
@@ -112,7 +123,7 @@ export const DAYLIGHT_BAND = {
  * How far through the fade a given sun altitude is, in `[0, 1]`.
  *
  * Smoothstepped rather than linear so the palette leaves and arrives without a
- * corner; a mark that changes colour at a constant rate and then stops is more
+ * corner; a name that changes colour at a constant rate and then stops is more
  * noticeable than one that eases.
  */
 export function daylightFraction(altitudeDeg: number): number {
@@ -126,11 +137,11 @@ export function daylightFraction(altitudeDeg: number): number {
 }
 
 /**
- * The two palettes mixed, in sRGB, which is the space they were checked in.
+ * The two palettes mixed, in sRGB.
  *
  * Returns one of the two ends outright when it lands on one, so the overwhelming
- * majority of the day is drawn in the exact colours that were searched for
- * rather than in a blend that rounds to them.
+ * majority of the day is drawn in exactly those rather than in a blend that
+ * rounds to them.
  */
 export function blendPalettes(fraction: number): MarkerPalette {
   if (fraction <= 0) return NIGHT_PALETTE;
@@ -138,21 +149,13 @@ export function blendPalettes(fraction: number): MarkerPalette {
 
   const night = NIGHT_PALETTE;
   const day = DAYLIGHT_PALETTE;
-  const categories = {} as Record<SatelliteCategory, string>;
-  for (const category of Object.keys(night.categories) as SatelliteCategory[]) {
-    categories[category] = mixColors(
-      night.categories[category],
-      day.categories[category],
-      fraction
-    );
-  }
-
   return {
-    categories,
-    outline: mixInk(night.outline, day.outline, fraction),
+    mark: MARK_COLOR,
+    outline: MARK_EDGE,
     halo: mixInk(night.halo, day.halo, fraction),
     glow: night.glow + (day.glow - night.glow) * fraction,
-    label: mixColors(night.label, day.label, fraction)
+    label: mixColors(night.label, day.label, fraction),
+    labelShadow: mixInk(night.labelShadow, day.labelShadow, fraction)
   };
 }
 
@@ -160,12 +163,10 @@ export function blendPalettes(fraction: number): MarkerPalette {
  * How far through the fade a place is at a given moment, quantised.
  *
  * The quantisation is not a rounding convenience. A palette is a set of colour
- * *strings*, the Skia backend caches one parsed colour per string, and an
- * unquantised fade would hand it a new set every time it was asked. Thirty-two
- * steps over a journey of about 0.5 in OKLab puts the largest step at 0.015,
- * which is under the 0.02 or so at which two swatches side by side begin to
- * look like different colours at all — and it means the fade has 32 states
- * rather than unboundedly many.
+ * *strings*, the Skia backend caches one parsed colour and one gradient per
+ * string, and an unquantised fade would hand it a new set every time it was
+ * asked. Thirty-two steps is too fine for any one of them to be seen — and it
+ * means the fade has 32 states rather than unboundedly many.
  */
 export function daylightFractionAt(observer: ObserverLocation, when: Date): number {
   const fraction = daylightFraction(sunAltitudeDeg(observer, when));

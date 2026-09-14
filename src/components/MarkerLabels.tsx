@@ -7,7 +7,7 @@ type Props = {
   labels: LabelPlacement[];
   /** Camera roll, so a name stays level with the horizon. */
   rollDeg: number;
-  /** Night or daylight: a name flips with the marks it belongs to. */
+  /** Night or daylight: a name is light text at night and dark ink by day. */
   palette: MarkerPalette;
 };
 
@@ -27,8 +27,9 @@ type Props = {
  */
 export const MarkerLabels: React.FC<Props> = ({ labels, rollDeg, palette }) => {
   // A photograph is not a background you can pick a text colour against, so the
-  // name carries the marks' own outline as a shadow and flips with them.
-  const shadowColor = cssColor(palette.outline);
+  // name carries a shadow the other way round from itself, and both flip with
+  // the day. See `MarkerPalette.labelShadow`.
+  const shadowColor = cssColor(palette.labelShadow);
   return (
     <>
       {labels.map((label) => (

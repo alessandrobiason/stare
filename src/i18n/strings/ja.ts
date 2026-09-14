@@ -23,8 +23,7 @@ export const ja: Strings = {
       landmark: {
         name: "注目の衛星",
         meaning: "宇宙ステーションや大型望遠鏡。名前と一緒に表示されます。"
-      },
-      colors: "色は用途を表します："
+      }
     },
     paths: {
       title: "いつ、どこを見るか",

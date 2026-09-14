@@ -4,10 +4,11 @@ import {
   DAYLIGHT_PALETTE,
   daylightFraction,
   daylightFractionAt,
+  MARK_COLOR,
+  MARK_EDGE,
   NIGHT_PALETTE,
   skyPalette
 } from "../src/components/palette";
-import { SATELLITE_CATEGORIES, SatelliteCategory } from "../src/satellite/categories";
 import { ObserverLocation } from "../src/types";
 
 const LONDON: ObserverLocation = { latitudeDeg: 51.5, longitudeDeg: -0.13, heightM: 0 };
@@ -20,40 +21,6 @@ function luminance(color: string): number {
     return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   });
   return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-}
-
-/**
- * OKLab, so the separation the two ladders were searched for is checked rather
- * than only asserted in a comment. Perceptually uniform, which is the whole
- * reason a distance in it means anything.
- */
-function oklab(color: string): [number, number, number] {
-  const [red, green, blue] = [1, 3, 5].map((index) => {
-    const value = Number.parseInt(color.slice(index, index + 2), 16) / 255;
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  const long = Math.cbrt(0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue);
-  const medium = Math.cbrt(0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue);
-  const short = Math.cbrt(0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue);
-  return [
-    0.2104542553 * long + 0.793617785 * medium - 0.0040720468 * short,
-    1.9779984951 * long - 2.428592205 * medium + 0.4505937099 * short,
-    0.0259040371 * long + 0.7827717662 * medium - 0.808675766 * short
-  ];
-}
-
-function closestPair(colors: Record<SatelliteCategory, string>): number {
-  let closest = Infinity;
-  for (const [index, first] of SATELLITE_CATEGORIES.entries()) {
-    for (const second of SATELLITE_CATEGORIES.slice(index + 1)) {
-      const [firstLab, secondLab] = [oklab(colors[first]), oklab(colors[second])];
-      closest = Math.min(
-        closest,
-        Math.hypot(...firstLab.map((value, axis) => value - secondLab[axis]))
-      );
-    }
-  }
-  return closest;
 }
 
 test("reads the sky from where the observer is, not from the clock", () => {
@@ -92,21 +59,22 @@ test("changes over twilight rather than at an instant", () => {
 test("blends the two sets while it does, and lands exactly on them", () => {
   const half = blendPalettes(0.5);
 
-  // The ends are the palettes themselves, not a blend that rounds to them, so
-  // the overwhelming majority of the day is drawn in the colours that were
-  // searched for.
+  // The ends are the palettes themselves, not a blend that rounds to them.
   expect(blendPalettes(0)).toBe(NIGHT_PALETTE);
   expect(blendPalettes(1)).toBe(DAYLIGHT_PALETTE);
 
-  for (const category of SATELLITE_CATEGORIES) {
-    const mixed = luminance(half.categories[category]);
-    const ends = [
-      luminance(NIGHT_PALETTE.categories[category]),
-      luminance(DAYLIGHT_PALETTE.categories[category])
-    ].sort((first, second) => first - second);
-    expect(mixed).toBeGreaterThan(ends[0]);
-    expect(mixed).toBeLessThan(ends[1]);
-  }
+  // What turns over is the light around a mark and the names; halfway through
+  // it, each is between its two ends.
+  const between = (value: number, one: number, other: number) =>
+    value > Math.min(one, other) && value < Math.max(one, other);
+  expect(between(half.glow, NIGHT_PALETTE.glow, DAYLIGHT_PALETTE.glow)).toBe(true);
+  expect(
+    between(
+      luminance(half.label),
+      luminance(NIGHT_PALETTE.label),
+      luminance(DAYLIGHT_PALETTE.label)
+    )
+  ).toBe(true);
 });
 
 test("quantises the fade, so it has a fixed number of states", () => {
@@ -124,35 +92,35 @@ test("quantises the fade, so it has a fixed number of states", () => {
   expect(steps.size).toBeGreaterThan(2);
 });
 
-test("puts the loudest mark and the quietest at opposite ends of each ladder", () => {
-  const night = SATELLITE_CATEGORIES.map((category) =>
-    luminance(NIGHT_PALETTE.categories[category])
-  );
-  const day = SATELLITE_CATEGORIES.map((category) =>
-    luminance(DAYLIGHT_PALETTE.categories[category])
-  );
-  const [landmark, ...rest] = SATELLITE_CATEGORIES;
-  expect(landmark).toBe("LANDMARK");
-  expect(rest[rest.length - 1]).toBe("OTHER");
+describe("the marks themselves", () => {
+  test("are white on a near-black edge at every point of the day", () => {
+    // Not two ladders any more: one mark, the same object at noon and midnight.
+    for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+      const palette = blendPalettes(fraction);
+      expect(palette.mark).toBe(MARK_COLOR);
+      expect(palette.outline).toEqual(MARK_EDGE);
+    }
+    expect(luminance(MARK_COLOR)).toBe(1);
+  });
 
-  // Against a night sky the landmark tier is the lightest thing drawn and the
-  // residual the darkest; against a daylit one both swap, because what is loud
-  // on a bright background is ink rather than light.
-  expect(Math.max(...night)).toBe(night[0]);
-  expect(Math.min(...night)).toBe(night[night.length - 1]);
-  expect(Math.min(...day)).toBe(day[0]);
-  expect(Math.max(...day)).toBe(day[day.length - 1]);
+  test("put the whole scale between the fill and its edge", () => {
+    // What makes one mark legible on both skies: whichever of the two a sky is
+    // close to, the other is far from it.
+    expect(luminance(MARK_EDGE.color)).toBeLessThan(0.005);
+    expect(MARK_EDGE.alpha).toBeGreaterThan(0.8);
+  });
 
-  // The rim inverts with them: darker than every mark at night, lighter than
-  // every mark by day.
-  expect(luminance(NIGHT_PALETTE.outline.color)).toBeLessThan(Math.min(...night));
-  expect(luminance(DAYLIGHT_PALETTE.outline.color)).toBeGreaterThan(Math.max(...day));
-});
+  test("glow at night and not by day, where a glow would wash out the edge", () => {
+    expect(NIGHT_PALETTE.glow).toBe(1);
+    expect(DAYLIGHT_PALETTE.glow).toBe(0);
+  });
 
-test("keeps the five categories apart in both sets", () => {
-  // Five is about the limit of what colour alone can separate, and both ladders
-  // were searched numerically against it. Below roughly 0.15 in OKLab two
-  // swatches start to be guessed at rather than read.
-  expect(closestPair(NIGHT_PALETTE.categories)).toBeGreaterThan(0.15);
-  expect(closestPair(DAYLIGHT_PALETTE.categories)).toBeGreaterThan(0.15);
+  test("leave the names to flip: light on dark at night, dark on light by day", () => {
+    expect(luminance(NIGHT_PALETTE.label)).toBeGreaterThan(
+      luminance(NIGHT_PALETTE.labelShadow.color)
+    );
+    expect(luminance(DAYLIGHT_PALETTE.label)).toBeLessThan(
+      luminance(DAYLIGHT_PALETTE.labelShadow.color)
+    );
+  });
 });

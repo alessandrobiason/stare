@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
 import { compassMarks, nearestPoint } from "../src/components/HorizonCompass";
-import { NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SkyHeader } from "../src/components/SkyHeader";
 import { TabBar } from "../src/components/TabBar";
@@ -37,7 +36,6 @@ function legend(enabled = allCategories(), starlink = true, open = true) {
       starlink={starlink}
       onToggleStarlink={() => undefined}
       onEnableAll={() => undefined}
-      palette={NIGHT_PALETTE}
     />
   );
 }
@@ -505,8 +503,7 @@ describe("the tapped satellite's card", () => {
         onClose={() => undefined}
         describeRef={describeRef}
         pass={pass}
-        palette={NIGHT_PALETTE}
-      />
+        />
     );
   }
 

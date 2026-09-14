@@ -2,10 +2,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MarkerLabels } from "../src/components/MarkerLabels";
 import { buildMarkerScene, GlyphShape, TAIL_FADE } from "../src/components/markerScene";
-import { DAYLIGHT_PALETTE, NIGHT_PALETTE } from "../src/components/palette";
+import { DAYLIGHT_PALETTE, MARK_COLOR, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
-import { CATEGORY_COLORS } from "../src/satellite/categories";
 import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../src/constants";
 
 const FRAME = { width: 720, height: 1280 };
@@ -52,16 +51,25 @@ test("draws nothing before the frame has been laid out", () => {
   ).toBe("");
 });
 
-test("colours a marker by its category and nothing else", () => {
+test("draws every marker white, whatever it is for", () => {
   const { glyphs } = scene([
     marker({ category: "NAVIGATION" }),
-    marker({ name: "OTHER SAT", category: "EARTH", rangeKm: 39000 })
+    marker({ name: "OTHER SAT", category: "EARTH", rangeKm: 39000 }),
+    marker({ name: "ISS", category: "LANDMARK" }),
+    marker({ name: "JUNK", category: "OTHER", parked: true, next: null })
   ]);
 
-  expect(glyphs.map((glyph) => glyph.color)).toEqual([
-    CATEGORY_COLORS.NAVIGATION,
-    CATEGORY_COLORS.EARTH
-  ]);
+  expect(new Set(glyphs.map((glyph) => glyph.color))).toEqual(new Set([MARK_COLOR]));
+});
+
+test("draws the same white mark on the same dark edge by day as by night", () => {
+  const frame: MarkerFrame = { markers: [marker()], paths: [], rollDeg: 0 };
+  const night = buildMarkerScene(frame, FRAME, NIGHT_PALETTE);
+  const day = buildMarkerScene(frame, FRAME, DAYLIGHT_PALETTE);
+
+  expect(day.glyphs[0].color).toBe(night.glyphs[0].color);
+  expect(day.palette.outline).toEqual(MARK_EDGE);
+  expect(night.palette.outline).toEqual(MARK_EDGE);
 });
 
 test("draws a parked satellite as a ring and gives it no tail", () => {
@@ -84,8 +92,8 @@ test("sizes the marker by distance, not by category", () => {
 });
 
 test("outlines every marker so it survives a bright sky", () => {
-  // No fill in either palette clears 2:1 against both ends of the day, so the
-  // rim is what is actually being read at one of them.
+  // White cannot be read against a bright sky, so by day the dark edge is what
+  // is actually being read.
   for (const category of ["LANDMARK", "COMMS", "OTHER"] as const) {
     const { glyphs } = scene([marker({ category, next: null })]);
     // The rim is a larger shape under the mark, so the colour keeps its full
@@ -119,8 +127,18 @@ describe("a satellite with no sun on it", () => {
     expect(dark.alpha).toBeGreaterThan(0.2);
   });
 
+  test("keeps its edge whole, so by day it is still plainly a mark", () => {
+    // The white fades; the dark edge, which is what a mark is read by on a
+    // bright sky, does not. Terrain still fades both.
+    const dark = scene([marker({ sunlit: "eclipsed" })]).glyphs[0];
+    const hidden = scene([marker({ sunlit: "eclipsed", opacity: 0.4 })]).glyphs[0];
+
+    expect(dark.edgeAlpha).toBe(1);
+    expect(hidden.edgeAlpha).toBeCloseTo(0.4, 6);
+  });
+
   test("keeps every channel it was already spending", () => {
-    // Colour, shape, size and heading are all still true of an object nobody
+    // Edge, shape, size and heading are all still true of an object nobody
     // can see, and all four are how it is found again when it comes back into
     // the sunlight. Only the opacity, which nothing else uses at rest, moves.
     const lit = scene([marker({ sunlit: "sunlit" })]).glyphs[0];
@@ -260,29 +278,31 @@ describe("a moving mark", () => {
     expect(glyph.glow.alpha).toBeLessThan(1);
   });
 
-  test("has a lit centre in its own colour, inside the point", () => {
-    const [glyph] = scene([marker({ category: "COMMS", next: null })]).glyphs;
-
-    expect(glyph.spark).not.toBeNull();
-    expect(glyph.spark!.radius).toBeLessThan(glyph.core.radius);
-    // Lighter than the category colour in every channel, and not white: the
-    // hue is what says what the object is for.
-    const channels = (color: string) =>
-      [1, 3, 5].map((index) => Number.parseInt(color.slice(index, index + 2), 16));
-    const lit = channels(glyph.spark!.color);
-    channels(CATEGORY_COLORS.COMMS).forEach((channel, index) => {
-      expect(lit[index]).toBeGreaterThanOrEqual(channel);
-    });
-    expect(glyph.spark!.color).not.toBe("#ffffff");
+  test("has an edge thick enough to read as a ring on a bright sky", () => {
+    // By day the edge is most of what is seen of a white mark, and a single
+    // pixel of it is a grey smudge rather than a ring.
+    for (const rangeKm of [400, 40000]) {
+      const small = { width: 360, height: 640 };
+      const [glyph] = scene([marker({ rangeKm, next: null })], 0, small).glyphs;
+      expect(glyph.rim.radius - glyph.core.radius).toBeGreaterThanOrEqual(1.25);
+    }
   });
 
-  test("gives off hardly any light by day, where the marks are ink", () => {
+  test("edges its tail as well, a little wider on every side", () => {
+    // A white tail on a bright sky is otherwise invisible, and it is the one
+    // part of a mark that says which way the object is going.
+    const [glyph] = scene([marker()]).glyphs;
+    expect(glyph.tail!.rim).toBeGreaterThan(0);
+    expect(glyph.tail!.rim).toBeCloseTo(glyph.rim.radius - glyph.core.radius, 6);
+  });
+
+  test("gives off no light by day, where a glow would wash out its edge", () => {
     const frame: MarkerFrame = { markers: [marker()], paths: [], rollDeg: 0 };
     const night = buildMarkerScene(frame, FRAME, NIGHT_PALETTE).glyphs[0];
     const day = buildMarkerScene(frame, FRAME, DAYLIGHT_PALETTE).glyphs[0];
 
-    expect(day.glow.alpha).toBeLessThan(night.glow.alpha / 2);
-    expect(day.spark!.alpha).toBeLessThan(night.spark!.alpha / 2);
+    expect(night.glow.alpha).toBeGreaterThan(0);
+    expect(day.glow.alpha).toBe(0);
     // The point, its size and its tail are the same mark either way.
     expect(day.core).toEqual(night.core);
     expect(day.tail).toEqual(night.tail);
@@ -299,12 +319,11 @@ describe("depth", () => {
     expect(near.glow.alpha).toBeGreaterThan(far.glow.alpha);
     expect(near.tail!.alpha).toBeGreaterThan(far.tail!.alpha);
     expect(near.tail!.width).toBeGreaterThan(far.tail!.width);
-    expect(near.spark!.alpha).toBeGreaterThan(far.spark!.alpha);
   });
 
   test("is restrained: the far end of the scale is still plainly drawn", () => {
-    // Two decades out is half strength, not gone — and the point itself, which
-    // carries the colour, is drawn solid at any range.
+    // Two decades out is half strength, not gone — and the point itself is
+    // drawn solid at any range.
     const near = scene([marker({ rangeKm: 400 })]).glyphs[0];
     const far = scene([marker({ rangeKm: 40000 })]).glyphs[0];
 
@@ -503,10 +522,10 @@ describe("a landmark's path across the sky", () => {
     };
   }
 
-  test("draws it as thin rimmed dashes in the landmark colour", () => {
+  test("draws it as thin dashes, white on the marks' dark edge", () => {
     const [shape] = scene([], 0, FRAME, [path()]).paths;
 
-    expect(shape.color).toBe(CATEGORY_COLORS.LANDMARK);
+    expect(shape.color).toBe(MARK_COLOR);
     // Thinner than the marks it runs between, and rimmed like all of them: a
     // path is two thousand pixels long and must not be the loudest thing on a
     // photograph of the sky.

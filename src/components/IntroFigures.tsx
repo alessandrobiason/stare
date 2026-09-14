@@ -11,8 +11,7 @@ import {
   SAMPLE_NOW_MS,
   SAMPLE_PASSES
 } from "../onboarding/introFigures";
-import type { IntroSwatch } from "../onboarding/introPages";
-import { cssColor, NIGHT_PALETTE } from "./palette";
+import { NIGHT_PALETTE } from "./palette";
 import { SatelliteMarkers } from "./SatelliteMarkers";
 import { theme } from "./theme";
 import { PassesPanel } from "./UpcomingPasses";
@@ -64,31 +63,6 @@ export const MarkTile: React.FC<{ sample: MarkSample }> = ({ sample }) => {
     </View>
   );
 };
-
-/**
- * The five colours, each on a chip of sky with the filter's name for it.
- *
- * Swatches rather than marks, as the filter draws them: this is the key to the
- * colour alone, and the shapes are the rows above it.
- */
-export const ColorKey: React.FC<{ swatches: readonly IntroSwatch[] }> = ({ swatches }) => (
-  <View style={styles.swatches}>
-    {swatches.map((swatch) => (
-      <View key={swatch.category} style={styles.swatch}>
-        <View
-          style={[
-            styles.swatchDot,
-            {
-              backgroundColor: NIGHT_PALETTE.categories[swatch.category],
-              borderColor: cssColor(NIGHT_PALETTE.outline)
-            }
-          ]}
-        />
-        <Text style={styles.swatchName}>{swatch.name}</Text>
-      </View>
-    ))}
-  </View>
-);
 
 /** A number on a picture, and the same number beside what it means. */
 export const Callout: React.FC<{ number: number; style?: StyleProp<ViewStyle> }> = ({
@@ -239,34 +213,6 @@ const styles = StyleSheet.create({
   passesCallout: {
     marginLeft: 8,
     marginTop: 5
-  },
-  swatches: {
-    marginTop: 6,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
-  },
-  swatch: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 7,
-    borderRadius: 10,
-    backgroundColor: FIGURE_SKY
-  },
-  // The filter's own swatch, a point smaller: see `CategoryLegend`.
-  swatchDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    borderWidth: 1.5,
-    marginRight: 5
-  },
-  swatchName: {
-    color: theme.color.text,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.4
   },
   callout: {
     width: CALLOUT_SIZE,

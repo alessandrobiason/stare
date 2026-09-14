@@ -1,7 +1,6 @@
 import { strings } from "../i18n";
 import type { IntroAccessStrings, IntroElementStrings, IntroKeyStrings } from "../i18n/types";
 import type { IconName } from "../components/Icon";
-import { SATELLITE_CATEGORIES, SatelliteCategory } from "../satellite/categories";
 import type { MarkSample } from "./introFigures";
 
 /**
@@ -88,9 +87,6 @@ export type IntroElement = IntroElementStrings & {
 /** One kind of mark, beside a drawing of it. */
 export type IntroMark = IntroKeyStrings & { sample: MarkSample };
 
-/** One colour on the key: the category, and the name the filter gives it. */
-export type IntroSwatch = { category: SatelliteCategory; name: string };
-
 export type IntroPage = {
   /** Shown as the card's title. The first page has none — see `wordmark`. */
   title?: string;
@@ -110,8 +106,6 @@ export type IntroPage = {
   guide?: boolean;
   /** The marks page: each kind of mark, drawn as the sky draws it. */
   marks?: readonly IntroMark[];
-  /** And under them, what the colours are for, in the filter's own words. */
-  colors?: { label: string; swatches: readonly IntroSwatch[] };
   /** A landmark's line across the sky, and what its numbered callouts say, in order. */
   path?: { callouts: readonly string[] };
   /** The upcoming-passes panel shut and then open, and what each callout says. */
@@ -152,16 +146,7 @@ export function introPages(mode: IntroMode = "intro"): readonly IntroPage[] {
         { sample: "parked", ...intro.marks.parked },
         { sample: "shadow", ...intro.marks.shadow },
         { sample: "landmark", ...intro.marks.landmark }
-      ],
-      colors: {
-        label: intro.marks.colors,
-        // The filter's names, so the key here and the key in the corner are the
-        // same five words.
-        swatches: SATELLITE_CATEGORIES.map((category) => ({
-          category,
-          name: t.filter.categories[category]
-        }))
-      }
+      ]
     },
     {
       title: intro.paths.title,

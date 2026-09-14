@@ -23,8 +23,7 @@ export const ar: Strings = {
       landmark: {
         name: "الأشهر",
         meaning: "المحطات الفضائية والتلسكوبات الكبيرة، مع أسمائها."
-      },
-      colors: "اللون يدل على وظيفته:"
+      }
     },
     paths: {
       title: "أين ومتى تنظر",

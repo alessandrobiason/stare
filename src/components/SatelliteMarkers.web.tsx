@@ -100,8 +100,8 @@ function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
   context.lineCap = "round";
   // Under the marks, and first: a path is what the marks are read against.
   for (const path of scene.paths) drawPath(context, path, scene.palette);
-  // Every rim before any mark's light, as on the phone: the station is several
-  // marks in one place, and each rim over the glow beneath it cut a dark ring.
+  // Every edge before any mark's light, as on the phone: the station is several
+  // marks in one place, and each edge over the glow beneath it cut a dark ring.
   for (const glyph of scene.glyphs) drawRim(context, glyph, scene.palette);
   for (const glyph of scene.glyphs) drawGlyph(context, glyph, scene.palette);
   // Over every mark, including the ones in front of the selected satellite: a
@@ -162,12 +162,12 @@ function drawSelection(context: CanvasRenderingContext2D, ring: SelectionRing): 
 }
 
 /**
- * One satellite, over the rims: its halo if it is a landmark, its glow, its
- * tail, its point and the lit centre of it.
+ * One satellite, over the edges: its halo if it is a landmark, its glow, its
+ * tail and its point.
  *
  * Drawn a marker at a time rather than a layer at a time, so the sort by range
  * holds — a nearer object's whole shape passes in front of a farther one's. The
- * rims are already down (`drawRim`), so no dark ring is left cutting between a
+ * edges are already down (`drawRim`), so no dark ring is left cutting between a
  * point and its own tail, or through the light around it.
  */
 function drawGlyph(
@@ -205,22 +205,24 @@ function drawGlyph(
     glow(glyph.halo, palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
   glow(glyph.glow.radius, glyph.color, glyph.glow.alpha * glyph.alpha);
-  if (glyph.tail) drawTail(context, glyph, glyph.tail);
-  circle(glyph.core, glyph.color, glyph.alpha);
-  if (glyph.spark) {
-    const { spark } = glyph;
-    circle({ radius: spark.radius, width: null }, spark.color, spark.alpha * glyph.alpha);
+  if (glyph.tail) {
+    drawTail(context, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
   }
+  circle(glyph.core, glyph.color, glyph.alpha);
 }
 
-/** The contrasting rim under a mark: a disc, or a band under a ring. */
+/** The dark edge under a mark and under its tail: a disc, or a band under a ring. */
 function drawRim(
   context: CanvasRenderingContext2D,
   glyph: GlyphShape,
   palette: MarkerPalette
 ): void {
+  const ink = palette.outline;
+  if (glyph.tail) {
+    drawTail(context, glyph, glyph.tail, ink.color, ink.alpha * glyph.edgeAlpha, glyph.tail.rim);
+  }
   const { rim } = glyph;
-  context.globalAlpha = palette.outline.alpha * glyph.alpha;
+  context.globalAlpha = ink.alpha * glyph.edgeAlpha;
   context.beginPath();
   context.arc(glyph.x, glyph.y, Math.max(0, rim.radius), 0, TWO_PI);
   if (rim.width === null) {
@@ -233,16 +235,37 @@ function drawRim(
   }
 }
 
-/** The comet's tail: the taper, faded from the point to its tip. */
-function drawTail(context: CanvasRenderingContext2D, glyph: GlyphShape, tail: TailShape): void {
-  const [tipX, tipY] = tail.points;
+/**
+ * The comet's tail, faded from the point to its tip: in white, or — `outset`
+ * wider on every side — in the edge's ink under it.
+ */
+function drawTail(
+  context: CanvasRenderingContext2D,
+  glyph: GlyphShape,
+  tail: TailShape,
+  color: string,
+  alpha: number,
+  outset: number
+): void {
+  if (!(alpha > 0)) return;
+  const alongX = Math.cos(tail.angle);
+  const alongY = Math.sin(tail.angle);
+  const length = tail.length + outset;
+  const half = tail.width / 2 + outset;
+  const tipX = glyph.x + alongX * length;
+  const tipY = glyph.y + alongY * length;
+
   const fade = context.createLinearGradient(glyph.x, glyph.y, tipX, tipY);
   for (const stop of TAIL_FADE) {
-    fade.addColorStop(stop.at, cssColor({ color: glyph.color, alpha: stop.strength }));
+    fade.addColorStop(stop.at, cssColor({ color, alpha: stop.strength }));
   }
-  trace(context, [tail.points]);
+  const acrossX = -alongY * half;
+  const acrossY = alongX * half;
+  const [leftX, leftY] = [glyph.x + acrossX, glyph.y + acrossY];
+  const [rightX, rightY] = [glyph.x - acrossX, glyph.y - acrossY];
+  trace(context, [[tipX, tipY, leftX, leftY, rightX, rightY]]);
   context.closePath();
-  context.globalAlpha = tail.alpha * glyph.alpha;
+  context.globalAlpha = alpha;
   context.fillStyle = fade;
   context.fill();
 }

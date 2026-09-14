@@ -23,8 +23,7 @@ export const zh: Strings = {
       landmark: {
         name: "著名航天器",
         meaning: "空间站和大型太空望远镜，会显示名字。"
-      },
-      colors: "颜色表示用途："
+      }
     },
     paths: {
       title: "何时、往哪看",

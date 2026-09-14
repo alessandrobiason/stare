@@ -110,14 +110,18 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
       const line = Skia.Path.Make();
       // Under the marks, and first: a path is what the marks are read against.
       for (const path of scene.paths) drawPath(canvas, paint, line, path, scene.palette);
-      // Every rim before any mark's light. Crew and cargo vehicles sit on the
+      // Every edge before any mark's light. Crew and cargo vehicles sit on the
       // station they are docked to, so the station is several marks in one
-      // place, and each rim laid over the glow of the marks under it cut a dark
-      // ring through the brightest thing on the frame. A rim is a pixel wide;
-      // what it separates a point from is the sky, not the marks behind it.
+      // place, and each edge laid over the glow of the marks under it cut a
+      // dark ring through the brightest thing on the frame. An edge is a pixel
+      // or so wide; what it separates a mark from is the sky, not the marks
+      // behind it.
       const ink = scene.palette.outline;
       for (const glyph of scene.glyphs) {
-        circle(canvas, paint, glyph, glyph.rim, ink.color, ink.alpha * glyph.alpha);
+        const { tail } = glyph;
+        const edge = ink.alpha * glyph.edgeAlpha;
+        if (tail) drawTail(canvas, paint, glyph, tail, ink.color, edge, tail.rim);
+        circle(canvas, paint, glyph, glyph.rim, ink.color, edge);
       }
       for (const glyph of scene.glyphs) drawGlyph(canvas, paint, glyph, scene.palette);
       // Over every mark, including the ones in front of the selected satellite:
@@ -129,18 +133,18 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
 }
 
 /**
- * One satellite, over the rims: its halo if it is a landmark, its glow, its
- * tail, its point and the lit centre of it.
+ * One satellite, over the edges: its halo if it is a landmark, its glow, its
+ * tail and its point.
  *
  * Drawn a marker at a time rather than a layer at a time, so the sort by range
  * holds — a nearer object's whole shape passes in front of a farther one's. The
- * rims have all gone down already (`record`), so the tail and the point are laid
- * over their own rim and no dark ring is left cutting between a point and its
- * own tail, or through the light around it.
+ * edges have all gone down already (`record`), so the tail and the point are
+ * laid over their own edge and no dark ring is left cutting between a point and
+ * its own tail, or through the light around it.
  *
- * The rim is a larger shape *under* the mark rather than a border inside it, so
- * the colour keeps the full diameter — at the few pixels a point is drawn at, a
- * border would leave hardly any colour to see.
+ * The edge is a larger shape *under* the mark rather than a border inside it, so
+ * the white keeps the full diameter — at the few pixels a point is drawn at, a
+ * border would leave hardly any of it to see.
  */
 function drawGlyph(
   canvas: SkCanvas,
@@ -152,12 +156,10 @@ function drawGlyph(
     glow(canvas, paint, glyph, glyph.halo, palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
   glow(canvas, paint, glyph, glyph.glow.radius, glyph.color, glyph.glow.alpha * glyph.alpha);
-  if (glyph.tail) drawTail(canvas, paint, glyph, glyph.tail);
-  circle(canvas, paint, glyph, glyph.core, glyph.color, glyph.alpha);
-  if (glyph.spark) {
-    fill(paint, glyph.spark.color, glyph.spark.alpha * glyph.alpha);
-    canvas.drawCircle(glyph.x, glyph.y, glyph.spark.radius, paint);
+  if (glyph.tail) {
+    drawTail(canvas, paint, glyph, glyph.tail, glyph.color, glyph.tail.alpha * glyph.alpha, 0);
   }
+  circle(canvas, paint, glyph, glyph.core, glyph.color, glyph.alpha);
 }
 
 /**
@@ -190,21 +192,31 @@ function glow(
 }
 
 /**
- * The comet's tail: the taper, faded from the point to its tip.
+ * The comet's tail, faded from the point to its tip: in white, or — `outset`
+ * wider on every side — in the edge's ink under it.
  *
  * Placed the way a glow is — one triangle and one gradient, both a unit long,
  * and the canvas turned and stretched onto the tail — for the same reason. The
  * stretch is not uniform, which a stroke would show and a fill does not: the
  * triangle is filled after it is transformed, so its edges are as sharp as any.
  */
-function drawTail(canvas: SkCanvas, paint: SkPaint, glyph: GlyphShape, tail: TailShape): void {
+function drawTail(
+  canvas: SkCanvas,
+  paint: SkPaint,
+  glyph: GlyphShape,
+  tail: TailShape,
+  color: string,
+  alpha: number,
+  outset: number
+): void {
+  if (!(alpha > 0)) return;
   paint.setStyle(PaintStyle.Fill);
-  paint.setShader(fadeShader("tail", glyph.color));
-  paint.setAlphaf(tail.alpha * glyph.alpha);
+  paint.setShader(fadeShader("tail", color));
+  paint.setAlphaf(alpha);
   canvas.save();
   canvas.translate(glyph.x, glyph.y);
   canvas.rotate((tail.angle * 180) / Math.PI, 0, 0);
-  canvas.scale(tail.length, tail.width / 2);
+  canvas.scale(tail.length + outset, tail.width / 2 + outset);
   canvas.drawPath(unitTail(), paint);
   canvas.restore();
   paint.setShader(null);
@@ -304,10 +316,10 @@ function stroke(paint: SkPaint, color: string, alpha: number, width: number): vo
 /**
  * `#rrggbb` as Skia wants it, parsed once per colour rather than per marker.
  *
- * A palette is seven colours — five categories, the rim and the halo — and their
- * lit centres, against several hundred draws a frame, and the fade between the
- * day and night sets has a fixed number of steps (`daylightFractionAt`), so this
- * cannot grow without bound over a long session.
+ * A palette is a handful of colours — the white, the edge, the halo — against
+ * several hundred draws a frame, and the fade between the day and night sets has
+ * a fixed number of steps (`daylightFractionAt`), so this cannot grow without
+ * bound over a long session.
  */
 const colors = new Map<string, SkColor>();
 function parsed(color: string): SkColor {

@@ -182,21 +182,6 @@ const CATEGORY_LABELS = {
   OTHER: "OTHER"
 };
 const CATEGORY_ORDER = ["LANDMARK", "NAVIGATION", "EARTH", "COMMS", "OTHER"];
-const NIGHT_COLORS = {
-  LANDMARK: "#fdfdfd",
-  NAVIGATION: "#ffcf5c",
-  EARTH: "#5fd0d4",
-  COMMS: "#7a71cc",
-  OTHER: "#48515c"
-};
-const DAYLIGHT_COLORS = {
-  LANDMARK: "#121212",
-  NAVIGATION: "#745913",
-  EARTH: "#164547",
-  COMMS: "#4e1dbc",
-  OTHER: "#808790"
-};
-const OUTLINE = { night: "rgba(3, 9, 17, 0.85)", daylight: "rgba(244, 248, 253, 0.9)" };
 
 /**
  * The glyphs the control layer wears, as SVG.
@@ -318,14 +303,11 @@ function headerPanel(scene) {
 /** The category filter, hanging from the button in the header. */
 function filterPanel(scene) {
   if (scene.panels.filter !== "open") return "";
-  const colors = scene.palette === "daylight" ? DAYLIGHT_COLORS : NIGHT_COLORS;
-  const outline = OUTLINE[scene.palette] ?? OUTLINE.night;
-
+  // No swatch on a row: every mark is white whatever it is for (`CategoryLegend`).
   return `<div class="filter">
       <div class="filter-head"><span class="panel-title">FILTER</span></div>
       ${CATEGORY_ORDER.map(
         (category) => `<div class="row">
-        <span class="swatch" style="background:${colors[category]};border-color:${outline}"></span>
         <span class="name">${CATEGORY_LABELS[category]}</span>
         <span class="toggle on"><span class="knob"></span></span>
       </div>`
@@ -379,8 +361,6 @@ function bottomCard(scene) {
 
 function satelliteCard(scene) {
   const card = scene.card;
-  const colors = scene.palette === "daylight" ? DAYLIGHT_COLORS : NIGHT_COLORS;
-  const outline = OUTLINE[scene.palette] ?? OUTLINE.night;
   const strip =
     card.names.length > 1
       ? `<div class="strip">${card.names
@@ -395,9 +375,7 @@ function satelliteCard(scene) {
       <div class="grip"><span></span></div>
       ${strip}
       <div class="head">
-        <span class="badge" style="border-color:${colors[card.category]}">
-          <span class="mark" style="background:${colors[card.category]};border-color:${outline}"></span>
-        </span>
+        <span class="badge"><span class="mark${card.parked ? " ring" : ""}"></span></span>
         <div class="heading">
           <div class="name">${escape(card.selected)}</div>
           <div class="purpose-label">${escape(card.purpose)}</div>
@@ -603,7 +581,7 @@ async function render() {
   );
 
   const labels = document.getElementById("labels");
-  const shadow = SCENE.palette === "daylight" ? "rgba(244, 248, 253, 0.9)" : "rgba(3, 9, 17, 0.85)";
+  const shadow = scene.palette.labelShadow;
   for (const label of scene.labels) {
     const span = document.createElement("span");
     span.textContent = label.name;

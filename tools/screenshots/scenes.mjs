@@ -375,8 +375,8 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 196,
     caption: {
-      title: "Colour is what it is for",
-      body: "Size is how far away. A ring holds station over the equator. Day or night, the sky decides the ink."
+      title: "Clear by day and by night",
+      body: "White on a dark edge, readable against a bright sky or a dark one. Size is how far away; a ring holds station over the equator."
     },
     sky: {
       mode: "day",
@@ -391,8 +391,8 @@ const scenes = [
     },
     palette: "daylight",
     panels: { filter: "open", status: "closed" },
-    // The daylight ink runs the other way round, and the path runs with it: on
-    // a bright sky the landmark tier is near-black, line and all.
+    // The same white marks as at night, read by their dark edges against a
+    // bright sky — line and all.
     paths: [pathAhead(TIANGONG_BY_DAY, { runPct: 80 })],
     markers: [
       ...geostationaryBelt({ top: 62, from: 5, to: 60, count: 5, seed: 13 }),

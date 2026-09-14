@@ -36,10 +36,10 @@ import { Ink, MarkerPalette } from "./palette";
  * a body with a tapered trail sweeping back from it (`assets/icon.svg`), and
  * the marks kept that shape — but drawn as it was, an opaque disc a couple of
  * dozen pixels across in a solid tail, seventy of them covered the picture they
- * were marking. So the solid part is now a point about half of that, with a
- * lit centre, in a glow of its own colour that fades to nothing; and the tail
- * is the same taper, faded from the point to its tip. What a satellite looks
- * like in the sky is a point of light moving, and that is what is drawn.
+ * were marking. So the solid part is now a point about half of that, white on a
+ * near-black edge, in a glow that fades to nothing; and the tail is the same
+ * taper, faded from the point to its tip. What a satellite looks like in the
+ * sky is a point of light moving, and that is what is drawn.
  *
  * The tail is the ground the object has just covered: it tapers from nothing
  * into the point, so the shape has only one head and the eye finds it without
@@ -52,10 +52,15 @@ import { Ink, MarkerPalette } from "./palette";
  * weaker (`depthStrength`). Restrained on purpose: both are read off the same
  * logarithmic range scale as the size, and the far end is still plainly drawn.
  *
- * The channels are otherwise unchanged, because they are what the overlay is
- * for:
+ * **Every mark is white.** They were coloured by what each satellite is for,
+ * five colours in two ladders, one for a night sky and one for a daylit one.
+ * White on a dark edge reads better than any of the five at both ends of the
+ * day, and a mark that looks the same at noon as at midnight needs no key; what
+ * an object is for is on its card, and is what the filter sorts by. See
+ * `palette.ts`.
  *
- * - **Colour** is what the satellite is for, and nothing else.
+ * The channels the overlay does spend are:
+ *
  * - **Shape** is whether it holds station. A geostationary object is a ring
  *   that never moves; everything else is a body with a tail as long as the
  *   distance it covers in a few seconds.
@@ -66,14 +71,17 @@ import { Ink, MarkerPalette } from "./palette";
  * And one that is new, and is not about where the object is at all: **how
  * strongly the mark is drawn** says whether the sun is on it. An object in the
  * Earth's shadow has nothing to reflect and cannot be seen however clear the
- * sky is, so it is drawn at half strength — see `sunlightAlpha`.
+ * sky is, so its white is drawn at half strength — see `sunlightAlpha`. Its
+ * edge is not faded with it, so by day, when the edge is most of what is seen,
+ * a mark in shadow is a dark ring round a grey centre rather than a mark half
+ * gone.
  *
- * Every point sits on a contrasting rim a pixel wide, because the background is
- * a photograph of the sky and so is either much brighter or much darker than
- * any fill — a street lamp or the moon behind a glowing point swallows it
- * otherwise. Which way round that runs — light marks in a dark rim, or dark
- * marks in a light one — is the palette's business rather than this module's;
- * see `palette.ts`. So is how much a mark glows at all, which by day is hardly.
+ * Every mark, tail included, sits on a near-black edge a pixel or so wide,
+ * because the background is a photograph of the sky and so is either much
+ * brighter or much darker than any fill. At night the white is what reads and
+ * the edge is what keeps it legible over a street lamp or the moon; by day it is
+ * the other way round. How much a mark glows is the palette's business, and by
+ * day it does not glow at all.
  */
 export type MarkerScene = {
   /**
@@ -131,9 +139,10 @@ export type FadeStop = { at: number; strength: number };
  * across the frame is straight to well inside a pixel, so the taper is a
  * triangle rather than an arc.
  *
- * No rim, unlike the point it comes out of. A tail is the quietest part of a
- * mark and fades to nothing anyway; a dark edge around it would be the one part
- * of it that did not.
+ * Edged like the point it comes out of — the same taper, `rim` wider on every
+ * side, in the edge's ink and faded along with it. A white tail on a bright sky
+ * is otherwise invisible, and it is the one part of a mark that says which way
+ * the object is going.
  */
 export type TailShape = {
   /**
@@ -151,6 +160,8 @@ export type TailShape = {
   width: number;
   /** How strong the tail is at its head, before `TAIL_FADE` takes it to its tip. */
   alpha: number;
+  /** How far the edge under the tail reaches past it on every side, in layout pixels. */
+  rim: number;
 };
 
 /**
@@ -159,38 +170,34 @@ export type TailShape = {
  */
 export type Glow = { radius: number; alpha: number };
 
-/** The lit centre of a moving mark's point. */
-export type Spark = {
-  radius: number;
-  /** The mark's own colour, lit: its hue, much nearer white. */
-  color: string;
-  alpha: number;
-};
-
-/** One satellite's mark: a point in a glow, its tail, rimmed, haloed if it is a landmark. */
+/** One satellite's mark: a point in a glow, its tail, edged, haloed if it is a landmark. */
 export type GlyphShape = {
   /** Centre, in layout pixels from the frame's top-left. */
   x: number;
   y: number;
   /** The trail behind it, or `null` for an object that holds station. */
   tail: TailShape | null;
-  /** The rim under the mark, which is what reads it against the sky. */
+  /** The edge under the mark, which is what reads it against the sky. */
   rim: Circle;
-  /** The coloured mark itself: a point, or a small ring if the object holds station. */
+  /** The mark itself: a point, or a small ring if the object holds station. */
   core: Circle;
-  /** The glow of the mark's own colour around it, stronger the nearer it is. */
+  /** The glow around it, stronger the nearer it is. */
   glow: Glow;
-  /** The bright centre of the point, or `null` for a ring, which has none. */
-  spark: Spark | null;
   /** Radius of the landmark halo, or `null` for everything else. Faded like a glow. */
   halo: number | null;
-  /** The category colour, as `#rrggbb`. */
+  /** The mark's fill, as `#rrggbb`: the palette's, which is white. */
   color: string;
   /**
    * How far through a fade the marker is, in `(0, 1]`, times whether the sun is
-   * on it. Everything above is drawn at this on top of its own strength.
+   * on it. The fill, glow, halo and tail are drawn at this on top of their own
+   * strength.
    */
   alpha: number;
+  /**
+   * How strongly the edges — under the point and under the tail — are drawn:
+   * the fade alone, without the sun. See `sunlightAlpha`.
+   */
+  edgeAlpha: number;
 };
 
 /**
@@ -203,11 +210,10 @@ export type GlyphShape = {
  * never says which of the four marks under the finger is the one now being
  * described.
  *
- * Two circles, like the marks themselves: a dark rim under a bright ring, so it
- * reads against a photograph of the sky whichever way round the day has the
- * palette. Drawn clear of the mark rather than over it — the mark's own colour,
- * size and shape are three of the four channels the overlay has, and a
- * selection must not paint over any of them.
+ * Two circles, like the marks themselves: a dark edge under a white ring, so it
+ * reads against a photograph of the sky at either end of the day. Drawn clear of
+ * the mark rather than over it — the mark's size and shape are channels the
+ * overlay spends, and a selection must not paint over either.
  */
 export type SelectionRing = {
   /** Centre: the marker's own. */
@@ -218,7 +224,7 @@ export type SelectionRing = {
   /** Thickness of the bright ring, and of the dark rim carrying it. */
   width: number;
   rimWidth: number;
-  /** The ring's colour: the palette's own, so it flips with the day. */
+  /** The ring's colour: the marks' own white. */
   color: string;
   rim: Ink;
   /** The fade the marker is in, so the ring goes with it rather than alone. */
@@ -269,7 +275,7 @@ export type PathShape = {
    * line, so a mark is the same line turning a corner rather than a new shape.
    */
   arrows: number[][];
-  /** The category colour, which for a landmark path is the landmark colour. */
+  /** The marks' own white. */
   color: string;
   /** How solid the line is, which says how far ahead the pass is. */
   alpha: number;
@@ -365,7 +371,7 @@ export function buildMarkerScene(
     const footprint = markerDiameterPx(marker.rangeKm) * scale;
     const size = selected ? footprint * SELECTED_GROWTH : footprint;
     const strength = selected ? 1 : depthStrength(marker.rangeKm);
-    const color = palette.categories[marker.category];
+    const color = palette.mark;
     const landmark = marker.category === "LANDMARK";
 
     const reach = marker.next ? trailReach(marker.point, marker.next, box) : null;
@@ -376,12 +382,14 @@ export function buildMarkerScene(
     // reaching `outline` past the mark and stopping flush with it on the inside,
     // so the colour keeps the full width it was sized at.
     const diameter = size * (marker.parked ? RING_DIAMETER_RATIO : CORE_DIAMETER_RATIO);
-    const outline = Math.max(MIN_OUTLINE_PX, diameter * OUTLINE_RATIO);
+    const outline = Math.max(MIN_EDGE_PX, diameter * OUTLINE_RATIO);
     const ring = marker.parked ? Math.max(MIN_RING_PX, diameter * RING_RATIO) : null;
     glyphs.push({
       x,
       y,
-      tail: reach && tailFor(x, y, reach, diameter * TRAIL_WIDTH_RATIO, TAIL_ALPHA * strength),
+      tail:
+        reach &&
+        tailFor(x, y, reach, diameter * TRAIL_WIDTH_RATIO, TAIL_ALPHA * strength, outline),
       rim:
         ring === null
           ? { radius: diameter / 2 + outline, width: null }
@@ -391,17 +399,10 @@ export function buildMarkerScene(
           ? { radius: diameter / 2, width: null }
           : { radius: (diameter - ring) / 2, width: ring },
       glow: { radius: size * GLOW_RATIO, alpha: GLOW_ALPHA * strength * palette.glow },
-      spark:
-        ring === null
-          ? {
-              radius: (diameter / 2) * SPARK_RATIO,
-              color: litColor(color),
-              alpha: strength * palette.glow
-            }
-          : null,
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
       color,
-      alpha: marker.opacity * sunlightAlpha(marker)
+      alpha: marker.opacity * sunlightAlpha(marker),
+      edgeAlpha: marker.opacity
     });
 
     if (selected) {
@@ -415,7 +416,7 @@ export function buildMarkerScene(
         radius: clear + SELECTION_GAP_PX * scale + (SELECTION_WIDTH_PX * scale) / 2,
         width: SELECTION_WIDTH_PX * scale,
         rimWidth: (SELECTION_WIDTH_PX + 2 * MIN_OUTLINE_PX) * scale,
-        color: palette.label,
+        color: palette.mark,
         rim: palette.outline,
         alpha: marker.opacity
       };
@@ -529,7 +530,7 @@ function pathShapeFor(
       alpha: alpha * LANDMARK_PATHS.pastOpacity * wakeStrength(step.behind)
     })),
     arrows,
-    color: palette.categories[path.category],
+    color: palette.mark,
     alpha,
     width,
     rimWidth: width + 2 * Math.max(MIN_OUTLINE_PX, width * OUTLINE_RATIO),
@@ -580,7 +581,8 @@ function tailFor(
   y: number,
   reach: TrailReach,
   width: number,
-  alpha: number
+  alpha: number,
+  rim: number
 ): TailShape {
   // Along the direction of travel, and across it.
   const alongX = reach.dx / reach.length;
@@ -600,13 +602,14 @@ function tailFor(
     length: reach.length,
     angle: Math.atan2(-reach.dy, -reach.dx),
     width,
-    alpha
+    alpha,
+    rim
   };
 }
 
 /**
  * How strongly a mark's light is drawn for its distance, in `[FAR_STRENGTH, 1]`:
- * the glow, the lit centre and the tail, all at once.
+ * the glow and the tail, both at once.
  *
  * The second half of depth, after size. Read off the same range scale
  * (`rangeShare`), so the nearest objects are the largest and the brightest
@@ -622,35 +625,6 @@ function tailFor(
 function depthStrength(range: number): number {
   return 1 - (1 - FAR_STRENGTH) * rangeShare(range);
 }
-
-/**
- * A colour lit: laid over itself as light, twice.
- *
- * What a point of light looks like at its centre is its own hue driven towards
- * white, and screening a colour onto itself is exactly that — every channel
- * moves towards full by what it has left, so a hue stays itself and a darker
- * colour stays darker than a brighter one. The quiet tier's slate is lit to a
- * pale slate rather than to the white the landmarks' is.
- *
- * Cached for the reason `SatelliteMarkers` caches parsed colours: a palette is
- * a handful of strings and the day's fade has a fixed number of steps.
- */
-function litColor(color: string): string {
-  const known = litColors.get(color);
-  if (known) return known;
-  const lit = `#${[1, 3, 5]
-    .map((index) => {
-      const channel = Number.parseInt(color.slice(index, index + 2), 16) / 255;
-      return Math.round((1 - (1 - channel) ** 3) * 255)
-        .toString(16)
-        .padStart(2, "0");
-    })
-    .join("")}`;
-  litColors.set(color, lit);
-  return lit;
-}
-
-const litColors = new Map<string, string>();
 
 /**
  * How a tail falls away from the mark to its tip.
@@ -687,12 +661,11 @@ export const DESIGN_FRAME_WIDTH_PX = 720;
  * those exactly as it drew the lit ones, which on a clear evening is half the
  * marks on the frame pointing at nothing — and no way to tell which half.
  *
- * Opacity is the channel it costs, and it is the only one going spare. The four
- * the overlay already carries are all in use at rest — hue for what the object
- * is for, fill and shape for whether it holds station, size for range, a name
- * for the landmarks — and spending any of them would be trading one fact for
- * another. Opacity is not: at rest a marker is either faded fully in or has
- * been dropped, and everything in between belongs to the crossfade the terrain
+ * Opacity is the channel it costs, and it is the only one going spare. The
+ * others the overlay carries are all in use at rest — shape for whether it holds
+ * station, size for range, a name for the landmarks — and spending any of them
+ * would be trading one fact for another. Opacity is not: at rest a marker is
+ * either faded fully in or has been dropped, and everything in between belongs to the crossfade the terrain
  * mask arbitrates (`MarkerVisibilityFilter`), which is a transition rather than
  * something to read. A marker held permanently at half strength is a state
  * nothing else produces.
@@ -707,7 +680,9 @@ export const DESIGN_FRAME_WIDTH_PX = 720;
  * out behind a roof like any other — the two compound, which is honest, since
  * such a marker really is both.
  *
- * The mark and nothing else. A landmark's name and the ring around a tapped
+ * The mark's white and nothing else — not its edge, which is what a mark is
+ * read by on a bright sky, so that by day a mark in shadow is still plainly a
+ * mark, a dark ring round a greyer centre. A landmark's name and the ring around a tapped
  * object are the app's own annotations rather than light coming off a
  * satellite, and both stay at full strength: somebody wants to read `ISS` and
  * to see which mark they have selected exactly as much when the thing is in the
@@ -725,7 +700,7 @@ function sunlightAlpha(marker: SatelliteMarker): number {
  * whole mark used to be drawn at in solid colour, with the rest of the
  * footprint given over to its glow. A third of the footprint was tried first
  * and was too small on a phone: the far end came out under three points, which
- * is a speck rather than a mark, and the colour could not be read in it.
+ * is a speck rather than a mark.
  */
 const CORE_DIAMETER_RATIO = 0.52;
 /**
@@ -742,8 +717,6 @@ const GLOW_RATIO = 0.9;
  * off the mark rather than as a second, larger disc of colour.
  */
 const GLOW_ALPHA = 0.5;
-/** The lit centre, as a fraction of the point's radius. */
-const SPARK_RATIO = 0.55;
 /**
  * How strong a tail is where it leaves the point, at full depth strength. A
  * shade under the point itself, so the point stays the brightest thing on it.
@@ -771,9 +744,18 @@ const SELECTED_GROWTH = 1.25;
  * they trailed.
  */
 const TRAIL_WIDTH_RATIO = 0.75;
-/** Rim thickness, as a fraction of the point's diameter. */
+/** Edge thickness, as a fraction of the point's diameter. */
 const OUTLINE_RATIO = 0.16;
+/** The thinnest a line's rim is drawn, in layout pixels. */
 const MIN_OUTLINE_PX = 1;
+/**
+ * The thinnest a mark's edge is drawn, in layout pixels.
+ *
+ * Thicker than a line's rim, because by day the edge is most of what is seen of
+ * a white mark on a bright sky, and at a single pixel that is a grey smudge
+ * rather than a ring.
+ */
+const MIN_EDGE_PX = 1.25;
 /** Thickness of the parked ring, as a fraction of its diameter. */
 const RING_RATIO = 0.2;
 const MIN_RING_PX = 1;
@@ -781,7 +763,7 @@ const MIN_RING_PX = 1;
  * What is left of a marker with no sun on it. See `sunlightAlpha`.
  *
  * Half, which is far enough to read as a different kind of mark at a glance and
- * not so far that the object is lost: it is still there, it still has a colour,
+ * not so far that the object is lost: it is still there, it still has an edge,
  * a size and a heading, and all three are how somebody finds it again when it
  * comes back into the sunlight a few minutes later. Fading it to near nothing
  * would be the overlay deciding on somebody's behalf that an object it can

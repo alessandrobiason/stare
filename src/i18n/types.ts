@@ -329,8 +329,8 @@ export type IntroStrings = {
   /**
    * The second: what a mark on the sky says, beside a drawing of each kind.
    *
-   * This used to be a paragraph — colour for purpose, size for distance, a
-   * ring, a fainter mark — and five channels in one paragraph is not something
+   * This used to be a paragraph — size for distance, a tail, a ring, a
+   * fainter mark — and that many channels in one paragraph is not something
    * anyone carries to the sky. So each is a row with the mark itself beside it,
    * drawn by the overlay's own code (`introFigures.ts`), and `name` is the word
    * for the row rather than a place on the screen.
@@ -346,8 +346,6 @@ export type IntroStrings = {
     shadow: IntroKeyStrings;
     /** A landmark: the halo, and the name under it. */
     landmark: IntroKeyStrings;
-    /** Over the colour key, whose names are the filter's own (`filter.categories`). */
-    colors: string;
   };
   /**
    * The third: a landmark's line across the sky, drawn as the overlay draws it.

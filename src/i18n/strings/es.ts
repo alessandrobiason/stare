@@ -25,8 +25,7 @@ export const es: Strings = {
       landmark: {
         name: "Destacados",
         meaning: "Estaciones espaciales y grandes telescopios, con su nombre."
-      },
-      colors: "El color indica para qué sirve:"
+      }
     },
     paths: {
       title: "Dónde y cuándo mirar",

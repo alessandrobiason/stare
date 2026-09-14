@@ -14,7 +14,7 @@ import { strings } from "../i18n";
 import { IntroMode, introButtonLabel, introPages } from "../onboarding/introPages";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
-import { CalloutList, ColorKey, MarkTile, PassesPicture, PathPicture } from "./IntroFigures";
+import { CalloutList, MarkTile, PassesPicture, PathPicture } from "./IntroFigures";
 import { Icon } from "./Icon";
 import { LanguagePicker } from "./LanguagePicker";
 import { FrameSize } from "./markerGeometry";
@@ -194,13 +194,6 @@ export const IntroScreen: React.FC<Props> = ({ onDone, mode = "intro" }) => {
                           </View>
                         </View>
                       ))}
-
-                      {content.colors ? (
-                        <>
-                          <Text style={styles.colorsLabel}>{content.colors.label}</Text>
-                          <ColorKey swatches={content.colors.swatches} />
-                        </>
-                      ) : null}
 
                       {content.path ? (
                         <View style={styles.figure}>
@@ -431,12 +424,6 @@ const styles = StyleSheet.create({
   },
   elementMeaning: {
     marginTop: 2,
-    color: theme.color.textDim,
-    fontSize: 11.5,
-    lineHeight: 16
-  },
-  colorsLabel: {
-    marginTop: 14,
     color: theme.color.textDim,
     fontSize: 11.5,
     lineHeight: 16

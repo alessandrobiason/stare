@@ -33,8 +33,7 @@ export const en: Strings = {
       landmark: {
         name: "Highlights",
         meaning: "Space stations and big telescopes, shown with their name."
-      },
-      colors: "The colour shows what it's for:"
+      }
     },
     paths: {
       title: "When and where to look",

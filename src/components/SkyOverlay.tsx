@@ -573,7 +573,6 @@ export const SkyOverlay: React.FC<Props> = ({
               starlink={starlink}
               onToggleStarlink={onToggleStarlink}
               onEnableAll={onEnableAll}
-              palette={palette}
             />
           </>
         )}
@@ -622,7 +621,6 @@ export const SkyOverlay: React.FC<Props> = ({
                   onClose={() => setSelection(null)}
                   describeRef={describeRef}
                   pass={passAhead(upcoming, selection.selected)}
-                  palette={palette}
                 />
               )}
 

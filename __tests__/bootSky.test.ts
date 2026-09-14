@@ -6,16 +6,17 @@ import {
   bootSkyScene,
   skyAngleDeg
 } from "../src/components/bootSky";
-import { CATEGORY_COLORS } from "../src/satellite/categories";
+import { MARK_COLOR } from "../src/components/palette";
 
 const PHONE = { width: 390, height: 844 };
 
-test("the sky is one satellite per category, in the overlay's own colours", () => {
+test("the sky is five satellites in the overlay's own white", () => {
   const drawn = bootSkyScene(PHONE).satellites.map((satellite) => satellite.color);
 
-  // The point of drawing five rather than one: the palette a person will read
-  // against the real sky is already in front of them while it loads.
-  expect(new Set(drawn)).toEqual(new Set(Object.values(CATEGORY_COLORS)));
+  // The marks a person will read against the real sky are all white, and so
+  // is every satellite on the screen they wait on.
+  expect(drawn).toHaveLength(5);
+  expect(new Set(drawn)).toEqual(new Set([MARK_COLOR]));
 });
 
 test("every orbit turns about the middle of the screen", () => {

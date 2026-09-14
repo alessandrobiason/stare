@@ -322,15 +322,6 @@ body {
   padding: 3px 0;
 }
 
-.swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 5px;
-  margin-right: 9px;
-  border: 1.5px solid;
-  flex: none;
-}
-
 .filter .row .name {
   flex: 1;
   margin-right: 8px;
@@ -384,7 +375,7 @@ body {
   height: 10px;
   border-radius: 5px;
   margin-right: 9px;
-  border: 2px solid var(--text-dim);
+  border: 2.5px solid #ffffff;
   background: transparent;
   flex: none;
 }
@@ -588,7 +579,13 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 6px;
-  border: 1.5px solid;
+  background: #ffffff;
+  border: 1.5px solid rgba(5, 7, 10, 0.9);
+}
+
+.card .badge .mark.ring {
+  background: transparent;
+  border: 2.5px solid #ffffff;
 }
 
 .card .heading {

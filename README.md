@@ -15,16 +15,19 @@ built yet, and the settings the guide and the console now live in.
 **A marker is the app's own logo**: the
 body and tapered trail of `assets/icon.svg`, the same shape the boot screen turns
 five of — both drawn by `tools/make-logo.mjs` from the geometry in
-`src/components/bootSky.ts` — drawn as light: a point a few pixels across with a
-lit centre, in a soft glow of its own colour, trailing a comet's tail that fades
-to nothing. Solid discs a couple of dozen pixels across covered the picture they
+`src/components/bootSky.ts` — drawn as light: a white point a few pixels across
+on a near-black edge, in a soft glow, trailing a comet's tail that fades to
+nothing. Solid discs a couple of dozen pixels across covered the picture they
 were marking. Nearer objects are larger *and* brighter, glow and tail alike, on
-the same log scale as their size. It carries five channels at once —
-colour for purpose (five categories), shape for whether the object holds station
-(a geostationary ring, or a body trailing the 12 seconds of ground track it has
-just covered), size for range on a log scale from 400 km to 40,000 km, a
-label, spent only on a couple of dozen landmarks, and **strength for whether the
-sun is on it**.
+the same log scale as their size. **Every mark is white**, whatever the object is
+for: the marks were once coloured by purpose, and white on a dark edge read
+better than any of those five colours against both a night sky and a daylit one.
+What an object is for is on its card and is what the filter sorts by. A mark
+carries four channels at once — shape for whether the object holds station (a
+geostationary ring, or a body trailing the 12 seconds of ground track it has
+just covered), size for range on a log scale from 400 km to 40,000 km, a label,
+spent only on a couple of dozen landmarks, and **strength for whether the sun is
+on it**.
 
 That last one is the only channel that is not about where the object is, and it
 is the one the app was missing for longest. A satellite is not a light: it is a
@@ -87,13 +90,16 @@ them as a strip of names, with the sky ringing whichever one is being read about
 the card is open, because they are all moving: a low pass halves its range in
 the time it takes to read them.
 
-Every mark is a coloured core inside a contrasting rim, because a photograph of
-the sky is either far brighter or far darker than any fill. Which way round that
-runs follows the sun: with it down the marks are light in a dark rim, with it up
-they are dark in a light one, and the two ladders cross over a two-degree band
-of solar altitude inside civil twilight — worked out from the GPS fix and the
-clock, so it is right in Oslo in June as well as on the equator (`src/components/palette.ts`,
-`src/coordinates/sunAltitude.ts`).
+Every mark is white on a near-black edge, tail included, because a photograph of
+the sky is either far brighter or far darker than any fill — and a fill and an
+edge at the two ends of the scale read against both. At night the white is what
+is seen; by day the edge is, a dark ring with a light centre, and it holds over
+cloud. A mark in the Earth's shadow fades its white and keeps its edge. What does
+follow the sun is what is around a mark: it glows at night and not by day, and
+the landmark names are light text at night and dark by day, crossing over a
+two-degree band of solar altitude inside civil twilight — worked out from the GPS
+fix and the clock, so it is right in Oslo in June as well as on the equator
+(`src/components/palette.ts`, `src/coordinates/sunAltitude.ts`).
 
 The `DEBUG` button swaps in the workings: the sky mask tinted over the picture —
 travelling with the sky it was cut from, so it slides and tilts with the
@@ -127,7 +133,7 @@ satellites → screen positions → markers, composited over the camera picture.
 | Drawn at display rate, every marker in one canvas | `src/components/markerScene.ts`, `SatelliteMarkers` |
 | Where the landmarks will be for the next few hours | `src/satellite/orbitPath.ts`, `src/hooks/useOrbitPaths.ts` |
 | The same plan read as a list: what is coming, and when | `src/satellite/upcomingPasses.ts`, `src/components/UpcomingPasses.tsx` |
-| Day or night palette, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
+| Day or night glow and names, from the sun's own altitude | `src/components/palette.ts`, `src/coordinates/sunAltitude.ts` |
 | Whether the sun is on it, and whether it can be seen from here | `src/satellite/illumination.ts`, `src/satellite/nakedEye.ts` |
 | A tap back into the sky: which markers, and what they are | `src/components/markerHitTest.ts`, `SkyTracker.describe`, `src/satellite/briefing.ts`, `src/satellite/landmarkPhotos.ts` |
 | The controls over the picture: glass, one accent, no words it can do without | `src/components/theme.ts`, `src/components/Icon.tsx`, `src/components/SkyOverlay.tsx` |
@@ -376,8 +382,9 @@ rather than stating them. The suite holds the landmark list here and the one in
 than shrugging on the card.
 
 Which channel to spend was the one real design question, and the answer came
-from what is in use *at rest*. Hue, fill, shape and size are all carrying
-something permanently, so any of them would have traded one fact for another —
+from what is in use *at rest*. Fill, shape and size are all carrying
+something permanently (and hue was, when the marks still had one), so any of
+them would have traded one fact for another —
 and fill in particular is already the difference between a parked ring and an
 ordinary dot, which is why an unlit mark cannot be a hollow one: the legend
 would have had two rings in it meaning different things. Opacity is not spent:
