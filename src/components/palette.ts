@@ -53,6 +53,16 @@ export type MarkerPalette = {
   outline: Ink;
   /** The glow that says this one is worth looking up for. Landmarks only. */
   halo: Ink;
+  /**
+   * How much light a mark gives off, in `[0, 1]`: the glow around it and the
+   * lit centre of its point.
+   *
+   * All of it at night, where a satellite *is* a point of light and the marks
+   * are drawn as one. Only a trace by day, where the marks are ink on a bright
+   * sky: a glow in a dark colour is a smudge, and a lit centre in a dark point
+   * is a hole in it.
+   */
+  glow: number;
   /** The landmark names, which are drawn as text and outlined by `outline`. */
   label: string;
 };
@@ -61,6 +71,7 @@ export const NIGHT_PALETTE: MarkerPalette = {
   categories: CATEGORY_COLORS,
   outline: { color: "#030911", alpha: 0.85 },
   halo: { color: "#ffffff", alpha: 0.18 },
+  glow: 1,
   label: "#ffffff"
 };
 
@@ -68,6 +79,7 @@ export const DAYLIGHT_PALETTE: MarkerPalette = {
   categories: CATEGORY_COLORS_DAYLIGHT,
   outline: { color: "#f4f8fd", alpha: 0.9 },
   halo: { color: "#04121f", alpha: 0.2 },
+  glow: 0.3,
   label: "#10161c"
 };
 
@@ -139,6 +151,7 @@ export function blendPalettes(fraction: number): MarkerPalette {
     categories,
     outline: mixInk(night.outline, day.outline, fraction),
     halo: mixInk(night.halo, day.halo, fraction),
+    glow: night.glow + (day.glow - night.glow) * fraction,
     label: mixColors(night.label, day.label, fraction)
   };
 }

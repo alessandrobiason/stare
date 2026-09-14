@@ -6,22 +6,25 @@ import { FrameSize } from "./markerGeometry";
 import {
   buildMarkerScene,
   Circle,
+  GLOW_FADE,
   GlyphShape,
   MarkerScene,
   PathShape,
   SelectionRing,
+  TAIL_FADE,
   TailShape
 } from "./markerScene";
-import { Ink, MarkerPalette } from "./palette";
+import { MarkerPalette } from "./palette";
 import {
   PaintStyle,
   Skia,
   SkiaPictureView,
   StrokeCap,
   StrokeJoin,
+  TileMode,
   createPicture
 } from "./skia";
-import type { SkCanvas, SkColor, SkPaint, SkPath, SkPicture } from "./skia";
+import type { SkCanvas, SkColor, SkPaint, SkPath, SkPicture, SkShader } from "./skia";
 
 type Props = {
   /** The drawn frames, as a subscription. See `MarkerSource`. */
@@ -91,19 +94,25 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
     (canvas) => {
       const paint = Skia.Paint();
       paint.setAntiAlias(true);
-      // Round, so the rim stroked around a tail follows it to the tip instead
-      // of running two edges out to the spike where they would have met.
       paint.setStrokeJoin(StrokeJoin.Round);
       paint.setStrokeCap(StrokeCap.Round);
 
-      // One path, rewound per shape: a tail is three points, and allocating a
-      // native object for each of seventy of them every frame is the kind of
-      // cost this whole arrangement exists to avoid. The landmarks' arcs are
-      // rewound into the same one, for the same reason.
-      const tail = Skia.Path.Make();
+      // One path, rewound per shape: allocating a native object for each dash
+      // and each step of a wake every frame is the kind of cost this whole
+      // arrangement exists to avoid.
+      const line = Skia.Path.Make();
       // Under the marks, and first: a path is what the marks are read against.
-      for (const path of scene.paths) drawPath(canvas, paint, tail, path, scene.palette);
-      for (const glyph of scene.glyphs) drawGlyph(canvas, paint, tail, glyph, scene.palette);
+      for (const path of scene.paths) drawPath(canvas, paint, line, path, scene.palette);
+      // Every rim before any mark's light. Crew and cargo vehicles sit on the
+      // station they are docked to, so the station is several marks in one
+      // place, and each rim laid over the glow of the marks under it cut a dark
+      // ring through the brightest thing on the frame. A rim is a pixel wide;
+      // what it separates a point from is the sky, not the marks behind it.
+      const ink = scene.palette.outline;
+      for (const glyph of scene.glyphs) {
+        circle(canvas, paint, glyph, glyph.rim, ink.color, ink.alpha * glyph.alpha);
+      }
+      for (const glyph of scene.glyphs) drawGlyph(canvas, paint, glyph, scene.palette);
       // Over every mark, including the ones in front of the selected satellite:
       // a ring half hidden behind a passing dot says nothing.
       if (scene.selection) drawSelection(canvas, paint, scene.selection);
@@ -113,52 +122,100 @@ function record(scene: MarkerScene, frame: FrameSize): SkPicture {
 }
 
 /**
- * One satellite: its halo if it is a landmark, its tail, its rim and its mark.
+ * One satellite, over the rims: its halo if it is a landmark, its glow, its
+ * tail, its point and the lit centre of it.
  *
  * Drawn a marker at a time rather than a layer at a time, so the sort by range
  * holds — a nearer object's whole shape passes in front of a farther one's. The
- * order within a marker is what joins the tail to the body: the rim goes down
- * first, in both shapes, and the two coloured shapes are laid over it
- * afterwards, so no dark ring is left cutting between a body and its own tail.
+ * rims have all gone down already (`record`), so the tail and the point are laid
+ * over their own rim and no dark ring is left cutting between a point and its
+ * own tail, or through the light around it.
  *
  * The rim is a larger shape *under* the mark rather than a border inside it, so
- * the colour keeps the full diameter. Drawn as a border it ate the middle of
- * the marker instead, and at the eight pixels the geostationary belt is drawn
- * at there was hardly any colour left to see.
+ * the colour keeps the full diameter — at the few pixels a point is drawn at, a
+ * border would leave hardly any colour to see.
  */
 function drawGlyph(
   canvas: SkCanvas,
   paint: SkPaint,
-  tail: SkPath,
   glyph: GlyphShape,
   palette: MarkerPalette
 ): void {
   if (glyph.halo !== null) {
-    fill(paint, palette.halo.color, palette.halo.alpha * glyph.alpha);
-    canvas.drawCircle(glyph.x, glyph.y, glyph.halo, paint);
+    glow(canvas, paint, glyph, glyph.halo, palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
-
-  if (glyph.tail) {
-    trace(tail, glyph.tail.points, true);
-    rim(canvas, paint, tail, glyph.tail, palette.outline, glyph.alpha);
-  }
-
-  circle(canvas, paint, glyph, glyph.rim, palette.outline.color, palette.outline.alpha * glyph.alpha);
-
-  if (glyph.tail) {
-    fill(paint, glyph.color, glyph.alpha);
-    canvas.drawPath(tail, paint);
-  }
+  glow(canvas, paint, glyph, glyph.glow.radius, glyph.color, glyph.glow.alpha * glyph.alpha);
+  if (glyph.tail) drawTail(canvas, paint, glyph, glyph.tail);
   circle(canvas, paint, glyph, glyph.core, glyph.color, glyph.alpha);
+  if (glyph.spark) {
+    fill(paint, glyph.spark.color, glyph.spark.alpha * glyph.alpha);
+    canvas.drawCircle(glyph.x, glyph.y, glyph.spark.radius, paint);
+  }
 }
 
 /**
- * One landmark's path: the arc it will travel, and the clock minutes on it.
+ * Light fading out from a mark's centre to `radius`.
+ *
+ * The canvas is moved and scaled onto a circle of radius one rather than a
+ * gradient made to measure: a shader is a native object, and one per mark per
+ * frame is seventy allocations a frame for what is the same gradient every
+ * time. So there is one per colour (`fadeShader`), and the canvas does the
+ * placing.
+ */
+function glow(
+  canvas: SkCanvas,
+  paint: SkPaint,
+  glyph: GlyphShape,
+  radius: number,
+  color: string,
+  alpha: number
+): void {
+  if (!(radius > 0) || !(alpha > 0)) return;
+  paint.setStyle(PaintStyle.Fill);
+  paint.setShader(fadeShader("glow", color));
+  paint.setAlphaf(alpha);
+  canvas.save();
+  canvas.translate(glyph.x, glyph.y);
+  canvas.scale(radius, radius);
+  canvas.drawCircle(0, 0, 1, paint);
+  canvas.restore();
+  paint.setShader(null);
+}
+
+/**
+ * The comet's tail: the taper, faded from the point to its tip.
+ *
+ * Placed the way a glow is — one triangle and one gradient, both a unit long,
+ * and the canvas turned and stretched onto the tail — for the same reason. The
+ * stretch is not uniform, which a stroke would show and a fill does not: the
+ * triangle is filled after it is transformed, so its edges are as sharp as any.
+ */
+function drawTail(canvas: SkCanvas, paint: SkPaint, glyph: GlyphShape, tail: TailShape): void {
+  paint.setStyle(PaintStyle.Fill);
+  paint.setShader(fadeShader("tail", glyph.color));
+  paint.setAlphaf(tail.alpha * glyph.alpha);
+  canvas.save();
+  canvas.translate(glyph.x, glyph.y);
+  canvas.rotate((tail.angle * 180) / Math.PI, 0, 0);
+  canvas.scale(tail.length, tail.width / 2);
+  canvas.drawPath(unitTail(), paint);
+  canvas.restore();
+  paint.setShader(null);
+}
+
+/**
+ * One landmark's path: the wake behind the object, the dashes ahead of it, and
+ * the clock minutes on them.
  *
  * Rims first for the whole shape and colour afterwards, rather than rim and
- * colour a run at a time. An arrowhead sits on the line it belongs to, so drawn
+ * colour a piece at a time. An arrowhead sits on the line it belongs to, so drawn
  * in pairs the mark's own rim is laid over the line's colour and every mark
  * cuts a dark notch through the arc it is measuring.
+ *
+ * The dashes are one path and one draw, however many there are; the wake is a
+ * draw per step, since each step has a strength of its own. Its steps are cut
+ * square, so they meet end to end — rounded, each join would be two caps laid
+ * over each other, and a bead on the line.
  */
 function drawPath(
   canvas: SkCanvas,
@@ -167,17 +224,25 @@ function drawPath(
   shape: PathShape,
   palette: MarkerPalette
 ): void {
-  const draw = (points: number[], color: string, alpha: number, width: number) => {
-    trace(line, points, false);
+  const draw = (runs: number[][], color: string, alpha: number, width: number) => {
+    if (runs.length === 0) return;
+    trace(line, runs);
     stroke(paint, color, alpha, width);
     canvas.drawPath(line, paint);
   };
+  const wake = (color: string, strength: number, width: number) => {
+    paint.setStrokeCap(StrokeCap.Butt);
+    for (const step of shape.past) draw([step.points], color, strength * step.alpha, width);
+    paint.setStrokeCap(StrokeCap.Round);
+  };
 
   const ink = palette.outline;
-  for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
-  for (const arrow of shape.arrows) draw(arrow, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
-  for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
-  for (const arrow of shape.arrows) draw(arrow, shape.color, shape.alpha, shape.width);
+  wake(ink.color, ink.alpha, shape.pastRimWidth);
+  draw(shape.dashes, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  draw(shape.arrows, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  wake(shape.color, 1, shape.pastWidth);
+  draw(shape.dashes, shape.color, shape.alpha, shape.width);
+  draw(shape.arrows, shape.color, shape.alpha, shape.width);
 }
 
 /** The ring that says which satellite the info card is describing. */
@@ -189,38 +254,17 @@ function drawSelection(canvas: SkCanvas, paint: SkPaint, ring: SelectionRing): v
 }
 
 /**
- * Flat `x, y` pairs into the path this frame is reusing: closed for a tail,
- * which is a filled triangle, and open for an arc, which is a stroked line and
- * would otherwise be drawn a segment back to where it started.
+ * Runs of flat `x, y` pairs into the path this frame is reusing, each its own
+ * open stretch: a dash, a step of a wake, an arrowhead.
  */
-function trace(path: SkPath, points: number[], close: boolean): void {
+function trace(path: SkPath, runs: number[][]): void {
   path.rewind();
-  path.moveTo(points[0], points[1]);
-  for (let index = 2; index < points.length; index += 2) {
-    path.lineTo(points[index], points[index + 1]);
+  for (const points of runs) {
+    path.moveTo(points[0], points[1]);
+    for (let index = 2; index < points.length; index += 2) {
+      path.lineTo(points[index], points[index + 1]);
+    }
   }
-  if (close) path.close();
-}
-
-/**
- * The dark shape under a tail: the same polygon filled and stroked.
- *
- * Two draws rather than one because Skia's paint styles here are fill or
- * stroke and not both, and a stroke on its own would leave the middle of a
- * shape only a couple of pixels wide unpainted.
- */
-function rim(
-  canvas: SkCanvas,
-  paint: SkPaint,
-  path: SkPath,
-  shape: TailShape,
-  ink: Ink,
-  alpha: number
-): void {
-  fill(paint, ink.color, ink.alpha * alpha);
-  canvas.drawPath(path, paint);
-  stroke(paint, ink.color, ink.alpha * alpha, shape.rimWidth);
-  canvas.drawPath(path, paint);
 }
 
 /** One of the scene's circles: a disc, or a band stroked on its own radius. */
@@ -253,10 +297,10 @@ function stroke(paint: SkPaint, color: string, alpha: number, width: number): vo
 /**
  * `#rrggbb` as Skia wants it, parsed once per colour rather than per marker.
  *
- * A palette is seven colours — five categories, the rim and the halo — against
- * several hundred draws a frame, and the fade between the day and night sets
- * has a fixed number of steps (`daylightFractionAt`), so this cannot grow
- * without bound over a long session.
+ * A palette is seven colours — five categories, the rim and the halo — and their
+ * lit centres, against several hundred draws a frame, and the fade between the
+ * day and night sets has a fixed number of steps (`daylightFractionAt`), so this
+ * cannot grow without bound over a long session.
  */
 const colors = new Map<string, SkColor>();
 function parsed(color: string): SkColor {
@@ -265,6 +309,51 @@ function parsed(color: string): SkColor {
   const made = Skia.Color(color);
   colors.set(color, made);
   return made;
+}
+
+/**
+ * A colour faded out along a unit of distance, as a shader: along `+x` from
+ * nought to one for a tail, and out from the origin to radius one for a glow.
+ *
+ * Built once per kind and colour, bounded for the reason `parsed` is. The fade
+ * itself is the scene's (`TAIL_FADE`, `GLOW_FADE`); the paint's own alpha is
+ * what scales it for the mark being drawn.
+ */
+const shaders = new Map<string, SkShader>();
+function fadeShader(kind: "tail" | "glow", color: string): SkShader {
+  const key = `${kind}:${color}`;
+  const known = shaders.get(key);
+  if (known) return known;
+
+  const stops = kind === "tail" ? TAIL_FADE : GLOW_FADE;
+  const base = parsed(color);
+  const ramp = stops.map((stop) =>
+    Float32Array.of(base[0], base[1], base[2], base[3] * stop.strength)
+  );
+  const offsets = stops.map((stop) => stop.at);
+  const origin = Skia.Point(0, 0);
+  const made =
+    kind === "tail"
+      ? Skia.Shader.MakeLinearGradient(origin, Skia.Point(1, 0), ramp, offsets, TileMode.Clamp)
+      : Skia.Shader.MakeRadialGradient(origin, 1, ramp, offsets, TileMode.Clamp);
+  shaders.set(key, made);
+  return made;
+}
+
+/**
+ * The tail's taper at unit size: the tip at `(1, 0)`, the head across the
+ * origin from `(0, -1)` to `(0, 1)`. Made on first use, once Skia is set up.
+ */
+let unitTailPath: SkPath | null = null;
+function unitTail(): SkPath {
+  if (unitTailPath) return unitTailPath;
+  const path = Skia.Path.Make();
+  path.moveTo(1, 0);
+  path.lineTo(0, 1);
+  path.lineTo(0, -1);
+  path.close();
+  unitTailPath = path;
+  return path;
 }
 
 const styles = StyleSheet.create({

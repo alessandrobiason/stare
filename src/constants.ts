@@ -316,7 +316,7 @@ export const SATELLITE_TRACKING = {
  */
 export const SATELLITE_MARKERS = {
   /**
-   * Marker diameter, in frame pixels, at the near and far ends of the range
+   * Marker footprint, in frame pixels, at the near and far ends of the range
    * scale.
    *
    * One frame of sky spans about a hundred to one in distance — 1,200 km to
@@ -324,6 +324,11 @@ export const SATELLITE_MARKERS = {
    * flat overlay in which the geostationary belt crowds the foreground. Sizing
    * by the logarithm of range puts it back where it belongs, behind
    * everything else.
+   *
+   * The footprint is the span of the mark's light rather than of its solid
+   * colour: the point itself is about a third of it, and the rest is a glow
+   * that fades to nothing (`markerScene`). Opaque discs this size hid the
+   * picture they were marking.
    */
   nearDiameterPx: 17,
   farDiameterPx: 8,
@@ -521,7 +526,45 @@ export const LANDMARK_PATHS = {
    * width, and a line drawn at the width of a trail would be the loudest thing
    * on a photograph of the sky.
    */
-  widthPx: 2,
+  widthPx: 1.5,
+  /**
+   * How the arc still ahead is broken up, in degrees of sky: this much line,
+   * then this much gap.
+   *
+   * Dashed so that the two halves of a pass under way read as different things
+   * at a glance — the ground covered and the ground to come — without either
+   * needing a key. Measured in degrees along the sky rather than in pixels, and
+   * from the object itself, so the dashes are pinned to the pass rather than to
+   * the screen: turning the phone moves them with the sky, and it is only the
+   * object's own motion that carries them along. Six tenths of a degree is
+   * about seven pixels at the design width.
+   */
+  dashDeg: 0.6,
+  dashGapDeg: 0.45,
+  /**
+   * How much of the arc behind a moving object is drawn, in degrees of sky.
+   *
+   * A fading wake rather than the whole of what the pass has covered: what it
+   * says is which way the object came and how it is curving, and that is said
+   * in the first few degrees. Long enough to show the bend of the orbit, short
+   * enough that a pass nearly over does not leave a line back to the horizon it
+   * rose from. The plan walks back at least this far for a pass already under
+   * way (`SkyPass.history`).
+   */
+  pastArcDeg: 24,
+  /**
+   * How many steps the wake fades in: each a stretch of equal arc, fainter than
+   * the one before. At two degrees a step, a difference nobody sees.
+   */
+  pastSteps: 12,
+  /**
+   * The wake's width, and how solid it is where it leaves the object as a share
+   * of the line ahead of it. Thinner and fainter, so of the three things on a
+   * pass — where it has been, where it is, where it goes — the mark is the
+   * brightest and the ground already covered the quietest.
+   */
+  pastWidthPx: 1,
+  pastOpacity: 0.55,
   /**
    * The time mark itself: an arrowhead, this long along the path and this far
    * across it, at the design width.
@@ -573,9 +616,10 @@ export const MARKER_SELECTION = {
    * How far from a marker's centre a tap still counts as hitting it.
    *
    * Half of the 44-point target Apple's guidelines put a floor at, which is
-   * about what a fingertip actually covers. The markers themselves are 8 to 17
-   * pixels across, so without this the far half of the catalogue would be a
-   * four-pixel radius target, and a tap would mostly be a miss.
+   * about what a fingertip actually covers. The markers themselves are points a
+   * few pixels across in a glow of 8 to 17, so without this the far half of the
+   * catalogue would be a four-pixel radius target, and a tap would mostly be a
+   * miss.
    */
   tapRadiusPx: 22,
   /**

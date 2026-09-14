@@ -37,6 +37,7 @@ export type {
   SkColor,
   SkPaint,
   SkPath,
-  SkPicture
+  SkPicture,
+  SkShader
 } from "@shopify/react-native-skia/src/skia";
 export { SkiaPictureView } from "@shopify/react-native-skia/src/views/SkiaPictureView";

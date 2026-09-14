@@ -45,11 +45,22 @@ export type TrailReach = {
  * Clamped at both ends so the marker stays a marker.
  */
 export function markerDiameterPx(range: number): number {
-  const { nearDiameterPx, farDiameterPx, nearRangeKm, farRangeKm } = SATELLITE_MARKERS;
-  if (!(range > nearRangeKm)) return nearDiameterPx;
-  const decades = Math.log10(range / nearRangeKm) / Math.log10(farRangeKm / nearRangeKm);
-  const scaled = nearDiameterPx - (nearDiameterPx - farDiameterPx) * decades;
-  return Math.max(farDiameterPx, scaled);
+  const { nearDiameterPx, farDiameterPx } = SATELLITE_MARKERS;
+  return nearDiameterPx - (nearDiameterPx - farDiameterPx) * rangeShare(range);
+}
+
+/**
+ * Where `range` falls on the marker's range scale, in `[0, 1]`: nought at the
+ * near end, one at the far end, logarithmic between.
+ *
+ * The one measure of distance everything about a mark's depth is read off — its
+ * size (`markerDiameterPx`), and how strongly its glow and tail are drawn
+ * (`markerScene`) — so the two cannot disagree about how far away it is.
+ */
+export function rangeShare(range: number): number {
+  const { nearRangeKm, farRangeKm } = SATELLITE_MARKERS;
+  if (!(range > nearRangeKm)) return 0;
+  return Math.min(1, Math.log10(range / nearRangeKm) / Math.log10(farRangeKm / nearRangeKm));
 }
 
 /**

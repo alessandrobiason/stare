@@ -32,7 +32,8 @@ function path(name: string, anchor: { left: number; top: number } | null): Marke
     name,
     key: `${name}@1`,
     category: "LANDMARK",
-    lines: [],
+    dashes: [],
+    past: [],
     ticks: [],
     anchor: anchor && { at: anchor, atMs: Date.UTC(2026, 7, 29, 20, 37, 0) },
     lead: 0

@@ -2,7 +2,7 @@ import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } f
 import { axesFromAttitude, CameraAxes } from "../camera/attitude";
 import { FrameLens, FramePoint, projectChain, projectWithAxes } from "../camera/projection";
 import {
-  clipPolyline,
+  clipSegment,
   FrameViewport,
   pointInViewport,
   pointOnFrame,
@@ -18,8 +18,8 @@ import { isStarlink, SatelliteCategory } from "../satellite/categories";
 import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
 import { SunlitState } from "../satellite/illumination";
 import { SkyDarkness, skyDarknessAt } from "../satellite/nakedEye";
-import { pathFrom, SkyPass } from "../satellite/orbitPath";
-import { OrbitEpoch } from "../types";
+import { ArcPiece, cutAlong, pathBehind, pathFrom, SkyPass } from "../satellite/orbitPath";
+import { EnuPosition, OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { AnchoredSkyMask, skyProbe } from "../vision/anchoredMask";
@@ -75,10 +75,19 @@ export type MarkerPath = {
   key: string;
   category: SatelliteCategory;
   /**
-   * The arc, as the runs of it that cross the view: more than one when a path
-   * leaves the frame and comes back, none when the whole of it is elsewhere.
+   * The arc still ahead of the object, as the dashes it is drawn in: each a
+   * short run of points, measured along the sky from the object itself (see
+   * `LANDMARK_PATHS.dashDeg`). Only the ones near enough the frame to be seen;
+   * none when the whole of it is elsewhere.
    */
-  lines: FramePoint[][];
+  dashes: FramePoint[][];
+  /**
+   * The arc already behind the object, as the steps its wake fades in, nearest
+   * the object first. Each carries how far back it is, in `(0, 1)` of
+   * `LANDMARK_PATHS.pastArcDeg`, which is what it is faded by. Empty for a pass
+   * that has not begun, and for steps nowhere near the frame.
+   */
+  past: { points: FramePoint[]; behind: number }[];
   /** Round clock minutes along it, each with the path just ahead of it. */
   ticks: { at: FramePoint; ahead: FramePoint }[];
   /**
@@ -305,30 +314,58 @@ const VISIBLE_COUNT_INTERVAL_MS = 250;
 const MARKER_WARMING_MARGIN = 1;
 
 /**
- * How far past the frame's edges a path is still drawn, in frame percent.
+ * How near the frame a stretch of path has to come to be cut into dashes, in
+ * frame percent.
  *
- * A whole frame past every edge, which is generous for something that is
- * clipped at the border anyway — and that is the point. What is being kept out
- * is not the part of the line that is off screen but the part that is
- * arbitrarily far off it: the segment leaving the camera's near plane is
- * thousands of frames long by construction (`projectChain`), and a canvas
- * handed geometry at that scale is a canvas asked to rasterise a line whose
- * ends are nowhere near the picture. Clipped to a box a frame wider than the
- * view, every path is a handful of short segments and the drawn result is
- * identical.
+ * A pass is up to a hundred and eighty degrees of sky and the frame is sixty,
+ * so most of every path is somewhere off the screen, and cut into dashes it is
+ * a couple of hundred of them per path per frame for the canvas to clip away.
+ * What is kept is the stretches of the arc that cross this box — the frame and
+ * a sliver around it, so a dash hanging over an edge is still drawn to it. It
+ * also keeps out the part of a line that is arbitrarily far off screen: the
+ * stretch leaving the camera's near plane projects thousands of frames long,
+ * and a canvas handed geometry at that scale is asked to rasterise a line whose
+ * ends are nowhere near the picture.
  */
-const PATH_BOX: FrameViewport = { left: -100, top: -100, right: 200, bottom: 200 };
+const PATH_BOX: FrameViewport = { left: -5, top: -5, right: 105, bottom: 105 };
+
+/**
+ * Which segments of a chain of sky positions cross `PATH_BOX`, by index.
+ *
+ * A segment with an end behind the camera is not one of them. The samples are
+ * a few degrees apart, and the near plane is ninety degrees from the middle of
+ * the view: a segment reaching behind it is nowhere near a frame sixty wide.
+ */
+function segmentsNearFrame(
+  chain: readonly EnuPosition[],
+  axes: CameraAxes,
+  lens: FrameLens
+): (segment: number) => boolean {
+  const points = chain.map((position) => projectWithAxes(position, axes, lens));
+  return (segment) => {
+    const from = points[segment];
+    const to = points[segment + 1];
+    return Boolean(from && to && clipSegment(from, to, PATH_BOX));
+  };
+}
+
+/** Pieces of arc as the runs of frame points that draw them. */
+function projectPieces(pieces: ArcPiece[], axes: CameraAxes, lens: FrameLens): FramePoint[][] {
+  return pieces.flatMap((piece) => projectChain(piece.positions, axes, lens));
+}
 
 /**
  * The planned passes as lines on this frame, at this instant.
  *
  * Three things happen here, and the order of them is the whole function. The
- * pass is trimmed to the present, so the line starts at the object rather than
- * where it was when the plan was made (`pathFrom`); it is projected against the
- * frame's own axes, cut where it passes behind the camera; and what is left is
- * clipped to a box around the view.
+ * pass is split at the present into the sky ahead of the object and a short
+ * wake behind it, so the line meets the object rather than where it was when
+ * the plan was made (`pathFrom`, `pathBehind`); the stretches of each that come
+ * near the view are cut into what they are drawn in — dashes ahead, fading
+ * steps behind (`cutAlong`); and those are projected against the frame's own
+ * axes.
  *
- * A path with nothing left on the frame is dropped rather than carried as an
+ * A path with nothing left near the frame is dropped rather than carried as an
  * empty shape — a landmark rising behind the person holding the phone costs
  * this frame a walk of fifty points and draws nothing.
  *
@@ -356,11 +393,36 @@ export function projectPaths(
     const ahead = pathFrom(pass, atMs);
     if (ahead.length < 2) continue;
 
-    const lines: FramePoint[][] = [];
-    for (const run of projectChain(ahead, axes, lens)) {
-      for (const clipped of clipPolyline(run, PATH_BOX)) lines.push(clipped);
-    }
-    if (lines.length === 0) continue;
+    // Dashed from the object forwards, so the pattern is anchored to it: the
+    // dashes stay on their piece of sky as the phone turns, and a replanned
+    // pass — whose samples start somewhere new — draws exactly the same ones.
+    const dashes = projectPieces(
+      cutAlong(
+        ahead,
+        LANDMARK_PATHS.dashDeg + LANDMARK_PATHS.dashGapDeg,
+        LANDMARK_PATHS.dashDeg,
+        Number.POSITIVE_INFINITY,
+        segmentsNearFrame(ahead, axes, lens)
+      ),
+      axes,
+      lens
+    );
+
+    // And the wake, from the object backwards, in steps of equal arc: each
+    // one's distance back is what it is faded by (`markerScene`).
+    const { pastArcDeg, pastSteps } = LANDMARK_PATHS;
+    const stepDeg = pastArcDeg / pastSteps;
+    const behind = pathBehind(pass, atMs, pastArcDeg);
+    const nearBehind = segmentsNearFrame(behind, axes, lens);
+    const past = cutAlong(behind, stepDeg, stepDeg, pastArcDeg, nearBehind)
+      .flatMap((piece) =>
+        projectChain(piece.positions, axes, lens).map((points) => ({
+          points,
+          behind: (piece.fromDeg + stepDeg / 2) / pastArcDeg
+        }))
+      );
+
+    if (dashes.length === 0 && past.length === 0) continue;
 
     // The marks that have not gone by yet, and only where both ends of one land
     // in front of the camera: a mark is drawn across the path, and half of a
@@ -380,7 +442,8 @@ export function projectPaths(
       name: pass.name,
       key,
       category: pass.category,
-      lines,
+      dashes,
+      past,
       ticks,
       anchor: anchorFor(pass, key, atMs, axes, lens, anchors),
       // Nought while the object is on the path, one at the far end of the

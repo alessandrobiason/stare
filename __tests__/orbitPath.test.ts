@@ -15,7 +15,15 @@ import { projectPaths } from "../src/hooks/useAnimatedMarkers";
 import { wrapDegrees360 } from "../src/math/angles";
 import { parseTleCatalog } from "../src/data/tleCatalog";
 import { CatalogEntry, SatelliteCatalog } from "../src/satellite/catalog";
-import { passesFor, pathFrom, planSkyPaths, separationDeg, SkyPass } from "../src/satellite/orbitPath";
+import {
+  cutAlong,
+  passesFor,
+  pathBehind,
+  pathFrom,
+  planSkyPaths,
+  separationDeg,
+  SkyPass
+} from "../src/satellite/orbitPath";
 import { propagateAt } from "../src/satellite/propagator";
 import { startSlicing } from "../src/timeSlice";
 import { EnuPosition, ObserverLocation } from "../src/types";
@@ -99,6 +107,63 @@ test("starts the pass under way where the object is now, not where it rose", () 
   );
   expect(separationDeg(pass.samples[0].position, truePosition(landmark(25867), MIDNIGHT)))
     .toBeLessThan(0.01);
+});
+
+describe("the sky a pass under way has already covered", () => {
+  test("is walked back from where the plan starts, as far as the wake reaches", () => {
+    const [pass] = passesFor(landmark(25867), MIDNIGHT, observer);
+    const { history } = pass;
+
+    expect(history.length).toBeGreaterThan(0);
+    // In time order, all of it before the arc still to come.
+    for (let index = 1; index < history.length; index += 1) {
+      expect(history[index].atMs).toBeGreaterThan(history[index - 1].atMs);
+    }
+    expect(history[history.length - 1].atMs).toBeLessThan(pass.startsAtMs);
+    // Back to the wake's length of sky or to the rise, whichever is nearer.
+    // Chandra is slow: this pass rose over two hours before midnight and has
+    // covered less sky than a wake since, so the walk ends on the floor.
+    const chain = [...history, pass.samples[0]];
+    const reach = chain
+      .slice(1)
+      .reduce(
+        (sum, sample, index) => sum + separationDeg(chain[index].position, sample.position),
+        0
+      );
+    expect(reach).toBeLessThan(LANDMARK_PATHS.pastArcDeg + 2 * LANDMARK_PATHS.sampleStepDeg);
+    expect(elevationDeg(history[0].position)).toBeCloseTo(MINIMUM_SATELLITE_ELEVATION_DEG, 0);
+    // And it is where the object really was.
+    for (const sample of history) {
+      expect(separationDeg(sample.position, truePosition(landmark(25867), sample.atMs)))
+        .toBeLessThan(0.01);
+    }
+  });
+
+  test("stops at the rise when the pass began less than a wake ago", () => {
+    // Half a minute into a pass of the station: the walk back meets the floor.
+    const [upcoming] = passesFor(landmark(25544), MIDNIGHT, observer).filter((one) => !one.started);
+    const planned = passesFor(landmark(25544), upcoming.startsAtMs + 30_000, observer)[0];
+
+    expect(planned.started).toBe(true);
+    expect(planned.history.length).toBeGreaterThan(0);
+    expect(planned.history[0].atMs).toBeGreaterThanOrEqual(upcoming.startsAtMs - 1000);
+    expect(elevationDeg(planned.history[0].position))
+      .toBeGreaterThan(MINIMUM_SATELLITE_ELEVATION_DEG);
+  });
+
+  test("is left empty for a pass that has not begun, whose rise is in its samples", () => {
+    const upcoming = passesFor(landmark(25544), MIDNIGHT, observer).filter((one) => !one.started);
+    expect(upcoming.length).toBeGreaterThan(0);
+    for (const pass of upcoming) expect(pass.history).toEqual([]);
+  });
+
+  test("changes nothing else about the pass", () => {
+    // Where it starts, its time marks and its samples are still the sky ahead:
+    // the list of what is coming reads them, and it must not see the past.
+    const [pass] = passesFor(landmark(25867), MIDNIGHT, observer);
+    expect(pass.startsAtMs).toBe(pass.samples[0].atMs);
+    for (const tick of pass.ticks) expect(tick.atMs).toBeGreaterThanOrEqual(pass.startsAtMs);
+  });
 });
 
 test("spaces the samples by angle rather than by the clock", () => {
@@ -267,6 +332,106 @@ describe("trimming a planned path to the present", () => {
   });
 });
 
+describe("the wake behind the object", () => {
+  const pass = () => passesFor(landmark(25544), MIDNIGHT, observer)[0];
+  const { pastArcDeg } = LANDMARK_PATHS;
+
+  const arcOf = (chain: EnuPosition[]) =>
+    chain.slice(1).reduce((sum, position, index) => sum + separationDeg(chain[index], position), 0);
+
+  test("starts where the line ahead does, at the object", () => {
+    const upcoming = pass();
+    const atMs = upcoming.startsAtMs + 90_000;
+    const behind = pathBehind(upcoming, atMs, pastArcDeg);
+    const ahead = pathFrom(upcoming, atMs);
+
+    expect(behind.length).toBeGreaterThan(1);
+    expect(separationDeg(behind[0], ahead[0])).toBeLessThan(1e-9);
+    // And runs back the way the object came: its far end is where it was.
+    const tail = behind[behind.length - 1];
+    expect(separationDeg(tail, truePosition(landmark(25544), upcoming.startsAtMs)))
+      .toBeLessThan(separationDeg(tail, ahead[ahead.length - 1]));
+  });
+
+  test("is no longer than the wake, measured along the sky", () => {
+    const upcoming = pass();
+    const late = pathBehind(upcoming, upcoming.endsAtMs - 30_000, pastArcDeg);
+    expect(arcOf(late)).toBeCloseTo(pastArcDeg, 2);
+  });
+
+  test("reaches only back to the rise early in a pass", () => {
+    const upcoming = pass();
+    const early = pathBehind(upcoming, upcoming.startsAtMs + 5000, pastArcDeg);
+    expect(arcOf(early)).toBeLessThan(pastArcDeg);
+    expect(separationDeg(early[early.length - 1], upcoming.samples[0].position)).toBeLessThan(1e-9);
+  });
+
+  test("is nothing before the pass begins or once it is over", () => {
+    const upcoming = pass();
+    expect(pathBehind(upcoming, upcoming.startsAtMs - 1000, pastArcDeg)).toEqual([]);
+    expect(pathBehind(upcoming, upcoming.endsAtMs + 1000, pastArcDeg)).toEqual([]);
+  });
+
+  test("is the same wake from a plan made mid-pass as from the plan before it", () => {
+    // The reason a plan walks back at all: without it, a plan made a minute
+    // into a pass would draw a wake a minute long, and every replan would cut
+    // the wake back to nothing.
+    const upcoming = pass();
+    const replanned = passesFor(landmark(25544), upcoming.startsAtMs + 120_000, observer)[0];
+    const atMs = upcoming.startsAtMs + 150_000;
+
+    const before = pathBehind(upcoming, atMs, pastArcDeg);
+    const after = pathBehind(replanned, atMs, pastArcDeg);
+    expect(arcOf(after)).toBeCloseTo(arcOf(before), 1);
+    expect(separationDeg(after[after.length - 1], before[before.length - 1])).toBeLessThan(0.1);
+  });
+});
+
+describe("cutting an arc along the sky", () => {
+  const chain = () => pathFrom(passesFor(landmark(25544), MIDNIGHT, observer)[0], MIDNIGHT);
+  const arcOf = (positions: EnuPosition[]) =>
+    positions
+      .slice(1)
+      .reduce((sum, position, index) => sum + separationDeg(positions[index], position), 0);
+
+  test("cuts dashes of the length asked for, from the chain's first point", () => {
+    const pieces = cutAlong(chain(), 1, 0.6);
+
+    expect(pieces.length).toBeGreaterThan(20);
+    expect(separationDeg(pieces[0].positions[0], chain()[0])).toBeLessThan(1e-9);
+    pieces.slice(0, -1).forEach((piece, index) => {
+      expect(piece.fromDeg).toBeCloseTo(index, 6);
+      expect(arcOf(piece.positions)).toBeCloseTo(0.6, 3);
+    });
+  });
+
+  test("cuts contiguous steps as long as their spacing, and stops where asked", () => {
+    const pieces = cutAlong(chain(), 2, 2, 24);
+
+    expect(pieces).toHaveLength(12);
+    for (let index = 1; index < pieces.length; index += 1) {
+      const last = pieces[index - 1].positions;
+      expect(separationDeg(last[last.length - 1], pieces[index].positions[0])).toBeLessThan(1e-4);
+    }
+  });
+
+  test("skips the pieces lying only on segments nobody wants", () => {
+    const all = cutAlong(chain(), 1, 0.6);
+    const onlyFirst = (segment: number) => segment === 0;
+    const firstOnly = cutAlong(chain(), 1, 0.6, Number.POSITIVE_INFINITY, onlyFirst);
+
+    expect(firstOnly.length).toBeGreaterThan(0);
+    expect(firstOnly.length).toBeLessThan(all.length);
+    expect(firstOnly[0].fromDeg).toBe(0);
+  });
+
+  test("leaves no piece of no length at the end of the chain", () => {
+    for (const piece of cutAlong(chain(), 1, 0.6)) {
+      expect(arcOf(piece.positions)).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("a planned pass on the frame", () => {
   const upcoming = () => passesFor(landmark(25544), MIDNIGHT, observer)[1];
 
@@ -285,9 +450,16 @@ describe("a planned pass on the frame", () => {
     const [drawn] = projectPaths([pass], MIDNIGHT, aimedAt(middle.position), DEVICE_LENS);
 
     expect(drawn.name).toBe("ISS");
-    expect(drawn.lines.length).toBeGreaterThan(0);
+    expect(drawn.dashes.length).toBeGreaterThan(0);
     // Through the middle of the view, since that is what the camera is on.
-    expect(drawn.lines.flat().some((point) => pointOnFrame(point))).toBe(true);
+    expect(drawn.dashes.flat().some((point) => pointOnFrame(point))).toBe(true);
+    // Only near the view: a pass is three times the frame, and the rest of it
+    // is not cut into dashes for the canvas to throw away. Near is a sample's
+    // spacing past the edge, since the stretches kept are whole segments.
+    for (const dash of drawn.dashes) {
+      expect(dash.some((point) => Math.abs(point.left - 50) < 75 && Math.abs(point.top - 50) < 75))
+        .toBe(true);
+    }
   });
 
   test("keeps the line while the object itself is nowhere near the view", () => {
@@ -298,7 +470,7 @@ describe("a planned pass on the frame", () => {
     const later = pass.samples[pass.samples.length - 2];
     const [drawn] = projectPaths([pass], MIDNIGHT, aimedAt(later.position), DEVICE_LENS);
 
-    expect(drawn.lines.length).toBeGreaterThan(0);
+    expect(drawn.dashes.length).toBeGreaterThan(0);
     // And the object is not on the frame: it is minutes away from that spot.
     const head = projectWithAxes(pass.samples[0].position, aimedAt(later.position), DEVICE_LENS);
     expect(head === null || !pointOnFrame(head)).toBe(true);
@@ -321,8 +493,47 @@ describe("a planned pass on the frame", () => {
     const [drawn] = projectPaths([pass], middle.atMs, axes, DEVICE_LENS);
 
     const head = projectWithAxes(truePosition(landmark(25544), middle.atMs), axes, DEVICE_LENS);
-    expect(drawn.lines[0][0].left).toBeCloseTo(head!.left, 1);
-    expect(drawn.lines[0][0].top).toBeCloseTo(head!.top, 1);
+    expect(drawn.dashes[0][0].left).toBeCloseTo(head!.left, 1);
+    expect(drawn.dashes[0][0].top).toBeCloseTo(head!.top, 1);
+  });
+
+  test("dashes from the object, so a replanned pass draws the same dashes", () => {
+    // A plan is remade every minute, and one made mid-pass starts its samples
+    // somewhere new. Dashes counted from the plan's own start would jump every
+    // time; counted from the object, they do not.
+    const pass = upcoming();
+    const replanned = passesFor(landmark(25544), pass.startsAtMs + 60_000, observer).find(
+      (one) => one.started
+    )!;
+    const atMs = pass.startsAtMs + 90_000;
+    const axes = aimedAt(pathFrom(pass, atMs)[0]);
+
+    const [before] = projectPaths([pass], atMs, axes, DEVICE_LENS);
+    const [after] = projectPaths([replanned], atMs, axes, DEVICE_LENS);
+    for (const index of [0, 5, 10]) {
+      expect(after.dashes[index][0].left).toBeCloseTo(before.dashes[index][0].left, 1);
+      expect(after.dashes[index][0].top).toBeCloseTo(before.dashes[index][0].top, 1);
+    }
+  });
+
+  test("draws a fading wake behind a pass under way, and none ahead of one", () => {
+    const pass = upcoming();
+    const atMs = pass.startsAtMs + 90_000;
+    const axes = aimedAt(pathFrom(pass, atMs)[0]);
+
+    const [underWay] = projectPaths([pass], atMs, axes, DEVICE_LENS);
+    expect(underWay.past.length).toBeGreaterThan(0);
+    // From the object backwards: it starts where the dashes do, and each step
+    // is further back than the one before it.
+    expect(underWay.past[0].points[0].left).toBeCloseTo(underWay.dashes[0][0].left, 6);
+    expect(underWay.past[0].points[0].top).toBeCloseTo(underWay.dashes[0][0].top, 6);
+    for (let index = 1; index < underWay.past.length; index += 1) {
+      expect(underWay.past[index].behind).toBeGreaterThan(underWay.past[index - 1].behind);
+    }
+    expect(underWay.past.every((step) => step.behind > 0 && step.behind < 1)).toBe(true);
+
+    const [ahead] = projectPaths([pass], MIDNIGHT, aimedAt(pass.samples[0].position), DEVICE_LENS);
+    expect(ahead.past).toEqual([]);
   });
 
   describe("where the name is written", () => {

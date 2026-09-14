@@ -1,8 +1,8 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MarkerLabels } from "../src/components/MarkerLabels";
-import { buildMarkerScene, GlyphShape } from "../src/components/markerScene";
-import { NIGHT_PALETTE } from "../src/components/palette";
+import { buildMarkerScene, GlyphShape, TAIL_FADE } from "../src/components/markerScene";
+import { DAYLIGHT_PALETTE, NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
 import { CATEGORY_COLORS } from "../src/satellite/categories";
@@ -191,17 +191,17 @@ test("lays the tail behind the marker, as far back as the object will travel", (
   expect(head[0].y).toBeGreaterThan(head[1].y);
 });
 
-test("tapers the tail from nothing to a fraction of the body", () => {
+test("tapers the tail from nothing to most of the point", () => {
   const [glyph] = scene([marker({ rangeKm: 500 })]).glyphs;
   const [, ...head] = corners(glyph);
   const width = Math.hypot(head[0].x - head[1].x, head[0].y - head[1].y);
 
-  // Three points is the taper: one at the tip, two at the head. The icon's own
-  // proportion is a trail a little under half the radius of its body.
+  // Three points is the taper: one at the tip, two at the head. The head is
+  // narrower than the point it comes out of, so the point stays the head.
   expect(corners(glyph)).toHaveLength(3);
   expect(width).toBeGreaterThan(0);
-  expect(width).toBeLessThan(glyph.core.radius);
-  expect(width / glyph.core.radius).toBeCloseTo(0.48, 2);
+  expect(width).toBeLessThan(glyph.core.radius * 2);
+  expect(width).toBeCloseTo(glyph.tail!.width, 6);
 });
 
 test("points the tail along the line of travel, in pixels", () => {
@@ -217,12 +217,101 @@ test("points the tail along the line of travel, in pixels", () => {
   expect(tip.y).toBeCloseTo(640 - 128);
 });
 
-test("keeps the tail's rim outside its colour rather than inside it", () => {
-  const [glyph] = scene([marker()]).glyphs;
+test("fades the tail from the point to nothing at its tip", () => {
+  // A comet's tail: brightest where it leaves the mark, gone where the object
+  // was twelve seconds ago, and never brighter further out than nearer in.
+  expect(TAIL_FADE[0]).toEqual({ at: 0, strength: 1 });
+  expect(TAIL_FADE[TAIL_FADE.length - 1]).toEqual({ at: 1, strength: 0 });
+  for (let index = 1; index < TAIL_FADE.length; index += 1) {
+    expect(TAIL_FADE[index].at).toBeGreaterThan(TAIL_FADE[index - 1].at);
+    expect(TAIL_FADE[index].strength).toBeLessThan(TAIL_FADE[index - 1].strength);
+  }
 
-  // The rim is the same polygon stroked as well as filled, so it reaches half
-  // that stroke past every edge of a shape only a couple of pixels wide.
-  expect(glyph.tail?.rimWidth).toBeGreaterThan(0);
+  // And even where it is strongest it is a shade under the point itself, so
+  // the point is the brightest thing on the mark.
+  const [glyph] = scene([marker({ rangeKm: 400 })]).glyphs;
+  expect(glyph.tail!.alpha).toBeLessThan(1);
+  expect(glyph.tail!.alpha).toBeGreaterThan(0.5);
+});
+
+test("points the tail's fade from the mark towards the tip", () => {
+  const [glyph] = scene([
+    marker({ point: { left: 50, top: 50 }, next: { left: 50, top: 60 } })
+  ]).glyphs;
+  const [tip] = corners(glyph);
+
+  // Travelling down the frame, so the tail lies straight up from the mark.
+  expect(glyph.tail!.length).toBeCloseTo(128, 6);
+  expect(Math.cos(glyph.tail!.angle) * glyph.tail!.length).toBeCloseTo(tip.x - glyph.x, 6);
+  expect(Math.sin(glyph.tail!.angle) * glyph.tail!.length).toBeCloseTo(tip.y - glyph.y, 6);
+});
+
+describe("a moving mark", () => {
+  test("is a small point in a glow, not a disc over the picture", () => {
+    const [glyph] = scene([marker({ rangeKm: 400, next: null })]).glyphs;
+    const footprint = SATELLITE_MARKERS.nearDiameterPx;
+
+    // The solid part is well under half the footprint the range scale gives
+    // it; the rest of that footprint is light fading to nothing.
+    expect(glyph.core.radius * 2).toBeLessThan(footprint / 2);
+    expect(glyph.rim.radius * 2).toBeLessThan(footprint / 2);
+    expect(glyph.glow.radius).toBeGreaterThan(glyph.rim.radius);
+    expect(glyph.glow.alpha).toBeGreaterThan(0);
+    expect(glyph.glow.alpha).toBeLessThan(1);
+  });
+
+  test("has a lit centre in its own colour, inside the point", () => {
+    const [glyph] = scene([marker({ category: "COMMS", next: null })]).glyphs;
+
+    expect(glyph.spark).not.toBeNull();
+    expect(glyph.spark!.radius).toBeLessThan(glyph.core.radius);
+    // Lighter than the category colour in every channel, and not white: the
+    // hue is what says what the object is for.
+    const channels = (color: string) =>
+      [1, 3, 5].map((index) => Number.parseInt(color.slice(index, index + 2), 16));
+    const lit = channels(glyph.spark!.color);
+    channels(CATEGORY_COLORS.COMMS).forEach((channel, index) => {
+      expect(lit[index]).toBeGreaterThanOrEqual(channel);
+    });
+    expect(glyph.spark!.color).not.toBe("#ffffff");
+  });
+
+  test("gives off hardly any light by day, where the marks are ink", () => {
+    const frame: MarkerFrame = { markers: [marker()], paths: [], rollDeg: 0 };
+    const night = buildMarkerScene(frame, FRAME, NIGHT_PALETTE).glyphs[0];
+    const day = buildMarkerScene(frame, FRAME, DAYLIGHT_PALETTE).glyphs[0];
+
+    expect(day.glow.alpha).toBeLessThan(night.glow.alpha / 2);
+    expect(day.spark!.alpha).toBeLessThan(night.spark!.alpha / 2);
+    // The point, its size and its tail are the same mark either way.
+    expect(day.core).toEqual(night.core);
+    expect(day.tail).toEqual(night.tail);
+  });
+});
+
+describe("depth", () => {
+  test("draws a nearer satellite's light stronger as well as its point larger", () => {
+    const near = scene([marker({ rangeKm: 450 })]).glyphs[0];
+    const far = scene([marker({ rangeKm: 20000 })]).glyphs[0];
+
+    expect(near.core.radius).toBeGreaterThan(far.core.radius);
+    expect(near.glow.radius).toBeGreaterThan(far.glow.radius);
+    expect(near.glow.alpha).toBeGreaterThan(far.glow.alpha);
+    expect(near.tail!.alpha).toBeGreaterThan(far.tail!.alpha);
+    expect(near.tail!.width).toBeGreaterThan(far.tail!.width);
+    expect(near.spark!.alpha).toBeGreaterThan(far.spark!.alpha);
+  });
+
+  test("is restrained: the far end of the scale is still plainly drawn", () => {
+    // Two decades out is half strength, not gone — and the point itself, which
+    // carries the colour, is drawn solid at any range.
+    const near = scene([marker({ rangeKm: 400 })]).glyphs[0];
+    const far = scene([marker({ rangeKm: 40000 })]).glyphs[0];
+
+    expect(far.glow.alpha).toBeCloseTo(near.glow.alpha / 2, 6);
+    expect(far.tail!.alpha).toBeCloseTo(near.tail!.alpha / 2, 6);
+    expect(far.alpha).toBe(near.alpha);
+  });
 });
 
 test("fades the whole marker together as it crosses an edge", () => {
@@ -327,13 +416,34 @@ describe("the ring around a tapped satellite", () => {
     expect(selection!.radius - selection!.width / 2).toBeGreaterThan(outerEdge);
   });
 
-  test("clears a landmark's halo too", () => {
-    const { selection, glyphs } = selectedScene(
-      [marker({ name: "ISS", category: "LANDMARK" })],
-      "ISS"
-    );
+  test("sits as close around a landmark as around any other mark", () => {
+    // A halo is light fading to nothing, not a shape with an edge to clear, and
+    // a ring drawn outside it would be a hand's width across around a point a
+    // few pixels wide.
+    const landmark = selectedScene([marker({ name: "ISS", category: "LANDMARK" })], "ISS");
+    const other = selectedScene([marker({ name: "SAT" })], "SAT");
 
-    expect(selection!.radius - selection!.width / 2).toBeGreaterThan(glyphs[0].halo!);
+    expect(landmark.selection!.radius).toBeCloseTo(other.selection!.radius, 6);
+    expect(landmark.selection!.radius - landmark.selection!.width / 2).toBeGreaterThan(
+      landmark.glyphs[0].rim.radius
+    );
+  });
+
+  test("draws the tapped satellite a little larger and brighter than its range says", () => {
+    const tapped = selectedScene([marker({ name: "SAT", rangeKm: 20000 })], "SAT").glyphs[0];
+    const plain = scene([marker({ name: "SAT", rangeKm: 20000 })]).glyphs[0];
+
+    expect(tapped.core.radius).toBeGreaterThan(plain.core.radius);
+    expect(tapped.core.radius).toBeLessThan(plain.core.radius * 1.5);
+    expect(tapped.glow.alpha).toBeGreaterThan(plain.glow.alpha);
+    // Brighter, but it has not changed colour or strength: those are channels.
+    expect(tapped.color).toBe(plain.color);
+    expect(tapped.alpha).toBe(plain.alpha);
+  });
+
+  test("does not move a landmark's name when it is tapped", () => {
+    const landmark = marker({ name: "ISS", category: "LANDMARK" });
+    expect(selectedScene([landmark], "ISS").labels).toEqual(scene([landmark]).labels);
   });
 
   test("is a bright band on a dark rim, like every other mark on the sky", () => {
@@ -375,13 +485,17 @@ describe("a landmark's path across the sky", () => {
       name: "ISS",
       key: "25544@1",
       category: "LANDMARK",
-      lines: [
+      dashes: [
         [
           { left: 20, top: 50 },
-          { left: 50, top: 50 },
-          { left: 80, top: 50 }
+          { left: 21, top: 50 }
+        ],
+        [
+          { left: 22, top: 50 },
+          { left: 23, top: 50 }
         ]
       ],
+      past: [],
       ticks: [{ at: { left: 50, top: 50 }, ahead: { left: 60, top: 50 } }],
       anchor: null,
       lead: 0,
@@ -389,7 +503,7 @@ describe("a landmark's path across the sky", () => {
     };
   }
 
-  test("draws it as a thin rimmed line in the landmark colour", () => {
+  test("draws it as thin rimmed dashes in the landmark colour", () => {
     const [shape] = scene([], 0, FRAME, [path()]).paths;
 
     expect(shape.color).toBe(CATEGORY_COLORS.LANDMARK);
@@ -400,11 +514,57 @@ describe("a landmark's path across the sky", () => {
     expect(shape.rimWidth).toBeGreaterThan(shape.width);
   });
 
-  test("places the arc in pixels on the frame it is drawn into", () => {
+  test("places the dashes in pixels on the frame it is drawn into", () => {
     const [shape] = scene([], 0, FRAME, [path()]).paths;
-    expect(shape.lines).toHaveLength(1);
+    expect(shape.dashes).toHaveLength(2);
     // Percent of the frame, in the order the pass runs.
-    expect(shape.lines[0]).toEqual([144, 640, 360, 640, 576, 640]);
+    expect(shape.dashes[0]).toEqual([144, 640, 151.2, 640]);
+    expect(shape.dashes[1]).toEqual([158.4, 640, 165.6, 640]);
+  });
+
+  describe("the wake behind a pass under way", () => {
+    /** A wake of three steps running back to the left of an object at the centre. */
+    const underWay = () =>
+      path({
+        past: [0, 1, 2].map((step) => ({
+          points: [
+            { left: 50 - step * 5, top: 50 },
+            { left: 45 - step * 5, top: 50 }
+          ],
+          behind: (step + 0.5) / 3
+        }))
+      });
+
+    test("is thinner and fainter than the line ahead, and fades as it goes back", () => {
+      const [shape] = scene([], 0, FRAME, [underWay()]).paths;
+
+      expect(shape.past).toHaveLength(3);
+      expect(shape.pastWidth).toBeLessThan(shape.width);
+      expect(shape.pastRimWidth).toBeGreaterThan(shape.pastWidth);
+      expect(shape.past[0].alpha).toBeLessThan(shape.alpha);
+      for (let index = 1; index < shape.past.length; index += 1) {
+        expect(shape.past[index].alpha).toBeLessThan(shape.past[index - 1].alpha);
+      }
+    });
+
+    test("is placed in pixels, step by step from the object back", () => {
+      const [shape] = scene([], 0, FRAME, [underWay()]).paths;
+      const expected = [
+        [360, 640, 324, 640],
+        [324, 640, 288, 640],
+        [288, 640, 252, 640]
+      ];
+      expect(shape.past).toHaveLength(expected.length);
+      shape.past.forEach((step, index) => {
+        step.points.forEach((value, at) => expect(value).toBeCloseTo(expected[index][at], 6));
+      });
+    });
+
+    test("fades with the pass, as the line ahead does", () => {
+      const now = scene([], 0, FRAME, [{ ...underWay(), lead: 0 }]).paths[0];
+      const later = scene([], 0, FRAME, [{ ...underWay(), lead: 1 }]).paths[0];
+      expect(later.past[0].alpha / now.past[0].alpha).toBeCloseTo(later.alpha / now.alpha, 6);
+    });
   });
 
   test("scales with the frame, as every other size does", () => {

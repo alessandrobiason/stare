@@ -5,13 +5,15 @@ import { FrameSize } from "./markerGeometry";
 import {
   buildMarkerScene,
   Circle,
+  GLOW_FADE,
   GlyphShape,
   MarkerScene,
   PathShape,
   SelectionRing,
+  TAIL_FADE,
   TailShape
 } from "./markerScene";
-import { Ink, MarkerPalette } from "./palette";
+import { cssColor, MarkerPalette } from "./palette";
 
 type Props = {
   /** The drawn frames, as a subscription. See `MarkerSource`. */
@@ -36,7 +38,7 @@ type Props = {
  *
  * What both backends draw is decided in `markerScene`, which is where the look
  * of a marker is defined and where the tests read it from. This file, like its
- * native sibling, only knows how to fill a circle and a polygon.
+ * native sibling, only knows how to fill a circle and a polygon and fade one.
  */
 export const SatelliteMarkers: React.FC<Props> = ({
   markers,
@@ -91,12 +93,13 @@ export const SatelliteMarkers: React.FC<Props> = ({
 };
 
 function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
-  // Round, so the rim stroked around a tail follows it to the tip instead of
-  // running two edges out to the spike where they would have met.
   context.lineJoin = "round";
   context.lineCap = "round";
   // Under the marks, and first: a path is what the marks are read against.
   for (const path of scene.paths) drawPath(context, path, scene.palette);
+  // Every rim before any mark's light, as on the phone: the station is several
+  // marks in one place, and each rim over the glow beneath it cut a dark ring.
+  for (const glyph of scene.glyphs) drawRim(context, glyph, scene.palette);
   for (const glyph of scene.glyphs) drawGlyph(context, glyph, scene.palette);
   // Over every mark, including the ones in front of the selected satellite: a
   // ring half hidden behind a passing dot says nothing.
@@ -104,30 +107,40 @@ function draw(context: CanvasRenderingContext2D, scene: MarkerScene): void {
 }
 
 /**
- * One landmark's path: the arc it will travel, and the clock minutes on it.
+ * One landmark's path: the wake behind the object, the dashes ahead of it, and
+ * the clock minutes on them.
  *
  * Rims for the whole shape first and colour afterwards, as on the phone: an
  * arrowhead sits on the line it belongs to, and drawn in pairs each mark's rim
- * would cut a dark notch through the arc it is measuring.
+ * would cut a dark notch through the arc it is measuring. The wake's steps are
+ * cut square so they meet end to end rather than overlapping into beads.
  */
 function drawPath(
   context: CanvasRenderingContext2D,
   shape: PathShape,
   palette: MarkerPalette
 ): void {
-  const draw = (points: number[], color: string, alpha: number, width: number) => {
-    trace(context, points, false);
+  const draw = (runs: number[][], color: string, alpha: number, width: number) => {
+    if (runs.length === 0) return;
+    trace(context, runs);
     context.globalAlpha = alpha;
     context.strokeStyle = color;
     context.lineWidth = width;
     context.stroke();
   };
+  const wake = (color: string, strength: number, width: number) => {
+    context.lineCap = "butt";
+    for (const step of shape.past) draw([step.points], color, strength * step.alpha, width);
+    context.lineCap = "round";
+  };
 
   const ink = palette.outline;
-  for (const run of shape.lines) draw(run, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
-  for (const arrow of shape.arrows) draw(arrow, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
-  for (const run of shape.lines) draw(run, shape.color, shape.alpha, shape.width);
-  for (const arrow of shape.arrows) draw(arrow, shape.color, shape.alpha, shape.width);
+  wake(ink.color, ink.alpha, shape.pastRimWidth);
+  draw(shape.dashes, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  draw(shape.arrows, ink.color, ink.alpha * shape.alpha, shape.rimWidth);
+  wake(shape.color, 1, shape.pastWidth);
+  draw(shape.dashes, shape.color, shape.alpha, shape.width);
+  draw(shape.arrows, shape.color, shape.alpha, shape.width);
 }
 
 /** The ring that says which satellite the info card is describing. */
@@ -146,13 +159,13 @@ function drawSelection(context: CanvasRenderingContext2D, ring: SelectionRing): 
 }
 
 /**
- * One satellite: its halo if it is a landmark, its tail, its rim and its mark.
+ * One satellite, over the rims: its halo if it is a landmark, its glow, its
+ * tail, its point and the lit centre of it.
  *
  * Drawn a marker at a time rather than a layer at a time, so the sort by range
  * holds — a nearer object's whole shape passes in front of a farther one's. The
- * order within a marker is what joins the tail to the body: the rim goes down
- * first, in both shapes, and the two coloured shapes are laid over it
- * afterwards, so no dark ring is left cutting between a body and its own tail.
+ * rims are already down (`drawRim`), so no dark ring is left cutting between a
+ * point and its own tail, or through the light around it.
  */
 function drawGlyph(
   context: CanvasRenderingContext2D,
@@ -172,52 +185,77 @@ function drawGlyph(
       context.stroke();
     }
   };
+  const glow = (radius: number, color: string, alpha: number) => {
+    if (!(radius > 0) || !(alpha > 0)) return;
+    const light = context.createRadialGradient(glyph.x, glyph.y, 0, glyph.x, glyph.y, radius);
+    for (const stop of GLOW_FADE) {
+      light.addColorStop(stop.at, cssColor({ color, alpha: stop.strength }));
+    }
+    context.globalAlpha = alpha;
+    context.fillStyle = light;
+    context.beginPath();
+    context.arc(glyph.x, glyph.y, radius, 0, TWO_PI);
+    context.fill();
+  };
 
   if (glyph.halo !== null) {
-    circle({ radius: glyph.halo, width: null }, palette.halo.color, palette.halo.alpha * glyph.alpha);
+    glow(glyph.halo, palette.halo.color, palette.halo.alpha * glyph.alpha);
   }
-  if (glyph.tail) rim(context, glyph.tail, palette.outline, glyph.alpha);
-  circle(glyph.rim, palette.outline.color, palette.outline.alpha * glyph.alpha);
-  if (glyph.tail) {
-    trace(context, glyph.tail.points, true);
-    context.globalAlpha = glyph.alpha;
-    context.fillStyle = glyph.color;
-    context.fill();
-  }
+  glow(glyph.glow.radius, glyph.color, glyph.glow.alpha * glyph.alpha);
+  if (glyph.tail) drawTail(context, glyph, glyph.tail);
   circle(glyph.core, glyph.color, glyph.alpha);
-}
-
-/**
- * The dark shape under a tail: the same polygon filled and stroked, so the rim
- * reaches half the stroke past every edge and the tip stays a tip.
- */
-function rim(
-  context: CanvasRenderingContext2D,
-  shape: TailShape,
-  ink: Ink,
-  alpha: number
-): void {
-  trace(context, shape.points, true);
-  context.globalAlpha = ink.alpha * alpha;
-  context.fillStyle = ink.color;
-  context.fill();
-  context.strokeStyle = ink.color;
-  context.lineWidth = shape.rimWidth;
-  context.stroke();
-}
-
-/**
- * Flat `x, y` pairs as the context's current path: closed for a tail, which is
- * a filled triangle, and open for an arc, which is a stroked line and would
- * otherwise be drawn a segment back to where it started.
- */
-function trace(context: CanvasRenderingContext2D, points: number[], close: boolean): void {
-  context.beginPath();
-  context.moveTo(points[0], points[1]);
-  for (let index = 2; index < points.length; index += 2) {
-    context.lineTo(points[index], points[index + 1]);
+  if (glyph.spark) {
+    const { spark } = glyph;
+    circle({ radius: spark.radius, width: null }, spark.color, spark.alpha * glyph.alpha);
   }
-  if (close) context.closePath();
+}
+
+/** The contrasting rim under a mark: a disc, or a band under a ring. */
+function drawRim(
+  context: CanvasRenderingContext2D,
+  glyph: GlyphShape,
+  palette: MarkerPalette
+): void {
+  const { rim } = glyph;
+  context.globalAlpha = palette.outline.alpha * glyph.alpha;
+  context.beginPath();
+  context.arc(glyph.x, glyph.y, Math.max(0, rim.radius), 0, TWO_PI);
+  if (rim.width === null) {
+    context.fillStyle = palette.outline.color;
+    context.fill();
+  } else {
+    context.strokeStyle = palette.outline.color;
+    context.lineWidth = rim.width;
+    context.stroke();
+  }
+}
+
+/** The comet's tail: the taper, faded from the point to its tip. */
+function drawTail(context: CanvasRenderingContext2D, glyph: GlyphShape, tail: TailShape): void {
+  const [tipX, tipY] = tail.points;
+  const fade = context.createLinearGradient(glyph.x, glyph.y, tipX, tipY);
+  for (const stop of TAIL_FADE) {
+    fade.addColorStop(stop.at, cssColor({ color: glyph.color, alpha: stop.strength }));
+  }
+  trace(context, [tail.points]);
+  context.closePath();
+  context.globalAlpha = tail.alpha * glyph.alpha;
+  context.fillStyle = fade;
+  context.fill();
+}
+
+/**
+ * Runs of flat `x, y` pairs as the context's current path, each its own open
+ * stretch: a dash, a step of a wake, an arrowhead — or, closed after, a tail.
+ */
+function trace(context: CanvasRenderingContext2D, runs: number[][]): void {
+  context.beginPath();
+  for (const points of runs) {
+    context.moveTo(points[0], points[1]);
+    for (let index = 2; index < points.length; index += 2) {
+      context.lineTo(points[index], points[index + 1]);
+    }
+  }
 }
 
 const TWO_PI = Math.PI * 2;

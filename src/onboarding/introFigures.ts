@@ -1,5 +1,7 @@
-import { FramePoint } from "../camera/projection";
+import { DEVICE_LENS, FramePoint } from "../camera/projection";
 import { clipPolyline, FrameSize, WHOLE_FRAME } from "../components/markerGeometry";
+import { DESIGN_FRAME_WIDTH_PX } from "../components/markerScene";
+import { LANDMARK_PATHS } from "../constants";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../hooks/useAnimatedMarkers";
 import { SatelliteCategory } from "../satellite/categories";
 import { SunlitState } from "../satellite/illumination";
@@ -208,10 +210,16 @@ export function pathFigure(box: FrameSize): PathFigure {
     name: "ISS",
     key: "ISS intro",
     category: "LANDMARK",
-    lines: clipPolyline(
-      curve.map((point) => pointIn(box, point.x, point.y)),
-      WHOLE_FRAME
+    // Dashed as the sky dashes a pass, at the length a dash is on the phone's
+    // own camera — the picture is at design scale — and from the start of the
+    // line, which is where the object is going to come from.
+    dashes: dashesAlong(total, along).flatMap((dash) =>
+      clipPolyline(
+        dash.map((point) => pointIn(box, point.x, point.y)),
+        WHOLE_FRAME
+      )
     ),
+    past: [],
     ticks,
     anchor: { at: pointIn(box, anchor.x, anchor.y), atMs: SAMPLE_PATH_TIME_MS },
     lead: 0
@@ -232,6 +240,32 @@ export function pathFigure(box: FrameSize): PathFigure {
 
   return { frame: { markers: [], paths: [path], rollDeg: 0 }, roofs, callouts };
 }
+
+/**
+ * A line `total` points long cut into the dashes the sky draws a pass ahead in,
+ * each as its two ends and its middle, so a dash follows the curve.
+ */
+function dashesAlong(
+  total: number,
+  along: (distance: number) => { x: number; y: number }
+): { x: number; y: number }[][] {
+  const dash = LANDMARK_PATHS.dashDeg * POINTS_PER_DEGREE;
+  const every = dash + LANDMARK_PATHS.dashGapDeg * POINTS_PER_DEGREE;
+  const dashes: { x: number; y: number }[][] = [];
+  for (let from = 0; from < total; from += every) {
+    const to = Math.min(total, from + dash);
+    dashes.push([along(from), along((from + to) / 2), along(to)]);
+  }
+  return dashes;
+}
+
+/**
+ * A degree of sky in the middle of the phone's camera frame, in points at the
+ * design width, which is the scale the pictures are drawn at
+ * (`FIGURE_MARK_SCALE`).
+ */
+const POINTS_PER_DEGREE =
+  (DESIGN_FRAME_WIDTH_PX / 2 / DEVICE_LENS.horizontalScale) * (Math.PI / 180);
 
 /** How far a callout sits from what it points at, in points. */
 const CALLOUT_CLEARANCE = 18;

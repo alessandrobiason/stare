@@ -226,7 +226,7 @@ describe("the landmark's line", () => {
 
   test("comes up from the bottom edge, where the roofs are", () => {
     const figure = pathFigure(CARD);
-    const start = figure.frame.paths[0].lines[0][0];
+    const start = figure.frame.paths[0].dashes[0][0];
 
     expect(start.top).toBeGreaterThan(95);
     expect(figure.roofs.every((roof) => roof.height > 0 && roof.height < CARD.height / 2)).toBe(true);

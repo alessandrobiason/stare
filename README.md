@@ -13,9 +13,13 @@ strip of cardinal points along the bottom of the frame, a card carrying the next
 landmark due over you, and a bar of three tabs — the sky, a catalog that is not
 built yet, and the settings the guide and the console now live in.
 **A marker is the app's own logo**: the
-body and tapered trail of `assets/icon.svg`, a couple of dozen pixels across,
-the same shape the boot screen turns five of — both drawn by `tools/make-logo.mjs`
-from the geometry in `src/components/bootSky.ts`. It carries five channels at once —
+body and tapered trail of `assets/icon.svg`, the same shape the boot screen turns
+five of — both drawn by `tools/make-logo.mjs` from the geometry in
+`src/components/bootSky.ts` — drawn as light: a point a few pixels across with a
+lit centre, in a soft glow of its own colour, trailing a comet's tail that fades
+to nothing. Solid discs a couple of dozen pixels across covered the picture they
+were marking. Nearer objects are larger *and* brighter, glow and tail alike, on
+the same log scale as their size. It carries five channels at once —
 colour for purpose (five categories), shape for whether the object holds station
 (a geostationary ring, or a body trailing the 12 seconds of ground track it has
 just covered), size for range on a log scale from 400 km to 40,000 km, a
@@ -422,7 +426,13 @@ about the station is not where it is — most of the time it is under the floor,
 and no marker can be drawn for that — but *when* it comes over and *where* to
 stand. So a landmark is drawn with the arc it will trace across the sky: rise to
 set, for every pass in the next three hours, with an arrowhead at each round
-clock minute and the object's name written on the line itself.
+clock minute and the object's name written on the line itself. The sky still to
+come is dashed; for a pass under way, the sky already covered trails behind the
+object as a thinner solid wake that fades out a couple of dozen degrees back —
+so where it has been, where it is and where it is going read without a key.
+Both are measured in degrees along the sky from the object, so the dashes stay
+on their piece of sky as the phone turns, and each plan walks back far enough
+(`SkyPass.history`) that replanning never cuts the wake short.
 
 Both of those are the second draft. The marks were strokes *across* the line,
 which answer "when" and leave "which way" to be guessed — the one thing a line
@@ -456,8 +466,8 @@ it.
 
 The plan is a few thousand propagations, made once a minute off the frame
 thread in slices (`src/timeSlice.ts`) and trimmed to the present on every frame,
-so the line always starts at the object and never at where it was when the plan
-was made. It is sampled by *angle* rather than by the clock — four degrees a
+so the line ahead always starts at the object and never at where it was when
+the plan was made. It is sampled by *angle* rather than by the clock — four degrees a
 step, chosen from the object's own rate — which is what makes one arc out of a
 station crossing at a degree a second and Chandra crawling at a degree a minute.
 Four paths at a time, breadth first, with a ferry docked to a station collapsed

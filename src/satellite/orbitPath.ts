@@ -69,6 +69,21 @@ export type SkyPass = {
   category: SatelliteCategory;
   /** The arc, ordered in time. Never fewer than two points. */
   samples: SkySample[];
+  /**
+   * The sky a pass already under way had covered before the plan was made:
+   * ordered in time, ending just before `samples` begins, and reaching back
+   * `LANDMARK_PATHS.pastArcDeg` or to the rise, whichever is nearer. Empty for
+   * a pass that had not begun, whose rise is in `samples` already.
+   *
+   * Only the wake behind the object is drawn from it (`pathBehind`), and it is
+   * kept apart from `samples` so that nothing else about a pass changes: where
+   * it starts, its time marks and its place in the list of what is coming are
+   * all still the sky ahead.
+   *
+   * Without it the wake would be as long as the plan was old, and every minute
+   * a new plan would cut it back to nothing.
+   */
+  history: SkySample[];
   ticks: SkyTick[];
   startsAtMs: number;
   endsAtMs: number;
@@ -121,6 +136,28 @@ function between(from: EnuPosition, to: EnuPosition, share: number): EnuPosition
     east: from.east + (to.east - from.east) * share,
     north: from.north + (to.north - from.north) * share,
     up: from.up + (to.up - from.up) * share
+  };
+}
+
+/**
+ * A direction `share` of the way from one position to another, measured as an
+ * angle rather than along the straight line between them.
+ *
+ * `between` is the right step in time — an object's position moves along its
+ * orbit — but not in angle: where the range changes along a segment, as it does
+ * by a factor of five between the horizon and overhead, equal steps along the
+ * line are unequal angles. Cutting an arc by degrees wants the angle, and a
+ * direction is all a projection reads, so the two ends are made unit vectors
+ * first; over the few degrees a segment spans, a step along the chord between
+ * them is a step in angle to a ten-thousandth of itself.
+ */
+function directionBetween(from: EnuPosition, to: EnuPosition, share: number): EnuPosition {
+  const fromLength = Math.hypot(from.east, from.north, from.up) || 1;
+  const toLength = Math.hypot(to.east, to.north, to.up) || 1;
+  return {
+    east: from.east / fromLength + (to.east / toLength - from.east / fromLength) * share,
+    north: from.north / fromLength + (to.north / toLength - from.north / fromLength) * share,
+    up: from.up / fromLength + (to.up / toLength - from.up / fromLength) * share
   };
 }
 
@@ -226,6 +263,45 @@ function walkArc(satrec: SatRec, frame: ObserverFrame, startMs: number, untilMs:
 }
 
 /**
+ * The arc behind a pass already under way, walked backwards from its first
+ * sample until the object drops to the floor or `pastArcDeg` of sky is covered.
+ *
+ * `walkArc` run the other way, and for the same reasons spaced by angle and
+ * ended on the floor crossing itself: the wake starts where the marker first
+ * appeared rather than a step short of it. Ordered in time on the way out.
+ */
+function walkBack(satrec: SatRec, frame: ObserverFrame, from: SkySample): SkySample[] {
+  const history: SkySample[] = [];
+  let previous = from;
+  let coveredDeg = 0;
+  let stepMs = LANDMARK_PATHS.initialStepSeconds * 1000;
+
+  while (
+    coveredDeg < LANDMARK_PATHS.pastArcDeg &&
+    history.length < LANDMARK_PATHS.maximumSamples
+  ) {
+    const atMs = previous.atMs - stepMs;
+    const position = enuAt(satrec, atMs, frame);
+    if (!position) break;
+
+    if (!(elevationDeg(position) > FLOOR_DEG)) {
+      const risesAtMs = floorCrossingMs(satrec, frame, previous.atMs, atMs);
+      const first = risesAtMs < previous.atMs ? enuAt(satrec, risesAtMs, frame) : null;
+      if (first) history.push({ position: first, atMs: risesAtMs });
+      break;
+    }
+
+    const stepDeg = separationDeg(previous.position, position);
+    coveredDeg += stepDeg;
+    stepMs = stepFor(stepDeg / (stepMs / 1000));
+    previous = { position, atMs };
+    history.push(previous);
+  }
+
+  return history.reverse();
+}
+
+/**
  * The round clock minutes falling on an arc, at a cadence the arc itself
  * chooses. See `LANDMARK_PATHS.tickMinutes`.
  *
@@ -295,8 +371,9 @@ function middleOf(samples: SkySample[]): SkyTick {
  * floor and sampled by angle while it is above it, so the cost is set by the
  * window rather than by how busy the sky is. A pass already under way at
  * `fromMs` starts there rather than at the rise that happened in the past: what
- * is drawn is the sky ahead, and the ground the object has already covered is
- * the marker's own tail.
+ * is drawn is the sky ahead. The ground the object has already covered is kept
+ * beside it, a short way back, for the fading wake behind the object
+ * (`SkyPass.history`).
  */
 export function passesFor(
   entry: CatalogEntry,
@@ -339,6 +416,7 @@ export function passesFor(
       noradId: entry.noradId,
       category: entry.category,
       samples: walk.samples,
+      history: started ? walkBack(entry.satrec, frame, walk.samples[0]) : [],
       ticks: ticksAlong(walk.samples),
       startsAtMs: walk.samples[0].atMs,
       endsAtMs: walk.samples[walk.samples.length - 1].atMs,
@@ -448,4 +526,135 @@ export function pathFrom(pass: SkyPass, atMs: number): EnuPosition[] {
   const ahead: EnuPosition[] = [head];
   for (let rest = index; rest < samples.length; rest += 1) ahead.push(samples[rest].position);
   return ahead;
+}
+
+/**
+ * The part of a pass already behind the object at `atMs`, from where the object
+ * is at that moment backwards, and no more than `arcDeg` of sky of it.
+ *
+ * `pathFrom` the other way. It starts at the same interpolated head, so the wake
+ * and the line ahead meet at the object, and it reaches back into the sky the
+ * plan walked before it began (`SkyPass.history`) — so how long the wake is
+ * depends on how far the object has come, not on how old the plan is.
+ *
+ * Cut at `arcDeg` by interpolating along the last segment it reaches into, so
+ * the end of the wake moves as smoothly as its head does rather than a sample
+ * at a time. Empty before the pass has begun and once it is over.
+ */
+export function pathBehind(pass: SkyPass, atMs: number, arcDeg: number): EnuPosition[] {
+  const chain = pass.history.length > 0 ? [...pass.history, ...pass.samples] : pass.samples;
+  if (atMs <= chain[0].atMs || atMs >= chain[chain.length - 1].atMs) return [];
+
+  let index = 1;
+  while (index < chain.length && chain[index].atMs < atMs) index += 1;
+  const before = chain[index - 1];
+  const after = chain[index];
+  const span = after.atMs - before.atMs;
+  const head = between(before.position, after.position, span > 0 ? (atMs - before.atMs) / span : 0);
+
+  const behind: EnuPosition[] = [head];
+  let coveredDeg = 0;
+  for (let rest = index - 1; rest >= 0; rest -= 1) {
+    const last = behind[behind.length - 1];
+    const next = chain[rest].position;
+    const stepDeg = separationDeg(last, next);
+    if (coveredDeg + stepDeg >= arcDeg) {
+      behind.push(directionBetween(last, next, stepDeg > 0 ? (arcDeg - coveredDeg) / stepDeg : 0));
+      break;
+    }
+    behind.push(next);
+    coveredDeg += stepDeg;
+  }
+  return behind;
+}
+
+/** One piece of a chain cut along the sky, and how far along the chain it starts. */
+export type ArcPiece = {
+  positions: EnuPosition[];
+  /** Degrees of sky from the chain's first point to this piece's first point. */
+  fromDeg: number;
+};
+
+/**
+ * A chain of positions cut into pieces measured along the sky: one starting
+ * every `everyDeg` from the chain's first point, each `pieceDeg` long, none
+ * starting past `untilDeg`.
+ *
+ * What a path is drawn in. Shorter pieces than their spacing are dashes; pieces
+ * as long as their spacing are the contiguous steps a wake fades in. Measured in
+ * degrees rather than in pixels because what the pieces are marking out is the
+ * sky: a dash the length of a piece of sky stays on that piece of sky as the
+ * phone turns, where one measured on the screen would slide along its line with
+ * every change in how the projection stretches it.
+ *
+ * Every point the chain turns at inside a piece is kept in it, so a piece
+ * follows the arc rather than cutting its corners — though at the four degrees
+ * the arc is sampled at, those corners are under a degree on the frame. The
+ * points a piece is cut at are directions rather than positions
+ * (`directionBetween`), which is all a projection needs of them.
+ *
+ * `wanted` says which of the chain's segments are worth cutting at all, by
+ * index: a piece lying wholly on unwanted segments is skipped before anything
+ * is made for it. It is what keeps the cost of a path proportional to the part
+ * of it anyone can see — a pass is up to a hundred and eighty degrees of sky and
+ * a frame is sixty — rather than to its length in dashes.
+ */
+export function cutAlong(
+  chain: readonly EnuPosition[],
+  everyDeg: number,
+  pieceDeg: number,
+  untilDeg: number = Number.POSITIVE_INFINITY,
+  wanted: (segment: number) => boolean = () => true
+): ArcPiece[] {
+  const pieces: ArcPiece[] = [];
+  if (chain.length < 2 || !(everyDeg > 0) || !(pieceDeg > 0)) return pieces;
+
+  let segment = 0;
+  let segmentFromDeg = 0;
+  let segmentDeg = separationDeg(chain[0], chain[1]);
+
+  /** Moves on to the segment `deg` falls in; `false` once past the chain's end. */
+  const reach = (deg: number): boolean => {
+    while (segmentFromDeg + segmentDeg < deg) {
+      if (segment + 2 >= chain.length) return false;
+      segment += 1;
+      segmentFromDeg += segmentDeg;
+      segmentDeg = separationDeg(chain[segment], chain[segment + 1]);
+    }
+    return true;
+  };
+  const pointAt = (deg: number): EnuPosition =>
+    directionBetween(
+      chain[segment],
+      chain[segment + 1],
+      segmentDeg > 0 ? Math.min(1, (deg - segmentFromDeg) / segmentDeg) : 0
+    );
+
+  for (let fromDeg = 0; fromDeg < untilDeg; fromDeg += everyDeg) {
+    if (!reach(fromDeg)) break;
+    const firstSegment = segment;
+    const start = pointAt(fromDeg);
+
+    const toDeg = fromDeg + pieceDeg;
+    const inside = reach(toDeg);
+    // Past the end, the piece runs out on the chain's last point — unless it
+    // starts there, which is a piece of no length, and stroked with round caps
+    // a dot on the sky where the path ends.
+    if (!inside && fromDeg >= segmentFromDeg + segmentDeg) break;
+    const end = inside ? pointAt(toDeg) : chain[chain.length - 1];
+
+    let seen = false;
+    for (let index = firstSegment; index <= segment && !seen; index += 1) seen = wanted(index);
+    if (seen) {
+      const positions = [start];
+      for (let corner = firstSegment + 1; corner <= segment; corner += 1) {
+        positions.push(chain[corner]);
+      }
+      positions.push(end);
+      pieces.push({ positions, fromDeg });
+    }
+    if (!inside) break;
+  }
+
+  return pieces;
 }
