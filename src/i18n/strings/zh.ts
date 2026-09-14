@@ -94,6 +94,11 @@ export const zh: Strings = {
       empty: "视野内没有卫星",
       other: "其他"
     },
+    notable: {
+      closest: "最近",
+      farthest: "最远",
+      navigation: "导航"
+    },
     sunlight: {
       daylight: "白天 — 目前一颗也看不到",
       none: "它们都在地球的阴影里",

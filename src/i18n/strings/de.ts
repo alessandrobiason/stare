@@ -98,6 +98,11 @@ export const de: Strings = {
       empty: "Nichts im Bild",
       other: "Andere"
     },
+    notable: {
+      closest: "Am nächsten",
+      farthest: "Am weitesten",
+      navigation: "Navigation"
+    },
     sunlight: {
       daylight: "Tageslicht — noch ist keiner davon zu sehen",
       none: "Alle stehen im Erdschatten",

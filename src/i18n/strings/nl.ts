@@ -98,6 +98,11 @@ export const nl: Strings = {
       empty: "Niets in beeld",
       other: "Overige"
     },
+    notable: {
+      closest: "Dichtstbij",
+      farthest: "Verst weg",
+      navigation: "Navigatie"
+    },
     sunlight: {
       daylight: "Het is dag — nog geen ervan is te zien",
       none: "Ze staan allemaal in de schaduw van de aarde",

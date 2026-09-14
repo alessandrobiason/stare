@@ -10,7 +10,7 @@ import {
   WHOLE_FRAME
 } from "../components/markerGeometry";
 import { LANDMARK_PATHS, MARKER_VISIBILITY, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
-import { rangeKm } from "../coordinates/transform";
+import { elevationDeg, rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { clamp } from "../math/angles";
 import { SatelliteCatalog } from "../satellite/catalog";
@@ -18,6 +18,7 @@ import { isStarlink, SatelliteCategory } from "../satellite/categories";
 import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
 import { SunlitState } from "../satellite/illumination";
 import { SkyDarkness, skyDarknessAt } from "../satellite/nakedEye";
+import { NotableCandidate, NotableRole, NotableSatellites } from "../satellite/notable";
 import { ArcPiece, cutAlong, pathBehind, pathFrom, SkyPass } from "../satellite/orbitPath";
 import { EnuPosition, OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
@@ -58,6 +59,11 @@ export type SatelliteMarker = {
    * geometry and `markerScene.ts` for what is done with it.
    */
   sunlit: SunlitState;
+  /**
+   * Why a satellite that is not a landmark is named on the sky, if it is.
+   * Decided over the whole sky rather than this frame: see `NotableSatellites`.
+   */
+  notable?: NotableRole;
 };
 
 /**
@@ -647,6 +653,8 @@ export function useAnimatedMarkers({
   const visibilityRef = useRef(new MarkerVisibilityFilter());
   /** Which sample each arc's name is written at. See `anchorFor`. */
   const pathAnchorsRef = useRef(new Map<string, number>());
+  /** Which satellites besides the landmarks are named, and why. */
+  const notableRef = useRef(new NotableSatellites());
   const frameRateRef = useRef(0);
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
   const listenersRef = useRef(new Set<(frame: MarkerFrame) => void>());
@@ -687,6 +695,12 @@ export function useAnimatedMarkers({
       const categories = enabledCategoriesRef.current;
       const starlinkDrawn = starlinkRef.current;
       const visibility = visibilityRef.current;
+      const notable = notableRef.current;
+      // Once a second rather than per frame, and from everything above the
+      // elevation mask rather than what is near the frame — so the names do not
+      // depend on where the phone is pointing.
+      const choosingNotable = notable.due(time.getTime());
+      const candidates: NotableCandidate[] = [];
       const visible: SatelliteMarker[] = [];
       let occluded = 0;
       let unmapped = 0;
@@ -744,6 +758,16 @@ export function useAnimatedMarkers({
           // is off, so the default sky pays nothing for it: a name test per
           // satellite per frame is cheap, and skipped entirely is cheaper.
           if (!starlinkDrawn && isStarlink(fix.name)) continue;
+
+          const range = rangeKm(fix.position);
+          if (choosingNotable) {
+            candidates.push({
+              name: fix.name,
+              category: fix.category,
+              rangeKm: range,
+              elevationDeg: elevationDeg(fix.position)
+            });
+          }
 
           // Hide satellites the segmentation says are behind terrain or
           // buildings — but through the visibility filter, so what decides it
@@ -835,15 +859,17 @@ export function useAnimatedMarkers({
             category: fix.category,
             parked: fix.parked,
             point,
-            rangeKm: rangeKm(fix.position),
+            rangeKm: range,
             opacity,
             sunlit: fix.sunlit,
+            notable: notable.roleOf(fix.name),
             // Allowed off-frame: a trail about to leave the view is the one
             // whose direction says the most.
             next
           });
         }
         visibility.endFrame();
+        if (choosingNotable) notable.choose(candidates, time.getTime());
       } else {
         // No mask means no frame to compare the next one against: a satellite
         // half faded out when the mask went stale must not resume from there
@@ -925,6 +951,8 @@ export function useAnimatedMarkers({
     // The sky jumps, so the piece of it each name was written on is no longer
     // the piece of it in front of the camera.
     pathAnchorsRef.current.clear();
+    // And so is whoever was nearest before it.
+    notableRef.current.reset();
     skyMemory.reset();
   }, [skyMemory]);
 

@@ -94,6 +94,11 @@ export const ja: Strings = {
       empty: "表示中の衛星はありません",
       other: "その他"
     },
+    notable: {
+      closest: "最も近い",
+      farthest: "最も遠い",
+      navigation: "測位"
+    },
     sunlight: {
       daylight: "昼間 — まだどれも見えません",
       none: "すべて地球の影の中です",

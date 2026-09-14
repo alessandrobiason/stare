@@ -98,6 +98,11 @@ export const ru: Strings = {
       empty: "Пока ничего",
       other: "Другие"
     },
+    notable: {
+      closest: "Ближайший",
+      farthest: "Самый дальний",
+      navigation: "Навигация"
+    },
     sunlight: {
       daylight: "День — пока не видно ни одного",
       none: "Все они в тени Земли",

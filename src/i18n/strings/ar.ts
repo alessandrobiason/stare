@@ -94,6 +94,11 @@ export const ar: Strings = {
       empty: "لا شيء في المشهد",
       other: "أخرى"
     },
+    notable: {
+      closest: "الأقرب",
+      farthest: "الأبعد",
+      navigation: "ملاحة"
+    },
     sunlight: {
       daylight: "النهار — لا يمكن رؤية أي منها بعد",
       none: "جميعها في ظل الأرض",

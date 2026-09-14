@@ -1,7 +1,10 @@
 import { FramePoint } from "../camera/projection";
 import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../constants";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../hooks/useAnimatedMarkers";
+import { strings } from "../i18n";
 import { clockTime } from "../i18n/format";
+import { fleetOf } from "../satellite/fleets";
+import { NOTABLE_ROLES } from "../satellite/notable";
 import {
   FrameSize,
   labellablePoints,
@@ -65,8 +68,9 @@ import { Ink, MarkerPalette } from "./palette";
  *   that never moves; everything else is a body with a tail as long as the
  *   distance it covers in a few seconds.
  * - **Size** is distance, on a log scale.
- * - **A label** is spent only on the landmarks, and only where two of them do
- *   not collide.
+ * - **A label** is spent on the landmarks and on the few satellites that stand
+ *   out from the rest (`NotableSatellites`), and only where two of them do not
+ *   collide.
  *
  * And one that is new, and is not about where the object is at all: **how
  * strongly the mark is drawn** says whether the sun is on it. An object in the
@@ -287,7 +291,7 @@ export type PathShape = {
   pastRimWidth: number;
 };
 
-/** A landmark's name, and the mark it belongs under. */
+/** A name, and the mark or piece of path it belongs to. */
 export type LabelPlacement = {
   /**
    * What identifies this label between frames.
@@ -298,10 +302,20 @@ export type LabelPlacement = {
    */
   key: string;
   name: string;
-  /** The marker's centre; the label is placed below it and turns about it. */
+  /**
+   * A second, smaller line saying why the object is named — "Closest", "GPS" —
+   * or `null` for a name that explains itself.
+   */
+  detail: string | null;
+  /** The anchor's centre; the label is placed beside it and turns about it. */
   x: number;
   y: number;
-  /** How far below that centre the name's box starts, in layout pixels. */
+  /**
+   * Which side of the anchor the name is on. A marker's name sits right on top
+   * of it; an arc's hangs under its point on the line.
+   */
+  above: boolean;
+  /** How far from that centre the name's nearer edge is, in layout pixels. */
   offsetY: number;
   alpha: number;
 };
@@ -327,22 +341,25 @@ export function buildMarkerScene(
 ): MarkerScene {
   const glyphs: GlyphShape[] = [];
 
-  // Which landmarks get to keep their name. Crew and cargo vehicles share a
+  // Which marks get to keep their name. Crew and cargo vehicles share a
   // coordinate with the station they are docked to, so the decision has to be
   // made across the whole frame rather than marker by marker.
   //
   // Only the ones whose mark is on the frame: a satellite kept for its trail
-  // (`trailOnFrame`) has its centre outside the view, and a name set below a
+  // (`trailOnFrame`) has its centre outside the view, and a name set beside a
   // centre just past an edge is a label with nothing under it — half of one
-  // sliding in at the top of the frame, which is the flicker the trails were
+  // sliding in at an edge of the frame, which is the flicker the trails were
   // kept to stop.
-  const landmarks = frame.markers.filter(
-    (marker) => marker.category === "LANDMARK" && pointOnFrame(marker.point)
-  );
-  const marks = landmarks.map((marker) => marker.point);
-  const named = new Set(
-    landmarks.filter((_, index) => labellablePoints(marks, box)[index]).map((one) => one.name)
-  );
+  //
+  // In a fixed order of importance, landmarks first, so that where two names
+  // collide the same one wins however the phone has been turned to bring them
+  // into view.
+  const candidates = frame.markers
+    .filter((marker) => labelRank(marker) !== null && pointOnFrame(marker.point))
+    .sort((first, second) => (labelRank(first) ?? 0) - (labelRank(second) ?? 0));
+  const marks = candidates.map((marker) => marker.point);
+  const clear = labellablePoints(marks, box);
+  const named = new Set(candidates.filter((_, index) => clear[index]).map((one) => one.name));
   // Every arc says which object it belongs to as well, at a point on the line
   // itself (`MarkerPath.anchor`). Without it a landmark hidden behind a roof —
   // which is a landmark with no marker at all — leaves an anonymous line across
@@ -422,12 +439,14 @@ export function buildMarkerScene(
       };
     }
 
-    if (landmark && named.has(marker.name)) {
+    if (named.has(marker.name)) {
       labels.push({
         key: marker.name,
-        name: marker.name,
+        name: landmark ? marker.name : shortName(marker.name),
+        detail: landmark ? null : notableDetail(marker),
         x,
         y,
+        above: true,
         // Off the footprint rather than the drawn size, so a name does not jump
         // when its mark is tapped.
         offsetY: footprint / 2 + LABEL_GAP_PX,
@@ -457,8 +476,10 @@ export function buildMarkerScene(
       // the half that would be cut is the time. Broken here rather than left to
       // wrap, so where it breaks is not a question about a typeface.
       name: `${arc.path.name}\n${clockTime(new Date(arc.anchor.atMs))}`,
+      detail: null,
       x: (arc.anchor.at.left / 100) * box.width,
       y: (arc.anchor.at.top / 100) * box.height,
+      above: false,
       offsetY: ARC_LABEL_GAP_PX * scale,
       alpha: pathOpacity(arc.path.lead)
     });
@@ -787,6 +808,44 @@ const SELECTION_GAP_PX = 5;
  * under it is what keeps it legible at this weight.
  */
 const SELECTION_WIDTH_PX = 1.5;
+/**
+ * Where a mark's name comes in the queue for clear space: landmarks, then the
+ * notable roles in their own order. `null` for a mark that is not named at all.
+ */
+function labelRank(marker: SatelliteMarker): number | null {
+  if (marker.category === "LANDMARK") return 0;
+  return marker.notable ? 1 + NOTABLE_ROLES.indexOf(marker.notable) : null;
+}
+
+/**
+ * A catalogue name without its trailing brackets: `NAVSTAR 81 (USA 319)` is
+ * `NAVSTAR 81`, and `COSMOS 2514 [GLONASS-M]` is `COSMOS 2514`. What is in them
+ * is a second designation, and a label the width of two names is one that
+ * wraps.
+ */
+export function shortName(name: string): string {
+  return name.replace(/\s*(\([^()]*\)|\[[^[\]]*\])\s*$/, "") || name;
+}
+
+/**
+ * Why a notable satellite is named. A navigation satellite says which system it
+ * belongs to where that has a name — "GPS" says more than "Navigation", and
+ * needs no translating — and the category's word where it does not.
+ */
+function notableDetail(marker: SatelliteMarker): string | null {
+  const words = strings().scene.notable;
+  switch (marker.notable) {
+    case "closest":
+      return words.closest;
+    case "farthest":
+      return words.farthest;
+    case "navigation":
+      return fleetOf(marker.name) ?? words.navigation;
+    default:
+      return null;
+  }
+}
+
 /**
  * The box a label is drawn in, centred on its marker.
  *

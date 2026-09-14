@@ -16,6 +16,7 @@ import {
   sunlightSummary,
   timeUntil
 } from "../src/i18n/format";
+import { LABEL_BOX_PX } from "../src/components/markerScene";
 import { MARK_TILE, PATH_FIGURE_HEIGHT, SAMPLE_PASSES } from "../src/onboarding/introFigures";
 import { introPages } from "../src/onboarding/introPages";
 import {
@@ -209,6 +210,13 @@ describe("and says it in the space it is given", () => {
     // rather than wrapped — so this is the whole of the room it has.
     const purpose = `${stringsFor(locale).filter.categories.COMMS} · ${t.holdsStation}`;
     expect(width(purpose, 10, 0.7)).toBeLessThan(375 - 12 * 2 - 14 - 8 - 38 - 12 - 12 - 38);
+  });
+
+  test.each(LOCALES)("%s fits the reason line under a name on the sky", (locale) => {
+    // One line, clipped rather than wrapped, in the box a label is set in.
+    for (const reason of Object.values(stringsFor(locale).scene.notable)) {
+      expect(width(reason, 9, 0.3)).toBeLessThan(LABEL_BOX_PX);
+    }
   });
 
   test.each(LOCALES)("%s fits the sunlight line in the count panel", (locale) => {

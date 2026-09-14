@@ -106,6 +106,11 @@ export const en: Strings = {
       empty: "Nothing in view",
       other: "Others"
     },
+    notable: {
+      closest: "Closest",
+      farthest: "Farthest",
+      navigation: "Navigation"
+    },
     sunlight: {
       daylight: "Daylight — none of these can be seen yet",
       none: "All of these are in the Earth's shadow",

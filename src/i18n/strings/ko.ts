@@ -94,6 +94,11 @@ export const ko: Strings = {
       empty: "보이는 위성이 없습니다",
       other: "기타"
     },
+    notable: {
+      closest: "가장 가까운",
+      farthest: "가장 먼",
+      navigation: "위성항법"
+    },
     sunlight: {
       daylight: "낮 — 아직 아무것도 보이지 않습니다",
       none: "모두 지구 그림자 속에 있습니다",

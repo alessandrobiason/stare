@@ -354,14 +354,40 @@ export const SATELLITE_MARKERS = {
   /** Trails shorter than this, in frame pixels, are not worth drawing. */
   minimumTrailPx: 4,
   /**
-   * Half-width and half-height of the box a landmark's label claims, in frame
-   * pixels.
+   * Half-width and half-height of the box a label claims, in frame pixels.
    *
-   * Only landmarks are labelled, and even they yield to each other: crew and
-   * cargo vehicles sit on the station they are docked to, so without this the
-   * one place a name matters most is where the names pile up.
+   * Few marks are labelled, and even they yield to each other: crew and cargo
+   * vehicles sit on the station they are docked to, so without this the one
+   * place a name matters most is where the names pile up. Wide enough for a
+   * catalogue name like `STARLINK-37118` on one line, which a notable
+   * satellite's often is (`NotableSatellites`).
    */
-  labelClearancePx: { x: 46, y: 11 }
+  labelClearancePx: { x: 60, y: 11 }
+} as const;
+
+/**
+ * Which satellites besides the landmarks are named on the sky
+ * (`src/satellite/notable.ts`).
+ *
+ * The figures here are about keeping a name where it is. Chosen afresh every
+ * time, "the closest" would hop between a dozen low passes a minute, so a
+ * satellite keeps its role until it sets or somebody clearly better has been
+ * there long enough to be worth the change.
+ */
+export const NOTABLE_SATELLITES = {
+  /**
+   * How often the choice is made, in seconds of sky time. The loop runs at
+   * display rate and the answer changes on a scale of minutes.
+   */
+  intervalSeconds: 1,
+  /** No role changes hands within this long of its last change, in seconds. */
+  holdSeconds: 60,
+  /** The nearest is replaced only by one at least this much nearer, as a share. */
+  closestMargin: 0.3,
+  /** The farthest only by one at least this much farther, as a share. */
+  farthestMargin: 0.1,
+  /** The navigation satellite only by one at least this much higher, in degrees. */
+  navigationMarginDeg: 15
 } as const;
 
 /**

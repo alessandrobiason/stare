@@ -12,14 +12,15 @@ type Props = {
 };
 
 /**
- * The landmark names, and the only part of the overlay that is still views.
+ * The names on the sky, and the only part of the overlay that is still views.
  *
  * Everything else is drawn into one canvas, and text could be too — but a
  * canvas needs a typeface handed to it, which is a system font lookup on the
  * phone and a downloaded font file in the browser, for two backends that would
  * then disagree about metrics. Views cost nothing here: a label is spent only
- * on the couple of dozen landmarks, and only on the ones that do not collide,
- * so this is a dozen views against the five hundred the marks used to be.
+ * on the landmarks and a few notable satellites (`NotableSatellites`), and only
+ * on the ones that do not collide, so this is a dozen views against the five
+ * hundred the marks used to be.
  *
  * Each is memoized against sub-pixel movement, and placed by a transform
  * rather than by `left` and `top` — moving a name is not a reason to lay the
@@ -36,8 +37,10 @@ export const MarkerLabels: React.FC<Props> = ({ labels, rollDeg, palette }) => {
         <Label
           key={label.key}
           name={label.name}
+          detail={label.detail}
           x={label.x}
           y={label.y}
+          above={label.above}
           offsetY={label.offsetY}
           alpha={label.alpha}
           rollDeg={rollDeg}
@@ -51,8 +54,10 @@ export const MarkerLabels: React.FC<Props> = ({ labels, rollDeg, palette }) => {
 
 type LabelProps = {
   name: string;
+  detail: string | null;
   x: number;
   y: number;
+  above: boolean;
   offsetY: number;
   alpha: number;
   rollDeg: number;
@@ -62,8 +67,10 @@ type LabelProps = {
 
 const Label = React.memo(function Label({
   name,
+  detail,
   x,
   y,
+  above,
   offsetY,
   alpha,
   rollDeg,
@@ -80,20 +87,34 @@ const Label = React.memo(function Label({
         }
       ]}
     >
-      <Text
-        // Two, for a name written on a path: the object, and the clock time it
-        // is at that point of the line, which is a line each (`markerScene`). A
-        // marker's own name is one word and takes one of them — unless it is
-        // long enough not to fit the box, and `Einstein Probe` is, in which
-        // case wrapping it says more than cutting it did.
-        numberOfLines={2}
+      <View
+        // Anchored by the edge nearer the mark, so a name above its marker grows
+        // upwards when it wraps rather than down over the mark it names.
         style={[
-          styles.label,
-          { top: LABEL_BOX_PX / 2 + offsetY, color, textShadowColor: shadowColor }
+          styles.block,
+          above ? { bottom: LABEL_BOX_PX / 2 + offsetY } : { top: LABEL_BOX_PX / 2 + offsetY }
         ]}
       >
-        {name}
-      </Text>
+        <Text
+          // Two, for a name written on a path: the object, and the clock time it
+          // is at that point of the line, which is a line each (`markerScene`). A
+          // marker's own name is one word and takes one of them — unless it is
+          // long enough not to fit the box, and `Einstein Probe` is, in which
+          // case wrapping it says more than cutting it did.
+          numberOfLines={2}
+          style={[styles.label, { color, textShadowColor: shadowColor }]}
+        >
+          {name}
+        </Text>
+        {detail !== null && (
+          <Text
+            numberOfLines={1}
+            style={[styles.label, styles.detail, { color, textShadowColor: shadowColor }]}
+          >
+            {detail}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }, unmoved);
@@ -110,6 +131,8 @@ const Label = React.memo(function Label({
 function unmoved(previous: LabelProps, next: LabelProps): boolean {
   return (
     previous.name === next.name &&
+    previous.detail === next.detail &&
+    previous.above === next.above &&
     previous.color === next.color &&
     previous.shadowColor === next.shadowColor &&
     within(previous.x, next.x, POSITION_EPSILON_PX) &&
@@ -148,10 +171,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  label: {
+  block: {
     position: "absolute",
     left: 0,
-    right: 0,
+    right: 0
+  },
+  label: {
     textAlign: "center",
     fontSize: 11,
     fontWeight: "700",
@@ -159,5 +184,12 @@ const styles = StyleSheet.create({
     // Colour and shadow come from the palette, which the day decides.
     textShadowRadius: 3,
     textShadowOffset: { width: 0, height: 1 }
+  },
+  /** The line saying why a name is there: the same ink, a step quieter. */
+  detail: {
+    fontSize: 9,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+    opacity: 0.85
   }
 });

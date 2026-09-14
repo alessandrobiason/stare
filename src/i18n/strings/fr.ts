@@ -100,6 +100,11 @@ export const fr: Strings = {
       empty: "Rien en vue",
       other: "Autres"
     },
+    notable: {
+      closest: "Le plus proche",
+      farthest: "Le plus éloigné",
+      navigation: "Navigation"
+    },
     sunlight: {
       daylight: "Il fait jour — aucun n'est encore visible",
       none: "Tous sont dans l'ombre de la Terre",

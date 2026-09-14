@@ -1,11 +1,17 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MarkerLabels } from "../src/components/MarkerLabels";
-import { buildMarkerScene, GlyphShape, TAIL_FADE } from "../src/components/markerScene";
+import {
+  buildMarkerScene,
+  GlyphShape,
+  shortName,
+  TAIL_FADE
+} from "../src/components/markerScene";
 import { DAYLIGHT_PALETTE, MARK_COLOR, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../src/hooks/useAnimatedMarkers";
 import { LANDMARK_PATHS, SATELLITE_MARKERS } from "../src/constants";
+import { setLocaleForTesting } from "../src/i18n";
 
 const FRAME = { width: 720, height: 1280 };
 
@@ -342,13 +348,77 @@ test("fades the whole marker together as it crosses an edge", () => {
   expect(labels[0].alpha).toBeCloseTo(0.4);
 });
 
-test("names the landmarks and nothing else", () => {
+test("names the landmarks and the notable satellites, and nothing else", () => {
   const { labels } = scene([
     marker({ name: "ISS", category: "LANDMARK", rangeKm: 430 }),
-    marker({ name: "STARLINK-1234", point: { left: 20, top: 20 } })
+    marker({ name: "STARLINK-1234", point: { left: 20, top: 20 } }),
+    marker({ name: "STARLINK-1007", point: { left: 80, top: 80 }, notable: "closest" })
   ]);
 
-  expect(labels.map((label) => label.name)).toEqual(["ISS"]);
+  expect(labels.map((label) => label.name)).toEqual(["ISS", "STARLINK-1007"]);
+});
+
+describe("a notable satellite's name", () => {
+  afterEach(() => setLocaleForTesting(undefined));
+
+  test("says why it is there, in the reader's language", () => {
+    setLocaleForTesting("it");
+    const { labels } = scene([
+      marker({ name: "STARLINK-1007", notable: "closest" }),
+      marker({ name: "INTELSAT 33E", point: { left: 20, top: 20 }, notable: "farthest" })
+    ]);
+
+    expect(labels.map((label) => label.detail)).toEqual(["Il più vicino", "Il più lontano"]);
+  });
+
+  test("names a navigation satellite's system where it has a name", () => {
+    const { labels } = scene([
+      marker({ name: "NAVSTAR 81 (USA 319)", category: "NAVIGATION", notable: "navigation" })
+    ]);
+
+    expect(labels[0].name).toBe("NAVSTAR 81");
+    expect(labels[0].detail).toBe("GPS");
+  });
+
+  test("falls back to the category's word for a system with no name", () => {
+    const { labels } = scene([
+      marker({ name: "SOME NAVSAT", category: "NAVIGATION", notable: "navigation" })
+    ]);
+
+    expect(labels[0].detail).toBe("Navigation");
+  });
+
+  test("yields to a landmark's where the two collide, whatever order they come in", () => {
+    const iss = marker({ name: "ISS", category: "LANDMARK", point: { left: 50, top: 50 } });
+    const near = marker({
+      name: "STARLINK-1007",
+      point: { left: 50.4, top: 50.1 },
+      notable: "closest"
+    });
+
+    expect(scene([near, iss]).labels.map((label) => label.name)).toEqual(["ISS"]);
+    expect(scene([iss, near]).labels.map((label) => label.name)).toEqual(["ISS"]);
+  });
+
+  test("and the nearest's wins over the farthest's", () => {
+    const far = marker({ name: "FAR", point: { left: 50, top: 50 }, notable: "farthest" });
+    const near = marker({ name: "NEAR", point: { left: 50.4, top: 50.1 }, notable: "closest" });
+
+    expect(scene([far, near]).labels.map((label) => label.name)).toEqual(["NEAR"]);
+  });
+});
+
+test("a landmark's name carries no reason line: it explains itself", () => {
+  const { labels } = scene([marker({ name: "ISS", category: "LANDMARK" })]);
+  expect(labels[0].detail).toBeNull();
+});
+
+test("shortens a catalogue name by its trailing brackets only", () => {
+  expect(shortName("NAVSTAR 81 (USA 319)")).toBe("NAVSTAR 81");
+  expect(shortName("GALILEO 23 (2C5)")).toBe("GALILEO 23");
+  expect(shortName("COSMOS 2514 [GLONASS-M]")).toBe("COSMOS 2514");
+  expect(shortName("STARLINK-1007")).toBe("STARLINK-1007");
+  expect(shortName("(USA 319)")).toBe("(USA 319)");
 });
 
 test("drops the second of two landmark labels sharing a coordinate", () => {
@@ -364,8 +434,8 @@ test("drops the second of two landmark labels sharing a coordinate", () => {
 test("keeps the tail of a landmark that has left the frame, but not its name", () => {
   // A satellite is kept on the frame while its trail crosses it, mark and all,
   // so the tail slides out tip last instead of being cut at the border. The
-  // name is not: set below a centre that is off the top edge, it would be half
-  // a label hanging into the frame under nothing.
+  // name is not: set beside a centre that is off the edge, it would be half a
+  // label hanging into the frame over nothing.
   const { glyphs, labels } = scene([
     marker({
       name: "ISS",
@@ -379,7 +449,7 @@ test("keeps the tail of a landmark that has left the frame, but not its name", (
   expect(labels).toEqual([]);
 });
 
-test("places a name below its marker, by a transform rather than a layout position", () => {
+test("places a name by a transform rather than a layout position", () => {
   // Position is a layout property and a transform is not, and every name moves
   // every frame: as `left` and `top` that is a layout pass over the whole
   // overlay sixty times a second for a box nothing else is positioned against.
@@ -394,6 +464,15 @@ test("places a name below its marker, by a transform rather than a layout positi
   expect(markup.match(/style="([^"]*)"/)?.[1]).toBe(
     "opacity:1;transform:translateX(360px) translateY(640px) rotate(0deg)"
   );
+});
+
+test("sets a marker's name right on top of it", () => {
+  const { labels, rollDeg, palette } = scene([marker({ name: "ISS", category: "LANDMARK" })]);
+  expect(labels[0].above).toBe(true);
+  // Anchored by its bottom edge, so a name that wraps grows away from the mark.
+  expect(
+    renderToStaticMarkup(<MarkerLabels labels={labels} rollDeg={rollDeg} palette={palette} />)
+  ).toMatch(/bottom:\d/);
 });
 
 test("keeps a name level with the horizon as the camera rolls", () => {
@@ -653,6 +732,8 @@ describe("a landmark's path across the sky", () => {
     expect(labels[0].x).toBeCloseTo(216, 6);
     expect(labels[0].y).toBeCloseTo(896, 6);
     expect(labels[0].offsetY).toBeGreaterThan(0);
+    // Under the point on the line, where a marker's name is over its mark.
+    expect(labels[0].above).toBe(false);
   });
 
   test("writes the time its object is at that point under the name", () => {

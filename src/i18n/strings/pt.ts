@@ -98,6 +98,11 @@ export const pt: Strings = {
       empty: "Nada à vista",
       other: "Outros"
     },
+    notable: {
+      closest: "O mais próximo",
+      farthest: "O mais distante",
+      navigation: "Navegação"
+    },
     sunlight: {
       daylight: "É dia — ainda não se vê nenhum",
       none: "Estão todos na sombra da Terra",
