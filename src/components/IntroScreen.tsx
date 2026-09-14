@@ -39,14 +39,14 @@ type Props = {
  * The screen the app opens on the very first time — and the part of it worth
  * reading again, whenever somebody asks for it.
  *
- * Six pages over the same turning sky the boot screen shows, so the intro and
+ * Six pages over the same moving sky the boot screen shows, so the intro and
  * the launch after it are one continuous thing rather than two designs. What is
  * said, and what is pictured, is in `introPages.ts`; this lays it out.
  *
  * The copy sits in a card at the foot of the screen rather than over the middle
- * of it. The middle is where the satellites turn, and text there is read against
- * five moving bodies — the card keeps the words on a surface of known colour and
- * leaves the composition above them intact. The pictures in the card are pieces
+ * of it. The upper half is where the satellite crosses, and text there is read
+ * against a moving light — the card keeps the words on a surface of known colour
+ * and leaves the composition above them intact. The pictures in the card are pieces
  * of night sky of their own (`IntroFigures`), for the same reason.
  *
  * Pages advance by swipe or by the button, which is the same button throughout
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   // Centred over the whole frame rather than inside the pager, so the name
-  // lands exactly where the boot screen puts it — the eye of the orbits —
+  // lands exactly where the boot screen puts it — under the satellite's pass —
   // rather than the smaller area the pager leaves above the footer.
   wordmarkLayer: {
     ...StyleSheet.absoluteFill,
@@ -334,10 +334,10 @@ const styles = StyleSheet.create({
   // same font.
   wordmark: {
     color: theme.color.textBright,
-    fontSize: 19,
-    fontWeight: "600",
-    letterSpacing: 7,
-    marginLeft: 7,
+    fontSize: 17,
+    fontWeight: "500",
+    letterSpacing: 9,
+    marginLeft: 9,
     opacity: 0.92
   },
   page: {

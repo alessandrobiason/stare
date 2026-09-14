@@ -1,29 +1,142 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  BOOT_ORBITS,
+  BOOT_PASSES,
   BOOT_SKY_DESIGN,
   bootSkyScene,
-  skyAngleDeg
+  PASS_TIMING,
+  passPose,
+  SkyPass,
+  skyMoment,
+  skyPass,
+  starAlpha
 } from "../src/components/bootSky";
-import { MARK_COLOR } from "../src/components/palette";
+import { BLOOM_FADE, CORE_FADE, FadeStop, GLOW_FADE, TAIL_FADE } from "../src/components/markerScene";
+import { MARK_BLOOM, MARK_COLOR } from "../src/components/palette";
 
 const PHONE = { width: 390, height: 844 };
+/** The smallest screen this ships to, and a current large one. */
+const SCREENS = [PHONE, { width: 375, height: 667 }, { width: 430, height: 932 }];
 
-test("the sky is five satellites in the overlay's own white", () => {
-  const drawn = bootSkyScene(PHONE).satellites.map((satellite) => satellite.color);
+/** Where the light's centre is `progress` of the way through a pass. */
+function headAt(pass: SkyPass, progress: number): { x: number; y: number } {
+  const { angleDeg } = passPose(pass, progress);
+  const radians = angleDeg * (Math.PI / 180);
+  const dx = pass.light.x - pass.cx;
+  const dy = pass.light.y - pass.cy;
+  return {
+    x: pass.cx + dx * Math.cos(radians) - dy * Math.sin(radians),
+    y: pass.cy + dx * Math.sin(radians) + dy * Math.cos(radians)
+  };
+}
 
-  // The marks a person will read against the real sky are all white, and so
-  // is every satellite on the screen they wait on.
-  expect(drawn).toHaveLength(5);
-  expect(new Set(drawn)).toEqual(new Set([MARK_COLOR]));
+const everyPass = (frame: typeof PHONE) => {
+  const scene = bootSkyScene(frame);
+  return BOOT_PASSES.map((_, index) => skyPass(scene, index));
+};
+
+test("the satellite is drawn in the overlay's own light", () => {
+  // The marks a person will read against the real sky are a white point in a
+  // cool bloom, and so is the satellite on the screen they wait on.
+  for (const pass of everyPass(PHONE)) {
+    expect(pass.light.color).toBe(MARK_COLOR);
+    expect(pass.light.bloomColor).toBe(MARK_BLOOM);
+  }
 });
 
-test("every orbit turns about the middle of the screen", () => {
-  for (const satellite of bootSkyScene(PHONE).satellites) {
-    expect(satellite.cx).toBeCloseTo(PHONE.width / 2);
-    expect(satellite.cy).toBeCloseTo(PHONE.height / 2);
+test("a pass crosses the whole frame, from beyond one edge to beyond the other", () => {
+  for (const frame of SCREENS) {
+    for (const pass of everyPass(frame)) {
+      const start = headAt(pass, 0);
+      const end = headAt(pass, 1);
+      const [left, right] = pass.direction === 1 ? [start, end] : [end, start];
+
+      expect(left.x).toBeLessThan(0);
+      expect(right.x).toBeGreaterThan(frame.width);
+    }
   }
+});
+
+test("every pass stays above the name, however the screen is shaped", () => {
+  // The name sits in the middle of the screen, and a light crossing it would
+  // cross out the one word the screen says.
+  for (const frame of SCREENS) {
+    for (const pass of everyPass(frame)) {
+      for (let progress = 0; progress <= 1; progress += 0.02) {
+        const { y } = headAt(pass, progress);
+        expect(y + pass.light.glow.radius).toBeLessThan(frame.height / 2 - 20);
+      }
+    }
+  }
+});
+
+test("the light is already in the sky on the first frame", () => {
+  // Boot can be over in a couple of seconds; it is not spent on an empty sky.
+  const moment = skyMoment(0);
+  const pass = skyPass(bootSkyScene(PHONE), moment.index);
+  const head = headAt(pass, moment.progress);
+
+  expect(passPose(pass, moment.progress).alpha).toBe(1);
+  expect(head.x).toBeGreaterThan(0);
+  expect(head.x).toBeLessThan(PHONE.width);
+});
+
+test("a pass fades in and out at its ends rather than appearing and vanishing", () => {
+  const [pass] = everyPass(PHONE);
+
+  expect(passPose(pass, 0).alpha).toBe(0);
+  expect(passPose(pass, 1).alpha).toBe(0);
+  expect(passPose(pass, PASS_TIMING.fadeShare / 2).alpha).toBeGreaterThan(0);
+  expect(passPose(pass, PASS_TIMING.fadeShare / 2).alpha).toBeLessThan(1);
+  expect(passPose(pass, 0.5).alpha).toBe(1);
+});
+
+test("a tail tapers from under the light to a point, behind it", () => {
+  // A comet's tail is behind it, and nobody has to be told which way it is
+  // going. Two of the passes run right to left, and "behind" for them is the
+  // other way round the arc.
+  for (const pass of everyPass(PHONE)) {
+    const { light } = pass;
+    const { points } = light.tail;
+    const count = points.length / 2;
+    const at = (index: number): [number, number] => [points[index * 2], points[index * 2 + 1]];
+
+    // Walked out along one edge and back along the other: the first and last
+    // points are the two edges at the head, a full width apart across it.
+    const [headX, headY] = at(0);
+    const [backX, backY] = at(count - 1);
+    expect(Math.hypot(headX - backX, headY - backY)).toBeGreaterThan(0);
+    expect(Math.hypot((headX + backX) / 2 - light.x, (headY + backY) / 2 - light.y)).toBeCloseTo(0);
+
+    // And it tapers to a single point.
+    expect(Math.hypot(at(count / 2 - 1)[0] - at(count / 2)[0], at(count / 2 - 1)[1] - at(count / 2)[1])).toBeCloseTo(0);
+
+    // The tip lies back the way the light has come.
+    expect(Math.sign(light.x - light.tail.tipX)).toBe(pass.direction);
+  }
+});
+
+test("the passes take different paths, both ways across, and then come round again", () => {
+  const passes = everyPass(PHONE);
+  const scene = bootSkyScene(PHONE);
+
+  expect(new Set(passes.map((pass) => pass.direction)).size).toBe(2);
+  expect(new Set(passes.map((pass) => Math.round(pass.light.y))).size).toBe(passes.length);
+  const again = skyPass(scene, passes.length);
+  expect({ ...again, index: 0 }).toEqual(passes[0]);
+});
+
+test("the clock moves the light along, and a held clock holds it", () => {
+  const scene = bootSkyScene(PHONE);
+  const at = (seconds: number) => {
+    const moment = skyMoment(seconds);
+    return headAt(skyPass(scene, moment.index), moment.progress);
+  };
+
+  expect(at(1)).toEqual(at(1));
+  expect(at(2).x).not.toBeCloseTo(at(1).x);
+  // A pass is flown in its period, and the next one follows it.
+  expect(skyMoment(PASS_TIMING.periodSeconds).index).toBe(skyMoment(0).index + 1);
 });
 
 test("the composition keeps its proportions on a screen of any shape", () => {
@@ -31,96 +144,26 @@ test("the composition keeps its proportions on a screen of any shape", () => {
   // the design frame, a tall one its sides, and neither squashes it.
   const tall = bootSkyScene({ width: 400, height: 900 });
   const wide = bootSkyScene({ width: 900, height: 400 });
+  const [tallPass] = [skyPass(tall, 0)];
+  const [widePass] = [skyPass(wide, 0)];
 
-  for (const [index, satellite] of tall.satellites.entries()) {
-    const other = wide.satellites[index];
-    const reach = (drawn: typeof satellite) => Math.hypot(drawn.bodyX - drawn.cx, drawn.bodyY - drawn.cy);
-    // Same radius per unit of the covering scale, whichever way the frame runs.
-    expect(reach(satellite) / (900 / BOOT_SKY_DESIGN.height)).toBeCloseTo(
-      reach(other) / (900 / BOOT_SKY_DESIGN.width)
-    );
-  }
+  expect(tallPass.radius / tall.scale).toBeCloseTo(widePass.radius / wide.scale);
+  expect(tallPass.light.glow.radius / tall.scale).toBeCloseTo(widePass.light.glow.radius / wide.scale);
 });
 
-test("a trail starts at a point and thickens to its head", () => {
-  const [satellite] = bootSkyScene(PHONE).satellites;
-  const points = satellite.trail;
-  const at = (index: number): [number, number] => [points[index * 2], points[index * 2 + 1]];
-  const count = points.length / 2;
-  /** The last point of the far edge; the near one starts at the next. */
-  const head = count / 2 - 1;
-
-  // The polygon is walked out along the far edge and back along the near one,
-  // so its first and last points are the two edges of the tail — one point.
-  const [tailX, tailY] = at(0);
-  const [tailBackX, tailBackY] = at(count - 1);
-  expect(Math.hypot(tailX - tailBackX, tailY - tailBackY)).toBeCloseTo(0);
-
-  // At the head they are a full trail width apart.
-  const [headX, headY] = at(head);
-  const [headBackX, headBackY] = at(head + 1);
-  const width = BOOT_ORBITS[0].trailWidth * (PHONE.height / BOOT_SKY_DESIGN.height);
-  expect(Math.hypot(headX - headBackX, headY - headBackY)).toBeCloseTo(width);
-});
-
-test("a trail stops short of its own body, rather than growing out of it", () => {
-  // A trail that runs under the body is one silhouette with the body: a round
-  // head with a tail on it, which is a tadpole. Every one of them keeps clear.
-  for (const satellite of bootSkyScene(PHONE).satellites) {
-    let nearest = Infinity;
-    for (let index = 0; index < satellite.trail.length; index += 2) {
-      nearest = Math.min(
-        nearest,
-        Math.hypot(satellite.trail[index] - satellite.bodyX, satellite.trail[index + 1] - satellite.bodyY)
-      );
-    }
-    expect(nearest).toBeGreaterThan(satellite.bodyRadius);
-  }
-});
-
-test("a trail follows its body rather than leading it, whichever way the orbit runs", () => {
-  // Two of the five orbits run anticlockwise, and "behind" for them is the
-  // other way round the circle. Laid out the same way as the clockwise ones,
-  // they went round tail first.
-  for (const satellite of bootSkyScene(PHONE).satellites) {
-    const angleOf = (x: number, y: number) =>
-      Math.atan2(y - satellite.cy, x - satellite.cx) * (180 / Math.PI);
-    const bodyDeg = angleOf(satellite.bodyX, satellite.bodyY);
-    const tipDeg = angleOf(satellite.trail[0], satellite.trail[1]);
-    // Signed turn from the tail's tip to the body, brought into (-180, 180].
-    const ahead = ((bodyDeg - tipDeg + 540) % 360) - 180;
-
-    // The body is ahead of its own tail, in the direction it is travelling.
-    expect(Math.sign(ahead)).toBe(Math.sign(satellite.degreesPerSecond));
-  }
-});
-
-test("the satellites turn, at their own rates and both ways round", () => {
-  const { satellites } = bootSkyScene(PHONE);
-  const after = satellites.map((satellite) => skyAngleDeg(satellite, 10));
-
-  expect(after.every((angle) => angle !== 0)).toBe(true);
-  // Both directions are used, or the whole picture drifts one way like a wheel.
-  expect(after.some((angle) => angle > 0)).toBe(true);
-  expect(after.some((angle) => angle < 0)).toBe(true);
-  // A full turn takes each orbit its own period, and none of them share one.
-  const turns = satellites.map((satellite) => 360 / Math.abs(satellite.degreesPerSecond));
-  expect(new Set(turns).size).toBe(turns.length);
-});
-
-test("nothing turns while the clock is held", () => {
-  const [satellite] = bootSkyScene(PHONE).satellites;
-  expect(skyAngleDeg(satellite, 0)).toBe(0);
-});
-
-test("the stars keep clear of the middle, where the orbits are busiest", () => {
+test("the stars keep clear of the name, and only ever twinkle a little", () => {
   const scene = bootSkyScene(PHONE);
   const scale = PHONE.height / BOOT_SKY_DESIGN.height;
 
   expect(scene.stars.length).toBeGreaterThan(0);
   for (const star of scene.stars) {
     const fromCentre = Math.hypot(star.x - PHONE.width / 2, star.y - PHONE.height / 2);
-    expect(fromCentre).toBeGreaterThanOrEqual(130 * scale - 0.001);
+    expect(fromCentre).toBeGreaterThanOrEqual(80 * scale - 0.001);
+    for (let seconds = 0; seconds < 20; seconds += 0.5) {
+      const alpha = starAlpha(star, seconds);
+      expect(alpha).toBeLessThanOrEqual(star.alpha);
+      expect(alpha).toBeGreaterThanOrEqual(star.alpha * 0.5);
+    }
   }
 });
 
@@ -130,31 +173,70 @@ test("the same sky comes out of every run", () => {
   expect(bootSkyScene(PHONE).stars).toEqual(bootSkyScene(PHONE).stars);
 });
 
+const round = (value: number) => Number(value.toFixed(2));
+const asset = (name: string) => readFileSync(join(__dirname, "..", "assets", name), "utf8");
+
+/** The stops a fade is written into an SVG gradient as, whatever its colour. */
+function stopsOf(fade: readonly FadeStop[], color: string): string {
+  return fade
+    .map(
+      (stop) =>
+        `<stop offset="${round(stop.at * 100)}%" stop-color="${color}" stop-opacity="${stop.strength}"/>`
+    )
+    .join("\n      ");
+}
+
 /**
  * `tools/make-logo.mjs` cannot import this module — it is a build script and
  * the composition is TypeScript — so it restates the geometry. This is what
  * stops the two drifting: change one, and the other has to be regenerated
  * before this passes.
  */
-test("the committed logo is this sky, held still", () => {
-  const svg = readFileSync(join(__dirname, "..", "assets", "logo-extended.svg"), "utf8");
-  const scene = bootSkyScene(BOOT_SKY_DESIGN);
-  const round = (value: number) => Number(value.toFixed(2));
+test("the committed logo is this sky, held at its first frame", () => {
+  const svg = asset("logo-extended.svg");
+  const frame = { width: BOOT_SKY_DESIGN.width * 3, height: BOOT_SKY_DESIGN.height * 3 };
+  const scene = bootSkyScene(frame);
+  const moment = skyMoment(0);
+  const pass = skyPass(scene, moment.index);
+  const pose = passPose(pass, moment.progress);
+  const { light } = pass;
 
-  for (const satellite of scene.satellites) {
-    const body =
-      `<circle cx="${round(satellite.bodyX)}" cy="${round(satellite.bodyY)}" ` +
-      `r="${round(satellite.bodyRadius)}"/>`;
-    expect(svg).toContain(`<g fill="${satellite.color}">`);
-    expect(svg).toContain(body);
+  expect(svg).toContain(`width="${frame.width}" height="${frame.height}"`);
+  expect(svg).toContain(`transform="rotate(${round(pose.angleDeg)} ${round(pass.cx)} ${round(pass.cy)})"`);
+  expect(svg).toContain(
+    `<circle cx="${round(light.x)}" cy="${round(light.y)}" r="${round(light.coreRadius)}"`
+  );
+  expect(svg).toContain(`r="${round(light.glow.radius)}"`);
+  expect(svg).toContain(`r="${round(light.bloom.radius)}"`);
+  // The tail too, or its shape can drift while the light agrees.
+  const [tailX, tailY] = light.tail.points;
+  expect(svg).toContain(`d="M ${round(tailX)} ${round(tailY)} L `);
+  expect(svg).toContain(`x2="${round(light.tail.tipX)}" y2="${round(light.tail.tipY)}"`);
 
-    // The trail too, or the shape itself can drift while the bodies agree:
-    // its tip is where the gap the trail leaves shows up in the file.
-    const [tipX, tipY] = [satellite.trail[0], satellite.trail[1]];
-    expect(svg).toContain(`d="M ${round(tipX)} ${round(tipY)} L `);
-  }
-
-  // Stars too, or a change to the field goes unnoticed: the bodies alone do
+  // Stars too, or a change to the field goes unnoticed: the light alone does
   // not depend on the seed.
-  expect(svg.match(/<circle[^>]*opacity=/g)?.length).toBe(scene.stars.length);
+  const field = svg.slice(svg.indexOf('<g id="stars"'), svg.indexOf("</g>", svg.indexOf('<g id="stars"')));
+  expect(field.match(/<circle /g)?.length).toBe(scene.stars.length);
+  const [first] = scene.stars;
+  expect(field).toContain(
+    `<circle cx="${round(first.x)}" cy="${round(first.y)}" r="${round(first.radius)}" ` +
+      `opacity="${round(starAlpha(first, 0))}"/>`
+  );
+
+  // And in the overlay's own fades.
+  expect(svg).toContain(stopsOf(TAIL_FADE, MARK_COLOR));
+  expect(svg).toContain(stopsOf(GLOW_FADE, MARK_COLOR));
+  expect(svg).toContain(stopsOf(BLOOM_FADE, MARK_BLOOM));
+  expect(svg).toContain(stopsOf(CORE_FADE, MARK_COLOR));
+});
+
+test("the icon is drawn in the overlay's own light", () => {
+  // Its tail holds on further than a marker's, so an arc sixty points across
+  // still reads as one (see ICON in tools/make-logo.mjs); the light around the
+  // point is the overlay's.
+  const svg = asset("icon.svg");
+
+  expect(svg).toContain(stopsOf(GLOW_FADE, MARK_COLOR));
+  expect(svg).toContain(stopsOf(BLOOM_FADE, MARK_BLOOM));
+  expect(svg).toContain(stopsOf(CORE_FADE, MARK_COLOR));
 });

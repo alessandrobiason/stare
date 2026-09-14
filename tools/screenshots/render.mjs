@@ -670,9 +670,8 @@ body {
 <div class="device"><img src="data:image/png;base64,${screenPng}" alt=""></div>
 <script>
 /*
- * The same night the boot screen is drawn on (assets/logo-extended.svg): a
- * radial grade with a thin scatter of stars, so the frame around the phone
- * belongs to the app rather than to a template.
+ * A night in the app's own blues: a radial grade with a thin scatter of stars,
+ * so the frame around the phone belongs to the app rather than to a template.
  */
 const canvas = document.getElementById("stars");
 const context = canvas.getContext("2d");

@@ -35,14 +35,15 @@ import { Ink, MarkerPalette } from "./palette";
  * one file that a test can read, and the two backends only have to be able to
  * fill a circle and a polygon, and fade one along a line (`FadeStop`).
  *
- * **A marker is a point of light with a comet's tail.** The app's own logo is
- * a body with a tapered trail sweeping back from it (`assets/icon.svg`), and
- * the marks kept that shape — but drawn as it was, an opaque disc a couple of
- * dozen pixels across in a solid tail, seventy of them covered the picture they
- * were marking. So the solid part is now a point about half of that, in a glow
- * that fades to nothing; and the tail is the same taper, faded from the point to
- * its tip. What a satellite looks like in the sky is a point of light moving,
- * and that is what is drawn.
+ * **A marker is a point of light with a comet's tail.** The app's logo was
+ * once a body with a tapered trail sweeping back from it, and the marks kept
+ * that shape — but drawn as it was, an opaque disc a couple of dozen pixels
+ * across in a solid tail, seventy of them covered the picture they were
+ * marking. So the solid part is now a point about half of that, in a glow that
+ * fades to nothing; and the tail is the same taper, faded from the point to its
+ * tip. What a satellite looks like in the sky is a point of light moving, and
+ * that is what is drawn — and the logo (`assets/icon.svg`) and the boot screen
+ * (`bootSky`) are now drawn in this light, rather than the other way round.
  *
  * **At night a mark is drawn the way a star photographs.** Three layers of the
  * same light, none of them with an edge: a white centre that is solid only in
@@ -142,13 +143,12 @@ export type Circle = {
 export type FadeStop = { at: number; strength: number };
 
 /**
- * The trail, as the tapered shape the icon draws it as, faded from the mark to
- * its tip.
+ * The trail, as a tapered shape faded from the mark to its tip.
  *
  * A polygon rather than a stroke because the shape narrows along its length,
  * which no single stroke width can express; the same reason the boot screen's
- * trails are polygons. Three points is all it takes here, though, where the
- * boot screen needs forty: over the few seconds a trail covers, an orbit's path
+ * tail is a polygon. Three points is all it takes here, though, where the
+ * boot screen needs dozens: over the few seconds a trail covers, an orbit's path
  * across the frame is straight to well inside a pixel, so the taper is a
  * triangle rather than an arc.
  *

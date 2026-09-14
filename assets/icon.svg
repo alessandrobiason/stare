@@ -1,7 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" fill="#0b1220"/>
-  <g transform="translate(512,512) scale(1.1153) translate(-532.32,-297.08)" fill="#ffcf5c">
-    <path d="M 192.6 429.04 L 195.96 415.15 L 199.92 401.41 L 204.48 387.82 L 209.64 374.42 L 215.37 361.24 L 221.69 348.3 L 228.57 335.62 L 236 323.23 L 243.98 311.15 L 252.48 299.41 L 261.5 288.03 L 271.02 277.04 L 281.02 266.45 L 291.48 256.28 L 302.4 246.56 L 313.74 237.31 L 325.49 228.55 L 337.63 220.28 L 350.14 212.54 L 362.99 205.33 L 376.16 198.68 L 389.63 192.59 L 403.37 187.08 L 417.36 182.17 L 431.57 177.85 L 445.97 174.15 L 460.55 171.07 L 475.27 168.63 L 490.1 166.81 L 505.03 165.64 L 520.01 165.12 L 535.03 165.24 L 550.05 166.01 L 565.04 167.44 L 579.98 169.52 L 594.85 172.24 L 609.6 175.61 L 624.22 179.62 L 638.67 184.27 L 652.93 189.55 L 666.97 195.45 L 680.77 201.96 L 658.77 242.36 L 647.23 235.78 L 635.39 229.69 L 623.27 224.11 L 610.91 219.06 L 598.31 214.53 L 585.51 210.55 L 572.52 207.12 L 559.38 204.24 L 546.09 201.94 L 532.7 200.21 L 519.23 199.06 L 505.69 198.49 L 492.11 198.51 L 478.53 199.12 L 464.96 200.32 L 451.43 202.1 L 437.97 204.47 L 424.61 207.43 L 411.36 210.97 L 398.25 215.09 L 385.31 219.78 L 372.56 225.04 L 360.03 230.85 L 347.75 237.2 L 335.73 244.1 L 324 251.52 L 312.58 259.46 L 301.5 267.89 L 290.77 276.82 L 280.43 286.21 L 270.48 296.06 L 260.95 306.35 L 251.86 317.06 L 243.23 328.18 L 235.08 339.67 L 227.41 351.53 L 220.26 363.72 L 213.62 376.24 L 207.53 389.05 L 201.99 402.14 L 197.01 415.47 L 192.6 429.04 Z"/>
-    <circle cx="772.04" cy="308.83" r="100"/>
+  <defs>
+    <linearGradient id="night" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1024">
+      <stop offset="0%" stop-color="#040811"/>
+      <stop offset="100%" stop-color="#12284a"/>
+    </linearGradient>
+    <radialGradient id="horizon" gradientUnits="userSpaceOnUse" cx="512" cy="1280" r="972.8">
+      <stop offset="0%" stop-color="#3f78c8" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#3f78c8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#night)"/>
+  <rect width="1024" height="1024" fill="url(#horizon)"/>
+  <defs>
+    <radialGradient id="light-bloom" gradientUnits="userSpaceOnUse" cx="684.36" cy="445.15" r="320">
+      <stop offset="0%" stop-color="#a9c9ff" stop-opacity="1"/>
+      <stop offset="20%" stop-color="#a9c9ff" stop-opacity="0.45"/>
+      <stop offset="50%" stop-color="#a9c9ff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#a9c9ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="light-glow" gradientUnits="userSpaceOnUse" cx="684.36" cy="445.15" r="150">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="12%" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="light-core" gradientUnits="userSpaceOnUse" cx="684.36" cy="445.15" r="34">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="light-tail" gradientUnits="userSpaceOnUse" x1="684.36" y1="445.15" x2="104.8" y2="495.86">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="75%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <circle cx="684.36" cy="445.15" r="320" fill="url(#light-bloom)" opacity="0.45"/>
+    <circle cx="684.36" cy="445.15" r="150" fill="url(#light-glow)" opacity="0.8"/>
+    <path d="M 692.9 425.97 L 677.89 420.1 L 662.74 414.63 L 647.47 409.56 L 632.08 404.89 L 616.59 400.63 L 601.01 396.78 L 585.35 393.33 L 569.62 390.29 L 553.82 387.67 L 537.98 385.46 L 522.1 383.66 L 506.2 382.28 L 490.27 381.32 L 474.35 380.76 L 458.42 380.62 L 442.51 380.9 L 426.63 381.59 L 410.79 382.69 L 394.99 384.2 L 379.25 386.11 L 363.58 388.44 L 347.99 391.16 L 332.49 394.29 L 317.09 397.82 L 301.8 401.74 L 286.63 406.06 L 271.59 410.76 L 256.69 415.85 L 241.95 421.32 L 227.36 427.17 L 212.94 433.38 L 198.7 439.97 L 184.65 446.91 L 170.8 454.21 L 157.15 461.86 L 143.72 469.86 L 130.51 478.2 L 117.54 486.86 L 104.8 495.86 L 104.8 495.86 L 118.12 487.77 L 131.62 480.04 L 145.31 472.67 L 159.18 465.66 L 173.2 459.03 L 187.39 452.76 L 201.72 446.87 L 216.18 441.36 L 230.77 436.24 L 245.47 431.49 L 260.28 427.14 L 275.19 423.18 L 290.18 419.6 L 305.24 416.42 L 320.36 413.64 L 335.54 411.25 L 350.77 409.26 L 366.02 407.67 L 381.3 406.47 L 396.59 405.67 L 411.88 405.28 L 427.16 405.27 L 442.42 405.67 L 457.66 406.46 L 472.85 407.64 L 488 409.22 L 503.08 411.19 L 518.09 413.55 L 533.03 416.3 L 547.87 419.43 L 562.62 422.94 L 577.25 426.83 L 591.77 431.09 L 606.15 435.73 L 620.4 440.73 L 634.5 446.1 L 648.44 451.82 L 662.22 457.91 L 675.82 464.34 Z" fill="url(#light-tail)" opacity="0.9"/>
+    <circle cx="684.36" cy="445.15" r="34" fill="url(#light-core)" opacity="1"/>
   </g>
 </svg>

@@ -3,18 +3,14 @@ import { StyleSheet } from "react-native";
 import { MarkerSource, useMarkerFrames } from "../hooks/useAnimatedMarkers";
 import { MarkerLabels } from "./MarkerLabels";
 import { FrameSize } from "./markerGeometry";
+import { fadeShader, RadialFade, skiaColor } from "./lightShaders";
 import {
-  BLOOM_FADE,
   buildMarkerScene,
   Circle,
-  CORE_FADE,
-  FadeStop,
-  GLOW_FADE,
   GlyphShape,
   MarkerScene,
   PathShape,
   SelectionRing,
-  TAIL_FADE,
   TailShape
 } from "./markerScene";
 import { MARK_BLOOM, MarkerPalette } from "./palette";
@@ -24,10 +20,9 @@ import {
   SkiaPictureView,
   StrokeCap,
   StrokeJoin,
-  TileMode,
   createPicture
 } from "./skia";
-import type { SkCanvas, SkColor, SkPaint, SkPath, SkPicture, SkShader } from "./skia";
+import type { SkCanvas, SkPaint, SkPath, SkPicture } from "./skia";
 
 type Props = {
   /** The drawn frames, as a subscription. See `MarkerSource`. */
@@ -318,71 +313,15 @@ function circle(
 
 function fill(paint: SkPaint, color: string, alpha: number): void {
   paint.setStyle(PaintStyle.Fill);
-  paint.setColor(parsed(color));
+  paint.setColor(skiaColor(color));
   paint.setAlphaf(alpha);
 }
 
 function stroke(paint: SkPaint, color: string, alpha: number, width: number): void {
   paint.setStyle(PaintStyle.Stroke);
-  paint.setColor(parsed(color));
+  paint.setColor(skiaColor(color));
   paint.setAlphaf(alpha);
   paint.setStrokeWidth(width);
-}
-
-/**
- * `#rrggbb` as Skia wants it, parsed once per colour rather than per marker.
- *
- * A palette is a handful of colours — the white, the edge, the halo — against
- * several hundred draws a frame, and the fade between the day and night sets has
- * a fixed number of steps (`daylightFractionAt`), so this cannot grow without
- * bound over a long session.
- */
-const colors = new Map<string, SkColor>();
-function parsed(color: string): SkColor {
-  const known = colors.get(color);
-  if (known) return known;
-  const made = Skia.Color(color);
-  colors.set(color, made);
-  return made;
-}
-
-/** The fades drawn out from a mark's centre, by the scene's name for each. */
-type RadialFade = "glow" | "bloom" | "core";
-const FADES: Record<RadialFade | "tail", readonly FadeStop[]> = {
-  tail: TAIL_FADE,
-  glow: GLOW_FADE,
-  bloom: BLOOM_FADE,
-  core: CORE_FADE
-};
-
-/**
- * A colour faded out along a unit of distance, as a shader: along `+x` from
- * nought to one for a tail, and out from the origin to radius one for a glow,
- * a bloom or a point.
- *
- * Built once per kind and colour, bounded for the reason `parsed` is. The fade
- * itself is the scene's (`TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`);
- * the paint's own alpha is what scales it for the mark being drawn.
- */
-const shaders = new Map<string, SkShader>();
-function fadeShader(kind: RadialFade | "tail", color: string): SkShader {
-  const key = `${kind}:${color}`;
-  const known = shaders.get(key);
-  if (known) return known;
-
-  const stops = FADES[kind];
-  const base = parsed(color);
-  const ramp = stops.map((stop) =>
-    Float32Array.of(base[0], base[1], base[2], base[3] * stop.strength)
-  );
-  const offsets = stops.map((stop) => stop.at);
-  const origin = Skia.Point(0, 0);
-  const made =
-    kind === "tail"
-      ? Skia.Shader.MakeLinearGradient(origin, Skia.Point(1, 0), ramp, offsets, TileMode.Clamp)
-      : Skia.Shader.MakeRadialGradient(origin, 1, ramp, offsets, TileMode.Clamp);
-  shaders.set(key, made);
-  return made;
 }
 
 /**

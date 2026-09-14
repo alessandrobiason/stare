@@ -12,12 +12,11 @@ name over a count of what is above you, one button for the category filter, a
 strip of cardinal points along the bottom of the frame, a card carrying the next
 landmark due over you, and a bar of three tabs — the sky, a catalog that is not
 built yet, and the settings the guide and the console now live in.
-**A marker is the app's own logo**: the
-body and tapered trail of `assets/icon.svg`, the same shape the boot screen turns
-five of — both drawn by `tools/make-logo.mjs` from the geometry in
-`src/components/bootSky.ts` — drawn as light: a white point a few pixels across
-on a near-black edge, in a soft glow, trailing a comet's tail that fades to
-nothing. Solid discs a couple of dozen pixels across covered the picture they
+**A marker is a point of light**: a white point a few pixels across
+in a soft glow and a cool bloom, trailing a comet's tail that fades to
+nothing — and the app's logo is that same light, on a wide arc over a horizon
+(`assets/icon.svg`, drawn by `tools/make-logo.mjs` with the overlay's own
+fades). Solid discs a couple of dozen pixels across covered the picture they
 were marking. Nearer objects are larger *and* brighter, glow and tail alike, on
 the same log scale as their size. **Every mark is white**, whatever the object is
 for: the marks were once coloured by purpose, and white on a dark edge read
@@ -144,11 +143,11 @@ catalog, the sensors, a GPS fix, magnetic declination, camera permission and the
 segmentation model. Any of them failing fails boot — there is no degraded mode
 that looks like it is working, and markers are drawn only against a mask that is
 less than 8 seconds old. While it runs, the screen is the logo and the app's
-name — five satellites turning around the one word, which sits in the clear
-circle their innermost orbit leaves (`src/components/bootSky.ts`, drawn still
-into `assets/logo-extended.svg`). Their turning is the only progress report,
+name — one satellite crossing the night above the one word, a pass at a time,
+each on its own arc (`src/components/bootSky.ts`, its first frame drawn still
+into `assets/logo-extended.svg`). Its crossing is the only progress report,
 because the steps behind it are not ones anyone can act on; a failure stops the
-sky, takes the name off it and says what went wrong.
+light where it is, takes the name off the sky and says what went wrong.
 
 **The first launch is not that** (`src/onboarding/`, `src/components/IntroScreen.tsx`).
 Boot asks for the camera and then for a GPS fix within a second of the app

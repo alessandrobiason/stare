@@ -7,102 +7,135 @@ import { dirname, join } from "node:path";
 /**
  * Draws the app's logo, in the two shapes it is kept in:
  *
- * - `assets/icon.svg`, the mark on its own — one satellite, gold, on a square,
- *   and `assets/icon.png`, the same picture rasterised: the app icon proper,
+ * - `assets/icon.svg`, the mark on its own — one satellite as a point of light
+ *   on a wide arc over a horizon, trailing a tail that fades to nothing — and
+ *   `assets/icon.png`, the same picture rasterised: the app icon proper,
  *   because `app.json` can only point iOS at a PNG.
- * - `assets/logo-extended.svg`, the boot screen held still — that same mark
- *   five times over, on five orbits, in the white the satellite overlay itself
- *   draws every mark in. It is the picture the app opens on; on the phone it
- *   turns.
+ * - `assets/logo-extended.svg`, the boot screen held still — the night, the
+ *   stars and the first pass, at the moment the phone first draws it, at three
+ *   times the design frame's points, which is a current iPhone's pixels.
  *
  *     node tools/make-logo.mjs
  *
- * Both come out of one `trailPolygon` on purpose. They were drawn separately
- * once and had already drifted — the icon's trail thickened as the square root
- * of its length, the boot screen's linearly, so the icon was a fatter shape
- * than the thing it was supposed to be the single-satellite version of. One
- * function is what stops that happening again.
+ * Both are drawn in the overlay's own light: a white point, a tight white glow
+ * and a wide cool bloom, faded by the stops `src/components/markerScene.ts`
+ * fades every mark by. The satellites on the sky became light rather than paint,
+ * and a logo that stayed a disc with a solid trail was a picture of a different
+ * app.
  *
- * The numbers below are `src/components/bootSky.ts`'s, restated: a build tool
- * cannot import TypeScript, and the alternative is a second copy of the
- * geometry that silently rots. `__tests__/bootSky.test.ts` fails if the two
- * disagree, so a change to the composition is a change to both, and this file
- * is what makes the second one a one-line command.
+ * The numbers below are `src/components/bootSky.ts`'s and `markerScene.ts`'s,
+ * restated: a build tool cannot import TypeScript, and the alternative is a
+ * second copy of the geometry that silently rots. `__tests__/bootSky.test.ts`
+ * fails if the two disagree, so a change to the composition is a change to
+ * both, and this file is what makes the second one a one-line command.
  *
  * No third-party imports on purpose, in keeping with the other generators here.
  */
 
-/** Must match BOOT_SKY_DESIGN, BOOT_ORBITS, TRAIL_GAP and STARS in src/components/bootSky.ts. */
-const DESIGN = { width: 1024, height: 1820 };
-const BACKGROUND = "#070f1c";
-const GLOW = {
-  x: 0.5,
-  y: 0.5,
-  radius: 0.78,
-  stops: [
-    { offset: 0, color: "#12263f" },
-    { offset: 0.52, color: "#0c1a2d" },
-    { offset: 1, color: BACKGROUND }
+/** Must match TAIL_FADE, GLOW_FADE, BLOOM_FADE and CORE_FADE in src/components/markerScene.ts. */
+const FADES = {
+  tail: [
+    { at: 0, strength: 1 },
+    { at: 0.3, strength: 0.5 },
+    { at: 0.65, strength: 0.15 },
+    { at: 1, strength: 0 }
+  ],
+  glow: [
+    { at: 0, strength: 1 },
+    { at: 0.12, strength: 0.7 },
+    { at: 0.35, strength: 0.22 },
+    { at: 1, strength: 0 }
+  ],
+  bloom: [
+    { at: 0, strength: 1 },
+    { at: 0.2, strength: 0.45 },
+    { at: 0.5, strength: 0.12 },
+    { at: 1, strength: 0 }
+  ],
+  core: [
+    { at: 0, strength: 1 },
+    { at: 0.5, strength: 1 },
+    { at: 1, strength: 0 }
   ]
 };
-/** `direction` is the orbit's, and it is which side of the body the trail lies on. */
-const ORBITS = [
-  { radius: 175, phaseDeg: -30, sweepDeg: 120, trailWidth: 14, bodyRadius: 28, color: "#ffffff", direction: 1 },
-  { radius: 300, phaseDeg: 150, sweepDeg: 104, trailWidth: 17, bodyRadius: 36, color: "#ffffff", direction: -1 },
-  { radius: 420, phaseDeg: -110, sweepDeg: 92, trailWidth: 24, bodyRadius: 50, color: "#ffffff", direction: 1 },
-  { radius: 500, phaseDeg: 60, sweepDeg: 84, trailWidth: 19, bodyRadius: 42, color: "#ffffff", direction: -1 },
-  { radius: 620, phaseDeg: -100, sweepDeg: 76, trailWidth: 34, bodyRadius: 72, color: "#ffffff", direction: 1 }
-];
-const TRAIL_GAP = 0.35;
-const STARS = {
-  seed: 11,
-  count: 56,
-  clearRadius: 130,
-  radius: { minimum: 2, maximum: 5.5 },
-  alpha: { minimum: 0.14, maximum: 0.48 },
-  color: "#dbe6f2"
-};
+/** Must match MARK_COLOR and MARK_BLOOM in src/components/palette.ts. */
+const MARK_COLOR = "#ffffff";
+const MARK_BLOOM = "#a9c9ff";
 
 /**
- * The mark on its own: one satellite, on its own orbit, filling a square.
+ * Must match BOOT_SKY_DESIGN, SKY, BOOT_PASSES[0], PASS_TIMING, LIGHT, STARS and
+ * STAR_COLOR in src/components/bootSky.ts.
+ */
+const DESIGN = { width: 390, height: 844 };
+const SKY = {
+  stops: [
+    { offset: 0, color: "#03060d" },
+    { offset: 0.55, color: "#07101f" },
+    { offset: 1, color: "#0d1c33" }
+  ],
+  horizon: { x: 0.5, y: 1.12, radius: 0.75, color: "#406eaa", alpha: 0.2 }
+};
+const FIRST_PASS = { apex: 253, radius: 608, lean: 20, direction: 1 };
+const PASS_TIMING = { startProgress: 0.3, fadeShare: 0.12, marginPx: 40 };
+const LIGHT = {
+  coreRadius: 2.6,
+  glow: { radius: 14, alpha: 0.8 },
+  bloom: { radius: 40, alpha: 0.35 },
+  tail: { width: 2.6, length: 130, alpha: 0.85 }
+};
+const STARS = {
+  seed: 7,
+  count: 64,
+  clearRadius: 80,
+  radius: { minimum: 0.35, maximum: 1.15 },
+  alpha: { minimum: 0.12, maximum: 0.54 },
+  twinkle: { depth: 0.22, rate: { minimum: 0.5, maximum: 1.5 } }
+};
+const STAR_COLOR = "#dbe6f2";
+
+/** The still is the design frame at this many pixels a point. */
+const EXTENDED_SCALE = 3;
+
+/**
+ * The mark on its own: one satellite, on its own arc, filling a square.
  *
- * Its own numbers rather than one of `ORBITS`, because it is not a crop of the
- * composition — a square crop of that cuts the outermost orbit off entirely,
- * and that arc *is* the icon. What it shares with the five is the shape:
- * same trail, same taper, same gap between trail and body.
+ * Its own numbers rather than a crop of the boot screen, because at the size
+ * of a home screen a light a few points across in a phone-sized sky is a speck.
+ * What it shares with the boot screen is everything else: the same night going
+ * lighter towards the horizon, the same kind of arc with its centre below the
+ * square, the same light made of the same fades.
  *
- * The orbit's centre is off the bottom of the square, so what the icon shows is
- * a piece of an arc rather than a ring — near enough a horizon, which is what
- * the app is pointed at.
+ * The one fade it does not share is the tail's. The overlay's spends most of a
+ * tail's strength in its first third, which at sixty points across is a stub;
+ * the icon's holds on further along so the arc still reads as an arc there.
  */
 const ICON = {
   size: 1024,
-  background: "#0b1220",
-  /**
-   * The app's own gold. The boot sky's five were once the overlay's five
-   * category colours and this was the outermost of them; the sky's marks are
-   * all white now and so are the five, and the icon kept its colour.
-   */
-  color: "#ffcf5c",
-  radius: 330,
-  phaseDeg: -38,
-  sweepDeg: 104,
-  trailWidth: 46,
-  bodyRadius: 100,
-  /** Clockwise, like the outermost orbit: trail below, body ahead. */
+  night: [
+    { offset: 0, color: "#040811" },
+    { offset: 1, color: "#12284a" }
+  ],
+  horizon: { x: 0.5, y: 1.25, radius: 0.95, color: "#3f78c8", alpha: 0.26 },
+  /** The arc's centre as fractions of the square, and its radius in pixels. */
+  arc: { cx: 0.43, cy: 0.97, radius: 600 },
+  /** Past the top of the arc and heading down it, clockwise: tail behind, rising from the left. */
+  headDeg: -66,
+  sweepDeg: 58,
   direction: 1,
-  /** How much of the square the drawing spans, the rest being margin. */
-  coverage: 0.74
+  coreRadius: 34,
+  glow: { radius: 150, alpha: 0.8 },
+  bloom: { radius: 320, alpha: 0.45 },
+  tail: { width: 42, alpha: 0.9 },
+  tailFade: [
+    { at: 0, strength: 1 },
+    { at: 0.35, strength: 0.5 },
+    { at: 0.75, strength: 0.12 },
+    { at: 1, strength: 0 }
+  ]
 };
 
-/**
- * The frame the extended logo is drawn in: the design frame itself, which is
- * portrait because the app is.
- */
-const WIDTH = DESIGN.width;
-const HEIGHT = DESIGN.height;
-
 const round = (value) => Number(value.toFixed(2));
+const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
 
 function pointAt(cx, cy, radius, degrees) {
   const radians = degrees * (Math.PI / 180);
@@ -110,58 +143,78 @@ function pointAt(cx, cy, radius, degrees) {
 }
 
 /**
- * The icon's shape: an arc that begins at a point, thickens along the orbit,
- * and stops `clearance` short of the body's centre — see TRAIL_GAP.
- *
- * `direction` is the orbit's: the trail lies behind the body, which is against
- * the way it travels, so an anticlockwise orbit's runs the other way round.
+ * A tail laid back along an arc from a head at `headDeg`: full width under the
+ * head, tapering to nothing at its tip. Out along the far edge and back along
+ * the near one, so the polygon closes on the point it started at.
  */
-function trailPolygon(cx, cy, radius, headDeg, sweepDeg, width, clearance, direction) {
-  const steps = Math.max(12, Math.round(sweepDeg / 2.5));
-  const trailHeadDeg = headDeg - direction * (clearance / radius) * (180 / Math.PI);
-  const tailDeg = trailHeadDeg - direction * sweepDeg;
+function tailOnArc(cx, cy, radius, headDeg, sweepDeg, width, direction) {
+  const steps = Math.max(16, Math.round(sweepDeg / 1.5));
   const outer = [];
   const inner = [];
-
   for (let step = 0; step <= steps; step += 1) {
     const along = step / steps;
-    const degrees = tailDeg + direction * sweepDeg * along;
-    const half = (width * along) / 2;
+    const degrees = headDeg - direction * sweepDeg * along;
+    const half = (width / 2) * (1 - along);
     outer.push(pointAt(cx, cy, radius + half, degrees));
     inner.push(pointAt(cx, cy, radius - half, degrees));
   }
-
-  return [...outer, ...inner.reverse()];
+  return { points: [...outer, ...inner.reverse()], tip: outer[outer.length - 1] };
 }
 
-/** One satellite, as the two shapes every backend draws it with. */
-function satellite(cx, cy, orbit, scale) {
-  const radius = orbit.radius * scale;
-  const points = trailPolygon(
-    cx,
-    cy,
-    radius,
-    orbit.phaseDeg,
-    orbit.sweepDeg,
-    orbit.trailWidth * scale,
-    orbit.bodyRadius * (1 + TRAIL_GAP) * scale,
-    orbit.direction
-  );
-  const [bodyX, bodyY] = pointAt(cx, cy, radius, orbit.phaseDeg);
-  return { points, bodyX, bodyY, bodyRadius: orbit.bodyRadius * scale };
+function crossingDeg(cx, radius, x) {
+  return -Math.acos(clamp((x - cx) / radius, -1, 1)) * (180 / Math.PI);
 }
 
-function group(color, { points, bodyX, bodyY, bodyRadius }, transform = "") {
-  const path = points.map(([x, y]) => `${round(x)} ${round(y)}`).join(" L ");
-  return `  <g${transform ? ` transform="${transform}"` : ""} fill="${color}">
-    <path d="M ${path} Z"/>
-    <circle cx="${round(bodyX)}" cy="${round(bodyY)}" r="${round(bodyRadius)}"/>
-  </g>`;
+/* ---- The boot screen, held still. ---------------------------------------- */
+
+/** `bootSkyScene`, `skyPass(scene, 0)` and `passPose` at `skyMoment(0)`, for the still's frame. */
+function bootStill() {
+  const scale = EXTENDED_SCALE;
+  const width = DESIGN.width * scale;
+  const height = DESIGN.height * scale;
+  const pass = FIRST_PASS;
+  const radius = pass.radius * scale;
+  const cx = (DESIGN.width / 2 + pass.lean) * scale;
+  const cy = (pass.apex + pass.radius) * scale;
+  const margin = PASS_TIMING.marginPx * scale;
+  const left = crossingDeg(cx, radius, -margin);
+  const right = crossingDeg(cx, radius, width + margin);
+  const [fromDeg, toDeg] = pass.direction === 1 ? [left, right] : [right, left];
+
+  const progress = PASS_TIMING.startProgress;
+  const edge = clamp(Math.min(progress, 1 - progress) / PASS_TIMING.fadeShare, 0, 1);
+  const pose = {
+    angleDeg: fromDeg + (toDeg - fromDeg) * progress + 90,
+    alpha: edge * edge * (3 - 2 * edge)
+  };
+
+  const [x, y] = pointAt(cx, cy, radius, -90);
+  const sweepDeg = ((LIGHT.tail.length * scale) / radius) * (180 / Math.PI);
+  const tail = tailOnArc(cx, cy, radius, -90, sweepDeg, LIGHT.tail.width * scale, pass.direction);
+
+  return {
+    width,
+    height,
+    scale,
+    pass: { cx, cy },
+    pose,
+    light: {
+      x,
+      y,
+      coreRadius: LIGHT.coreRadius * scale,
+      glow: { radius: LIGHT.glow.radius * scale, alpha: LIGHT.glow.alpha },
+      bloom: { radius: LIGHT.bloom.radius * scale, alpha: LIGHT.bloom.alpha },
+      tail: { ...tail, alpha: LIGHT.tail.alpha },
+      tailFade: FADES.tail
+    }
+  };
 }
 
-function stars(scale, offsetX, offsetY) {
+/** `starsFor`, with each star at the brightness `starAlpha` gives it on the first frame. */
+function stars(scale) {
   let state = STARS.seed;
   const random = () => (state = (state * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const between = (range) => range.minimum + random() * (range.maximum - range.minimum);
 
   const centreX = DESIGN.width / 2;
   const centreY = DESIGN.height / 2;
@@ -169,98 +222,138 @@ function stars(scale, offsetX, offsetY) {
   for (let attempt = 0; attempt < STARS.count * 60 && drawn.length < STARS.count; attempt += 1) {
     const x = random() * DESIGN.width;
     const y = random() * DESIGN.height;
-    const radius = STARS.radius.minimum + random() * (STARS.radius.maximum - STARS.radius.minimum);
-    const alpha = STARS.alpha.minimum + random() * (STARS.alpha.maximum - STARS.alpha.minimum);
+    const radius = between(STARS.radius);
+    const alpha = between(STARS.alpha);
+    between(STARS.twinkle.rate);
+    const phase = random() * Math.PI * 2;
     if (Math.hypot(x - centreX, y - centreY) < STARS.clearRadius) continue;
+    const { depth } = STARS.twinkle;
+    const shown = alpha * (1 - depth + depth * Math.sin(phase));
     drawn.push(
-      `    <circle cx="${round(offsetX + x * scale)}" cy="${round(offsetY + y * scale)}" ` +
-        `r="${round(radius * scale)}" opacity="${round(alpha)}"/>`
+      `    <circle cx="${round(x * scale)}" cy="${round(y * scale)}" ` +
+        `r="${round(radius * scale)}" opacity="${round(shown)}"/>`
     );
   }
   return drawn;
 }
 
-/**
- * The square mark: drawn about its orbit's centre, then fitted to the square.
- *
- * The fit is returned as well as applied, because the PNG has to place the mark
- * where the SVG places it and there is only one placement to get wrong. The
- * numbers are the rounded ones the SVG carries rather than the full-precision
- * ones behind them, so the two files are the same picture down to the pixel
- * instead of near enough.
- */
-function iconFit() {
-  const middle = ICON.size / 2;
-  const drawn = satellite(middle, middle, ICON, 1);
-  const xs = [
-    ...drawn.points.map(([x]) => x),
-    drawn.bodyX - drawn.bodyRadius,
-    drawn.bodyX + drawn.bodyRadius
-  ];
-  const ys = [
-    ...drawn.points.map(([, y]) => y),
-    drawn.bodyY - drawn.bodyRadius,
-    drawn.bodyY + drawn.bodyRadius
-  ];
-  const left = Math.min(...xs);
-  const right = Math.max(...xs);
-  const top = Math.min(...ys);
-  const bottom = Math.max(...ys);
-  // Fitted on the longer side and centred on its own bounding box, so the gap
-  // the trail leaves does not push the mark off the middle of the square.
-  const scale = Number(
-    ((ICON.size * ICON.coverage) / Math.max(right - left, bottom - top)).toFixed(4)
-  );
-  const shiftX = round(-(left + right) / 2);
-  const shiftY = round(-(top + bottom) / 2);
+/* ---- SVG. ---------------------------------------------------------------- */
 
+function stopsSvg(fade, color) {
+  return fade
+    .map((stop) => `      <stop offset="${round(stop.at * 100)}%" stop-color="${color}" stop-opacity="${stop.strength}"/>`)
+    .join("\n");
+}
+
+/**
+ * One light, as the four shapes every backend draws it with: bloom, glow, tail
+ * and point, each filled with its fade. Gradients in user space, so a light
+ * inside a turned group turns with its gradients.
+ */
+function lightSvg(id, light, alpha, transform = "") {
+  const { x, y, tail } = light;
+  const path = tail.points.map(([px, py]) => `${round(px)} ${round(py)}`).join(" L ");
+  const radial = (name, radius, fade, color) => `    <radialGradient id="${id}-${name}" gradientUnits="userSpaceOnUse" cx="${round(x)}" cy="${round(
+    y
+  )}" r="${round(radius)}">
+${stopsSvg(fade, color)}
+    </radialGradient>`;
+
+  const defs = `  <defs>
+${radial("bloom", light.bloom.radius, FADES.bloom, MARK_BLOOM)}
+${radial("glow", light.glow.radius, FADES.glow, MARK_COLOR)}
+${radial("core", light.coreRadius, FADES.core, MARK_COLOR)}
+    <linearGradient id="${id}-tail" gradientUnits="userSpaceOnUse" x1="${round(x)}" y1="${round(y)}" x2="${round(
+      tail.tip[0]
+    )}" y2="${round(tail.tip[1])}">
+${stopsSvg(light.tailFade, MARK_COLOR)}
+    </linearGradient>
+  </defs>`;
+
+  const shapes = `  <g${transform ? ` transform="${transform}"` : ""}>
+    <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.bloom.radius)}" fill="url(#${id}-bloom)" opacity="${round(
+      light.bloom.alpha * alpha
+    )}"/>
+    <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.glow.radius)}" fill="url(#${id}-glow)" opacity="${round(
+      light.glow.alpha * alpha
+    )}"/>
+    <path d="M ${path} Z" fill="url(#${id}-tail)" opacity="${round(tail.alpha * alpha)}"/>
+    <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.coreRadius)}" fill="url(#${id}-core)" opacity="${round(alpha)}"/>
+  </g>`;
+
+  return `${defs}\n${shapes}`;
+}
+
+/** The composition: the boot screen's first frame, as `BootSky` draws it. */
+function extendedSvg() {
+  const still = bootStill();
+  const { width, height, scale } = still;
+  const horizon = SKY.horizon;
+  const transform = `rotate(${round(still.pose.angleDeg)} ${round(still.pass.cx)} ${round(still.pass.cy)})`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="night" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${height}">
+${SKY.stops.map((stop) => `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}"/>`).join("\n")}
+    </linearGradient>
+    <radialGradient id="horizon" gradientUnits="userSpaceOnUse" cx="${round(horizon.x * width)}" cy="${round(
+      horizon.y * height
+    )}" r="${round(horizon.radius * height)}">
+      <stop offset="0%" stop-color="${horizon.color}" stop-opacity="${horizon.alpha}"/>
+      <stop offset="100%" stop-color="${horizon.color}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#night)"/>
+  <rect width="${width}" height="${height}" fill="url(#horizon)"/>
+  <g id="stars" fill="${STAR_COLOR}">
+${stars(scale).join("\n")}
+  </g>
+${lightSvg("pass", still.light, still.pose.alpha, transform)}
+</svg>
+`;
+}
+
+/** The icon's light, placed in the square. */
+function iconLight() {
+  const S = ICON.size;
+  const cx = ICON.arc.cx * S;
+  const cy = ICON.arc.cy * S;
+  const [x, y] = pointAt(cx, cy, ICON.arc.radius, ICON.headDeg);
+  const tail = tailOnArc(cx, cy, ICON.arc.radius, ICON.headDeg, ICON.sweepDeg, ICON.tail.width, ICON.direction);
   return {
-    drawn,
-    transform: `translate(${middle},${middle}) scale(${scale}) translate(${shiftX},${shiftY})`,
-    /** The same transform as arithmetic: a point of the drawing to a pixel. */
-    place: ([x, y]) => [middle + scale * (round(x) + shiftX), middle + scale * (round(y) + shiftY)],
-    scale
+    x,
+    y,
+    coreRadius: ICON.coreRadius,
+    glow: ICON.glow,
+    bloom: ICON.bloom,
+    tail: { ...tail, alpha: ICON.tail.alpha },
+    tailFade: ICON.tailFade
   };
 }
 
-function iconSvg({ drawn, transform }) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ICON.size}" height="${
-    ICON.size
-  }" viewBox="0 0 ${ICON.size} ${ICON.size}">
-  <rect width="${ICON.size}" height="${ICON.size}" fill="${ICON.background}"/>
-${group(ICON.color, drawn, transform)}
-</svg>
-`;
-}
-
-/** The composition: the design frame scaled to cover the drawing, as `bootSkyScene` scales it. */
-function extendedSvg() {
-  const scale = Math.max(WIDTH / DESIGN.width, HEIGHT / DESIGN.height);
-  const offsetX = (WIDTH - DESIGN.width * scale) / 2;
-  const offsetY = (HEIGHT - DESIGN.height * scale) / 2;
-  const centreX = offsetX + (DESIGN.width / 2) * scale;
-  const centreY = offsetY + (DESIGN.height / 2) * scale;
-
-  const satellites = ORBITS.map((orbit) => group(orbit.color, satellite(centreX, centreY, orbit, scale)));
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
+function iconSvg(light) {
+  const S = ICON.size;
+  const { horizon } = ICON;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">
   <defs>
-    <radialGradient id="sky" gradientUnits="userSpaceOnUse" cx="${round(centreX)}" cy="${round(
-      centreY
-    )}" r="${round(GLOW.radius * DESIGN.height * scale)}">
-${GLOW.stops
-  .map((stop) => `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}"/>`)
-  .join("\n")}
+    <linearGradient id="night" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${S}">
+${ICON.night.map((stop) => `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}"/>`).join("\n")}
+    </linearGradient>
+    <radialGradient id="horizon" gradientUnits="userSpaceOnUse" cx="${round(horizon.x * S)}" cy="${round(
+      horizon.y * S
+    )}" r="${round(horizon.radius * S)}">
+      <stop offset="0%" stop-color="${horizon.color}" stop-opacity="${horizon.alpha}"/>
+      <stop offset="100%" stop-color="${horizon.color}" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#sky)"/>
-  <g fill="${STARS.color}">
-${stars(scale, offsetX, offsetY).join("\n")}
-  </g>
-${satellites.join("\n")}
+  <rect width="${S}" height="${S}" fill="url(#night)"/>
+  <rect width="${S}" height="${S}" fill="url(#horizon)"/>
+${lightSvg("light", light, 1)}
 </svg>
 `;
 }
+
+/* ---- PNG. ---------------------------------------------------------------- */
 
 /**
  * The icon again, as pixels. `app.json` names a PNG because that is all an iOS
@@ -269,8 +362,11 @@ ${satellites.join("\n")}
  * for a while — the App Store showed the older one, and a new build did not
  * change that. Drawing both here is what keeps them one picture.
  *
- * Two shapes, no strokes and no gradients, so a scanline fill is the whole
- * renderer: cheaper than a dependency, and it keeps the file's no-imports rule.
+ * The SVG is two gradient-filled rectangles and a light, and every one of those
+ * is a formula per pixel, so a compositor that evaluates each layer's gradient
+ * the way SVG defines it and lays it over the last is the whole renderer — the
+ * one edge that needs antialiasing, the tail's, gets a scanline coverage map.
+ * Cheaper than a dependency, and it keeps the file's no-imports rule.
  */
 
 /** Coverage is exact across a row and sampled down it, so this is what the arc's diagonals cost. */
@@ -281,6 +377,20 @@ function rgb(hex) {
   return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
 }
 
+/** A fade's strength `t` of the way along it, interpolated between its stops as SVG does. */
+function fadeAt(fade, t) {
+  if (t <= fade[0].at) return fade[0].strength;
+  for (let index = 1; index < fade.length; index += 1) {
+    const stop = fade[index];
+    if (t <= stop.at) {
+      const previous = fade[index - 1];
+      const share = (t - previous.at) / (stop.at - previous.at);
+      return previous.strength + (stop.strength - previous.strength) * share;
+    }
+  }
+  return fade[fade.length - 1].strength;
+}
+
 /** Adds a horizontal run's exact per-pixel overlap into one row of the coverage map. */
 function addSpan(coverage, row, size, start, end) {
   for (let x = Math.max(0, Math.floor(start)); x < Math.min(size, Math.ceil(end)); x += 1) {
@@ -289,15 +399,8 @@ function addSpan(coverage, row, size, start, end) {
   }
 }
 
-/**
- * Coverage of the polygon and the disc, in [0, 1] per pixel.
- *
- * Spans are merged before they are added because coverage is a union, not a
- * sum: two overlapping runs over one pixel would otherwise darken it past
- * full. The trail stops short of the body today, so nothing overlaps — merging
- * is what stops that being a thing the drawing is quietly not allowed to change.
- */
-function rasterise(size, polygon, body) {
+/** Coverage of a polygon, in [0, 1] per pixel, by even-odd scanline fill. */
+function rasterise(size, polygon) {
   const coverage = new Float64Array(size * size);
   for (let step = 0; step < size * SUBSAMPLES; step += 1) {
     const y = (step + 0.5) / SUBSAMPLES;
@@ -310,29 +413,92 @@ function rasterise(size, polygon, body) {
       crossings.push(x0 + ((y - y0) / (y1 - y0)) * (x1 - x0));
     }
     crossings.sort((a, b) => a - b);
-    const spans = [];
-    for (let i = 0; i + 1 < crossings.length; i += 2) spans.push([crossings[i], crossings[i + 1]]);
-
-    const dy = y - body.y;
-    if (Math.abs(dy) < body.radius) {
-      const dx = Math.sqrt(body.radius * body.radius - dy * dy);
-      spans.push([body.x - dx, body.x + dx]);
-    }
-    if (spans.length === 0) continue;
-
-    spans.sort((a, b) => a[0] - b[0]);
     const row = Math.floor(y) * size;
-    let [start, end] = spans[0];
-    for (let i = 1; i <= spans.length; i += 1) {
-      if (i < spans.length && spans[i][0] <= end) {
-        end = Math.max(end, spans[i][1]);
-        continue;
-      }
-      addSpan(coverage, row, size, start, end);
-      if (i < spans.length) [start, end] = spans[i];
+    for (let i = 0; i + 1 < crossings.length; i += 2) {
+      addSpan(coverage, row, size, crossings[i], crossings[i + 1]);
     }
   }
   return coverage;
+}
+
+/**
+ * A little noise per pixel, the same on every run.
+ *
+ * Added before each channel is rounded to eight bits. A night that goes from
+ * near-black to deep blue across a thousand pixels has fewer than fifty steps of
+ * blue to spend on it, and without this they are bands a person can count.
+ */
+function dither(x, y) {
+  let hash = Math.imul(x, 374761393) + Math.imul(y, 668265263);
+  hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
+  hash ^= hash >>> 16;
+  return (hash >>> 0) / 4294967296 - 0.5;
+}
+
+function iconPng(light) {
+  const S = ICON.size;
+  const colour = new Float64Array(S * S * 3);
+  const over = (index, [red, green, blue], alpha) => {
+    if (!(alpha > 0)) return;
+    colour[index] += (red - colour[index]) * alpha;
+    colour[index + 1] += (green - colour[index + 1]) * alpha;
+    colour[index + 2] += (blue - colour[index + 2]) * alpha;
+  };
+
+  const top = rgb(ICON.night[0].color);
+  const bottom = rgb(ICON.night[1].color);
+  const horizon = { ...ICON.horizon, x: ICON.horizon.x * S, y: ICON.horizon.y * S, radius: ICON.horizon.radius * S };
+  const tail = rasterise(S, light.tail.points);
+  const [tipX, tipY] = light.tail.tip;
+  const alongX = tipX - light.x;
+  const alongY = tipY - light.y;
+  const alongSquared = alongX * alongX + alongY * alongY;
+  const radial = (index, px, py, radius, fade, color, alpha) => {
+    const distance = Math.hypot(px - light.x, py - light.y);
+    if (distance < radius) over(index, color, alpha * fadeAt(fade, distance / radius));
+  };
+  const white = rgb(MARK_COLOR);
+  const bloom = rgb(MARK_BLOOM);
+  const breath = rgb(horizon.color);
+
+  for (let y = 0; y < S; y += 1) {
+    const py = y + 0.5;
+    const t = py / S;
+    const night = top.map((channel, index) => channel + (bottom[index] - channel) * t);
+    for (let x = 0; x < S; x += 1) {
+      const px = x + 0.5;
+      const index = (y * S + x) * 3;
+      colour[index] = night[0];
+      colour[index + 1] = night[1];
+      colour[index + 2] = night[2];
+
+      const fromHorizon = Math.hypot(px - horizon.x, py - horizon.y) / horizon.radius;
+      if (fromHorizon < 1) over(index, breath, horizon.alpha * (1 - fromHorizon));
+
+      radial(index, px, py, light.bloom.radius, FADES.bloom, bloom, light.bloom.alpha);
+      radial(index, px, py, light.glow.radius, FADES.glow, white, light.glow.alpha);
+
+      const covered = tail[y * S + x];
+      if (covered > 0) {
+        const along = clamp(((px - light.x) * alongX + (py - light.y) * alongY) / alongSquared, 0, 1);
+        over(index, white, Math.min(1, covered) * light.tail.alpha * fadeAt(light.tailFade, along));
+      }
+
+      radial(index, px, py, light.coreRadius, FADES.core, white, 1);
+    }
+  }
+
+  const pixels = Buffer.alloc(S * S * 3);
+  for (let y = 0; y < S; y += 1) {
+    for (let x = 0; x < S; x += 1) {
+      const index = (y * S + x) * 3;
+      const noise = dither(x, y);
+      for (let channel = 0; channel < 3; channel += 1) {
+        pixels[index + channel] = clamp(Math.round(colour[index + channel] + noise), 0, 255);
+      }
+    }
+  }
+  return encodePng(S, pixels);
 }
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
@@ -361,8 +527,8 @@ function chunk(tag, body) {
  *
  * The alpha channel is the point: App Store Connect rejects an icon that has
  * one at all, opaque or not (ITMS-90717), which is what `tools/check-icon-opaque.mjs`
- * guards on the Linux gate. Coverage is flattened against the background here
- * rather than kept as transparency, so there is no channel to reject.
+ * guards on the Linux gate. Every layer is flattened onto the night here rather
+ * than kept as transparency, so there is no channel to reject.
  */
 function encodePng(size, pixels) {
   const stride = size * 3;
@@ -388,34 +554,11 @@ function encodePng(size, pixels) {
   ]);
 }
 
-function iconPng({ drawn, place, scale }) {
-  const polygon = drawn.points.map(place);
-  const [bodyX, bodyY] = place([drawn.bodyX, drawn.bodyY]);
-  const coverage = rasterise(ICON.size, polygon, {
-    x: bodyX,
-    y: bodyY,
-    radius: round(drawn.bodyRadius) * scale
-  });
-
-  const background = rgb(ICON.background);
-  const foreground = rgb(ICON.color);
-  const pixels = Buffer.alloc(ICON.size * ICON.size * 3);
-  for (let index = 0; index < coverage.length; index += 1) {
-    const alpha = Math.min(1, coverage[index]);
-    for (let channel = 0; channel < 3; channel += 1) {
-      pixels[index * 3 + channel] = Math.round(
-        background[channel] + (foreground[channel] - background[channel]) * alpha
-      );
-    }
-  }
-  return encodePng(ICON.size, pixels);
-}
-
-const fit = iconFit();
+const light = iconLight();
 const assets = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
 for (const [name, contents] of [
-  ["icon.svg", iconSvg(fit)],
-  ["icon.png", iconPng(fit)],
+  ["icon.svg", iconSvg(light)],
+  ["icon.png", iconPng(light)],
   ["logo-extended.svg", extendedSvg()]
 ]) {
   const out = join(assets, name);

@@ -29,16 +29,17 @@ type Props = {
  * The screen the app opens on, and the one it comes back to when something
  * fatal happens.
  *
- * While it is loading it is the sky and the app's name — five satellites
- * turning, and the one word they turn around (see `bootSky`). It used to carry
+ * While it is loading it is the sky and the app's name — one satellite
+ * crossing the night above the one word (see `bootSky`). It used to carry
  * a tagline, a progress bar and the list of start-up steps as they settled,
  * which was a lot of screen spent telling someone that a catalogue they have
  * never heard of is being downloaded. None of it was actionable: the app either
  * opens, or it comes back here with a reason.
  *
  * A failure is that reason, and is the only other thing this screen ever
- * writes. The name gives way to it, and the sky stops turning underneath,
- * because the turning is what was saying that something is still happening.
+ * writes. The name gives way to it, and the light stops where it is
+ * underneath, because its moving is what was saying that something is still
+ * happening.
  */
 export const BootScreen: React.FC<Props> = ({
   failed,
@@ -125,27 +126,27 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   /**
-   * The name, in the eye of the orbits.
+   * The name, in the middle of the night the satellite crosses.
    *
-   * It has to fit inside them. The innermost satellite in `BOOT_ORBITS` runs at
-   * 175 design units with a body of 28, so the clear circle around the centre is
-   * 147 of the design frame's 1820 tall — 54 layout points on the smallest
-   * screen this ships to, a 375 x 667 phone, and 69 on a current one. Five
-   * letters at this size and spacing measure 91 points across, so the word ends
-   * some eight points short of the closest satellite even there. Grow either
-   * figure and they meet.
+   * Set small, light and wide, the way a name is set on something made with
+   * care rather than on a sign: the light above it is the thing to look at, and
+   * the word only has to say whose sky it is. Every pass in `BOOT_PASSES` peaks
+   * well above the middle of the screen, so the two never meet.
    *
    * `letterSpacing` is applied after the last letter as well as between them, so
    * the box is a space wider than the word in it and the letters sit half a
    * space left of the middle. A margin shifts a centred box by half of itself,
    * which is why the correction is the whole space rather than half of it.
+   *
+   * `IntroScreen` sets the same word in the same place on its first page, and
+   * its style is this one: change both.
    */
   wordmark: {
     color: theme.color.textBright,
-    fontSize: 19,
-    fontWeight: "600",
-    letterSpacing: 7,
-    marginLeft: 7,
+    fontSize: 17,
+    fontWeight: "500",
+    letterSpacing: 9,
+    marginLeft: 9,
     opacity: 0.92
   },
   card: {

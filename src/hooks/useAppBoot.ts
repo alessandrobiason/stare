@@ -32,10 +32,10 @@ export type AppBoot<T> = {
  * when it does not finish.
  *
  * The sequence reports its progress step by step and this throws that away.
- * The screen it feeds shows the sky turning and nothing else while boot runs
- * (see `bootSky`), and what a failure needs is the error, not the tally — the
- * steps that had settled travel on `BootError` instead, which is where the
- * decision about retrying reads them from.
+ * The screen it feeds shows a satellite crossing the sky and nothing else while
+ * boot runs (see `bootSky`), and what a failure needs is the error, not the
+ * tally — the steps that had settled travel on `BootError` instead, which is
+ * where the decision about retrying reads them from.
  *
  * A successful run does not switch to `"ready"` the moment the sequence
  * resolves — it waits out `MIN_BOOT_SCREEN_MS` first, so the boot screen

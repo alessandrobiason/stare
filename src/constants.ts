@@ -1294,7 +1294,7 @@ export const TLE_RETRY_INTERVAL_MS = 15 * 60 * 1000;
  *
  * Boot's five steps race each other (`runBootSequence`), and a warm cache can
  * clear all of them in a couple of hundred milliseconds — too fast for the
- * turning sky (`BootSky`) to read as anything but a flash. It is the app's
+ * boot sky (`BootSky`) to read as anything but a flash. It is the app's
  * one moment of its own before the camera takes the screen, so it holds for
  * this long regardless of how quickly the work underneath it finishes. See
  * `useAppBoot`.

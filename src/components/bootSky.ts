@@ -1,215 +1,368 @@
+import { clamp } from "../math/angles";
 import { FrameSize } from "./markerGeometry";
-import { MARK_COLOR } from "./palette";
+import { MARK_BLOOM, MARK_COLOR } from "./palette";
 
 /**
- * The sky the app opens on: five satellites turning around the middle of the
- * screen, and nothing else.
+ * The sky the app opens on: one satellite crossing the night above the app's
+ * name, and nothing else.
  *
- * It is the logo rather than a decoration of it. `assets/icon.svg` is one
- * tapered trail with a body just ahead of it; this is that shape five times
- * over, on five orbits, in the white every mark on the real sky is drawn in —
- * so what a person is about to read against that sky is already in front of
- * them while it loads. The icon alone keeps its gold, which is the app's own.
+ * It is the logo rather than a decoration of it. `assets/icon.svg` is a single
+ * point of light on a wide arc over a horizon, trailing a tail that fades to
+ * nothing; this is that pass, moving. And the light is the overlay's own — the
+ * same white point in the same cool bloom, faded by the same stops
+ * (`TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`) — so what a person is
+ * about to read against the real sky is already in front of them while it
+ * loads.
  *
- * The turning is the whole of the loading indicator. There is no spinner, no
+ * It used to be five solid satellites turning on five orbits around the name.
+ * That was the logo as it was then — a disc with a separate solid trail — and
+ * when the marks became light it was the one place left drawing them as
+ * paint. Five of anything also made a diagram of it. One light is a sky.
+ *
+ * The motion is the whole of the loading indicator. There is no spinner, no
  * progress bar and no step list, because none of them told anyone anything
  * they could act on: the app either opens or comes back with a reason. So the
  * screen says only "something is still happening", which motion says on its
- * own, and it says it in the one image the app is named for.
+ * own, and it says it with the thing the app is for: something crossing your
+ * sky.
  *
  * Nothing here knows about Skia, about a browser canvas or about React — the
- * same split as `markerScene`, and for the same reason. The geometry is built
- * once per frame size and then only *turned*: a satellite's trail keeps its
- * shape as it goes round, so what changes per displayed frame is one angle per
- * orbit rather than two hundred points. `BootSky.tsx` draws it on the phone,
- * `BootSky.web.tsx` in the replay harness, and both only have to be able to
- * fill a polygon and a circle.
+ * same split as `markerScene`, and for the same reason. A pass is built once
+ * and then only *turned*: its light keeps its shape as it goes along the arc, so
+ * what changes per displayed frame is one angle and one alpha rather than the
+ * geometry. `BootSky.tsx` draws it on the phone, `BootSky.web.tsx` in the replay
+ * harness, and `tools/make-logo.mjs` holds its first frame still.
  */
 
 /**
- * The space the composition is drawn in: a tall frame, mapped onto whatever
- * the device's actually is by covering it. Portrait because the app is
- * portrait-only, and cropping the sides of a picture arranged around its own
- * centre costs it nothing.
+ * The space the composition is drawn in, in points: a phone's own frame,
+ * mapped onto whatever the device's actually is by covering it. Portrait
+ * because the app is portrait-only, and the light sizes below are quoted in it
+ * so that they are the size on a phone that they read as here.
  */
-export const BOOT_SKY_DESIGN: FrameSize = { width: 1024, height: 1820 };
+export const BOOT_SKY_DESIGN: FrameSize = { width: 390, height: 844 };
 
-/** The colour behind the drawing, for the frame before the first one lands. */
-export const BOOT_SKY_BACKGROUND = "#070f1c";
-
-/** The glow behind the satellites: a night sky is not one flat colour. */
-const GLOW = {
-  /** Fraction of the design frame, from its top-left. */
-  x: 0.5,
-  y: 0.5,
-  /** Radius as a fraction of the design frame's height. */
-  radius: 0.78,
+/**
+ * The night behind everything: darkest overhead, lifting towards the horizon
+ * the phone is held above.
+ *
+ * Deliberately not a flat colour and not a glow round the middle — the old sky
+ * had one, and it made the screen a spotlit stage. A sky is lighter near the
+ * horizon than at the zenith, and a person holding a phone upright is looking
+ * at the part of it just above the horizon.
+ */
+const SKY = {
+  /** Top to bottom of the design frame. */
   stops: [
-    { offset: 0, color: "#12263f" },
-    { offset: 0.52, color: "#0c1a2d" },
-    { offset: 1, color: BOOT_SKY_BACKGROUND }
-  ]
+    { offset: 0, color: "#03060d" },
+    { offset: 0.55, color: "#07101f" },
+    { offset: 1, color: "#0d1c33" }
+  ],
+  /**
+   * The faint breath of light over the horizon, below the bottom of the frame.
+   * Fractions of the design frame: `x` of its width, `y` and `radius` of its
+   * height.
+   */
+  horizon: { x: 0.5, y: 1.12, radius: 0.75, color: "#406eaa", alpha: 0.2 }
 } as const;
 
 /**
- * One orbit, in design pixels.
- *
- * `sweep` is how much of the circle the trail itself covers — laid behind the
- * body, and clear of it by `TRAIL_GAP` — and `phaseDeg` is where the body
- * starts, measured from the orbit's centre, with zero to the right and angles
- * increasing downwards, as the frame's own coordinates do.
- *
- * The periods are not physical. They are spread so the five never come back
- * into the same arrangement within the time a boot takes, which is what keeps
- * a screen made of circles from looking like it is stuck.
+ * The colour behind the drawing, for the frame before the first one lands:
+ * the middle of the night's own gradient, which is the single colour nearest
+ * to all of it.
  */
-type Orbit = {
+export const BOOT_SKY_BACKGROUND = SKY.stops[1].color;
+
+/**
+ * One pass, in design points: an arc of a circle whose centre is below the
+ * screen, so what shows is a shallow curve over the name — near enough the
+ * path a satellite takes across the sky from horizon to horizon.
+ */
+export type BootPass = {
+  /** How far from the top of the frame the arc peaks. */
+  apex: number;
   radius: number;
-  phaseDeg: number;
-  sweepDeg: number;
-  /** Width of the trail at its head; it tapers to nothing going back. */
-  trailWidth: number;
-  bodyRadius: number;
-  color: string;
-  /** Seconds for one turn, and its sign: 1 clockwise, -1 anticlockwise. */
-  periodSeconds: number;
+  /** How far right of the middle the arc's centre, and so its peak, sits. */
+  lean: number;
+  /** 1 left to right, -1 right to left. */
   direction: 1 | -1;
 };
 
 /**
- * The five orbits, inner to outer, drawn in that order so the largest body
- * passes in front rather than behind.
+ * The passes, in the order they are flown, and then round again.
  *
- * All five in `MARK_COLOR`, the overlay's own white, rather than a palette of
- * their own: the sky marks every satellite the same way, and so does this.
+ * Composed rather than random, so none of them can come out ugly: each peaks
+ * well above the name, which sits at 422, and a few points' lean either way
+ * keeps them from being the same arc four times. Alternate directions, because
+ * real passes do not all go one way, and a run of them that did would read as a
+ * progress bar.
  */
-export const BOOT_ORBITS: readonly Orbit[] = [
-  {
-    radius: 175,
-    phaseDeg: -30,
-    sweepDeg: 120,
-    trailWidth: 14,
-    bodyRadius: 28,
-    color: MARK_COLOR,
-    periodSeconds: 5.5,
-    direction: 1
-  },
-  {
-    radius: 300,
-    phaseDeg: 150,
-    sweepDeg: 104,
-    trailWidth: 17,
-    bodyRadius: 36,
-    color: MARK_COLOR,
-    periodSeconds: 8,
-    direction: -1
-  },
-  {
-    radius: 420,
-    phaseDeg: -110,
-    sweepDeg: 92,
-    trailWidth: 24,
-    bodyRadius: 50,
-    color: MARK_COLOR,
-    periodSeconds: 10.5,
-    direction: 1
-  },
-  {
-    radius: 500,
-    phaseDeg: 60,
-    sweepDeg: 84,
-    trailWidth: 19,
-    bodyRadius: 42,
-    color: MARK_COLOR,
-    periodSeconds: 14,
-    direction: -1
-  },
-  {
-    radius: 620,
-    phaseDeg: -100,
-    sweepDeg: 76,
-    trailWidth: 34,
-    bodyRadius: 72,
-    color: MARK_COLOR,
-    periodSeconds: 18.5,
-    direction: 1
-  }
+export const BOOT_PASSES: readonly BootPass[] = [
+  { apex: 253, radius: 608, lean: 20, direction: 1 },
+  { apex: 304, radius: 675, lean: -40, direction: -1 },
+  { apex: 228, radius: 557, lean: -15, direction: 1 },
+  { apex: 279, radius: 641, lean: 45, direction: -1 }
 ];
 
+/** How a pass is flown. */
+export const PASS_TIMING = {
+  /** Seconds from one edge of the frame to the other. */
+  periodSeconds: 8,
+  /**
+   * How far into the first pass the clock starts.
+   *
+   * A pass starts off the edge of the frame, and a boot can be over in two and
+   * a half seconds (`MIN_BOOT_SCREEN_MS`). Starting at the edge would spend the
+   * first second of that on an empty sky; starting part-way across, the light
+   * is there on the first frame.
+   */
+  startProgress: 0.3,
+  /** The share of a pass at each end over which its light fades in and out. */
+  fadeShare: 0.12,
+  /** How far past the frame's edge, in design points, a pass starts and ends. */
+  marginPx: 40
+} as const;
+
 /**
- * The clear sky between a body and the head of its own trail, as a fraction of
- * the body's radius.
+ * The light, in design points.
  *
- * The trail used to run all the way to the body's centre, so what emerged from
- * behind the body was fused to it: at a glance, a round head with a tail
- * growing straight out of it, which is a tadpole rather than a satellite.
- * Ending the trail short leaves two marks instead of one silhouette — the
- * object, and the ground it has just covered — and the eye reads the second as
- * something the first left behind rather than as part of its body.
- *
- * A fraction of the body rather than a fixed distance, because the five bodies
- * differ by two and a half times across the composition and a gap that does
- * not follow them closes on the largest.
+ * The overlay's own mark at the size a satellite would be drawn nearest, and a
+ * little over — the boot screen has one light, not seventy, and can afford to
+ * let it be seen. The alphas are the overlay's at full strength (`GLOW_ALPHA`,
+ * `BLOOM_ALPHA` in `markerScene`); the tail is longer than a marker's twelve
+ * seconds, since here it is the whole of what says which way the light is
+ * going.
  */
-const TRAIL_GAP = 0.35;
+const LIGHT = {
+  coreRadius: 2.6,
+  glow: { radius: 14, alpha: 0.8 },
+  bloom: { radius: 40, alpha: 0.35 },
+  tail: { width: 2.6, length: 130, alpha: 0.85 }
+} as const;
 
 /**
  * The star field, as the parameters that generate it.
  *
  * Generated rather than listed, and from a fixed seed, so the same sky comes
  * out of every run — the still frame in `assets/logo-extended.svg` is the same
- * picture as the first frame on the phone, rather than a similar one.
+ * picture as the first frame on the phone, rather than a similar one. Pinpricks
+ * rather than dots: the stars are what the light is seen *against*, and the old
+ * field's larger ones competed with the satellites.
  */
 const STARS = {
-  seed: 11,
-  count: 56,
-  /** Design pixels around the centre left clear, where the orbits are busiest. */
-  clearRadius: 130,
-  radius: { minimum: 2, maximum: 5.5 },
-  alpha: { minimum: 0.14, maximum: 0.48 }
+  seed: 7,
+  count: 64,
+  /** Design points around the middle left clear, where the name is. */
+  clearRadius: 80,
+  radius: { minimum: 0.35, maximum: 1.15 },
+  alpha: { minimum: 0.12, maximum: 0.54 },
+  /**
+   * How much of a star's light comes and goes, and how fast, in radians a
+   * second. Slow and shallow: it is there to keep a still sky from looking
+   * frozen, not to be noticed.
+   */
+  twinkle: { depth: 0.22, rate: { minimum: 0.5, maximum: 1.5 } }
 } as const;
+
+/** The colour of a star, which is the sky's own light rather than a satellite's. */
+export const STAR_COLOR = "#dbe6f2";
 
 export type SkyStar = {
   /** Centre, in layout pixels from the frame's top-left. */
   x: number;
   y: number;
   radius: number;
+  /** Its brightest; see `starAlpha`. */
   alpha: number;
+  twinkleRate: number;
+  twinklePhase: number;
 };
 
-/** One satellite: a shape, and the point it turns about. */
-export type SkySatellite = {
-  color: string;
-  /** The centre of its orbit, in layout pixels from the frame's top-left. */
-  cx: number;
-  cy: number;
-  /**
-   * The trail as a closed polygon — flat `x, y` pairs in layout pixels, at
-   * zero rotation. Points rather than an arc because the shape tapers, so it
-   * is not a stroke of constant width that either backend could describe.
-   */
-  trail: number[];
-  /** The body, a little ahead of the trail's head, at zero rotation. */
-  bodyX: number;
-  bodyY: number;
-  bodyRadius: number;
-  /** How far it turns each second, in degrees. Signed. */
-  degreesPerSecond: number;
+/** The night, in layout pixels. */
+export type SkyNight = {
+  /** Where the top-to-bottom gradient starts and ends. */
+  fromY: number;
+  toY: number;
+  stops: readonly { offset: number; color: string }[];
+  horizon: { x: number; y: number; radius: number; color: string; alpha: number };
 };
 
-/** The wash of colour behind everything, in layout pixels. */
-export type SkyGlow = {
+/** Light fading out from a centre to `radius`, at `alpha` at the centre. */
+export type SkyGlow = { radius: number; alpha: number };
+
+/**
+ * The satellite, at rest at the top of its arc. Layout pixels.
+ *
+ * Drawn the way a mark is: the bloom, the glow, the tail, and the point over
+ * them, each faded by the overlay's stop for it.
+ */
+export type SkyLight = {
   x: number;
   y: number;
+  color: string;
+  bloomColor: string;
+  coreRadius: number;
+  glow: SkyGlow;
+  bloom: SkyGlow;
+  tail: {
+    /**
+     * A closed polygon as flat `x, y` pairs: out along one edge from the head
+     * to the tip, and back along the other. It follows the arc and tapers to
+     * nothing, so it is neither a stroke nor a triangle.
+     */
+    points: number[];
+    /** The point it tapers to, which is where `TAIL_FADE` reaches nothing. */
+    tipX: number;
+    tipY: number;
+    alpha: number;
+  };
+};
+
+/** One pass across a frame. */
+export type SkyPass = {
+  index: number;
+  /** The centre of its arc, in layout pixels. */
+  cx: number;
+  cy: number;
   radius: number;
-  stops: readonly { offset: number; color: string }[];
+  direction: 1 | -1;
+  /**
+   * The light's angle about the centre where the pass begins and ends, in
+   * degrees — zero to the right, increasing downwards as the frame's own
+   * coordinates do, so the top of the arc is -90. Both are off the frame.
+   */
+  fromDeg: number;
+  toDeg: number;
+  light: SkyLight;
 };
 
 export type BootSkyScene = {
-  glow: SkyGlow;
+  frame: FrameSize;
+  /** Layout pixels per design point, and where the design frame's corner lands. */
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  night: SkyNight;
   stars: SkyStar[];
-  satellites: SkySatellite[];
 };
+
+/** Where a pass is, in its own terms. */
+export type SkyMoment = { index: number; progress: number };
+
+/** Where the light has got to: turned from rest about its arc's centre, and faded. */
+export type SkyPose = { angleDeg: number; alpha: number };
+
+/**
+ * The night and the stars for a frame.
+ *
+ * The design frame is scaled to *cover* the device's, so the composition keeps
+ * its proportions on any shape of screen and loses only what runs off the
+ * edges.
+ */
+export function bootSkyScene(frame: FrameSize): BootSkyScene {
+  const scale = Math.max(
+    frame.width / BOOT_SKY_DESIGN.width,
+    frame.height / BOOT_SKY_DESIGN.height
+  );
+  const offsetX = (frame.width - BOOT_SKY_DESIGN.width * scale) / 2;
+  const offsetY = (frame.height - BOOT_SKY_DESIGN.height * scale) / 2;
+  const { horizon } = SKY;
+
+  return {
+    frame,
+    scale,
+    offsetX,
+    offsetY,
+    night: {
+      fromY: offsetY,
+      toY: offsetY + BOOT_SKY_DESIGN.height * scale,
+      stops: SKY.stops,
+      horizon: {
+        x: offsetX + horizon.x * BOOT_SKY_DESIGN.width * scale,
+        y: offsetY + horizon.y * BOOT_SKY_DESIGN.height * scale,
+        radius: horizon.radius * BOOT_SKY_DESIGN.height * scale,
+        color: horizon.color,
+        alpha: horizon.alpha
+      }
+    },
+    stars: starsFor(scale, offsetX, offsetY)
+  };
+}
+
+/** Which pass is being flown after `elapsedSeconds`, and how far through it. */
+export function skyMoment(elapsedSeconds: number): SkyMoment {
+  const along = Math.max(0, elapsedSeconds) / PASS_TIMING.periodSeconds + PASS_TIMING.startProgress;
+  const index = Math.floor(along);
+  return { index, progress: along - index };
+}
+
+/**
+ * The `index`th pass across the scene's frame, at rest.
+ *
+ * Built once per pass and then posed (`passPose`). Where it starts and ends is
+ * worked out from the frame rather than the design frame: the covering scale
+ * crops the sides of a wide screen's composition and not a narrow one's, and a
+ * pass that started at the design frame's edge would spend a second of it
+ * invisible on the one and appear out of nowhere on the other.
+ */
+export function skyPass(scene: BootSkyScene, index: number): SkyPass {
+  const { scale, offsetX, offsetY, frame } = scene;
+  const pass = BOOT_PASSES[((index % BOOT_PASSES.length) + BOOT_PASSES.length) % BOOT_PASSES.length];
+  const radius = pass.radius * scale;
+  const cx = offsetX + (BOOT_SKY_DESIGN.width / 2 + pass.lean) * scale;
+  const cy = offsetY + (pass.apex + pass.radius) * scale;
+  const margin = PASS_TIMING.marginPx * scale;
+
+  const left = crossingDeg(cx, radius, -margin);
+  const right = crossingDeg(cx, radius, frame.width + margin);
+
+  return {
+    index,
+    cx,
+    cy,
+    radius,
+    direction: pass.direction,
+    fromDeg: pass.direction === 1 ? left : right,
+    toDeg: pass.direction === 1 ? right : left,
+    light: lightAtRest(cx, cy, radius, pass.direction, scale)
+  };
+}
+
+/**
+ * Where the light is `progress` of the way through its pass.
+ *
+ * At a constant rate, as a satellite moves, and faded in and out over the ends
+ * — smoothstepped, so it arrives and leaves rather than switching on.
+ */
+export function passPose(pass: SkyPass, progress: number): SkyPose {
+  const along = clamp(progress, 0, 1);
+  const headDeg = pass.fromDeg + (pass.toDeg - pass.fromDeg) * along;
+  const edge = clamp(Math.min(along, 1 - along) / PASS_TIMING.fadeShare, 0, 1);
+  return {
+    angleDeg: headDeg - REST_DEG,
+    alpha: edge * edge * (3 - 2 * edge)
+  };
+}
+
+/** How bright a star is after `elapsedSeconds`: slowly, and never far from its best. */
+export function starAlpha(star: SkyStar, elapsedSeconds: number): number {
+  const { depth } = STARS.twinkle;
+  const wave = Math.sin(star.twinkleRate * elapsedSeconds + star.twinklePhase);
+  return star.alpha * (1 - depth + depth * wave);
+}
+
+/** The top of every arc, where a pass's light is built before it is turned. */
+const REST_DEG = -90;
+
+/**
+ * The angle on the upper half of a circle at which it crosses a vertical line.
+ *
+ * Clamped, so a line the circle does not reach gives the nearest side rather
+ * than nothing — which is only possible on a frame far wider than any phone.
+ */
+function crossingDeg(cx: number, radius: number, x: number): number {
+  return -Math.acos(clamp((x - cx) / radius, -1, 1)) * (180 / Math.PI);
+}
 
 /** Points on a circle, with the frame's y axis pointing down. */
 function pointAt(cx: number, cy: number, radius: number, degrees: number): [number, number] {
@@ -218,57 +371,59 @@ function pointAt(cx: number, cy: number, radius: number, degrees: number): [numb
 }
 
 /**
- * The icon's shape: an arc that begins at a point, thickens along the orbit,
- * and stops short of the body it belongs to.
+ * The light at the top of its arc, its tail laid back along the arc behind it.
  *
- * Walked out along the far edge and back along the near one, which is what
- * makes the taper — the two edges start on the same point and separate to the
- * full trail width by the time they reach the head.
- *
- * `clearance` is how far behind the body's *centre* that head sits, measured
- * along the orbit; anything less than the body's own radius is swallowed by
- * it. See `TRAIL_GAP` for why the gap is there at all.
- *
- * `direction` is the orbit's, and it is what puts the trail on the right side
- * of the body: "behind" is against the way the satellite is travelling, so on
- * an anticlockwise orbit the trail lies at *increasing* angles from the body,
- * not decreasing ones. Laying every trail the same way round left the two
- * anticlockwise satellites leading with their tails.
+ * "Behind" is against the way the pass is flown, so a right-to-left pass's tail
+ * lies at *increasing* angles from the head rather than decreasing ones. The
+ * tail is full width at the head, under the point, and tapers to nothing at its
+ * tip: the widest part is covered by the light, and what shows is a streak
+ * thinning out of it.
  */
-function trailPolygon(
+function lightAtRest(
   cx: number,
   cy: number,
   radius: number,
-  headDeg: number,
-  sweepDeg: number,
-  width: number,
-  clearance: number,
-  direction: 1 | -1
-): number[] {
-  // About two and a half degrees a segment: past that the outer edge of the
-  // widest trail visibly flattens, and below it costs points for nothing.
-  const steps = Math.max(12, Math.round(sweepDeg / 2.5));
-  // The gap is an arc length, so what it costs in angle depends on the orbit:
-  // the same clear space is a wider turn on an inner one.
-  const trailHeadDeg = headDeg - direction * (clearance / radius) * (180 / Math.PI);
-  const tailDeg = trailHeadDeg - direction * sweepDeg;
+  direction: 1 | -1,
+  scale: number
+): SkyLight {
+  const [x, y] = pointAt(cx, cy, radius, REST_DEG);
+  const sweepDeg = ((LIGHT.tail.length * scale) / radius) * (180 / Math.PI);
+  // About a degree and a half a segment: an arc this shallow is straight to
+  // well inside a pixel over that.
+  const steps = Math.max(16, Math.round(sweepDeg / 1.5));
+  const width = LIGHT.tail.width * scale;
   const outer: number[] = [];
   const inner: number[] = [];
 
   for (let step = 0; step <= steps; step += 1) {
     const along = step / steps;
-    const degrees = tailDeg + direction * sweepDeg * along;
-    const half = (width * along) / 2;
+    const degrees = REST_DEG - direction * sweepDeg * along;
+    const half = (width / 2) * (1 - along);
     outer.push(...pointAt(cx, cy, radius + half, degrees));
     inner.push(...pointAt(cx, cy, radius - half, degrees));
   }
 
-  // Back along the near edge, so the polygon closes on the point it started at.
+  // Back along the near edge, so the polygon closes on the head it started at.
   const returning: number[] = [];
   for (let index = inner.length - 2; index >= 0; index -= 2) {
     returning.push(inner[index], inner[index + 1]);
   }
-  return [...outer, ...returning];
+
+  return {
+    x,
+    y,
+    color: MARK_COLOR,
+    bloomColor: MARK_BLOOM,
+    coreRadius: LIGHT.coreRadius * scale,
+    glow: { radius: LIGHT.glow.radius * scale, alpha: LIGHT.glow.alpha },
+    bloom: { radius: LIGHT.bloom.radius * scale, alpha: LIGHT.bloom.alpha },
+    tail: {
+      points: [...outer, ...returning],
+      tipX: outer[outer.length - 2],
+      tipY: outer[outer.length - 1],
+      alpha: LIGHT.tail.alpha
+    }
+  };
 }
 
 /**
@@ -280,6 +435,8 @@ function trailPolygon(
 function starsFor(scale: number, offsetX: number, offsetY: number): SkyStar[] {
   let state: number = STARS.seed;
   const random = () => (state = (state * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const between = (range: { minimum: number; maximum: number }) =>
+    range.minimum + random() * (range.maximum - range.minimum);
 
   const centreX = BOOT_SKY_DESIGN.width / 2;
   const centreY = BOOT_SKY_DESIGN.height / 2;
@@ -288,79 +445,19 @@ function starsFor(scale: number, offsetX: number, offsetY: number): SkyStar[] {
   for (let attempt = 0; attempt < STARS.count * 60 && stars.length < STARS.count; attempt += 1) {
     const x = random() * BOOT_SKY_DESIGN.width;
     const y = random() * BOOT_SKY_DESIGN.height;
-    const radius = STARS.radius.minimum + random() * (STARS.radius.maximum - STARS.radius.minimum);
-    const alpha = STARS.alpha.minimum + random() * (STARS.alpha.maximum - STARS.alpha.minimum);
+    const radius = between(STARS.radius);
+    const alpha = between(STARS.alpha);
+    const twinkleRate = between(STARS.twinkle.rate);
+    const twinklePhase = random() * Math.PI * 2;
     if (Math.hypot(x - centreX, y - centreY) < STARS.clearRadius) continue;
     stars.push({
       x: offsetX + x * scale,
       y: offsetY + y * scale,
       radius: radius * scale,
-      alpha
+      alpha,
+      twinkleRate,
+      twinklePhase
     });
   }
   return stars;
-}
-
-/** The colour of a star, which is the sky's own light rather than a satellite's. */
-export const STAR_COLOR = "#dbe6f2";
-
-/**
- * The whole drawing for a frame, at rest.
- *
- * Built once per frame size and then turned — see `skyAngleDeg`. The design
- * frame is scaled to *cover* the device's, so the composition keeps its
- * proportions on any shape of screen and loses only what runs off the sides.
- */
-export function bootSkyScene(frame: FrameSize): BootSkyScene {
-  const scale = Math.max(
-    frame.width / BOOT_SKY_DESIGN.width,
-    frame.height / BOOT_SKY_DESIGN.height
-  );
-  const offsetX = (frame.width - BOOT_SKY_DESIGN.width * scale) / 2;
-  const offsetY = (frame.height - BOOT_SKY_DESIGN.height * scale) / 2;
-  const toFrameX = (x: number) => offsetX + x * scale;
-  const toFrameY = (y: number) => offsetY + y * scale;
-
-  const centreX = toFrameX(BOOT_SKY_DESIGN.width / 2);
-  const centreY = toFrameY(BOOT_SKY_DESIGN.height / 2);
-
-  const satellites = BOOT_ORBITS.map((orbit): SkySatellite => {
-    const radius = orbit.radius * scale;
-    const [bodyX, bodyY] = pointAt(centreX, centreY, radius, orbit.phaseDeg);
-    return {
-      color: orbit.color,
-      cx: centreX,
-      cy: centreY,
-      trail: trailPolygon(
-        centreX,
-        centreY,
-        radius,
-        orbit.phaseDeg,
-        orbit.sweepDeg,
-        orbit.trailWidth * scale,
-        orbit.bodyRadius * (1 + TRAIL_GAP) * scale,
-        orbit.direction
-      ),
-      bodyX,
-      bodyY,
-      bodyRadius: orbit.bodyRadius * scale,
-      degreesPerSecond: (360 / orbit.periodSeconds) * orbit.direction
-    };
-  });
-
-  return {
-    glow: {
-      x: toFrameX(GLOW.x * BOOT_SKY_DESIGN.width),
-      y: toFrameY(GLOW.y * BOOT_SKY_DESIGN.height),
-      radius: GLOW.radius * BOOT_SKY_DESIGN.height * scale,
-      stops: GLOW.stops
-    },
-    stars: starsFor(scale, offsetX, offsetY),
-    satellites
-  };
-}
-
-/** How far a satellite has turned about its orbit's centre, in degrees. */
-export function skyAngleDeg(satellite: SkySatellite, elapsedSeconds: number): number {
-  return satellite.degreesPerSecond * elapsedSeconds;
 }

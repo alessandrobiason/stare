@@ -16,7 +16,7 @@ function screen(overrides: Partial<React.ComponentProps<typeof BootScreen>> = {}
 
 test("the loading screen says the app's name, and nothing else at all", () => {
   // One word. Every other word this screen has ever carried named a step of a
-  // start-up nobody can act on, and the satellites turning are what report that
+  // start-up nobody can act on, and the satellite crossing is what reports that
   // it is still going; the name is the one thing a launch is entitled to say.
   expect(textOf(screen())).toBe("STARE");
 });
