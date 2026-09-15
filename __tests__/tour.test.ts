@@ -54,7 +54,14 @@ describe("the steps", () => {
       setLocaleForTesting(locale);
       const steps = tourSteps();
 
-      expect(steps.map((step) => step.target)).toEqual([null, "count", "filter", "passes", "settings"]);
+      expect(steps.map((step) => step.target)).toEqual([
+        null,
+        "count",
+        "filter",
+        "freeze",
+        "passes",
+        "settings"
+      ]);
       for (const step of steps) {
         expect(step.title.length).toBeGreaterThan(1);
         expect(step.body.length).toBeGreaterThan(10);
@@ -77,8 +84,8 @@ describe("the steps", () => {
     // No passes card: nothing is coming, or a satellite's card has its place.
     const available = availableSteps(steps, (target) => target !== "passes");
 
-    expect(available.map((step) => step.id)).toEqual(["marks", "count", "filter", "settings"]);
-    expect(stepAfter(steps, available, "filter")?.id).toBe("settings");
+    expect(available.map((step) => step.id)).toEqual(["marks", "count", "filter", "freeze", "settings"]);
+    expect(stepAfter(steps, available, "freeze")?.id).toBe("settings");
     // Sitting on the passes step when the card goes: the tour moves on.
     expect(stepAt(steps, available, "passes")?.id).toBe("settings");
     expect(stepAfter(steps, available, "settings")).toBeNull();

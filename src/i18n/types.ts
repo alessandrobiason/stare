@@ -157,6 +157,22 @@ export type Strings = {
       /** Which way the camera is pointing. `{point}`, from `compass`. */
       facing: string;
     };
+    /**
+     * The button beside the filter that holds the view still, so a sky overhead
+     * can be read with the phone lowered (`SceneControls.frozen`).
+     */
+    freeze: {
+      /** What the button does while the view is live, for a screen reader. */
+      freeze: string;
+      /** And while it is frozen. */
+      resume: string;
+      /**
+       * The small line under the count while the view is held, so a still sky
+       * is not taken for a hung app. `{time}`, a clock time. Short: it is a pill
+       * over the sky.
+       */
+      frozenAt: string;
+    };
   };
   filter: {
     /** The panel's own title, closed and open. Short: it is a pill over the sky. */
@@ -369,6 +385,8 @@ export type TourStrings = {
   count: TourStepStrings;
   /** The layers button in the header. */
   filter: TourStepStrings;
+  /** The freeze button beside it, which a pause sign alone does not explain. */
+  freeze: TourStepStrings;
   /** The passes card over the tab bar. Skipped when there is none on screen. */
   passes: TourStepStrings;
   /** The settings tab. */

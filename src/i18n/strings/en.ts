@@ -43,6 +43,10 @@ export const en: Strings = {
       title: "Filter",
       body: "Choose which kinds of satellite to show."
     },
+    freeze: {
+      title: "Freeze",
+      body: "Hold the view still, then lower the phone and tap the marks at ease."
+    },
     passes: {
       title: "Coming up",
       body: "What will pass over you next. Tap to see the next few hours."
@@ -91,6 +95,11 @@ export const en: Strings = {
     },
     compass: {
       facing: "Facing {point}"
+    },
+    freeze: {
+      freeze: "Freeze the view",
+      resume: "Resume the live view",
+      frozenAt: "Frozen at {time}"
     }
   },
   filter: {

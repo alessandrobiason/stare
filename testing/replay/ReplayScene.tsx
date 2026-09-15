@@ -71,10 +71,11 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
       fieldOfView: REPLAY_CAMERA_FIELD_OF_VIEW,
       lens: REPLAY_LENS,
       grabber: videoFrameGrabber(() => videoRef.current),
-      render: ({ onDiscontinuity }) => (
+      render: ({ onDiscontinuity, frozen }) => (
         <ReplayVideo
           uri={boot.videoUri}
           videoRef={videoRef}
+          frozen={frozen}
           onTimeChange={onPlaybackTimeChange}
           onSeeked={(seconds) => {
             onDiscontinuity();
@@ -137,6 +138,8 @@ export const ReplayScene: React.FC<Props> = ({ boot }) => {
         onSelectTab={controls.setTab}
         filterOpen={controls.filterOpen}
         onToggleFilter={controls.toggleFilter}
+        frozen={controls.frozen}
+        onToggleFrozen={controls.toggleFrozen}
         onMaskStatusChange={onMaskStatusChange}
         debug={controls.debug}
         onToggleDebug={controls.toggleDebug}

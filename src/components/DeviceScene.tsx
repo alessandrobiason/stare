@@ -126,11 +126,12 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
       }),
       rebuild: rebuildCamera,
       // The live camera never jumps, so nothing here uses `onDiscontinuity`.
-      render: () => (
+      render: ({ frozen }) => (
         <CameraBackground
           cameraRef={cameraRef}
           onReadyChange={onCameraReadyChange}
           recoveryRef={rebuildCameraRef}
+          frozen={frozen}
         />
       )
     }),
@@ -179,6 +180,8 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onSelectTab={controls.setTab}
         filterOpen={controls.filterOpen}
         onToggleFilter={controls.toggleFilter}
+        frozen={controls.frozen}
+        onToggleFrozen={controls.toggleFrozen}
         onMaskStatusChange={onMaskStatusChange}
         onSkyFixChange={setSkyFixStanding}
         debug={controls.debug}

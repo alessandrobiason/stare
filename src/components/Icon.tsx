@@ -27,6 +27,8 @@ export type IconName =
   | "settings"
   /** The filter: the layers of the sky that may be drawn. */
   | "layers"
+  /** Freezing the view: the sign every screen already uses for "hold this". */
+  | "pause"
   /** Onwards into a card, and — turned — the thing that opens a panel. */
   | "chevron"
   /** The way out of a sheet. */
@@ -198,6 +200,30 @@ export const Icon: React.FC<Props> = ({
         </View>
       );
 
+    /**
+     * Two upright bars: pause.
+     *
+     * A snowflake would say "freeze" more literally, and at twenty points and
+     * built from views it is an asterisk. Pause is the one every phone already
+     * reads as "hold the picture where it is", which is exactly what it does.
+     */
+    case "pause":
+      return (
+        <View style={[box, styles.centre, styles.row, { gap: size * 0.2 }]}>
+          {[0, 1].map((bar) => (
+            <View
+              key={bar}
+              style={{
+                width: size * 0.18,
+                height: size * 0.62,
+                borderRadius: size * 0.05,
+                backgroundColor: color
+              }}
+            />
+          ))}
+        </View>
+      );
+
     /** The corner of a box, turned: the arrow every list row ends in. */
     case "chevron":
       return (
@@ -242,8 +268,13 @@ type ButtonProps = {
   /** What it is, spoken: these carry no words of their own. */
   label: string;
   onPress: () => void;
-  /** Lit, for a control whose panel is currently open. */
+  /** Lit, for a control whose panel is currently open — or that is switched on. */
   on?: boolean;
+  /**
+   * A switch rather than the handle of a panel: `on` is then said as pressed
+   * rather than as expanded, which is what a screen reader has to be told.
+   */
+  toggle?: boolean;
   /** The button's diameter. The header's are 40; nothing should be larger. */
   size?: number;
   style?: ViewStyle;
@@ -262,13 +293,14 @@ export const IconButton: React.FC<ButtonProps> = ({
   label,
   onPress,
   on = false,
+  toggle = false,
   size = 40,
   style
 }) => (
   <Pressable
     accessibilityRole="button"
     accessibilityLabel={label}
-    aria-expanded={on}
+    {...(toggle ? { "aria-pressed": on } : { "aria-expanded": on })}
     style={[
       styles.button,
       { width: size, height: size, borderRadius: size / 2 },

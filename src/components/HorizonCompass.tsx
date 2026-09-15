@@ -20,6 +20,12 @@ type Props = {
    * the way across the strip is a third of the way across the frame.
    */
   halfFovDeg: number;
+  /**
+   * Hold the strip where it is: the sky above it is frozen, and a strip still
+   * following the phone would be saying which way a picture that is no longer
+   * on the screen is pointing.
+   */
+  frozen?: boolean;
 };
 
 /**
@@ -95,7 +101,8 @@ const RULE_ROW = 10;
  */
 export const HorizonCompass: React.FC<Props> = React.memo(({
   orientationFilterRef,
-  halfFovDeg
+  halfFovDeg,
+  frozen = false
 }) => {
   // Every label in the strip is a translated letter, and nothing else here
   // changes when the console's picker changes the language. See `useLocale`.
@@ -118,7 +125,9 @@ export const HorizonCompass: React.FC<Props> = React.memo(({
   const pixelsPerDegree = width > 0 ? width / 2 / halfSpanDeg : 0;
 
   useEffect(() => {
-    if (pixelsPerDegree <= 0) return;
+    // Left on the last heading it slid to, which is the frame the markers were
+    // frozen on: both are read from the same filter on the same frame.
+    if (pixelsPerDegree <= 0 || frozen) return;
     let frame = 0;
     /** The last emphasis published, so a still phone costs no renders at all. */
     let shown = -1;
@@ -137,7 +146,7 @@ export const HorizonCompass: React.FC<Props> = React.memo(({
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [orientationFilterRef, pixelsPerDegree, slide]);
+  }, [frozen, orientationFilterRef, pixelsPerDegree, slide]);
 
   /**
    * Every label in the strip, at its own bearing, three rings of them.

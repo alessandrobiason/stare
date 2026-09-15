@@ -28,6 +28,16 @@ type Props = {
    * needs to reach the camera at the moment it gives up on it, not at a render.
    */
   recoveryRef?: MutableRefObject<(() => void) | null>;
+  /**
+   * Hold the preview on the frame it is showing: the sky view is frozen.
+   *
+   * The preview is paused rather than replaced by a still. A still is a capture
+   * — the better part of a second on this camera, and a different moment from
+   * the one the markers were frozen on — where a paused preview is the very
+   * frame on the screen when the button was pressed. Only the preview stops:
+   * the session goes on running underneath it, so coming back is immediate.
+   */
+  frozen?: boolean;
 };
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -78,7 +88,7 @@ const RUN_CAPTURE_PROBE = false;
  * diffs the props of the one view on screen that must not be disturbed.
  */
 export const CameraBackground: React.FC<Props> = React.memo(
-  ({ cameraRef, onReadyChange, recoveryRef }) => {
+  ({ cameraRef, onReadyChange, recoveryRef, frozen = false }) => {
     /** Bumped to throw the camera away and build another. */
     const [generation, setGeneration] = useState(0);
     /**
@@ -116,13 +126,29 @@ export const CameraBackground: React.FC<Props> = React.memo(
       []
     );
 
+    const frozenRef = useRef(frozen);
+    frozenRef.current = frozen;
+
+    /** Pauses or resumes the preview to match `frozen`, on whatever camera is up. */
+    const applyFrozen = useCallback(() => {
+      const camera = cameraRef.current;
+      if (!camera) return;
+      const change = frozenRef.current ? camera.pausePreview() : camera.resumePreview();
+      change.catch((error: unknown) => console.warn("The camera preview could not be held", error));
+    }, [cameraRef]);
+
+    useEffect(() => applyFrozen(), [applyFrozen, frozen]);
+
     const onCameraReady = useCallback(() => {
+      // A camera that comes up while the view is frozen — the first one, late,
+      // or a rebuilt one — comes up held, rather than live under a frozen sky.
+      if (frozenRef.current) applyFrozen();
       const waiter = startWaiter.current;
       if (!waiter) return;
       startWaiter.current = null;
       clearTimeout(waiter.abandon);
       waiter.resolve(true);
-    }, []);
+    }, [applyFrozen]);
 
     // A preview that has gone away is not ready again until it says so itself.
     useEffect(() => () => onReadyChange(false), [onReadyChange]);

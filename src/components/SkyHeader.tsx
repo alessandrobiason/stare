@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SkySummary } from "../hooks/useAnimatedMarkers";
 import { useLocale } from "../hooks/useLocale";
 import { fill, strings } from "../i18n";
-import { sunlightSummary } from "../i18n/format";
+import { clockTime, sunlightSummary } from "../i18n/format";
 import { Icon, IconButton } from "./Icon";
 import { glass, lift, theme } from "./theme";
 import { useTourTarget } from "./tourTargets";
@@ -18,6 +18,11 @@ type Props = {
   /** Whether the filter panel is open under the button on the right. */
   filterOpen: boolean;
   onToggleFilter: () => void;
+  /** Whether the view is frozen, by the button beside the filter's. */
+  frozen: boolean;
+  /** The moment it froze, while it is. */
+  frozenAt: Date | null;
+  onToggleFrozen: () => void;
 };
 
 /**
@@ -36,10 +41,16 @@ type Props = {
  * because the sky behind it is the point of the screen — the same trade every
  * panel in this app makes.
  *
- * **The button is the filter**, and it is a button rather than a labelled pill
- * because the word FILTER over a photograph is a word over a photograph. What
- * it opens says what it is (`CategoryLegend`), and the tour points at it once
- * (`GuideTour`).
+ * **The buttons are the filter and the freeze**, and they are buttons rather
+ * than labelled pills because the word FILTER over a photograph is a word over
+ * a photograph. What the filter opens says what it is (`CategoryLegend`); what
+ * the freeze does is not something a pause sign can say on its own, so the
+ * tour points at both (`GuideTour`).
+ *
+ * **A frozen view says so**, in one small line under the count: a still sky
+ * with nothing to say it is being held looks exactly like an app that has
+ * hung. It carries the time it froze at, which is also the time every card
+ * opened from it is describing.
  *
  * A degraded boot is not reported here: it tints the settings tab, which is
  * where the console that explains it now lives. This line is about the sky,
@@ -48,7 +59,14 @@ type Props = {
  * Memoized: it renders when the count does, not whenever a sky mask lands on
  * the view above it.
  */
-export const SkyHeader: React.FC<Props> = React.memo(({ sky, filterOpen, onToggleFilter }) => {
+export const SkyHeader: React.FC<Props> = React.memo(({
+  sky,
+  filterOpen,
+  onToggleFilter,
+  frozen,
+  frozenAt,
+  onToggleFrozen
+}) => {
   // Nothing in this component's props changes when the console's picker
   // changes the language, and every word in it does. See `useLocale`.
   useLocale();
@@ -56,6 +74,7 @@ export const SkyHeader: React.FC<Props> = React.memo(({ sky, filterOpen, onToggl
   const [expanded, setExpanded] = useState(false);
   const countRef = useTourTarget("count");
   const filterRef = useTourTarget("filter");
+  const freezeRef = useTourTarget("freeze");
   const { count, fleets } = sky;
   const empty = fleets.rows.length === 0 && fleets.other === 0;
   const counted = fill(t.visibleSatellites, { count });
@@ -89,9 +108,28 @@ export const SkyHeader: React.FC<Props> = React.memo(({ sky, filterOpen, onToggl
               color={theme.color.textFaint}
             />
           </Pressable>
+
+          {frozen && frozenAt && (
+            <View style={styles.frozen}>
+              <Text numberOfLines={1} style={styles.frozenLabel}>
+                {fill(t.freeze.frozenAt, { time: clockTime(frozenAt) })}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Wrapped so the tour can find it: the button itself takes no ref. */}
+        {/* Wrapped so the tour can find them: the buttons themselves take no
+            ref. The freeze first, so the filter keeps the corner it has
+            always had. */}
+        <View ref={freezeRef} collapsable={false}>
+          <IconButton
+            icon="pause"
+            label={frozen ? t.freeze.resume : t.freeze.freeze}
+            on={frozen}
+            toggle
+            onPress={onToggleFrozen}
+          />
+        </View>
         <View ref={filterRef} collapsable={false}>
           <IconButton
             icon="layers"
@@ -182,6 +220,22 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0, 0, 0, 0.5)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6
+  },
+  frozen: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: theme.color.accentBorder,
+    backgroundColor: theme.color.accentSoft
+  },
+  frozenLabel: {
+    color: theme.color.accent,
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.3
   },
   breakdown: {
     marginTop: 10,

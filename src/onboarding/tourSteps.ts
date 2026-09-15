@@ -19,7 +19,7 @@ import type { MarkSample } from "./markSamples";
  */
 
 /** The controls a step can point at. See `useTourTarget`. */
-export type TourTarget = "count" | "filter" | "passes" | "settings";
+export type TourTarget = "count" | "filter" | "freeze" | "passes" | "settings";
 
 export type TourMark = TourKeyStrings & { sample: MarkSample };
 
@@ -54,6 +54,10 @@ export function tourSteps(): readonly TourStep[] {
     },
     { id: "count", target: "count", ...t.count },
     { id: "filter", target: "filter", ...t.filter },
+    // Straight after the filter, which it sits beside — and pointed at at all
+    // because a pause sign says what it does to a video, not what it is for
+    // here: the sky held still, so the phone can come down and be read.
+    { id: "freeze", target: "freeze", ...t.freeze },
     { id: "passes", target: "passes", ...t.passes },
     { id: "settings", target: "settings", ...t.settings }
   ];

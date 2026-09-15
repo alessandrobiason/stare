@@ -1,5 +1,5 @@
 import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { axesFromAttitude, CameraAxes } from "../camera/attitude";
+import { axesFromAttitude, CameraAttitude, CameraAxes } from "../camera/attitude";
 import { FrameLens, FramePoint, projectChain, projectWithAxes } from "../camera/projection";
 import {
   clipSegment,
@@ -289,6 +289,15 @@ export type AnimatedMarkers = {
    */
   latestFrameRef: MutableRefObject<MarkerFrame>;
   /**
+   * The time and place that frame was placed at.
+   *
+   * The live epoch to within a frame while the sky is moving, and the moment
+   * the view was frozen while it is not — which is what a card about a mark on
+   * a frozen sky has to be describing, or its bearing and height are about
+   * where the object has got to since rather than the mark under the finger.
+   */
+  drawnEpochRef: MutableRefObject<OrbitEpoch>;
+  /**
    * Call on a seek: the sky jumps, so what each marker had settled on about
    * the piece of frame it was crossing no longer describes anything, and
    * neither does the sky the passes before the jump had mapped.
@@ -322,6 +331,34 @@ const FRAME_RATE_SMOOTHING = 0.1;
  * a second pass over the frame for a panel that is usually closed.
  */
 const VISIBLE_COUNT_INTERVAL_MS = 250;
+
+/**
+ * How long a frozen sky goes on being placed after something it is drawn from
+ * changes — a category switched on in the filter, a mask landing — in
+ * milliseconds.
+ *
+ * A frozen frame is otherwise not placed at all: nothing it is drawn from is
+ * moving, so every frame would be the one before it. But the marks fade rather
+ * than blink (`MarkerVisibilityFilter`), and a fade only happens across frames,
+ * so a change gets a few seconds of them: past `fadeSeconds` for a mark coming
+ * or going, and past three of `confidenceTimeConstantSeconds` for one whose
+ * answer about the sky has changed under it.
+ */
+const FROZEN_SETTLE_MS = 4000;
+
+/**
+ * What one drawn frame was placed with: the epoch, the aim and the clock the
+ * sky's memory and the picture's brightness were read against.
+ *
+ * Kept for the newest frame so that freezing holds exactly that one — the frame
+ * on screen when the button was pressed, rather than the next one along.
+ */
+type PlacedAt = {
+  epoch: OrbitEpoch;
+  attitude: CameraAttitude;
+  /** `performance.now()` milliseconds. */
+  atMs: number;
+};
 
 /**
  * How far past the frame's edges a satellite is still followed, as a share of
@@ -622,6 +659,17 @@ type AnimatedMarkerOptions = {
    * no more often than `VISIBLE_COUNT_INTERVAL_MS`.
    */
   onSkyChange: (summary: SkySummary) => void;
+  /**
+   * Hold the sky where the newest frame put it.
+   *
+   * Not a stopped loop: the time, the aim and the clock the sky is read against
+   * are pinned to that frame, and the loop goes on placing marks against them
+   * whenever something else changes — so the filter still works on a frozen
+   * sky, and a mark switched back on fades in where it would have been. With
+   * nothing changing it places nothing, and costs an animation frame that
+   * returns straight away. See `FROZEN_SETTLE_MS`.
+   */
+  frozen?: boolean;
 };
 
 /**
@@ -655,7 +703,8 @@ export function useAnimatedMarkers({
   enabledCategories,
   enabledSubcategories,
   viewport = WHOLE_FRAME,
-  onSkyChange
+  onSkyChange,
+  frozen = false
 }: AnimatedMarkerOptions): AnimatedMarkers {
   const tracker = useMemo(
     () => new SkyTracker(catalog, MINIMUM_SATELLITE_ELEVATION_DEG),
@@ -682,6 +731,11 @@ export function useAnimatedMarkers({
   const enabledCategoriesRef = useLatestRef(enabledCategories);
   const enabledSubcategoriesRef = useLatestRef(enabledSubcategories);
   const onSkyChangeRef = useLatestRef(onSkyChange);
+  const frozenRef = useLatestRef(frozen);
+  /** What the newest frame was placed with, and — while frozen — the one held. */
+  const placedRef = useRef<PlacedAt | null>(null);
+  const heldRef = useRef<PlacedAt | null>(null);
+  const drawnEpochRef = useRef<OrbitEpoch>(epochRef.current);
   const previousFrameRef = useRef<number | null>(null);
   const markerStatsRef = useRef<MarkerStats>({
     drawn: 0,
@@ -714,6 +768,21 @@ export function useAnimatedMarkers({
   }, [epochRef, lens, mask, skyMemory]);
 
   useEffect(() => {
+    /**
+     * What the previous frame was drawn from, to tell a frozen sky it changed.
+     * Kept field by field rather than as an array, which would be one more
+     * allocation a frame on the live path for a question only a frozen sky asks.
+     */
+    const seen = {
+      mask: undefined as AnchoredSkyMask | null | undefined,
+      filtering: undefined as boolean | undefined,
+      categories: undefined as Set<SatelliteCategory> | undefined,
+      subcategories: undefined as Set<SatelliteSubcategory> | undefined,
+      viewport: undefined as FrameViewport | undefined
+    };
+    /** Until when a frozen sky goes on being placed. See `FROZEN_SETTLE_MS`. */
+    let settleUntil = 0;
+
     let handle = requestAnimationFrame(function animate(now: number) {
       const previous = previousFrameRef.current;
       previousFrameRef.current = now;
@@ -725,16 +794,53 @@ export function useAnimatedMarkers({
             : frameRateRef.current + (rate - frameRateRef.current) * FRAME_RATE_SMOOTHING;
       }
 
-      const { time, observer } = epochRef.current;
-      // The sweep is charged to the frame it rides on, so its slice scales with
-      // how long that frame took. The first has no interval and sweeps the lot.
-      tracker.sweep(time, observer, previous === null ? 0 : (now - previous) / 1000);
-
-      const attitude = orientationFilterRef.current.sample(now / 1000);
       const currentMask = maskRef.current;
       const filtering = maskFilteringRef.current;
       const categories = enabledCategoriesRef.current;
       const subcategories = enabledSubcategoriesRef.current;
+
+      // Frozen on the frame that is on screen, not the next one: the first
+      // frozen frame takes over what the last live one was placed with. Before
+      // any frame has been placed there is nothing to hold, and the loop goes
+      // on live until there is.
+      if (!frozenRef.current) heldRef.current = null;
+      else if (!heldRef.current) heldRef.current = placedRef.current;
+      const held = heldRef.current;
+
+      const viewportNow = viewportRef.current;
+      const changed =
+        currentMask !== seen.mask ||
+        filtering !== seen.filtering ||
+        categories !== seen.categories ||
+        subcategories !== seen.subcategories ||
+        viewportNow !== seen.viewport;
+      seen.mask = currentMask;
+      seen.filtering = filtering;
+      seen.categories = categories;
+      seen.subcategories = subcategories;
+      seen.viewport = viewportNow;
+      if (held) {
+        if (changed) settleUntil = now + FROZEN_SETTLE_MS;
+        // Nothing moving and nothing changed: the frame on screen is already
+        // the one this would place.
+        if (now >= settleUntil) {
+          handle = requestAnimationFrame(animate);
+          return;
+        }
+      }
+
+      const { time, observer } = held ? held.epoch : epochRef.current;
+      // The sweep is charged to the frame it rides on, so its slice scales with
+      // how long that frame took. The first has no interval and sweeps the lot.
+      // Not on a frozen sky, whose satellites are all where they were.
+      if (!held) tracker.sweep(time, observer, previous === null ? 0 : (now - previous) / 1000);
+
+      const attitude = held ? held.attitude : orientationFilterRef.current.sample(now / 1000);
+      // The clock the sky's memory and the picture's brightness are read
+      // against, which is held with the rest: both expire, and a frozen sky
+      // left on a table must not empty itself as its readings go out of date.
+      // The visibility filter keeps the real one — a fade needs time to pass.
+      const clockMs = held ? held.atMs : now;
       const visibility = visibilityRef.current;
       const notable = notableRef.current;
       // Once a second rather than per frame, and from everything above the
@@ -791,11 +897,11 @@ export function useAnimatedMarkers({
         // What the passes before this one found, for the sky this one is not
         // aimed at. Resolved once per frame rather than per satellite, like the
         // probe above it.
-        const skyRemembered = filtering ? skyMemory.probe(now / 1000) : null;
+        const skyRemembered = filtering ? skyMemory.probe(clockMs / 1000) : null;
         // How bright the picture is behind each direction, read the same way
         // and resolved once per frame like the two above. Asked only of the
         // marks actually drawn, below.
-        const brightTowards = backdropProbe(brightnessRef.current, lens, now / 1000);
+        const brightTowards = backdropProbe(brightnessRef.current, lens, clockMs / 1000);
         visibility.beginFrame(now / 1000);
         for (const fix of tracker.fixesAt(time, observer)) {
           if (!categories.has(fix.category)) continue;
@@ -939,6 +1045,8 @@ export function useAnimatedMarkers({
 
       const drawn: MarkerFrame = { markers: visible, paths, rollDeg: attitude.rollDeg };
       latestFrameRef.current = drawn;
+      placedRef.current = held ?? { epoch: { time, observer }, attitude, atMs: now };
+      drawnEpochRef.current = placedRef.current.epoch;
       for (const listener of listenersRef.current) listener(drawn);
 
       // The clock is checked before the tally, so a sky that is not changing
@@ -982,6 +1090,7 @@ export function useAnimatedMarkers({
     enabledCategoriesRef,
     enabledSubcategoriesRef,
     epochRef,
+    frozenRef,
     lens,
     maskFilteringRef,
     maskRef,
@@ -1021,6 +1130,7 @@ export function useAnimatedMarkers({
     markerStatsRef,
     frameRateRef,
     latestFrameRef,
+    drawnEpochRef,
     reset,
     upcoming
   };

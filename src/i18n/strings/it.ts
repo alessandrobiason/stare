@@ -36,6 +36,10 @@ export const it: Strings = {
       title: "Filtro",
       body: "Scegli quali tipi di satellite mostrare."
     },
+    freeze: {
+      title: "Blocca",
+      body: "Ferma la vista, poi abbassa il telefono e tocca i segni con calma."
+    },
     passes: {
       title: "In arrivo",
       body: "Cosa passerà sopra di te a breve. Tocca per vedere le prossime ore."
@@ -84,6 +88,11 @@ export const it: Strings = {
     },
     compass: {
       facing: "Direzione {point}"
+    },
+    freeze: {
+      freeze: "Blocca la vista",
+      resume: "Torna alla vista dal vivo",
+      frozenAt: "Bloccata alle {time}"
     }
   },
   filter: {

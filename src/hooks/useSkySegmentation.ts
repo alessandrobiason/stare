@@ -145,7 +145,17 @@ export function useSkySegmentation(
    */
   rebuildSource?: () => boolean,
   /** Handed every frame a pass succeeded on, after the mask has been published. */
-  onFrame?: (frame: SegmentedFrameSample) => void
+  onFrame?: (frame: SegmentedFrameSample) => void,
+  /**
+   * Take no passes, and let the newest mask stand: the view is frozen.
+   *
+   * A frozen picture has nothing new in it to segment, and the mask that was
+   * current when it froze is the one that describes it — so it is not aged out
+   * while the view is held either. The clock it is aged by resumes where it
+   * stopped, rather than the view coming back to a mask thrown away for the
+   * minutes it spent frozen and a second of empty sky while the next pass runs.
+   */
+  paused = false
 ): SkySegmentation {
   const [mask, setMask] = useState<AnchoredSkyMask | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +172,8 @@ export function useSkySegmentation(
   rebuildSourceRef.current = rebuildSource;
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   useEffect(() => {
     let active = true;
@@ -177,10 +189,28 @@ export function useSkySegmentation(
     let anchor: CameraAttitude | null = null;
     let landed = false;
     const toleranceDeg = aimToleranceDeg(lens, SKY_MASK_CHASE_FRACTION);
+    /** When the view was frozen, in seconds, while it is. */
+    let pausedAtSeconds: number | null = null;
+    /**
+     * Whether the view is frozen, noting when it froze and — once it is not —
+     * handing the newest mask back the time it spent held.
+     */
+    const holding = () => {
+      const nowSeconds = performance.now() / 1000;
+      if (pausedRef.current) {
+        pausedAtSeconds ??= nowSeconds;
+        return true;
+      }
+      if (pausedAtSeconds !== null) {
+        maskAtSeconds += nowSeconds - pausedAtSeconds;
+        pausedAtSeconds = null;
+      }
+      return false;
+    };
 
     const segmentCurrentFrame = async () => {
       const grabber = grabberRef.current;
-      if (!active || !grabber || !grabber.size()) return;
+      if (!active || holding() || !grabber || !grabber.size()) return;
 
       const startedAtMs = performance.now();
       // Where the camera was looking at the moment the frame was taken, read at
@@ -315,6 +345,9 @@ export function useSkySegmentation(
      * camera hiccup that passes on its own into a trip back to the boot screen.
      */
     const overdue = () => {
+      // Nothing is due on a frozen view, however far the phone has been turned
+      // off the mask while it is held.
+      if (holding()) return false;
       if (!landed || !anchor) return false;
       const attitude = orientationFilterRef.current.sample(performance.now() / 1000);
       return aimOffsetDeg(anchor, attitude) >= toleranceDeg;
@@ -329,7 +362,7 @@ export function useSkySegmentation(
     // A pass that never returns leaves the newest mask in place indefinitely,
     // and a mask of where the buildings were a minute ago is worse than none.
     const staleness = setInterval(() => {
-      if (!active) return;
+      if (!active || holding()) return;
       if (performance.now() / 1000 - maskAtSeconds > SKY_MASK_MAX_AGE_SECONDS) {
         setMask((current) => (current === null ? current : null));
       }

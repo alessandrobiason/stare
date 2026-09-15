@@ -119,8 +119,15 @@ describe("the header", () => {
     ...over
   });
 
-  const header = (summary: SkySummary) => (
-    <SkyHeader sky={summary} filterOpen={false} onToggleFilter={() => undefined} />
+  const header = (summary: SkySummary, frozenAt: Date | null = null) => (
+    <SkyHeader
+      sky={summary}
+      filterOpen={false}
+      onToggleFilter={() => undefined}
+      frozen={frozenAt !== null}
+      frozenAt={frozenAt}
+      onToggleFrozen={() => undefined}
+    />
   );
 
   test("is the app's name and what is over you, and nothing else", () => {
@@ -132,6 +139,20 @@ describe("the header", () => {
     expect(text).toContain("17 visible satellites");
     expect(text).not.toContain("Starlink");
     expect(text).not.toContain("IN VIEW");
+  });
+
+  test("has a freeze button beside the filter, which says when it is holding the view", () => {
+    const live = renderToStaticMarkup(header(sky(17)));
+    expect(live).toContain('aria-label="Freeze the view"');
+    expect(live).toContain('aria-pressed="false"');
+    expect(live).not.toContain("Frozen at");
+    // Before the filter, so the filter keeps the corner.
+    expect(live.indexOf("Freeze the view")).toBeLessThan(live.indexOf("Category filter"));
+
+    const held = renderToStaticMarkup(header(sky(17), new Date(2026, 8, 14, 21, 43)));
+    expect(held).toContain('aria-label="Resume the live view"');
+    expect(held).toContain('aria-pressed="true"');
+    expect(held).toMatch(/Frozen at 21[:.]43|Frozen at 9:43/);
   });
 
   test("the count is the control that opens the breakdown", () => {
@@ -320,6 +341,9 @@ describe("what the count breaks down into", () => {
         sky={sky(17, { rows: [{ name: "Starlink", count: 10 }], other: 7 })}
         filterOpen={false}
         onToggleFilter={() => undefined}
+        frozen={false}
+        frozenAt={null}
+        onToggleFrozen={() => undefined}
       />
     );
 

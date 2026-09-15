@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet } from "react-native";
 
 /**
@@ -15,6 +15,11 @@ type Props = {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   onTimeChange: (seconds: number) => void;
   onSeeked: (seconds: number) => void;
+  /**
+   * The app's freeze button: the recording is paused under a frozen sky, and
+   * picks up again when it thaws if it was playing when it froze.
+   */
+  frozen?: boolean;
 };
 
 /**
@@ -27,7 +32,22 @@ type Props = {
  * native ones can be seen and never pressed. `ReplayControls` is the transport
  * instead, rendered over that tap target rather than under it.
  */
-export const ReplayVideo: React.FC<Props> = ({ uri, videoRef, onTimeChange, onSeeked }) => {
+export const ReplayVideo: React.FC<Props> = ({
+  uri,
+  videoRef,
+  onTimeChange,
+  onSeeked,
+  frozen = false
+}) => {
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!frozen || !video || video.paused) return;
+    video.pause();
+    return () => {
+      void video.play().catch(() => undefined);
+    };
+  }, [frozen, videoRef]);
+
   return (
     <HtmlVideo
       ref={videoRef}

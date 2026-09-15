@@ -21,6 +21,8 @@ const CARD = '[aria-label="Satellite details"]';
 const FILTER = '[aria-label="Category filter"]';
 const GUIDE_ROW = '[aria-label="Help"]';
 const COMPASS = '[aria-label^="Facing"]';
+const FREEZE = '[aria-label="Freeze the view"]';
+const RESUME = '[aria-label="Resume the live view"]';
 
 /**
  * Opens the console, which is two taps now rather than one: it is a row in the
@@ -106,6 +108,33 @@ test.describe("replay overlay", () => {
     // everywhere else on this platform.
     await page.locator('[aria-label="Satellite markers"]').click({ position: { x: 40, y: 320 } });
     await expect(page.getByText("SHOW ALL")).toHaveCount(0);
+  });
+
+  test("the freeze button holds the picture and the marks, and lets go of them", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+    const video = page.locator("video");
+    // Playing, so there is something moving to be held.
+    await page.locator('[aria-label="Play the recording"]').click();
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
+
+    await page.locator(FREEZE).click();
+    await expect(page.locator(RESUME)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("Frozen at", { exact: false })).toBeVisible();
+    expect(await video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(true);
+
+    // The middle of the picture, marks and all, is the same picture a second
+    // and a half later: nothing under the glass is moving.
+    const box = await page.locator('[aria-label="Satellite markers"]').boundingBox();
+    if (!box) throw new Error("The picture has no box");
+    const clip = { x: box.x, y: box.y + box.height * 0.3, width: box.width, height: box.height * 0.3 };
+    const before = await page.screenshot({ clip });
+    await page.waitForTimeout(1500);
+    expect((await page.screenshot({ clip })).equals(before)).toBe(true);
+
+    await page.locator(RESUME).click();
+    await expect(page.getByText("Frozen at", { exact: false })).toHaveCount(0);
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
   });
 
   test("the compass strip says which way the camera is pointing", async ({ page }) => {
@@ -281,9 +310,12 @@ test.describe("the tour", () => {
     await expect(page.getByText("In view")).toBeVisible();
     await page.getByRole("button", { name: "Next" }).last().click();
     await expect(page.getByText("Choose which kinds of satellite to show.")).toBeVisible();
+    // The freeze button, which a pause sign does not explain on its own.
+    await page.getByRole("button", { name: "Next" }).last().click();
+    await expect(page.getByText("Hold the view still", { exact: false })).toBeVisible();
 
     await page.getByText("Skip").click();
-    await expect(page.getByText("Choose which kinds of satellite to show.")).toHaveCount(0);
+    await expect(page.getByText("Hold the view still", { exact: false })).toHaveCount(0);
     await expect(page.locator(BOOTED).first()).toBeVisible();
     await expect(page.locator(SKY_TAB)).toHaveAttribute("aria-selected", "true");
   });

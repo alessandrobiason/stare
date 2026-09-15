@@ -8,10 +8,20 @@ on the picture where they actually are — positioned by GPS, aimed by the phone
 motion sensors, and hidden behind whatever buildings and trees are in the way.
 
 The view opens in **normal** mode: the camera picture, the markers, the app's
-name over a count of what is above you, one button for the category filter, a
+name over a count of what is above you, two buttons — one that freezes the view
+and one for the category filter — a
 strip of cardinal points along the bottom of the frame, a card carrying the next
 landmark due over you, and a bar of three tabs — the sky, a catalog that is not
 built yet, and the settings that hold Help (the tour) and the console.
+
+**Freezing the view** (the pause button beside the filter) holds the camera
+picture, the marks and the compass strip on the frame that was on screen, so the
+phone can be lowered and the marks still tapped where they were. The preview is
+paused rather than photographed, the sky segmentation takes no passes while it is
+held, and the marker loop pins the time, the aim and the clock its sky memory is
+read against — so the filter still works on a frozen sky, and a card opened from
+it describes the object at the moment the view froze, which a small "Frozen at"
+line under the count gives.
 **A marker is a point of light**: a pastel point a few pixels across
 in a soft glow and a bloom of its own colour, trailing a fine line along the
 path it has really flown — solid where it leaves the point, then broken into
@@ -172,7 +182,7 @@ light where it is, takes the name off the sky and says what went wrong.
 boot sky like every other launch, the operating system's camera and location
 prompts carry their own reasons (`locales/`), and a moment after the sky view
 appears a short tour runs over it. Each step dims the view, lights up one real
-control — the count, the filter, the passes card, the settings tab — with an
+control — the count, the filter, the freeze button, the passes card, the settings tab — with an
 arrow to it, and says the one thing about it that is not obvious from looking.
 The first step has nothing to point at, since the marks are wherever the sky
 puts them, so it is a key instead: each kind of mark drawn by the sky's own

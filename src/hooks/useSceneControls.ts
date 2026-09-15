@@ -44,6 +44,21 @@ export type SceneControls = {
   filterOpen: boolean;
   toggleFilter: () => void;
   /**
+   * Whether the sky is frozen: the picture, the marks on it and the compass
+   * strip held on the moment the button was pressed.
+   *
+   * What it is for is reading a sky that is overhead. The marks can only be
+   * tapped while the phone is held up at them, and an arm held up at the zenith
+   * is not an arm anybody reads a card with for long — so the view is caught,
+   * the phone comes down, and the marks go on being tappable where they were.
+   *
+   * Off on open, and left as it is by a change of tab: the other two tabs are
+   * sheets over the sky, and coming back from one onto the view that was frozen
+   * is the point of having frozen it.
+   */
+  frozen: boolean;
+  toggleFrozen: () => void;
+  /**
    * Which of the two view modes is running: normal, or normal plus the debug
    * overlays. Off on open — debug is what someone asks for, not what they land in.
    */
@@ -122,6 +137,7 @@ export function useSceneControls({ tourOnFirstRun = false }: SceneControlOptions
   const [enabledSubcategories, setEnabledSubcategories] =
     useState<Set<SatelliteSubcategory>>(allSubcategories);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [frozen, setFrozen] = useState(false);
   const [debug, setDebug] = useState(false);
   const [guide, setGuide] = useState(false);
   const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
@@ -148,6 +164,7 @@ export function useSceneControls({ tourOnFirstRun = false }: SceneControlOptions
     setEnabledSubcategories(allSubcategories());
   }, []);
   const toggleFilter = useCallback(() => setFilterOpen((open) => !open), []);
+  const toggleFrozen = useCallback(() => setFrozen((on) => !on), []);
   /**
    * Leaving the sky puts the filter away with it: the panel hangs off a button
    * that is no longer on the screen, and coming back to a sheet nobody opened
@@ -192,6 +209,8 @@ export function useSceneControls({ tourOnFirstRun = false }: SceneControlOptions
     enableAllCategories,
     filterOpen,
     toggleFilter,
+    frozen,
+    toggleFrozen,
     debug,
     toggleDebug,
     openConsole,

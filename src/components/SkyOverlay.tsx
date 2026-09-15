@@ -107,8 +107,11 @@ export type SceneFrame = {
    * `onDiscontinuity` is for a source that can jump — a seek in a video. It
    * drops the mask prior and the attitude estimate, both of which assume the
    * frame before this one was the frame before this one.
+   *
+   * `frozen` is the freeze button: hold the picture on the frame it is showing
+   * (a paused preview, a paused video) until it is false again.
    */
-  render: (controls: { onDiscontinuity: () => void }) => React.ReactNode;
+  render: (controls: { onDiscontinuity: () => void; frozen: boolean }) => React.ReactNode;
 };
 
 /**
@@ -155,6 +158,14 @@ type Props = {
    */
   filterOpen: boolean;
   onToggleFilter: () => void;
+  /**
+   * Whether the view is frozen, and how to freeze or thaw it: the picture, the
+   * marks and the compass held where they were, and the marks still tappable,
+   * so a sky overhead can be read with the phone lowered. See
+   * `SceneControls.frozen`.
+   */
+  frozen: boolean;
+  onToggleFrozen: () => void;
   /** Told what the sky mask is doing, so a scene can show it. */
   onMaskStatusChange?: (status: string) => void;
   /**
@@ -229,8 +240,8 @@ type Props = {
  *
  * **The controls are a thin layer of glass over the picture, and there are
  * five of them.** The app's name over a live count of what is overhead, top
- * left, which opens into what those marks are; one round button, top right,
- * which opens the filter; a rule of cardinal points along the foot of the
+ * left, which opens into what those marks are; two round buttons, top right,
+ * which freeze the view and open the filter; a rule of cardinal points along the foot of the
  * frame (`HorizonCompass`); one card above the tab bar — the satellite
  * somebody tapped, or the next pass if nobody has; and the bar itself, which is
  * the way out of the sky and into the two tabs that are not it. Everything else
@@ -280,6 +291,8 @@ export const SkyOverlay: React.FC<Props> = ({
   onSelectTab,
   filterOpen,
   onToggleFilter,
+  frozen,
+  onToggleFrozen,
   onMaskStatusChange,
   onSkyFixChange,
   debug,
@@ -395,7 +408,10 @@ export const SkyOverlay: React.FC<Props> = ({
     smoothed.readingRef,
     setFatal,
     frame.rebuild,
-    onSegmentedFrame
+    onSegmentedFrame,
+    // Nothing new to segment in a picture that is not moving, and the mask it
+    // froze with is the one that describes it.
+    frozen
   );
 
   const {
@@ -405,6 +421,7 @@ export const SkyOverlay: React.FC<Props> = ({
     markerStatsRef,
     frameRateRef,
     latestFrameRef,
+    drawnEpochRef,
     reset: resetMarkers,
     upcoming
   } = useAnimatedMarkers({
@@ -418,7 +435,8 @@ export const SkyOverlay: React.FC<Props> = ({
     enabledCategories,
     enabledSubcategories,
     viewport,
-    onSkyChange: setSky
+    onSkyChange: setSky,
+    frozen
   });
 
   // A row of the passes panel, picked: the same selection a tap on the object's
@@ -432,9 +450,11 @@ export const SkyOverlay: React.FC<Props> = ({
   );
 
   // What the tapped satellite is, resolved on the card's own slow timer against
-  // the epoch of whatever frame is on screen when it asks.
+  // the epoch of whatever frame is on screen when it asks — which on a frozen
+  // sky is the moment it froze, so the card describes the mark that was tapped
+  // rather than wherever the object has got to since.
   const describeRef = useLatestRef((name: string) => {
-    const { time, observer } = epochRef.current;
+    const { time, observer } = drawnEpochRef.current;
     return tracker.describe(name, time, observer);
   });
 
@@ -540,12 +560,14 @@ export const SkyOverlay: React.FC<Props> = ({
     <TourTargetsProvider>
       <View style={styles.sky} onLayout={onLayout}>
         <View style={[styles.frame, frameStyle]}>
-          {frame.render({ onDiscontinuity })}
+          {frame.render({ onDiscontinuity, frozen })}
 
           {/* Not while it is switched off: the mask drawn over the picture is
               the reason a marker is missing, and with nothing being hidden it
-              would be a red grid explaining markers that are all still there. */}
-          {debug && skyMaskFiltering && segmentation.mask && (
+              would be a red grid explaining markers that are all still there.
+              Nor while the view is frozen: the grid is placed by the live aim,
+              and would go on sliding over a picture that does not. */}
+          {debug && skyMaskFiltering && segmentation.mask && !frozen && (
             <SkyMaskOverlay
               mask={segmentation.mask}
               orientationFilterRef={smoothed.filterRef}
@@ -586,7 +608,14 @@ export const SkyOverlay: React.FC<Props> = ({
         <SafeAreaLayer>
           {tab === "sky" && (
             <>
-              <SkyHeader sky={sky} filterOpen={filterOpen} onToggleFilter={onToggleFilter} />
+              <SkyHeader
+                sky={sky}
+                filterOpen={filterOpen}
+                onToggleFilter={onToggleFilter}
+                frozen={frozen}
+                frozenAt={frozen ? drawnEpochRef.current.time : null}
+                onToggleFrozen={onToggleFrozen}
+              />
 
               <CategoryLegend
                 open={filterOpen}
@@ -628,6 +657,7 @@ export const SkyOverlay: React.FC<Props> = ({
                 <HorizonCompass
                   orientationFilterRef={smoothed.filterRef}
                   halfFovDeg={halfFovDeg}
+                  frozen={frozen}
                 />
 
                 {/* One card at a time, and always the thing most worth reading:
