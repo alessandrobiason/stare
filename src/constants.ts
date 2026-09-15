@@ -379,25 +379,18 @@ export const SATELLITE_MARKERS = {
  * Which satellites besides the landmarks are named on the sky
  * (`src/satellite/notable.ts`).
  *
- * The figures here are about keeping a name where it is. Chosen afresh every
- * time, "the closest" would hop between a dozen low passes a minute, so a
- * satellite keeps its role until it sets or somebody clearly better has been
- * there long enough to be worth the change.
+ * One per category, nearest first on the frame — and these two figures are
+ * about keeping a name where it is once chosen. A phone is never perfectly
+ * still, so without them the nearest satellite in a crowded category would
+ * swap every time the framing nudged by a few pixels; a satellite keeps its
+ * category's name until it leaves the frame or somebody clearly better has
+ * been on it long enough to be worth the change.
  */
 export const NOTABLE_SATELLITES = {
-  /**
-   * How often the choice is made, in seconds of sky time. The loop runs at
-   * display rate and the answer changes on a scale of minutes.
-   */
-  intervalSeconds: 1,
-  /** No role changes hands within this long of its last change, in seconds. */
-  holdSeconds: 60,
-  /** The nearest is replaced only by one at least this much nearer, as a share. */
-  closestMargin: 0.3,
-  /** The farthest only by one at least this much farther, as a share. */
-  farthestMargin: 0.1,
-  /** The navigation satellite only by one at least this much higher, in degrees. */
-  navigationMarginDeg: 15
+  /** A name does not change hands within this long of its last change, in seconds. */
+  holdSeconds: 10,
+  /** The one carrying a category's name is replaced only by one at least this much nearer, as a share. */
+  closestMargin: 0.25
 } as const;
 
 /**

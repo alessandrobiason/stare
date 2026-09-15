@@ -1,143 +1,112 @@
 import { NOTABLE_SATELLITES } from "../constants";
-import { SatelliteCategory } from "./categories";
+import { SATELLITE_CATEGORIES, SatelliteCategory } from "./categories";
 
 /**
  * Which satellites besides the landmarks get a name on the sky, and why.
  *
- * There are too many marks to name them all, so a few earn it by standing out
- * from the rest: the nearest, the farthest, and one navigation satellite. The
- * landmarks are not chosen here — they are always named (`markerScene.ts`) —
- * and cannot take one of these roles.
+ * There are too many marks to name them all, so one per category earns it —
+ * the landmarks are not chosen here, they are always named (`markerScene.ts`)
+ * and cannot take a category's slot.
  *
- * **Chosen from the whole sky, not from the frame.** What is on the screen
- * changes every time the phone moves, and a name that depended on it would
- * change with it: turn away and back, and a different satellite would be "the
- * nearest". Every object above the elevation mask is considered wherever the
- * camera is pointing, so turning the phone only decides which of the named ones
- * are in view.
+ * **Chosen from the frame, not the whole sky.** Turning the phone is what
+ * decides which satellites are worth naming: there is no "the nearest
+ * satellite" independent of where the camera is pointed, only the nearest of
+ * whatever it currently sees. So every choice here is made from the
+ * satellites actually on the frame this moment, category by category, nearest
+ * first within each.
  *
- * **Held, not recomputed.** A satellite keeps its role until it sets, is
- * filtered out, or a challenger beats it by a clear margin once the role has
- * been held for a while. See `NOTABLE_SATELLITES`.
+ * **Held, not recomputed from scratch.** A phone is never perfectly still,
+ * and picking the literal nearest afresh every frame would swap a category's
+ * name every time the framing nudged by a few pixels — the "ballare" a small
+ * tilt up and down must not cause. A satellite keeps its category's name
+ * until it leaves the frame or a clearly better one has been available for a
+ * while. See `NOTABLE_SATELLITES`.
  */
-export type NotableRole = "closest" | "farthest" | "navigation";
-
-/** The roles, in the order they are filled and their names win a collision. */
-export const NOTABLE_ROLES: readonly NotableRole[] = ["closest", "farthest", "navigation"];
-
-/** What the choice is made from: one satellite above the elevation mask. */
 export type NotableCandidate = {
   name: string;
   category: SatelliteCategory;
   rangeKm: number;
-  elevationDeg: number;
 };
 
-type Rule = {
-  /** Whether this satellite may hold the role at all. */
-  eligible: (candidate: NotableCandidate) => boolean;
-  /** Higher is better. */
-  score: (candidate: NotableCandidate) => number;
-  /** Whether a challenger is better by enough to take the role from its holder. */
-  beats: (challenger: NotableCandidate, holder: NotableCandidate) => boolean;
-};
+/** Every category besides the landmarks, which are named on their own. */
+const REPRESENTATIVE_CATEGORIES = SATELLITE_CATEGORIES.filter(
+  (category) => category !== "LANDMARK"
+);
 
-const notLandmark = (candidate: NotableCandidate): boolean => candidate.category !== "LANDMARK";
-
-const RULES: Record<NotableRole, Rule> = {
-  closest: {
-    eligible: notLandmark,
-    score: (candidate) => -candidate.rangeKm,
-    beats: (challenger, holder) =>
-      challenger.rangeKm <= holder.rangeKm * (1 - NOTABLE_SATELLITES.closestMargin)
-  },
-  farthest: {
-    eligible: notLandmark,
-    score: (candidate) => candidate.rangeKm,
-    beats: (challenger, holder) =>
-      challenger.rangeKm >= holder.rangeKm * (1 + NOTABLE_SATELLITES.farthestMargin)
-  },
-  navigation: {
-    eligible: (candidate) => candidate.category === "NAVIGATION",
-    score: (candidate) => candidate.elevationDeg,
-    beats: (challenger, holder) =>
-      challenger.elevationDeg >= holder.elevationDeg + NOTABLE_SATELLITES.navigationMarginDeg
-  }
-};
+/** Whether a challenger is close enough to be worth taking a name from its holder. */
+function beats(challenger: NotableCandidate, holder: NotableCandidate): boolean {
+  return challenger.rangeKm <= holder.rangeKm * (1 - NOTABLE_SATELLITES.closestMargin);
+}
 
 type Holder = { name: string; sinceMs: number };
 
 /**
- * The roles and who holds them, carried from one choice to the next.
+ * The categories and who is carrying each one's name, carried from one choice
+ * to the next.
  *
  * Timed on the sky's clock rather than the display's, so the replay harness
  * makes the same choices whatever speed it is played at.
  */
 export class NotableSatellites {
-  private readonly holders = new Map<NotableRole, Holder>();
-  private readonly roles = new Map<string, NotableRole>();
-  private chosenAtMs: number | null = null;
+  private readonly holders = new Map<SatelliteCategory, Holder>();
+  private readonly representatives = new Set<string>();
 
-  /** Whether it is time to choose again. Asked first, so a frame that is not pays nothing. */
-  due(atMs: number): boolean {
-    const last = this.chosenAtMs;
-    return (
-      last === null || atMs < last || atMs - last >= NOTABLE_SATELLITES.intervalSeconds * 1000
-    );
-  }
-
-  /** Chooses again, from every satellite above the elevation mask at `atMs`. */
+  /** Chooses again, from whatever is on the frame at `atMs`. */
   choose(candidates: readonly NotableCandidate[], atMs: number): void {
-    this.chosenAtMs = atMs;
-    this.roles.clear();
-    const byName = new Map(candidates.map((candidate) => [candidate.name, candidate]));
-    const holdMs = NOTABLE_SATELLITES.holdSeconds * 1000;
+    this.representatives.clear();
 
-    for (const role of NOTABLE_ROLES) {
-      const rule = RULES[role];
-      // One role per satellite, and the earlier role keeps it.
-      const open = (candidate: NotableCandidate): boolean =>
-        rule.eligible(candidate) && !this.roles.has(candidate.name);
+    const inFrame = new Map<SatelliteCategory, NotableCandidate[]>();
+    for (const candidate of candidates) {
+      if (candidate.category === "LANDMARK") continue;
+      const list = inFrame.get(candidate.category);
+      if (list) list.push(candidate);
+      else inFrame.set(candidate.category, [candidate]);
+    }
+
+    for (const category of REPRESENTATIVE_CATEGORIES) {
+      const onFrame = inFrame.get(category);
 
       let best: NotableCandidate | null = null;
-      for (const candidate of candidates) {
-        if (open(candidate) && (best === null || rule.score(candidate) > rule.score(best))) {
-          best = candidate;
+      if (onFrame) {
+        for (const candidate of onFrame) {
+          if (best === null || candidate.rangeKm < best.rangeKm) best = candidate;
         }
       }
 
-      const held = this.holders.get(role);
-      const holder = held ? byName.get(held.name) : undefined;
+      const held = this.holders.get(category);
+      const holder = held && onFrame ? onFrame.find((candidate) => candidate.name === held.name) : undefined;
+
       let chosen: NotableCandidate | null;
-      if (held && holder && open(holder)) {
-        // Still up and still allowed: kept unless the best is clearly better and
-        // the role has been held long enough. A clock that went backwards is a
-        // seek, and a hold from the other side of one means nothing.
-        const settled = atMs - held.sinceMs >= holdMs || atMs < held.sinceMs;
-        chosen = best && best !== holder && settled && rule.beats(best, holder) ? best : holder;
+      if (held && holder) {
+        // Still on the frame: kept unless the best is clearly better and the
+        // name has been held long enough to be worth contesting. A clock that
+        // went backwards is a seek, and a hold from the other side of one
+        // means nothing.
+        const settled = atMs - held.sinceMs >= NOTABLE_SATELLITES.holdSeconds * 1000 || atMs < held.sinceMs;
+        chosen = best && best !== holder && settled && beats(best, holder) ? best : holder;
       } else {
-        // Set, filtered out, or never held: the best takes it at once.
+        // Left the frame, or never held: the best takes it at once, so a
+        // category with anything on screen is never left unnamed.
         chosen = best;
       }
 
       if (chosen === null) {
-        this.holders.delete(role);
+        this.holders.delete(category);
         continue;
       }
-      if (chosen.name !== held?.name) this.holders.set(role, { name: chosen.name, sinceMs: atMs });
-      this.roles.set(chosen.name, role);
+      if (chosen.name !== held?.name) this.holders.set(category, { name: chosen.name, sinceMs: atMs });
+      this.representatives.add(chosen.name);
     }
   }
 
-  /** The role a satellite holds, if it holds one. */
-  roleOf(name: string): NotableRole | undefined {
-    return this.roles.get(name);
+  /** Whether this satellite is carrying its category's name right now. */
+  isRepresentative(name: string): boolean {
+    return this.representatives.has(name);
   }
 
-  /** Forgets every role: the sky has jumped, and who was nearest before it has no bearing. */
+  /** Forgets every hold: the sky has jumped, and who was on frame before it has no bearing. */
   reset(): void {
     this.holders.clear();
-    this.roles.clear();
-    this.chosenAtMs = null;
+    this.representatives.clear();
   }
 }

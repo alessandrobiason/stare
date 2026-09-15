@@ -70,9 +70,11 @@ export const en: Strings = {
       other: "Others"
     },
     notable: {
-      closest: "Closest",
-      farthest: "Farthest",
-      navigation: "Navigation"
+      NAVIGATION: "Navigation",
+      EARTH: "Earth watch",
+      INTERNET: "Internet",
+      TELECOM: "TV & phones",
+      OTHER: "Other"
     },
     sunlight: {
       daylight: "Daylight — none of these can be seen yet",

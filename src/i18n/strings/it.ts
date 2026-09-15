@@ -63,9 +63,11 @@ export const it: Strings = {
       other: "Altri"
     },
     notable: {
-      closest: "Il più vicino",
-      farthest: "Il più lontano",
-      navigation: "Navigazione"
+      NAVIGATION: "Navigazione",
+      EARTH: "Meteo e mappe",
+      INTERNET: "Internet",
+      TELECOM: "TV e telefonia",
+      OTHER: "Altro"
     },
     sunlight: {
       daylight: "È giorno — nessuno di questi è ancora visibile",

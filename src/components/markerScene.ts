@@ -3,8 +3,8 @@ import { BRIGHT_BACKDROP, LANDMARK_PATHS, SATELLITE_MARKERS } from "../constants
 import { MarkerFrame, MarkerPath, SatelliteMarker } from "../hooks/useAnimatedMarkers";
 import { strings } from "../i18n";
 import { clockTime } from "../i18n/format";
+import { SATELLITE_CATEGORIES } from "../satellite/categories";
 import { fleetOf } from "../satellite/fleets";
-import { NOTABLE_ROLES } from "../satellite/notable";
 import {
   FrameSize,
   labellablePoints,
@@ -74,9 +74,9 @@ import { Ink, MARK_COLOR, MarkerPalette } from "./palette";
  *   that never moves; everything else is a body with a tail as long as the
  *   distance it covers in a few seconds.
  * - **Size** is distance, on a log scale.
- * - **A label** is spent on the landmarks and on the few satellites that stand
- *   out from the rest (`NotableSatellites`), and only where two of them do not
- *   collide.
+ * - **A label** is spent on the landmarks and on one satellite per category
+ *   currently on the frame (`NotableSatellites`), and only where two of them
+ *   do not collide.
  *
  * And one that is new, and is not about where the object is at all: **how
  * strongly the mark is drawn** says whether the sun is on it. An object in the
@@ -1016,12 +1016,14 @@ const SELECTION_GAP_PX = 5;
  */
 const SELECTION_WIDTH_PX = 1.5;
 /**
- * Where a mark's name comes in the queue for clear space: landmarks, then the
- * notable roles in their own order. `null` for a mark that is not named at all.
+ * Where a mark's name comes in the queue for clear space: landmarks first,
+ * then each category's representative in the filter's own order — so where
+ * two collide the same one wins however the phone has been turned to bring
+ * them into view. `null` for a mark that is not named at all.
  */
 function labelRank(marker: SatelliteMarker): number | null {
   if (marker.category === "LANDMARK") return 0;
-  return marker.notable ? 1 + NOTABLE_ROLES.indexOf(marker.notable) : null;
+  return marker.notable ? 1 + SATELLITE_CATEGORIES.indexOf(marker.category) : null;
 }
 
 /**
@@ -1035,19 +1037,25 @@ export function shortName(name: string): string {
 }
 
 /**
- * Why a notable satellite is named. A navigation satellite says which system it
- * belongs to where that has a name — "GPS" says more than "Navigation", and
- * needs no translating — and the category's word where it does not.
+ * Why a notable satellite is named: which category it is standing in for. A
+ * navigation satellite says which system it belongs to where that has a name
+ * — "GPS" says more than "Navigation", and needs no translating — and the
+ * category's own word otherwise.
  */
 function notableDetail(marker: SatelliteMarker): string | null {
+  if (!marker.notable) return null;
   const words = strings().scene.notable;
-  switch (marker.notable) {
-    case "closest":
-      return words.closest;
-    case "farthest":
-      return words.farthest;
-    case "navigation":
-      return fleetOf(marker.name) ?? words.navigation;
+  switch (marker.category) {
+    case "NAVIGATION":
+      return fleetOf(marker.name) ?? words.NAVIGATION;
+    case "EARTH":
+      return words.EARTH;
+    case "INTERNET":
+      return words.INTERNET;
+    case "TELECOM":
+      return words.TELECOM;
+    case "OTHER":
+      return words.OTHER;
     default:
       return null;
   }

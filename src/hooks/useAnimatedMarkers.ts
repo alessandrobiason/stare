@@ -15,7 +15,7 @@ import {
   MARKER_VISIBILITY,
   MINIMUM_SATELLITE_ELEVATION_DEG
 } from "../constants";
-import { elevationDeg, rangeKm } from "../coordinates/transform";
+import { rangeKm } from "../coordinates/transform";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { clamp } from "../math/angles";
 import { SatelliteCatalog } from "../satellite/catalog";
@@ -23,7 +23,7 @@ import { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories
 import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
 import { SunlitState } from "../satellite/illumination";
 import { SkyDarkness, skyDarknessAt } from "../satellite/nakedEye";
-import { NotableCandidate, NotableRole, NotableSatellites } from "../satellite/notable";
+import { NotableCandidate, NotableSatellites } from "../satellite/notable";
 import { ArcPiece, cutAlong, pathBehind, pathFrom, SkyPass } from "../satellite/orbitPath";
 import { EnuPosition, OrbitEpoch } from "../types";
 import { SkyTracker } from "../satellite/skyTracker";
@@ -77,10 +77,12 @@ export type SatelliteMarker = {
    */
   backdrop?: number;
   /**
-   * Why a satellite that is not a landmark is named on the sky, if it is.
-   * Decided over the whole sky rather than this frame: see `NotableSatellites`.
+   * Whether this is the one satellite carrying its category's name right now.
+   * One of these at most per category, besides the landmarks, chosen from
+   * whatever that category has on the frame this moment: see
+   * `NotableSatellites`.
    */
-  notable?: NotableRole;
+  notable?: boolean;
 };
 
 /**
@@ -875,11 +877,16 @@ export function useAnimatedMarkers({
       const clockMs = held ? held.atMs : now;
       const visibility = visibilityRef.current;
       const notable = notableRef.current;
-      // Once a second rather than per frame, and from everything above the
-      // elevation mask rather than what is near the frame — so the names do not
-      // depend on where the phone is pointing.
-      const choosingNotable = notable.due(time.getTime());
+      // Who is drawn on the frame right now, one satellite per category — see
+      // `NotableSatellites`. Rebuilt every frame rather than throttled: the set
+      // this is chosen from is exactly what the phone is pointed at, and that
+      // changes as fast as a turn does.
       const candidates: NotableCandidate[] = [];
+      // Which marker each candidate became, so a role picked from `candidates`
+      // can be written back onto its marker once `notable.choose` has run —
+      // this frame's `visible` is still being built while `choose` needs the
+      // whole of it to pick from.
+      const candidateMarkers = new Map<string, SatelliteMarker>();
       const visible: SatelliteMarker[] = [];
       let occluded = 0;
       let unmapped = 0;
@@ -962,14 +969,6 @@ export function useAnimatedMarkers({
           if (fix.subcategory !== null && !subcategories.has(fix.subcategory)) continue;
 
           const range = rangeKm(fix.position);
-          if (choosingNotable) {
-            candidates.push({
-              name: fix.name,
-              category: fix.category,
-              rangeKm: range,
-              elevationDeg: elevationDeg(fix.position)
-            });
-          }
 
           // Hide satellites the segmentation says are behind terrain or
           // buildings — but through the visibility filter, so what decides it
@@ -1061,7 +1060,7 @@ export function useAnimatedMarkers({
           // a second, for a figure only the debug page reads.
           if (fix.sunlit === "eclipsed") eclipsed += 1;
           const backdrop = brightTowards?.(fix.position) ?? undefined;
-          visible.push({
+          const marker: SatelliteMarker = {
             name: fix.name,
             category: fix.category,
             parked: fix.parked,
@@ -1070,19 +1069,32 @@ export function useAnimatedMarkers({
             opacity,
             sunlit: fix.sunlit,
             ...(backdrop === undefined ? {} : { backdrop }),
-            notable: notable.roleOf(fix.name),
             // Allowed off-frame: a trail about to leave the view is the one
             // whose direction says the most.
             trail
-          });
+          };
+          visible.push(marker);
+          // Only what the camera is actually pointed at is in the running for a
+          // name — `visible` above also keeps an object past its own edge for
+          // its tail, and `onFrame` is what tells the two apart.
+          if (onFrame) {
+            candidates.push({ name: fix.name, category: fix.category, rangeKm: range });
+            candidateMarkers.set(fix.name, marker);
+          }
         }
         visibility.endFrame();
-        if (choosingNotable) notable.choose(candidates, time.getTime());
+        notable.choose(candidates, time.getTime());
+        for (const [name, marker] of candidateMarkers) {
+          if (notable.isRepresentative(name)) marker.notable = true;
+        }
       } else {
         // No mask means no frame to compare the next one against: a satellite
         // half faded out when the mask went stale must not resume from there
-        // once a fresh one lands minutes later.
+        // once a fresh one lands minutes later. Nobody is on screen either, so
+        // whoever was carrying a category's name has no more claim to it than
+        // anything else once the mask comes back.
         visibility.reset();
+        notable.reset();
       }
 
       markerStatsRef.current = {

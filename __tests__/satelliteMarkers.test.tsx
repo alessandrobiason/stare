@@ -483,7 +483,7 @@ test("names the landmarks and the notable satellites, and nothing else", () => {
   const { labels } = scene([
     marker({ name: "ISS", category: "LANDMARK", rangeKm: 430 }),
     marker({ name: "STARLINK-1234", point: { left: 20, top: 20 } }),
-    marker({ name: "STARLINK-1007", point: { left: 80, top: 80 }, notable: "closest" })
+    marker({ name: "STARLINK-1007", point: { left: 80, top: 80 }, notable: true })
   ]);
 
   expect(labels.map((label) => label.name)).toEqual(["ISS", "STARLINK-1007"]);
@@ -495,16 +495,16 @@ describe("a notable satellite's name", () => {
   test("says why it is there, in the reader's language", () => {
     setLocaleForTesting("it");
     const { labels } = scene([
-      marker({ name: "STARLINK-1007", notable: "closest" }),
-      marker({ name: "INTELSAT 33E", point: { left: 20, top: 20 }, notable: "farthest" })
+      marker({ name: "SENTINEL-2C", category: "EARTH", notable: true }),
+      marker({ name: "INTELSAT 33E", category: "TELECOM", point: { left: 20, top: 20 }, notable: true })
     ]);
 
-    expect(labels.map((label) => label.detail)).toEqual(["Il più vicino", "Il più lontano"]);
+    expect(labels.map((label) => label.detail)).toEqual(["Meteo e mappe", "TV e telefonia"]);
   });
 
   test("names a navigation satellite's system where it has a name", () => {
     const { labels } = scene([
-      marker({ name: "NAVSTAR 81 (USA 319)", category: "NAVIGATION", notable: "navigation" })
+      marker({ name: "NAVSTAR 81 (USA 319)", category: "NAVIGATION", notable: true })
     ]);
 
     expect(labels[0].name).toBe("NAVSTAR 81");
@@ -512,9 +512,7 @@ describe("a notable satellite's name", () => {
   });
 
   test("falls back to the category's word for a system with no name", () => {
-    const { labels } = scene([
-      marker({ name: "SOME NAVSAT", category: "NAVIGATION", notable: "navigation" })
-    ]);
+    const { labels } = scene([marker({ name: "SOME NAVSAT", category: "NAVIGATION", notable: true })]);
 
     expect(labels[0].detail).toBe("Navigation");
   });
@@ -524,18 +522,29 @@ describe("a notable satellite's name", () => {
     const near = marker({
       name: "STARLINK-1007",
       point: { left: 50.4, top: 50.1 },
-      notable: "closest"
+      notable: true
     });
 
     expect(scene([near, iss]).labels.map((label) => label.name)).toEqual(["ISS"]);
     expect(scene([iss, near]).labels.map((label) => label.name)).toEqual(["ISS"]);
   });
 
-  test("and the nearest's wins over the farthest's", () => {
-    const far = marker({ name: "FAR", point: { left: 50, top: 50 }, notable: "farthest" });
-    const near = marker({ name: "NEAR", point: { left: 50.4, top: 50.1 }, notable: "closest" });
+  test("where two categories' names collide, the filter's own order decides", () => {
+    const navigation = marker({
+      name: "NAVSTAR",
+      category: "NAVIGATION",
+      point: { left: 50, top: 50 },
+      notable: true
+    });
+    const other = marker({
+      name: "OTHERSAT",
+      category: "OTHER",
+      point: { left: 50.4, top: 50.1 },
+      notable: true
+    });
 
-    expect(scene([far, near]).labels.map((label) => label.name)).toEqual(["NEAR"]);
+    expect(scene([other, navigation]).labels.map((label) => label.name)).toEqual(["NAVSTAR"]);
+    expect(scene([navigation, other]).labels.map((label) => label.name)).toEqual(["NAVSTAR"]);
   });
 });
 

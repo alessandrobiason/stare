@@ -64,22 +64,16 @@ export type Strings = {
       other: string;
     };
     /**
-     * The small line under a notable satellite's name on the sky, saying why
-     * that one out of hundreds is named (`NotableSatellites`).
+     * The small line under a notable satellite's name on the sky, saying which
+     * category it is standing in for — one satellite is named per category
+     * currently on the frame (`NotableSatellites`).
      *
      * Short: it is set in the box a label is drawn in, under a name that
      * already fills it. A navigation satellite says which system it belongs to
-     * instead where that has a name (GPS, Galileo), so `navigation` is only the
-     * fallback for the ones that do not.
+     * instead where that has a name (GPS, Galileo), so `NAVIGATION` here is
+     * only the fallback for the ones that do not.
      */
-    notable: {
-      /** The nearest satellite above the horizon. */
-      closest: string;
-      /** The farthest. */
-      farthest: string;
-      /** A navigation satellite of a system with no name worth printing. */
-      navigation: string;
-    };
+    notable: Record<Exclude<SatelliteCategory, "LANDMARK">, string>;
     /**
      * Whether any of what is drawn can actually be seen, which is the thing a
      * count of markers cannot say on its own.
