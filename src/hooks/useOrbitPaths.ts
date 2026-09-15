@@ -138,7 +138,7 @@ const NO_PASSES: UpcomingPass[] = [];
  * the replay harness, and which an elapsed-time test would read as no time
  * having passed at all when the video is scrubbed backwards.
  */
-function stale(
+export function stale(
   plannedAtMs: number | null,
   plannedFrom: ObserverLocation | null,
   atMs: number,
@@ -173,5 +173,8 @@ const METRES_PER_DEGREE = 111320;
  * seek is answered while the person is still looking at where they seeked to,
  * and coarse enough that a check costs nothing between them — it is two
  * subtractions and a distance.
+ *
+ * Exported alongside `stale` for `useFocusedPath`, which replans one object
+ * on the same cadence rather than inventing its own.
  */
-const CHECK_INTERVAL_MS = 5000;
+export const CHECK_INTERVAL_MS = 5000;

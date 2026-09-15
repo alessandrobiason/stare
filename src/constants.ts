@@ -635,6 +635,23 @@ export const LANDMARK_PATHS = {
 } as const;
 
 /**
+ * How far back the wake reaches for the one satellite someone has tapped, in
+ * degrees of sky (`src/satellite/orbitPath.ts`'s `focusedPassFor`).
+ *
+ * A landmark's wake (`LANDMARK_PATHS.pastArcDeg`) is deliberately short — a
+ * hint of which way the object is curving, drawn for up to four passes at
+ * once. This is drawn for one object, on demand, and what someone tapping it
+ * wants is the whole story: where it rose, not just where it has lately been.
+ * 200 degrees is past the most any pass over one place can be, so the wake
+ * always reaches the rise itself rather than being cut short of it.
+ */
+export const FOCUSED_TRAJECTORY = {
+  pastArcDeg: 200,
+  /** More steps than the wake's, since the arc it fades across is longer. */
+  pastSteps: 20
+} as const;
+
+/**
  * Tapping a marker to read what it is (`src/components/markerHitTest.ts`).
  *
  * The overlay says what a satellite is *for* with colour and how far away it is

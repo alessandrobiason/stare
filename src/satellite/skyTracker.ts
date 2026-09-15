@@ -218,6 +218,19 @@ export class SkyTracker {
    * is stored, so the next sweep starts from a state that is fresher rather
    * than one it has to redo.
    */
+  /**
+   * The catalog entry for one satellite, by name, or `null`.
+   *
+   * What a caller wanting to propagate an object itself needs — the focused
+   * trajectory does (`focusedPassFor`), since a pass is worked out from a
+   * `CatalogEntry` rather than from anything the tracker keeps about where
+   * the object is *now*. Off the same index `describe` uses, so tapping a
+   * satellite never costs more than one lookup into it.
+   */
+  entryFor(name: string): CatalogEntry | null {
+    return this.byName().get(name)?.entry ?? null;
+  }
+
   describe(name: string, when: Date, observer: ObserverLocation): SatelliteDetail | null {
     const tracked = this.byName().get(name);
     if (!tracked) return null;

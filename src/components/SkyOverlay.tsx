@@ -436,7 +436,8 @@ export const SkyOverlay: React.FC<Props> = ({
     enabledSubcategories,
     viewport,
     onSkyChange: setSky,
-    frozen
+    frozen,
+    selectedName: selection?.selected ?? null
   });
 
   // A row of the passes panel, picked: the same selection a tap on the object's

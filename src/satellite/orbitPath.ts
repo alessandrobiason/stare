@@ -1,4 +1,4 @@
-import { LANDMARK_PATHS, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
+import { FOCUSED_TRAJECTORY, LANDMARK_PATHS, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import {
   createObserverFrame,
   eciToEnuInFrame,
@@ -269,17 +269,23 @@ function walkArc(satrec: SatRec, frame: ObserverFrame, startMs: number, untilMs:
  * `walkArc` run the other way, and for the same reasons spaced by angle and
  * ended on the floor crossing itself: the wake starts where the marker first
  * appeared rather than a step short of it. Ordered in time on the way out.
+ *
+ * `maxDeg` is a landmark's short wake by default, and the focused trajectory's
+ * much longer one when a caller asks for it — the walk itself does not care
+ * which: it stops at the rise or at `maxDeg`, whichever comes first.
  */
-function walkBack(satrec: SatRec, frame: ObserverFrame, from: SkySample): SkySample[] {
+function walkBack(
+  satrec: SatRec,
+  frame: ObserverFrame,
+  from: SkySample,
+  maxDeg: number = LANDMARK_PATHS.pastArcDeg
+): SkySample[] {
   const history: SkySample[] = [];
   let previous = from;
   let coveredDeg = 0;
   let stepMs = LANDMARK_PATHS.initialStepSeconds * 1000;
 
-  while (
-    coveredDeg < LANDMARK_PATHS.pastArcDeg &&
-    history.length < LANDMARK_PATHS.maximumSamples
-  ) {
+  while (coveredDeg < maxDeg && history.length < LANDMARK_PATHS.maximumSamples) {
     const atMs = previous.atMs - stepMs;
     const position = enuAt(satrec, atMs, frame);
     if (!position) break;
@@ -374,11 +380,16 @@ function middleOf(samples: SkySample[]): SkyTick {
  * is drawn is the sky ahead. The ground the object has already covered is kept
  * beside it, a short way back, for the fading wake behind the object
  * (`SkyPass.history`).
+ *
+ * `pastArcDeg` bounds how far back that wake reaches: a landmark's short one
+ * by default, or `FOCUSED_TRAJECTORY.pastArcDeg` for the one object someone
+ * has tapped. See `focusedPassFor`.
  */
 export function passesFor(
   entry: CatalogEntry,
   fromMs: number,
-  observer: ObserverLocation
+  observer: ObserverLocation,
+  pastArcDeg: number = LANDMARK_PATHS.pastArcDeg
 ): SkyPass[] {
   const frame = createObserverFrame(observer);
   const untilMs = fromMs + LANDMARK_PATHS.windowHours * MS_PER_HOUR;
@@ -416,7 +427,7 @@ export function passesFor(
       noradId: entry.noradId,
       category: entry.category,
       samples: walk.samples,
-      history: started ? walkBack(entry.satrec, frame, walk.samples[0]) : [],
+      history: started ? walkBack(entry.satrec, frame, walk.samples[0], pastArcDeg) : [],
       ticks: ticksAlong(walk.samples),
       startsAtMs: walk.samples[0].atMs,
       endsAtMs: walk.samples[walk.samples.length - 1].atMs,
@@ -427,6 +438,28 @@ export function passesFor(
   }
 
   return passes;
+}
+
+/**
+ * The satellite someone has tapped, as its own current or very next pass.
+ *
+ * `passesFor` run for one object rather than a whole tier, with the wake
+ * reaching back to the rise instead of the short one every landmark's path
+ * gets (`FOCUSED_TRAJECTORY.pastArcDeg`) — affordable here because it is
+ * spent on one satellite on demand rather than on the tier every minute.
+ * Every category answers, not only the landmarks: what decides whether an
+ * object gets a path is whether someone tapped it, not what it is.
+ *
+ * `null` when nothing above the floor is on the way for it within the
+ * planning window — a peak too low to be worth a line, on top of the low
+ * pass exemption `passesFor` already gives a pass under way.
+ */
+export function focusedPassFor(
+  entry: CatalogEntry,
+  fromMs: number,
+  observer: ObserverLocation
+): SkyPass | null {
+  return passesFor(entry, fromMs, observer, FOCUSED_TRAJECTORY.pastArcDeg)[0] ?? null;
 }
 
 /** Whether two passes are one object drawn twice. See `duplicateSeconds`. */
