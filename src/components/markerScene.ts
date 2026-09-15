@@ -427,16 +427,17 @@ export function buildMarkerScene(
     const selected = marker.name === selectedName;
     // The span of the mark's light, which is what the range scale sizes; the
     // selected one a little larger, so the eye finds it inside its ring.
+    const landmark = marker.category === "LANDMARK";
     const footprint = markerDiameterPx(marker.rangeKm) * scale;
-    const size = selected ? footprint * SELECTED_GROWTH : footprint;
-    const strength = selected ? 1 : depthStrength(marker.rangeKm);
+    const growth = (selected ? SELECTED_GROWTH : 1) * (landmark ? LANDMARK_GROWTH : 1);
+    const size = footprint * growth;
+    const strength = selected || landmark ? 1 : depthStrength(marker.rangeKm);
     // How much of the daylight mark this one is drawn as: all of it by day, and
     // at night as much as the picture behind it is bright (`backdropEdge`).
     const edge = Math.max(palette.edge, backdropEdge(marker));
     const light = Math.min(palette.glow, 1 - edge);
     const color = palette.categories[marker.category];
     const edgeColor = palette.edges[marker.category];
-    const landmark = marker.category === "LANDMARK";
 
     const path = marker.trail ? trailPixels(marker.point, marker.trail, box) : null;
 
@@ -946,6 +947,14 @@ const FAR_STRENGTH = 0.5;
  */
 const SELECTED_GROWTH = 1.25;
 /**
+ * How much larger a landmark is drawn than its range alone says.
+ *
+ * A landmark is a permanently-tracked object someone is meant to find at a
+ * glance among the ordinary traffic around it, so it is drawn distinctly
+ * larger rather than left to the same range-based scale as everything else.
+ */
+const LANDMARK_GROWTH = 1.6;
+/**
  * Trail width, as a fraction of the point's diameter.
  *
  * Under a third of the point's width: the point's softened rim (`CORE_FADE`)
@@ -989,7 +998,7 @@ const MIN_RING_PX = 1;
  * place exactly is not worth showing them.
  */
 const SHADOW_ALPHA = 0.5;
-const HALO_MARGIN_PX = 6;
+const HALO_MARGIN_PX = 10;
 /**
  * Clear sky left between a point and the ring saying it is selected, quoted at
  * the design width.

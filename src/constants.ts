@@ -562,7 +562,7 @@ export const LANDMARK_PATHS = {
    * width, and a line drawn at the width of a trail would be the loudest thing
    * on a photograph of the sky.
    */
-  widthPx: 1.5,
+  widthPx: 2,
   /**
    * How the arc still ahead is broken up, in degrees of sky: this much line,
    * then this much gap.
