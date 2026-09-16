@@ -212,6 +212,6 @@ export const en: Strings = {
     title: "Language"
   },
   console: {
-    detail: "Technical readings, in English only."
+    detail: "Technical readings."
   }
 };

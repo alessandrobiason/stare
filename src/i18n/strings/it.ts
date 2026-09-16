@@ -206,6 +206,6 @@ export const it: Strings = {
     title: "Lingua"
   },
   console: {
-    detail: "Dati tecnici, solo in inglese."
+    detail: "Dati tecnici."
   }
 };
