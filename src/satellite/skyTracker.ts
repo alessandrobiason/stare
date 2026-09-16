@@ -13,6 +13,7 @@ import { wrapDegrees360 } from "../math/angles";
 import {
   EciPosition,
   EciState,
+  EnuPosition,
   ObserverLocation,
   SatelliteDetail,
   SatelliteFix
@@ -25,9 +26,19 @@ import {
   phaseAngleDeg
 } from "./illumination";
 import { nakedEyeVerdict } from "./nakedEye";
-import { orbitPeriodMinutes, propagateStateAt } from "./propagator";
+import { Instant, instantOf, orbitPeriodMinutes, propagateStateIn } from "./propagator";
 import { standardMagnitudeFor } from "./standardMagnitude";
 import { twoBodyPath } from "./trajectory";
+
+/**
+ * The trail of an object that holds station, which is no trail at all.
+ *
+ * One shared function returning one shared array, rather than an empty pair of
+ * both per parked satellite per frame: the geostationary belt is a good part of
+ * every fix list, and none of it ever moves.
+ */
+const NO_TRAIL: readonly EnuPosition[] = [];
+const noTrail = (): readonly EnuPosition[] => NO_TRAIL;
 
 /** What the tracker remembers about one catalog entry between propagations. */
 type TrackedEntry = {
@@ -120,6 +131,9 @@ export class SkyTracker {
     const gmst = gmstAt(when);
     const frame = createObserverFrame(observer);
     const threshold = this.minimumElevationDeg - SATELLITE_TRACKING.candidateElevationMarginDeg;
+    // One conversion for the whole slice rather than one per entry, which is
+    // several hundred of them a frame for the same number. See `Instant`.
+    const instant = instantOf(when);
 
     for (let done = 0; done < count; done += 1) {
       const tracked = this.tracked[this.cursor];
@@ -129,7 +143,7 @@ export class SkyTracker {
         this.primed = true;
       }
 
-      this.refresh(tracked, whenMs);
+      this.refresh(tracked, instant);
       const candidate =
         tracked.state !== null &&
         elevationDeg(eciToEnuInFrame(tracked.state.position, gmst, frame)) > threshold;
@@ -164,11 +178,14 @@ export class SkyTracker {
     // Where the Earth's shadow lies, once for the whole frame. The sun moves a
     // fortieth of a degree an hour, and this walk is several hundred long.
     const shadow = createShadowFrame(when);
+    // For the stale states this walk re-propagates on demand, below. Converted
+    // here with the rest of the frame's constants. See `Instant`.
+    const instant = instantOf(when);
     const fixes: SatelliteFix[] = [];
 
     for (const tracked of this.tracked) {
       if (!tracked.candidate) continue;
-      const position = this.positionAt(tracked, whenMs);
+      const position = this.positionAt(tracked, instant);
       if (!position) continue;
 
       const enu = eciToEnuInFrame(position, gmst, frame);
@@ -182,11 +199,15 @@ export class SkyTracker {
         subcategory: tracked.entry.subcategory,
         parked: tracked.entry.parked,
         position: enu,
+        // Held as the work rather than as its result: see `SatelliteFix.trail`.
+        // A closure per fix, against nine integrations and eighteen vectors for
+        // the four fixes in five that are never asked.
         trail: tracked.entry.parked
-          ? []
-          : this.trailOf(tracked, whenMs, trailStepSeconds, trailPoints).map((point, index) =>
-              eciToEnuInFrame(point, trailGmst[index], frame)
-            ),
+          ? noTrail
+          : () =>
+              this.trailOf(tracked, whenMs, trailStepSeconds, trailPoints).map((point, index) =>
+                eciToEnuInFrame(point, trailGmst[index], frame)
+              ),
         // Asked in the inertial frame, where the question is about the Earth
         // and the sun rather than about the observer: whether this place is in
         // the dark is a separate matter, and the overlay asks it once for the
@@ -235,8 +256,7 @@ export class SkyTracker {
     const tracked = this.byName().get(name);
     if (!tracked) return null;
 
-    const whenMs = when.getTime();
-    this.refresh(tracked, whenMs);
+    this.refresh(tracked, instantOf(when));
     const state = tracked.state;
     if (!state) return null;
 
@@ -355,13 +375,13 @@ export class SkyTracker {
     return Math.min(this.tracked.length, Math.ceil(capped * this.tracked.length));
   }
 
-  /** Where a tracked object is at `whenMs`, carrying its state forward. */
-  private positionAt(tracked: TrackedEntry, whenMs: number): EciPosition | null {
-    const dtSeconds = (whenMs - tracked.stateAtMs) / 1000;
+  /** Where a tracked object is at `instant`, carrying its state forward. */
+  private positionAt(tracked: TrackedEntry, instant: Instant): EciPosition | null {
+    const dtSeconds = (instant.atMs - tracked.stateAtMs) / 1000;
     // Past the window the linear term no longer stands in for the orbit, and a
     // seek can strand the state arbitrarily far away in either direction.
     if (Math.abs(dtSeconds) > SATELLITE_TRACKING.maxExtrapolationSeconds) {
-      this.refresh(tracked, whenMs);
+      this.refresh(tracked, instant);
       return tracked.state?.position ?? null;
     }
 
@@ -374,8 +394,13 @@ export class SkyTracker {
     };
   }
 
-  private refresh(tracked: TrackedEntry, whenMs: number): void {
-    tracked.state = propagateStateAt(tracked.entry.satrec, new Date(whenMs));
-    tracked.stateAtMs = whenMs;
+  /**
+   * Re-propagates one object to `instant` and stamps it with that same moment,
+   * which is why the stamp comes off the instant rather than from a clock the
+   * caller passes beside it. See `Instant`.
+   */
+  private refresh(tracked: TrackedEntry, instant: Instant): void {
+    tracked.state = propagateStateIn(tracked.entry.satrec, instant);
+    tracked.stateAtMs = instant.atMs;
   }
 }

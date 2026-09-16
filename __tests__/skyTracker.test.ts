@@ -54,7 +54,10 @@ function primedTracker(): SkyTracker {
 
 /** How many SGP4 propagations a piece of work costs. */
 function countPropagations(work: () => void): number {
-  const spy = jest.spyOn(propagator, "propagateStateAt");
+  // `propagateStateIn` rather than `propagateStateAt`: every propagation in the
+  // app goes through it — the date-taking form is a one-line wrapper over it —
+  // so this counts the SGP4 runs themselves rather than one way of asking.
+  const spy = jest.spyOn(propagator, "propagateStateIn");
   try {
     work();
     return spy.mock.calls.length;
@@ -181,8 +184,9 @@ test("lays the trail through where the object really was, each point at its own 
 
   for (const fix of moving) {
     const entry = catalog.entries.find((candidate) => candidate.name === fix.name)!;
-    expect(fix.trail).toHaveLength(trailPoints);
-    fix.trail.forEach((point, index) => {
+    const trail = fix.trail();
+    expect(trail).toHaveLength(trailPoints);
+    trail.forEach((point, index) => {
       const when = new Date(WHEN.getTime() - ((index + 1) * trailSeconds * 1000) / trailPoints);
       const eci = propagator.propagateAt(entry.satrec, when)!;
       const truth = eciToEnuInFrame(eci, gmstAt(when), frame);
@@ -195,7 +199,7 @@ test("gives an object that holds station no trail at all", () => {
   const tracker = primedTracker();
   const parked = tracker.fixesAt(WHEN, observer).filter((fix) => fix.parked);
   expect(parked.length).toBeGreaterThan(0);
-  for (const fix of parked) expect(fix.trail).toEqual([]);
+  for (const fix of parked) expect(fix.trail()).toEqual([]);
 });
 
 test("objects in low orbit draw a trail across a real part of the frame", () => {
@@ -203,7 +207,10 @@ test("objects in low orbit draw a trail across a real part of the frame", () => 
   const moving = tracker.fixesAt(WHEN, observer).filter((fix) => !fix.parked);
   // A degree is twenty pixels; over three quarters of a minute the fastest low passes
   // cover a good part of the sky.
-  const arcs = moving.map((fix) => separationDeg(fix.position, fix.trail[fix.trail.length - 1]));
+  const arcs = moving.map((fix) => {
+    const trail = fix.trail();
+    return separationDeg(fix.position, trail[trail.length - 1]);
+  });
   expect(Math.max(...arcs)).toBeGreaterThan(10);
 });
 

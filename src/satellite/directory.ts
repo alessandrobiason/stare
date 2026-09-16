@@ -12,7 +12,7 @@ import { ObserverLocation } from "../types";
 import { CatalogEntry, SatelliteCatalog } from "./catalog";
 import { SATELLITE_CATEGORIES, SatelliteCategory } from "./categories";
 import { fleetOf } from "./fleets";
-import { propagateAt } from "./propagator";
+import { instantOf, propagateIn } from "./propagator";
 
 /**
  * The catalogue as something to look things up in, rather than as something to
@@ -305,10 +305,14 @@ export async function locateAll(
   const when = new Date(atMs);
   const gmst = gmstAt(when);
   const frame = createObserverFrame(observer);
+  // Every object in this scan is placed at the same instant, so it is converted
+  // once here rather than per entry — which on the largest fleet is ten
+  // thousand conversions of one number. See `Instant`.
+  const instant = instantOf(when);
   const fixes: DirectoryFix[] = [];
 
   for (const entry of entries) {
-    const eci = propagateAt(entry.satrec, when);
+    const eci = propagateIn(entry.satrec, instant);
     if (eci) {
       const enu = eciToEnuInFrame(eci, gmst, frame);
       const elevation = elevationDeg(enu);

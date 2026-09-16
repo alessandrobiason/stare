@@ -1022,8 +1022,15 @@ export function useAnimatedMarkers({
           // Withheld from the object the focused path is drawn for: two lines
           // saying where it has been, one of them a dozen seconds and the other
           // its whole pass, is a mark with two tails rather than emphasis.
+          //
+          // Asked of the fix here rather than carried on it: this line is past
+          // the category filter, the projection and the warming margin, so it
+          // runs for the marks about to be drawn instead of for everything
+          // above the horizon. See `SatelliteFix.trail`.
           const trail =
-            fix.parked || fix.name === focusedPass?.name ? null : projectTrail(fix.trail, axes, lens);
+            fix.parked || fix.name === focusedPass?.name
+              ? null
+              : projectTrail(fix.trail(), axes, lens);
 
           let confidence: number | null = 1;
           let fromMemory = false;

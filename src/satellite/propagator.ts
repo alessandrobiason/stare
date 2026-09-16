@@ -28,6 +28,53 @@ export function isUsableSatrec(satrec: SatRec): boolean {
   return satrec.error === 0 && Number.isFinite(satrec.no) && Number.isFinite(satrec.inclo);
 }
 
+/** Minutes in a day, which is what SGP4 measures its time argument in. */
+const MINUTES_PER_DAY = 1440;
+
+/**
+ * `jday`, which the library exports but does not declare.
+ *
+ * Its own conversion rather than one written here: the Julian date is the
+ * argument SGP4 is calibrated against, and a second implementation of it that
+ * agreed to nine decimal places instead of exactly would be a discrepancy
+ * nobody would find. Present in both the CommonJS and the ES builds; only the
+ * `.d.ts` has forgotten it.
+ */
+const julianDayOf = (satellite as unknown as { jday: (when: Date) => number }).jday;
+
+/**
+ * One instant, in the form SGP4 wants it.
+ *
+ * `satellite.propagate` takes a `Date` and converts it per call: seven
+ * `getUTC*` reads and three arrays of its own, before any orbital arithmetic
+ * happens. A whole catalog is propagated to *one* instant — the rolling sweep
+ * does a slice of sixteen thousand entries every frame — so that conversion was
+ * being redone for every entry to produce the same number each time, along with
+ * a `Date` allocated per entry to feed it.
+ *
+ * Converted once and handed to each propagation instead. It is the same two
+ * lines `satellite.propagate` runs, with the same result to the bit — a whole
+ * catalog agrees exactly — for about a quarter less time on the sweep.
+ *
+ * Carries the epoch milliseconds alongside the Julian date because callers
+ * that propagate also tend to record *when* they did — `SkyTracker` stamps
+ * every state it stores, and carries it forward from that stamp. Kept together
+ * so the two cannot come apart: a stamp a few milliseconds off the propagation
+ * it labels is an error nothing would report and every later frame would build
+ * on.
+ */
+export type Instant = {
+  /** What SGP4 measures its time argument against. */
+  julianDate: number;
+  /** The same moment as epoch milliseconds, for callers keeping a clock. */
+  atMs: number;
+};
+
+/** The instant a run of propagations shares. See `Instant`. */
+export function instantOf(when: Date): Instant {
+  return { julianDate: julianDayOf(when), atMs: when.getTime() };
+}
+
 /**
  * Propagates to `when`, or returns `null` when SGP4 cannot produce a state
  * (decayed object, epoch too far away, malformed elements). Callers routinely
@@ -37,9 +84,21 @@ export function isUsableSatrec(satrec: SatRec): boolean {
  * The velocity comes back with the position because it costs nothing extra —
  * SGP4 computes both — and it is what lets a caller carry the state forward
  * between propagations instead of re-running SGP4 for every frame.
+ *
+ * A caller propagating many records to one instant converts it once and calls
+ * `propagateStateIn` instead; this is that, for a caller with a single object
+ * and a `Date` in hand.
  */
 export function propagateStateAt(satrec: SatRec, when: Date): EciState | null {
-  const { position, velocity } = satellite.propagate(satrec, when);
+  return propagateStateIn(satrec, instantOf(when));
+}
+
+/** `propagateStateAt`, against an instant already converted. See `Instant`. */
+export function propagateStateIn(satrec: SatRec, instant: Instant): EciState | null {
+  const { position, velocity } = satellite.sgp4(
+    satrec,
+    (instant.julianDate - satrec.jdsatepoch) * MINUTES_PER_DAY
+  );
 
   // The published types declare `EciVec3 | boolean`, but SGP4 also returns
   // `undefined` for a decayed object and `{x: null, ...}` for a satrec built
@@ -63,6 +122,11 @@ export function propagateStateAt(satrec: SatRec, when: Date): EciState | null {
 /** Position-only variant, for callers with no use for the velocity. */
 export function propagateAt(satrec: SatRec, when: Date): EciPosition | null {
   return propagateStateAt(satrec, when)?.position ?? null;
+}
+
+/** The same, against an instant already converted. See `Instant`. */
+export function propagateIn(satrec: SatRec, instant: Instant): EciPosition | null {
+  return propagateStateIn(satrec, instant)?.position ?? null;
 }
 
 /** Throwing variant, for call sites that treat a failure as a bug. */

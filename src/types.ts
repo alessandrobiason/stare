@@ -73,12 +73,22 @@ export type SatelliteFix = {
    * `SATELLITE_MARKERS.trailPoints` positions, evenly spaced in time, nearest
    * first. Empty for an object that holds station.
    *
-   * Carried alongside the position because the marker's trail has to show the
-   * *orbit*, and a history of drawn frames would show the hand holding the
-   * phone instead. Positions resolved against one attitude cancel the camera
-   * out and leave the path.
+   * Belongs to the fix because the marker's trail has to show the *orbit*, and
+   * a history of drawn frames would show the hand holding the phone instead.
+   * Positions resolved against one attitude cancel the camera out and leave the
+   * path.
+   *
+   * Asked for rather than handed over, because most fixes never need one. A
+   * trail is nine gravity integrations and nine frame rotations, and it is the
+   * single most expensive thing on the frame path — but it is only ever drawn
+   * for a satellite the camera is pointed near, and from any spot on Earth
+   * most of what is above the horizon is somewhere behind the phone. Computed
+   * for every fix, two thirds of that arithmetic was thrown away on objects
+   * that never reached the frame, along with the objects a filter had already
+   * switched off. The caller runs its own tests first and asks only the marks
+   * it is actually about to draw. See `useAnimatedMarkers`.
    */
-  trail: EnuPosition[];
+  trail: () => readonly EnuPosition[];
   /**
    * Whether the sun is on it, which is whether there is anything to see.
    *
