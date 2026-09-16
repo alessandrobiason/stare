@@ -1,5 +1,5 @@
-import React, { MutableRefObject, useEffect, useState } from "react";
-import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import React, { MutableRefObject, useEffect, useRef, useState } from "react";
+import { PanResponder, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
 import { passDirection, passSeeing, timeUntil } from "../i18n/format";
@@ -85,7 +85,7 @@ export const UpcomingPasses: React.FC<Props> = React.memo(({
       passes={passes}
       nowMs={nowMs}
       expanded={expanded}
-      onToggle={() => setExpanded((open) => !open)}
+      onExpandedChange={setExpanded}
       onSelect={onSelect}
       style={style}
       viewRef={viewRef}
@@ -100,12 +100,19 @@ type PanelProps = {
   /** The clock the countdowns are read against, in epoch milliseconds. */
   nowMs: number;
   expanded: boolean;
-  onToggle: () => void;
+  onExpandedChange: (expanded: boolean) => void;
   onSelect: (name: string) => void;
   style?: StyleProp<ViewStyle>;
   /** Where the tour finds the card on screen. See `useTourTarget`. */
   viewRef?: React.Ref<View>;
 };
+
+/** How far, in points, a drag on the grip has to travel before it counts as
+ *  an open or a close rather than a stray touch. */
+const DRAG_THRESHOLD = 18;
+/** A quick flick counts even if it did not cross `DRAG_THRESHOLD` yet — this
+ *  is the release velocity (points/ms) past which it does. */
+const FLING_VELOCITY = 0.5;
 
 /**
  * The card as it is drawn, with nothing of its own to remember or to tick.
@@ -116,31 +123,56 @@ export const PassesPanel: React.FC<PanelProps> = ({
   passes,
   nowMs,
   expanded,
-  onToggle,
+  onExpandedChange,
   onSelect,
   style,
   viewRef
 }) => {
   const t = strings().scene.passes;
+
+  // `onExpandedChange` is a fresh closure every render; the responder below
+  // is built once, so it reads this ref rather than a stale copy of it.
+  const onExpandedChangeRef = useRef(onExpandedChange);
+  onExpandedChangeRef.current = onExpandedChange;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // Claimed on a vertical move past a few points, so an ordinary tap on
+      // the grip — which is not a button — passes through untouched.
+      onMoveShouldSetPanResponder: (_evt, gesture) =>
+        Math.abs(gesture.dy) > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderRelease: (_evt, gesture) => {
+        if (gesture.dy < -DRAG_THRESHOLD || gesture.vy < -FLING_VELOCITY) {
+          onExpandedChangeRef.current(true);
+        } else if (gesture.dy > DRAG_THRESHOLD || gesture.vy > FLING_VELOCITY) {
+          onExpandedChangeRef.current(false);
+        }
+      }
+    })
+  ).current;
+
   const next = passes[0];
   if (!next) return null;
 
   return (
     <View ref={viewRef} style={[styles.card, style]}>
-      {/* The grip. It is not a drag handle — nothing here is dragged — it is
-          the mark every sheet on this platform wears to say it opens, and it
-          is what makes a tap on the card an obvious thing to try. */}
-      <View style={styles.gripRow}>
+      {/* The grip: dragged up to open the panel and down to shut it again,
+          the way a sheet on this platform is worked. `onAccessibilityTap`
+          keeps a double-tap toggling it for anyone driving the screen
+          reader rather than a finger. */}
+      <View
+        style={styles.gripRow}
+        accessibilityRole="button"
+        accessibilityLabel={t.open}
+        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
+        onAccessibilityTap={() => onExpandedChange(!expanded)}
+        {...panResponder.panHandlers}
+      >
         <View style={styles.grip} />
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t.open}
-        aria-expanded={expanded}
-        style={styles.head}
-        onPress={onToggle}
-      >
+      <View style={styles.head}>
         <View style={styles.badge}>
           <Icon name="sky" size={20} color={theme.color.accent} />
         </View>
@@ -178,7 +210,7 @@ export const PassesPanel: React.FC<PanelProps> = ({
           direction={expanded ? "down" : "up"}
           color={theme.color.textFaint}
         />
-      </Pressable>
+      </View>
 
       {expanded && (
         // A list, and said to be one: what is under the card is several passes
@@ -270,7 +302,7 @@ const styles = StyleSheet.create({
   },
   gripRow: {
     alignItems: "center",
-    paddingTop: 7
+    paddingVertical: 10
   },
   grip: {
     width: 34,
