@@ -8,6 +8,26 @@ import type { Strings } from "../types";
  * there is no marker for that beyond the diff, so do the two together.
  */
 export const en: Strings = {
+  intro: {
+    what: {
+      body: "Point your phone up at the sky and move it slowly — you'll see the satellites above you, exactly where they are."
+    },
+    access: {
+      title: "Two quick permissions",
+      body: "Your phone is about to ask for these.",
+      camera: {
+        name: "Camera",
+        reason: "To show you the sky in front of you."
+      },
+      location: {
+        name: "Location",
+        reason: "To know which satellites are above you."
+      },
+      footnote: "Your location stays on your phone — it's never sent anywhere."
+    },
+    next: "NEXT",
+    allowAccess: "ALLOW ACCESS"
+  },
   tour: {
     open: "Help",
     about: "A quick tour of the screen.",

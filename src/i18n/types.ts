@@ -25,6 +25,12 @@ export type Strings = {
    */
   tour: TourStrings;
   /**
+   * The boot screen's own two pages, shown once on the very first launch
+   * before anything else: what the app does, and the two permissions the
+   * phone is about to ask for. See `IntroScreen`.
+   */
+  intro: IntroStrings;
+  /**
    * The three tabs along the bottom: the sky, the catalog, and everything
    * about the app rather than about the sky.
    *
@@ -392,6 +398,32 @@ export type TourStepStrings = {
   title: string;
   /** One sentence, two at most. */
   body: string;
+};
+
+export type IntroStrings = {
+  /** The first page, under the app's name: what it does, in a sentence or two. */
+  what: {
+    body: string;
+  };
+  /** The second page: the two things the phone is about to ask permission for. */
+  access: {
+    title: string;
+    body: string;
+    camera: IntroAccessStrings;
+    location: IntroAccessStrings;
+    /** A short line under both, on where the location goes. */
+    footnote: string;
+  };
+  /** The button on every page but the last. */
+  next: string;
+  /** The last page's button: accepting it is what lets boot begin. */
+  allowAccess: string;
+};
+
+/** One thing the operating system will ask about, and why the app needs it. */
+export type IntroAccessStrings = {
+  name: string;
+  reason: string;
 };
 
 export type TourKeyStrings = {

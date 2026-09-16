@@ -1,6 +1,26 @@
 import type { Strings } from "../types";
 
 export const it: Strings = {
+  intro: {
+    what: {
+      body: "Punta il telefono verso il cielo e muovilo piano: vedrai i satelliti sopra di te, esattamente dove si trovano."
+    },
+    access: {
+      title: "Due permessi veloci",
+      body: "Il telefono sta per chiedertene due.",
+      camera: {
+        name: "Fotocamera",
+        reason: "Per mostrarti il cielo che hai davanti."
+      },
+      location: {
+        name: "Posizione",
+        reason: "Per sapere quali satelliti hai sopra di te."
+      },
+      footnote: "La tua posizione resta sul telefono: non viene mai inviata altrove."
+    },
+    next: "AVANTI",
+    allowAccess: "CONSENTI"
+  },
   tour: {
     open: "Aiuto",
     about: "Una breve guida allo schermo.",
