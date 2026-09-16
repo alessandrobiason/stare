@@ -31,7 +31,7 @@ const mask: AnchoredSkyMask = {
   attitude: level
 };
 
-const noStats = { updatedAtMs: null, lastPassMs: null, passes: 0, failures: 0 };
+const noStats = { updatedAtMs: null, lastPassMs: null, passes: 0, failures: 0, stages: null };
 
 /** The mask doing its job, which is what every page below assumes. */
 const filtering = { on: true, onToggle: () => undefined };
@@ -107,7 +107,7 @@ describe("the mask page", () => {
       maskSection({
         mask,
         error: null,
-        stats: { updatedAtMs: 4000, lastPassMs: 920, passes: 7, failures: 1 },
+        stats: { updatedAtMs: 4000, lastPassMs: 920, passes: 7, failures: 1, stages: null },
         filtering,
         viewAttitude: { ...level, headingDeg: 12 },
         chaseAtDeg: 6.7,
@@ -595,5 +595,79 @@ describe("the sky model page", () => {
       modelSection({ backend: "ONNX Runtime Web (WASM, proxied worker)", detail: "1 thread", loadMs: 300 }).rows
     );
     expect(rows["Session load"]).toBe("300 ms");
+  });
+});
+
+describe("the mask page's frame readouts", () => {
+  const base = {
+    mask,
+    error: null,
+    filtering,
+    viewAttitude: level,
+    chaseAtDeg: 6.7,
+    nowMs: 5500
+  };
+
+  test("takes the last pass apart by stage", () => {
+    const rows = values(
+      maskSection({
+        ...base,
+        stats: {
+          updatedAtMs: 4000,
+          lastPassMs: 312.4,
+          passes: 3,
+          failures: 0,
+          stages: { frameMs: 41.2, tensorMs: 6.8, inferenceMs: 118.3, poolingMs: 33.9, afterMs: 57.1 }
+        }
+      }).rows
+    );
+    expect(rows.Stages).toBe("frame 41 · tensor 7 · model 118 · pooling 34 · after 57 ms");
+  });
+
+  test("says where frames come from, why stills if stills, and how video compared", () => {
+    const section = maskSection({
+      ...base,
+      stats: noStats,
+      reading: {
+        source: "still photo",
+        lastGrabMs: 612,
+        preferVideo: true,
+        fallbackReason: "Video frames came out turned against a still, so stills are read instead",
+        agreement: "turned against a still (upright -0.40 · turned 0.97 · mirrored 0.10 · flipped 0.05)"
+      },
+      videoFrames: { on: true, onToggle: () => undefined }
+    });
+    const rows = values(section.rows);
+    expect(rows["Frames from"]).toBe("still photo · 612 ms");
+    expect(rows["Why stills"]).toMatch(/turned/);
+    expect(rows["Video vs still"]).toMatch(/^turned against a still/);
+    expect(section.switches?.map((toggle) => toggle.label)).toEqual([
+      "Hide behind terrain",
+      "Read video frames, not stills"
+    ]);
+  });
+
+  test("offers no frame switch for a source without a choice", () => {
+    const section = maskSection({ ...base, stats: noStats });
+    expect(values(section.rows)["Frames from"]).toBeUndefined();
+    expect(section.switches).toHaveLength(1);
+  });
+});
+
+describe("the view page's stall readout", () => {
+  test("shows the worst frame of the last window, which an average hides", () => {
+    const rows = values(
+      viewSection({
+        source: "Phone camera",
+        box: { width: 609, height: 812 },
+        frame: { widthPx: 1080, heightPx: 1440 },
+        fieldOfView: { horizontalDeg: 53.7, verticalDeg: 68 },
+        attitude: { headingDeg: 14.7, pitchDeg: -4, rollDeg: -0.7, rotationRateDegPerSecond: 0 },
+        frameRate: 58,
+        stalls: { worstGapMs: 243.6, stalls: 4, windowMs: 5000 }
+      }).rows
+    );
+    expect(rows["Draw rate"]).toBe("58 fps");
+    expect(rows["Worst frame"]).toBe("244 ms · 4 over 50 ms in 5 s");
   });
 });

@@ -34,6 +34,12 @@ jest.mock("expo-file-system", () => ({
 
 /** Whether Skia's codec takes the hand-off JPEG, which a test can refuse. */
 let mockNativeDecodes = true;
+/** What a decoded still comes back as, which the video-frame tests set. */
+let mockStill: { width: number; height: number; pixels: Uint8Array } = {
+  width: 4,
+  height: 4,
+  pixels: new Uint8Array(4 * 4 * 4)
+};
 /** Native decoder objects made and not yet released. */
 let mockLiveNativeObjects = 0;
 
@@ -52,9 +58,9 @@ jest.mock("../src/components/skia", () => {
           mockOrder.push("decode");
           if (!mockNativeDecodes) return null;
           return made({
-            width: () => 4,
-            height: () => 4,
-            readPixels: () => new Uint8Array(4 * 4 * 4)
+            width: () => mockStill.width,
+            height: () => mockStill.height,
+            readPixels: () => mockStill.pixels
           });
         }
       }
@@ -142,4 +148,154 @@ test("a frame the native codec declines is decoded in JavaScript rather than fai
     mockNativeDecodes = true;
     warn.mockRestore();
   }
+});
+
+describe("frames from the video stream", () => {
+  const VIDEO = { width: 32, height: 44 };
+
+  /** A picture with a layout to it: bright at the top left, dark elsewhere. */
+  function picture(turned = false): Uint8Array {
+    const pixels = new Uint8Array(VIDEO.width * VIDEO.height * 4);
+    for (let y = 0; y < VIDEO.height; y += 1) {
+      for (let x = 0; x < VIDEO.width; x += 1) {
+        const [px, py] = turned ? [VIDEO.width - 1 - x, VIDEO.height - 1 - y] : [x, y];
+        const value = px < VIDEO.width / 3 && py < VIDEO.height / 4 ? 240 : (px * 3 + py * 2) % 40;
+        const at = (y * VIDEO.width + x) * 4;
+        pixels[at] = value;
+        pixels[at + 1] = value;
+        pixels[at + 2] = value;
+        pixels[at + 3] = 255;
+      }
+    }
+    return pixels;
+  }
+
+  /** A camera with a frame tap, and a still path the check can compare against. */
+  function tappedCamera(frame: () => Promise<ArrayBuffer | undefined>) {
+    return {
+      ...slowCamera(),
+      grabFrameAsync: jest.fn(async () => {
+        mockOrder.push("video frame requested");
+        return frame();
+      })
+    };
+  }
+
+  let warn: jest.SpyInstance;
+  beforeEach(() => {
+    mockOrder.length = 0;
+    mockStill = { width: VIDEO.width, height: VIDEO.height, pixels: picture() };
+    warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    mockStill = { width: 4, height: 4, pixels: new Uint8Array(4 * 4 * 4) };
+    warn.mockRestore();
+  });
+
+  test("read the attitude at the request, and take no still once they have been checked", async () => {
+    const camera = tappedCamera(async () => picture().buffer as ArrayBuffer);
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+
+    // The first frame is checked against a still of the same moment…
+    await grabber.grab(VIDEO, () => mockOrder.push("read the attitude"));
+    expect(mockOrder.slice(0, 3)).toEqual(["read the attitude", "video frame requested", "read the attitude"]);
+    expect(mockOrder).toContain("capture requested");
+    expect(grabber.reading?.().agreement).toMatch(/^matches a still/);
+
+    // …and after that a pass is a video frame and nothing else.
+    mockOrder.length = 0;
+    const frame = await grabber.grab(VIDEO, () => mockOrder.push("read the attitude"));
+    expect(mockOrder).toEqual(["read the attitude", "video frame requested"]);
+    expect(frame.pixels).toHaveLength(VIDEO.width * VIDEO.height * 4);
+    expect(grabber.reading?.()).toMatchObject({ source: "video frame", preferVideo: true, fallbackReason: null });
+  });
+
+  test("go back to stills when the video frame is the wrong way up against one", async () => {
+    const camera = tappedCamera(async () => picture(true).buffer as ArrayBuffer);
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+
+    const first = await grabber.grab(VIDEO, () => undefined);
+    // The still, not the turned frame, is what this pass segments.
+    expect(Array.from(first.pixels)).toEqual(Array.from(picture()));
+    expect(grabber.reading?.().fallbackReason).toMatch(/turned/);
+
+    mockOrder.length = 0;
+    await grabber.grab(VIDEO, () => undefined);
+    expect(mockOrder).not.toContain("video frame requested");
+    expect(grabber.reading?.().source).toBe("still photo");
+  });
+
+  test("keep checking a picture with nothing in it, but only a few times", async () => {
+    const flat = new Uint8Array(VIDEO.width * VIDEO.height * 4).fill(128);
+    mockStill = { width: VIDEO.width, height: VIDEO.height, pixels: flat };
+    const camera = tappedCamera(async () => flat.slice().buffer as ArrayBuffer);
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+
+    let stills = 0;
+    for (let pass = 0; pass < 5; pass += 1) {
+      mockOrder.length = 0;
+      await grabber.grab(VIDEO, () => undefined);
+      if (mockOrder.includes("capture requested")) stills += 1;
+    }
+    expect(stills).toBe(3);
+    expect(grabber.reading?.().agreement).toMatch(/inconclusive after 3 of 3/);
+    expect(grabber.reading?.().source).toBe("video frame");
+  });
+
+  test("fall back to stills for good on a build whose camera has no frame tap", async () => {
+    const camera = tappedCamera(async () => undefined);
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+
+    const frame = await grabber.grab(VIDEO, () => undefined);
+    expect(frame.pixels).toHaveLength(VIDEO.width * VIDEO.height * 4);
+    expect(grabber.reading?.().fallbackReason).toBe("This build's camera has no video frame tap");
+
+    await grabber.grab(VIDEO, () => undefined);
+    expect(camera.grabFrameAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test("read a still for each failed video frame, and stop asking after a run of them", async () => {
+    const camera = tappedCamera(async () => {
+      throw new Error("No video frame arrived in time");
+    });
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+
+    for (let pass = 0; pass < 5; pass += 1) {
+      const frame = await grabber.grab(VIDEO, () => undefined);
+      expect(frame.pixels).toHaveLength(VIDEO.width * VIDEO.height * 4);
+    }
+    expect(camera.grabFrameAsync).toHaveBeenCalledTimes(3);
+    expect(grabber.reading?.().fallbackReason).toBe(
+      "3 video frames failed in a row: No video frame arrived in time"
+    );
+  });
+
+  test("refuse a frame of the wrong size rather than segmenting garbage", async () => {
+    const camera = tappedCamera(async () => new ArrayBuffer(12));
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+
+    // One failure is not a run: the pass still gets a still.
+    const frame = await grabber.grab(VIDEO, () => undefined);
+    expect(frame.pixels).toHaveLength(VIDEO.width * VIDEO.height * 4);
+    expect(grabber.reading?.().fallbackReason).toBeNull();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  test("switch to stills from the Console, and back to a fresh start", async () => {
+    const camera = tappedCamera(async () => picture(true).buffer as ArrayBuffer);
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+    await grabber.grab(VIDEO, () => undefined);
+    expect(grabber.reading?.().fallbackReason).not.toBeNull();
+
+    grabber.setPreferVideo?.(false);
+    expect(grabber.reading?.().preferVideo).toBe(false);
+
+    // Switched back on, whatever ruled video frames out is forgotten, and they
+    // are checked against a still again.
+    grabber.setPreferVideo?.(true);
+    expect(grabber.reading?.()).toMatchObject({ preferVideo: true, fallbackReason: null, agreement: null });
+    mockOrder.length = 0;
+    await grabber.grab(VIDEO, () => undefined);
+    expect(mockOrder).toContain("video frame requested");
+  });
 });

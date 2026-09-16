@@ -427,6 +427,7 @@ export const SkyOverlay: React.FC<Props> = ({
     skyMemory,
     markerStatsRef,
     frameRateRef,
+    frameStallsRef,
     latestFrameRef,
     drawnEpochRef,
     reset: resetMarkers,
@@ -512,48 +513,61 @@ export const SkyOverlay: React.FC<Props> = ({
 
   // Rebuilt on every render and read only through the ref, because the panel
   // samples it on its own slow timer rather than drawing from this render.
-  const debugSource: DebugSource = () => [
-    ...(sceneDebugSections?.() ?? []),
-    maskSection({
-      mask: segmentation.mask,
-      error: segmentation.error,
-      stats: segmentation.statsRef.current,
-      filtering: { on: skyMaskFiltering, onToggle: onToggleSkyMaskFiltering },
-      // Where the camera is aimed now, so the panel can say how far the mask
-      // is from it: the one figure that says whether a pass is overdue.
-      viewAttitude: smoothed.filterRef.current.sample(performance.now() / 1000),
-      chaseAtDeg: aimToleranceDeg(frame.lens, SKY_MASK_CHASE_FRACTION),
-      nowMs: performance.now()
-    }),
-    // The model's session came up once at boot, so this is a plain read rather
-    // than something sampled off a ref: it never changes underneath the panel's
-    // own timer the way a per-frame stat does. See `skyModelDiagnostics`.
-    modelSection(skyModelDiagnostics()),
-    celestialSection({
-      stats: celestial.statsRef.current,
-      checking: { on: celestialAlignment, onToggle: onToggleCelestialAlignment },
-      nowSeconds: performance.now() / 1000
-    }),
-    skySection({
-      tracker: tracker.stats(),
-      markers: markerStatsRef.current,
-      // Walks the grid, which is why it is asked for here — on the panel's own
-      // slow timer — rather than kept up to date by the frame loop.
-      memory: skyMemory.stats(performance.now() / 1000),
-      epoch: epochRef.current
-    }),
-    // The cache's timestamps are wall-clock (they outlive the process), unlike
-    // everything else on this page, which is measured against `performance.now()`.
-    catalogSection({ cache: cachedCatalog(), nowMs: Date.now() }),
-    viewSection({
-      source: frame.label,
-      box: frameStyle,
-      frame: frame.sizePx,
-      fieldOfView: frame.fieldOfView,
-      attitude: smoothed.filterRef.current.sample(performance.now() / 1000),
-      frameRate: frameRateRef.current
-    })
-  ];
+  const debugSource: DebugSource = () => {
+    // Asked of the grabber each time the panel samples, like everything else on
+    // these pages: the choice between video frames and stills can change under
+    // it, from a run of failures or from the check against a still.
+    const reading = frame.grabber.reading?.() ?? null;
+    const setPreferVideo = frame.grabber.setPreferVideo;
+    return [
+      ...(sceneDebugSections?.() ?? []),
+      maskSection({
+        mask: segmentation.mask,
+        error: segmentation.error,
+        stats: segmentation.statsRef.current,
+        filtering: { on: skyMaskFiltering, onToggle: onToggleSkyMaskFiltering },
+        // Where the camera is aimed now, so the panel can say how far the mask
+        // is from it: the one figure that says whether a pass is overdue.
+        viewAttitude: smoothed.filterRef.current.sample(performance.now() / 1000),
+        chaseAtDeg: aimToleranceDeg(frame.lens, SKY_MASK_CHASE_FRACTION),
+        nowMs: performance.now(),
+        reading,
+        videoFrames:
+          reading && setPreferVideo
+            ? { on: reading.preferVideo, onToggle: () => setPreferVideo(!reading.preferVideo) }
+            : null
+      }),
+      // The model's session came up once at boot, so this is a plain read rather
+      // than something sampled off a ref: it never changes underneath the panel's
+      // own timer the way a per-frame stat does. See `skyModelDiagnostics`.
+      modelSection(skyModelDiagnostics()),
+      celestialSection({
+        stats: celestial.statsRef.current,
+        checking: { on: celestialAlignment, onToggle: onToggleCelestialAlignment },
+        nowSeconds: performance.now() / 1000
+      }),
+      skySection({
+        tracker: tracker.stats(),
+        markers: markerStatsRef.current,
+        // Walks the grid, which is why it is asked for here — on the panel's own
+        // slow timer — rather than kept up to date by the frame loop.
+        memory: skyMemory.stats(performance.now() / 1000),
+        epoch: epochRef.current
+      }),
+      // The cache's timestamps are wall-clock (they outlive the process), unlike
+      // everything else on this page, which is measured against `performance.now()`.
+      catalogSection({ cache: cachedCatalog(), nowMs: Date.now() }),
+      viewSection({
+        source: frame.label,
+        box: frameStyle,
+        frame: frame.sizePx,
+        fieldOfView: frame.fieldOfView,
+        attitude: smoothed.filterRef.current.sample(performance.now() / 1000),
+        frameRate: frameRateRef.current,
+        stalls: frameStallsRef.current
+      })
+    ];
+  };
   const debugSourceRef = useLatestRef(debugSource);
 
   const maskStatus = describeMask(segmentation.mask, segmentation.error);

@@ -17,7 +17,6 @@ import { CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
 import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
-import { MarkerStats } from "../hooks/useAnimatedMarkers";
 import { SkySegmentationStats } from "../hooks/useSkySegmentation";
 import { wrapDegrees360 } from "../math/angles";
 import { skyDarknessAt } from "../satellite/nakedEye";
@@ -27,6 +26,8 @@ import { AnchoredSkyMask, maskOffsetDeg } from "../vision/anchoredMask";
 import { refinedCellCount, skyCoverage } from "../vision/skyMask";
 import { SkyMemoryStats } from "../vision/skyMemory";
 import { SkyModelDiagnostics } from "../vision/skyModelTypes";
+import { FrameReading } from "../vision/skySegmenter";
+import { FrameStalls, MarkerStats, STALL_THRESHOLD_MS } from "../hooks/useAnimatedMarkers";
 import { bytes, clockTime, degrees, duration, fixed, NONE, position, vector } from "./format";
 
 /**
@@ -156,6 +157,17 @@ export type MaskDebugInput = {
   chaseAtDeg: number;
   /** `performance.now()` when the panel sampled, for the mask's age. */
   nowMs: number;
+  /**
+   * How the frame source is reading frames, when it has a choice to report —
+   * the phone's, between video frames and stills. See `FrameReading`.
+   */
+  reading?: FrameReading | null;
+  /**
+   * The switch between those two, where there is one. Off, every pass takes a
+   * still, which is how the stutter a still costs is told apart from anything
+   * else a pass does.
+   */
+  videoFrames?: { on: boolean; onToggle: () => void } | null;
 };
 
 /** What the sky segmentation is doing, and how fresh its answer is. */
@@ -166,7 +178,9 @@ export function maskSection({
   filtering,
   viewAttitude,
   chaseAtDeg,
-  nowMs
+  nowMs,
+  reading = null,
+  videoFrames = null
 }: MaskDebugInput): DebugSection {
   const mask = anchored?.mask ?? null;
   const rows: DebugRow[] = [
@@ -212,6 +226,36 @@ export function maskSection({
     label: "Last pass",
     value: stats.lastPassMs === null ? NONE : `${Math.round(stats.lastPassMs)} ms`
   });
+  // The pass taken apart, which is what says what a slow one is slow at: a
+  // `frame` in the hundreds is stills being taken, an `inference` in the
+  // hundreds is the model off the Neural Engine, and `after` is the work on the
+  // pixels once the mask is out — the horizon prior, the blend, and the
+  // backdrop and the sun-and-moon scan. Wall clock, so the stages that hand the
+  // thread back in slices read as long as they take rather than as their work.
+  if (stats.stages) {
+    const { frameMs, tensorMs, inferenceMs, poolingMs, afterMs } = stats.stages;
+    rows.push({
+      label: "Stages",
+      value: `frame ${Math.round(frameMs)} · tensor ${Math.round(tensorMs)} · model ${Math.round(
+        inferenceMs
+      )} · pooling ${Math.round(poolingMs)} · after ${Math.round(afterMs)} ms`,
+      wrap: true
+    });
+  }
+  if (reading) {
+    rows.push({
+      label: "Frames from",
+      value: reading.source
+        ? `${reading.source}${reading.lastGrabMs === null ? "" : ` · ${Math.round(reading.lastGrabMs)} ms`}`
+        : NONE
+    });
+    if (reading.fallbackReason) {
+      rows.push({ label: "Why stills", value: reading.fallbackReason, wrap: true });
+    }
+    if (reading.agreement) {
+      rows.push({ label: "Video vs still", value: reading.agreement, wrap: true });
+    }
+  }
   rows.push({ label: "Passes", value: `${stats.passes} ok · ${stats.failures} failed` });
   // A range rather than a figure: the gap is what a still camera waits, and the
   // floor is what a camera being turned off the mask's aim gets instead.
@@ -226,7 +270,10 @@ export function maskSection({
     title: "MASK",
     rows,
     switches: [
-      { label: "Hide behind terrain", on: filtering.on, onToggle: filtering.onToggle }
+      { label: "Hide behind terrain", on: filtering.on, onToggle: filtering.onToggle },
+      ...(videoFrames
+        ? [{ label: "Read video frames, not stills", on: videoFrames.on, onToggle: videoFrames.onToggle }]
+        : [])
     ]
   };
 }
@@ -244,7 +291,7 @@ export function maskSection({
  */
 export function modelSection(diagnostics: SkyModelDiagnostics | null): DebugSection {
   if (!diagnostics) {
-    return { id: "model", title: "SKY MODEL", rows: [{ label: "State", value: "Loading…" }] };
+    return { id: "model", title: "MODEL", rows: [{ label: "State", value: "Loading…" }] };
   }
 
   const rows: DebugRow[] = [
@@ -267,7 +314,7 @@ export function modelSection(diagnostics: SkyModelDiagnostics | null): DebugSect
     rows.push({ label: "Prepared size", value: bytes(preparedBytes) });
   }
 
-  return { id: "model", title: "SKY MODEL", rows };
+  return { id: "model", title: "MODEL", rows };
 }
 
 export type CelestialDebugInput = {
@@ -490,6 +537,8 @@ export type ViewDebugInput = {
     rotationRateDegPerSecond: number;
   };
   frameRate: number;
+  /** The worst of the recent frames, which an average hides. See `FrameStalls`. */
+  stalls?: FrameStalls | null;
 };
 
 /** What the markers were projected against: the frame, the lens and the aim. */
@@ -499,7 +548,8 @@ export function viewSection({
   frame,
   fieldOfView,
   attitude,
-  frameRate
+  frameRate,
+  stalls = null
 }: ViewDebugInput): DebugSection {
   return {
     id: "view",
@@ -519,7 +569,17 @@ export function viewSection({
       { label: "Pitch", value: degrees(attitude.pitchDeg) },
       { label: "Roll", value: degrees(attitude.rollDeg) },
       { label: "Turning", value: `${fixed(attitude.rotationRateDegPerSecond, 1)} °/s` },
-      { label: "Draw rate", value: `${frameRate.toFixed(0)} fps` }
+      { label: "Draw rate", value: `${frameRate.toFixed(0)} fps` },
+      ...(stalls
+        ? [
+            {
+              label: "Worst frame",
+              value: `${Math.round(stalls.worstGapMs)} ms · ${stalls.stalls} over ${STALL_THRESHOLD_MS} ms in ${Math.round(
+                stalls.windowMs / 1000
+              )} s`
+            }
+          ]
+        : [])
     ]
   };
 }

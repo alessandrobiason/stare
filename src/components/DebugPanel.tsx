@@ -98,20 +98,34 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose, sty
   return (
     <View style={[styles.sheet, { maxHeight }, style]}>
       <View style={styles.tabs}>
-        {sections.map((section) => {
-          const on = section.id === active?.id;
-          return (
-            <Pressable
-              key={section.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: on }}
-              style={[styles.tab, on && styles.tabOn]}
-              onPress={() => setSelected(section.id)}
-            >
-              <Text style={[styles.tabLabel, on && styles.tabLabelOn]}>{section.title}</Text>
-            </Pressable>
-          );
-        })}
+        {/* Scrolled rather than squeezed. Shared equally across the width, the
+            tabs were an eighth of a phone each once the pages reached eight, and
+            a title wider than that broke across three lines. Each tab is as wide
+            as its title now, spread to fill the bar while they fit and scrolled
+            once they do not. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabScroll}
+          contentContainerStyle={styles.tabStrip}
+        >
+          {sections.map((section) => {
+            const on = section.id === active?.id;
+            return (
+              <Pressable
+                key={section.id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={[styles.tab, on && styles.tabOn]}
+                onPress={() => setSelected(section.id)}
+              >
+                <Text numberOfLines={1} style={[styles.tabLabel, on && styles.tabLabelOn]}>
+                  {section.title}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Leave console"
@@ -170,13 +184,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.color.divider
   },
+  tabScroll: {
+    flex: 1
+  },
+  tabStrip: {
+    flexGrow: 1
+  },
   tab: {
-    flex: 1,
+    flexGrow: 1,
     // A thumb-sized target: the whole point is that this works on a phone.
     minHeight: 38,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4
+    paddingHorizontal: 10
   },
   tabOn: {
     backgroundColor: theme.color.controlActive

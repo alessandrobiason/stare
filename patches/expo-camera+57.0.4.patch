@@ -1,3 +1,72 @@
+diff --git a/node_modules/expo-camera/build/Camera.types.d.ts b/node_modules/expo-camera/build/Camera.types.d.ts
+index 0ee50ec..a7de354 100644
+--- a/node_modules/expo-camera/build/Camera.types.d.ts
++++ b/node_modules/expo-camera/build/Camera.types.d.ts
+@@ -471,6 +471,7 @@ export interface CameraViewRef {
+     readonly launchModernScanner: () => Promise<void>;
+     readonly resumePreview: () => Promise<void>;
+     readonly pausePreview: () => Promise<void>;
++    readonly grabFrame?: (width: number, height: number) => Promise<ArrayBuffer>;
+ }
+ /**
+  * @hidden
+diff --git a/node_modules/expo-camera/build/CameraView.d.ts b/node_modules/expo-camera/build/CameraView.d.ts
+index da858fa..35ac204 100644
+--- a/node_modules/expo-camera/build/CameraView.d.ts
++++ b/node_modules/expo-camera/build/CameraView.d.ts
+@@ -48,6 +48,15 @@ export default class CameraView extends Component<CameraViewProps> {
+      * Pauses the camera preview. It is not recommended to use `takePictureAsync` when preview is paused.
+      */
+     pausePreview(): Promise<void>;
++    /**
++     * The frame the preview is showing, cropped to the preview's shape and scaled
++     * to `width` x `height`, as RGBA bytes row by row. iOS only: resolves
++     * `undefined` where the native view has no such function.
++     *
++     * For reading the camera rather than photographing with it: no still is
++     * taken, nothing is encoded and nothing is written to disk.
++     */
++    grabFrameAsync(width: number, height: number): Promise<ArrayBuffer | undefined>;
+     static ConversionTables: {
+         [prop: string]: unknown;
+         type: Record<keyof import("./Camera.types").CameraType, import("./Camera.types").CameraNativeProps["facing"]>;
+diff --git a/node_modules/expo-camera/build/CameraView.js b/node_modules/expo-camera/build/CameraView.js
+index 78f8198..c52727e 100644
+--- a/node_modules/expo-camera/build/CameraView.js
++++ b/node_modules/expo-camera/build/CameraView.js
+@@ -107,6 +107,17 @@ export default class CameraView extends Component {
+     async pausePreview() {
+         return this._cameraRef.current?.pausePreview();
+     }
++    /**
++     * The frame the preview is showing, cropped to the preview's shape and scaled
++     * to `width` x `height`, as RGBA bytes row by row. iOS only: resolves
++     * `undefined` where the native view has no such function.
++     *
++     * For reading the camera rather than photographing with it: no still is
++     * taken, nothing is encoded and nothing is written to disk.
++     */
++    async grabFrameAsync(width, height) {
++        return this._cameraRef.current?.grabFrame?.(width, height);
++    }
+     // Values under keys from this object will be transformed to native options
+     static ConversionTables = ConversionTables;
+     static defaultProps = {
+diff --git a/node_modules/expo-camera/ios/CameraViewModule.swift b/node_modules/expo-camera/ios/CameraViewModule.swift
+index cccd73f..ff207d8 100644
+--- a/node_modules/expo-camera/ios/CameraViewModule.swift
++++ b/node_modules/expo-camera/ios/CameraViewModule.swift
+@@ -267,6 +267,10 @@ public final class CameraViewModule: Module, ScannerResultHandler {
+         return try await view.takePictureRef(options: options)
+       }
+ 
++      AsyncFunction("grabFrame") { (view, width: Int, height: Int) -> NativeArrayBuffer in
++        return try await view.grabFrame(width: width, height: height)
++      }
++
+       AsyncFunction("takePicture") { (view, options: TakePictureOptions, promise: Promise) in
+         #if targetEnvironment(simulator)
+         if AVCaptureDevice.default(for: .video) == nil {
 diff --git a/node_modules/expo-camera/ios/Common/CameraExceptions.swift b/node_modules/expo-camera/ios/Common/CameraExceptions.swift
 index 424294b..d3873be 100644
 --- a/node_modules/expo-camera/ios/Common/CameraExceptions.swift
@@ -15,6 +84,300 @@ index 424294b..d3873be 100644
  internal final class CameraSavingImageException: GenericException<String> {
    override var reason: String {
      "Failed to save image: \(param)"
+diff --git a/node_modules/expo-camera/ios/Current/CameraFrameTap.swift b/node_modules/expo-camera/ios/Current/CameraFrameTap.swift
+new file mode 100644
+index 0000000..f27c287
+--- /dev/null
++++ b/node_modules/expo-camera/ios/Current/CameraFrameTap.swift
+@@ -0,0 +1,288 @@
++import Accelerate
++@preconcurrency import AVFoundation
++import CoreVideo
++import ExpoModulesCore
++
++internal final class CameraFrameTapUnavailableException: Exception {
++  override var reason: String {
++    "The capture session cannot deliver video frames"
++  }
++}
++
++internal final class CameraFrameTapTimeoutException: Exception {
++  override var reason: String {
++    "No video frame arrived in time"
++  }
++}
++
++internal final class CameraFrameTapBusyException: Exception {
++  override var reason: String {
++    "A video frame is already being taken"
++  }
++}
++
++internal final class CameraFrameTapFrameException: GenericException<String> {
++  override var reason: String {
++    "The video frame could not be read: \(param)"
++  }
++}
++
++/// A copy of the frame the preview is showing, at a small size, for code that
++/// reads the camera rather than photographs with it.
++///
++/// `takePictureAsync` is the wrong tool for that. Every call is a full-resolution
++/// still through the photo pipeline — multi-frame fusion on the ISP, the GPU and
++/// the Neural Engine — then a HEIC decode, a crop and a full-resolution JPEG
++/// encode and decode in this library, all to be resampled to a few hundred
++/// pixels a side by the caller. Once a second that is enough to hitch the
++/// preview itself, and it competes with anything else on the Neural Engine.
++///
++/// The preview is already producing frames. This adds a video data output to
++/// the same session, leaves its connection disabled so nothing is delivered
++/// while no one is asking, and enables it for one frame per request: the frame
++/// is cropped to the preview's shape, scaled, turned upright the way the preview
++/// is, and handed back as RGBA. No still, no encode, no file, and a frame at
++/// most one or two video frames after the request.
++///
++/// `@unchecked Sendable` because every piece of mutable state is confined to a
++/// queue: `output` to the session queue, the pending request to `queue`.
++final class CameraFrameTap: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
++  /// What a request asks for.
++  struct Target {
++    let width: Int
++    let height: Int
++    /// Clockwise degrees the preview's own connection turns its frames by.
++    let rotationAngle: Int
++    /// The preview's width over its height, as it is shown.
++    let aspect: CGFloat
++  }
++
++  private struct Pending {
++    let id: Int
++    let target: Target
++    let continuation: CheckedContinuation<NativeArrayBuffer, Error>
++  }
++
++  private let session: AVCaptureSession
++  private let sessionQueue: DispatchQueue
++  /// Where frames arrive, and the only place `pending` and `nextID` are touched.
++  private let queue = DispatchQueue(label: "expo.camera.frameTap", qos: .userInitiated)
++  /// Touched on the session queue only.
++  private var output: AVCaptureVideoDataOutput?
++  private var pending: Pending?
++  private var nextID = 0
++
++  init(session: AVCaptureSession, sessionQueue: DispatchQueue) {
++    self.session = session
++    self.sessionQueue = sessionQueue
++    super.init()
++  }
++
++  func grab(target: Target, timeout: TimeInterval) async throws -> NativeArrayBuffer {
++    return try await withCheckedThrowingContinuation { continuation in
++      queue.async {
++        guard self.pending == nil else {
++          continuation.resume(throwing: CameraFrameTapBusyException())
++          return
++        }
++        self.nextID += 1
++        let id = self.nextID
++        self.pending = Pending(id: id, target: target, continuation: continuation)
++
++        self.sessionQueue.async {
++          guard let output = self.attachedOutput() else {
++            self.queue.async {
++              self.finish(id, with: .failure(CameraFrameTapUnavailableException()))
++            }
++            return
++          }
++          output.connection(with: .video)?.isEnabled = true
++        }
++        self.queue.asyncAfter(deadline: .now() + timeout) {
++          self.finish(id, with: .failure(CameraFrameTapTimeoutException()))
++        }
++      }
++    }
++  }
++
++  /// The output, added to the session the first time it is needed and again if
++  /// the session has been taken apart since. Must be called on the session queue.
++  private func attachedOutput() -> AVCaptureVideoDataOutput? {
++    if let output, session.outputs.contains(output) {
++      return output
++    }
++    let output = AVCaptureVideoDataOutput()
++    // BGRA as the barcode scanner in this library asks for it, so the colour
++    // conversion is the capture pipeline's own. The connection is off except
++    // while a frame is wanted, so it converts nothing the rest of the time.
++    output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
++    output.alwaysDiscardsLateVideoFrames = true
++    output.setSampleBufferDelegate(self, queue: queue)
++
++    session.beginConfiguration()
++    defer { session.commitConfiguration() }
++    guard session.canAddOutput(output) else {
++      return nil
++    }
++    session.addOutput(output)
++    output.connection(with: .video)?.isEnabled = false
++    self.output = output
++    return output
++  }
++
++  /// Resolves request `id` if it is still the one waiting, and turns delivery off.
++  private func finish(_ id: Int, with result: Result<NativeArrayBuffer, Error>) {
++    guard let pending, pending.id == id else {
++      return
++    }
++    self.pending = nil
++    disableDelivery()
++    pending.continuation.resume(with: result)
++  }
++
++  /// Called on `queue`. A request made after this enqueues its own enable from
++  /// the same serial queue, so it lands on the session queue after this disable
++  /// and never before it.
++  private func disableDelivery() {
++    sessionQueue.async {
++      self.output?.connection(with: .video)?.isEnabled = false
++    }
++  }
++
++  func captureOutput(
++    _ output: AVCaptureOutput,
++    didOutput sampleBuffer: CMSampleBuffer,
++    from connection: AVCaptureConnection
++  ) {
++    guard let pending else {
++      return
++    }
++    guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
++      return
++    }
++    do {
++      let pixels = try Self.render(
++        pixelBuffer,
++        bufferAngle: Self.rotationAngle(of: connection),
++        target: pending.target
++      )
++      finish(pending.id, with: .success(pixels))
++    } catch {
++      finish(pending.id, with: .failure(error))
++    }
++  }
++
++  /// A connection's rotation, as clockwise degrees: 0 is the sensor's own
++  /// landscape, 90 is portrait on the back camera.
++  static func rotationAngle(of connection: AVCaptureConnection) -> Int {
++    if #available(iOS 17.0, *) {
++      return (Int(connection.videoRotationAngle.rounded()) % 360 + 360) % 360
++    }
++    switch connection.videoOrientation {
++    case .portrait:
++      return 90
++    case .landscapeLeft:
++      return 180
++    case .portraitUpsideDown:
++      return 270
++    default:
++      return 0
++    }
++  }
++
++  /// The largest centred crop of the preview's shape, scaled to the target and
++  /// turned the rest of the way to the preview's rotation, as RGBA.
++  private static func render(_ pixelBuffer: CVPixelBuffer, bufferAngle: Int, target: Target) throws -> NativeArrayBuffer {
++    guard CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_32BGRA else {
++      throw CameraFrameTapFrameException("pixel format \(CVPixelBufferGetPixelFormatType(pixelBuffer))")
++    }
++    guard target.width > 0, target.height > 0, target.aspect > 0 else {
++      throw CameraFrameTapFrameException("target \(target.width)x\(target.height)")
++    }
++
++    CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
++    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
++    guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else {
++      throw CameraFrameTapFrameException("no base address")
++    }
++    let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
++    let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
++    let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
++
++    // How much further the buffer has to turn to face the way the preview does,
++    // and so which way round the preview's shape lies across the unturned buffer.
++    let turn = ((target.rotationAngle - bufferAngle) % 360 + 360) % 360
++    let sideways = turn == 90 || turn == 270
++    let scaledWidth = sideways ? target.height : target.width
++    let scaledHeight = sideways ? target.width : target.height
++    let aspect = sideways ? 1 / target.aspect : target.aspect
++
++    // What an aspect-fill preview shows of the buffer.
++    var cropWidth = bufferWidth
++    var cropHeight = Int((CGFloat(bufferWidth) / aspect).rounded())
++    if cropHeight > bufferHeight {
++      cropHeight = bufferHeight
++      cropWidth = min(bufferWidth, Int((CGFloat(bufferHeight) * aspect).rounded()))
++    }
++    let cropX = (bufferWidth - cropWidth) / 2
++    let cropY = (bufferHeight - cropHeight) / 2
++
++    var source = vImage_Buffer(
++      data: base.advanced(by: cropY * bytesPerRow + cropX * 4),
++      height: vImagePixelCount(cropHeight),
++      width: vImagePixelCount(cropWidth),
++      rowBytes: bytesPerRow
++    )
++
++    var result = Data(count: target.width * target.height * 4)
++    try result.withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
++      guard let out = bytes.baseAddress else {
++        throw CameraFrameTapFrameException("no output buffer")
++      }
++      var destination = vImage_Buffer(
++        data: out,
++        height: vImagePixelCount(target.height),
++        width: vImagePixelCount(target.width),
++        rowBytes: target.width * 4
++      )
++
++      if turn == 0 {
++        try check(vImageScale_ARGB8888(&source, &destination, nil, vImage_Flags(kvImageNoFlags)), "scale")
++      } else {
++        let scaled = UnsafeMutableRawPointer.allocate(
++          byteCount: scaledWidth * scaledHeight * 4,
++          alignment: MemoryLayout<UInt8>.alignment
++        )
++        defer { scaled.deallocate() }
++        var intermediate = vImage_Buffer(
++          data: scaled,
++          height: vImagePixelCount(scaledHeight),
++          width: vImagePixelCount(scaledWidth),
++          rowBytes: scaledWidth * 4
++        )
++        try check(vImageScale_ARGB8888(&source, &intermediate, nil, vImage_Flags(kvImageNoFlags)), "scale")
++        var background: [UInt8] = [0, 0, 0, 255]
++        // vImage counts quarter turns anticlockwise: 1 is a quarter turn
++        // anticlockwise, 3 a quarter turn clockwise.
++        let quarterTurns: UInt8 = turn == 90 ? 3 : turn == 180 ? 2 : 1
++        try check(
++          vImageRotate90_ARGB8888(&intermediate, &destination, quarterTurns, &background, vImage_Flags(kvImageNoFlags)),
++          "rotate"
++        )
++      }
++
++      // BGRA to RGBA, which is what the reader takes.
++      let order: [UInt8] = [2, 1, 0, 3]
++      try withUnsafePointer(to: &destination) { buffer in
++        try check(vImagePermuteChannels_ARGB8888(buffer, buffer, order, vImage_Flags(kvImageNoFlags)), "permute")
++      }
++    }
++    return NativeArrayBuffer.wrap(dataWithoutCopy: result)
++  }
++
++  private static func check(_ error: vImage_Error, _ step: String) throws {
++    if error != kvImageNoError {
++      throw CameraFrameTapFrameException("\(step) failed with vImage error \(error)")
++    }
++  }
++}
 diff --git a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
 index fc9a9bb..770649d 100644
 --- a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
@@ -510,10 +873,20 @@ index 7a6568c..ff2b9ca 100644
      delegate.barcodeScanner?.maybeStartBarcodeScanning()
      enableTorch()
 diff --git a/node_modules/expo-camera/ios/Current/CameraView.swift b/node_modules/expo-camera/ios/Current/CameraView.swift
-index 4692d00..a9a7869 100644
+index 4692d00..9023f4a 100644
 --- a/node_modules/expo-camera/ios/Current/CameraView.swift
 +++ b/node_modules/expo-camera/ios/Current/CameraView.swift
-@@ -39,6 +39,10 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+@@ -17,6 +17,9 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+   internal var permissionsManager: EXPermissionsInterface?
+ 
+   internal var barcodeScanner: BarcodeScanner?
++  /// Made on first use, which is the first `grabFrame`: a view nobody reads
++  /// frames from never has a video data output added to its session.
++  private lazy var frameTap = CameraFrameTap(session: session, sessionQueue: sessionQueue)
+ 
+   public override class var layerClass: AnyClass {
+     AVCaptureVideoPreviewLayer.self
+@@ -39,6 +42,10 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
      return mm
    }()
    private var isSessionPaused = false
@@ -524,7 +897,7 @@ index 4692d00..a9a7869 100644
  
    // MARK: Property Observers
  
-@@ -195,33 +199,75 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+@@ -195,33 +202,75 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
        return
      }
      didStartSession = true
@@ -608,7 +981,32 @@ index 4692d00..a9a7869 100644
      sessionQueue.async { [weak self] in
        guard let self else {
          return
-@@ -344,6 +390,8 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+@@ -293,6 +342,24 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
+     return try await photoCapture.takePictureRef(options: options, photoOutput: photoOutput)
+   }
+ 
++  /// The frame the preview is showing, cropped to the preview's shape and scaled
++  /// to `width` x `height`, as RGBA. See `CameraFrameTap`.
++  ///
++  /// The preview's size and rotation are read here, on the main actor where view
++  /// functions run, because they are the preview layer's and the frame is to be
++  /// a copy of what that layer shows.
++  func grabFrame(width: Int, height: Int) async throws -> NativeArrayBuffer {
++    let bounds = previewLayer.bounds.size
++    let aspect = bounds.width > 0 && bounds.height > 0
++      ? bounds.width / bounds.height
++      : CGFloat(width) / CGFloat(max(height, 1))
++    let rotationAngle = previewLayer.connection.map { CameraFrameTap.rotationAngle(of: $0) } ?? 90
++    return try await frameTap.grab(
++      target: CameraFrameTap.Target(width: width, height: height, rotationAngle: rotationAngle, aspect: aspect),
++      timeout: 1.0
++    )
++  }
++
+   func takePicturePromise(options: TakePictureOptions) async throws -> [String: Any] {
+     guard let photoOutput = sessionManager.currentPhotoOutput else {
+       throw CameraOutputNotReadyException()
+@@ -344,6 +411,8 @@ public class CameraView: ExpoView, EXAppLifecycleListener, EXCameraInterface, Ca
      NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
      previewRotationObservation?.invalidate()
      previewRotationObservation = nil
@@ -616,4 +1014,39 @@ index 4692d00..a9a7869 100644
 +    readinessObservation = nil
      rotationCoordinator = nil
    }
+ 
+diff --git a/node_modules/expo-camera/src/Camera.types.ts b/node_modules/expo-camera/src/Camera.types.ts
+index 7cf0a07..8c48e63 100644
+--- a/node_modules/expo-camera/src/Camera.types.ts
++++ b/node_modules/expo-camera/src/Camera.types.ts
+@@ -505,6 +505,7 @@ export interface CameraViewRef {
+   readonly launchModernScanner: () => Promise<void>;
+   readonly resumePreview: () => Promise<void>;
+   readonly pausePreview: () => Promise<void>;
++  readonly grabFrame?: (width: number, height: number) => Promise<ArrayBuffer>;
+ }
+ 
+ /**
+diff --git a/node_modules/expo-camera/src/CameraView.tsx b/node_modules/expo-camera/src/CameraView.tsx
+index b2cc359..5ec1f5a 100644
+--- a/node_modules/expo-camera/src/CameraView.tsx
++++ b/node_modules/expo-camera/src/CameraView.tsx
+@@ -153,6 +153,18 @@ export default class CameraView extends Component<CameraViewProps> {
+     return this._cameraRef.current?.pausePreview();
+   }
+ 
++  /**
++   * The frame the preview is showing, cropped to the preview's shape and scaled
++   * to `width` x `height`, as RGBA bytes row by row. iOS only: resolves
++   * `undefined` where the native view has no such function.
++   *
++   * For reading the camera rather than photographing with it: no still is
++   * taken, nothing is encoded and nothing is written to disk.
++   */
++  async grabFrameAsync(width: number, height: number): Promise<ArrayBuffer | undefined> {
++    return this._cameraRef.current?.grabFrame?.(width, height);
++  }
++
+   // Values under keys from this object will be transformed to native options
+   static ConversionTables = ConversionTables;
  

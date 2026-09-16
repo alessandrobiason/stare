@@ -59,6 +59,27 @@ export type SkyFrameGrabber = {
   size(): Size | null;
   /** The frame resampled to exactly `size`, taken at `onShutter`. */
   grab(size: Size, onShutter: ShutterCallback): Promise<FramePixels>;
+  /**
+   * How frames are being read, for the Console. Optional: only a source with a
+   * choice to report — the phone's, between video frames and stills — has one.
+   */
+  reading?(): FrameReading;
+  /** Switches that choice from the Console. See `FrameReading.preferVideo`. */
+  setPreferVideo?(on: boolean): void;
+};
+
+/** What a frame source can say about how it is reading frames. See `cameraFrameGrabber`. */
+export type FrameReading = {
+  /** Where the last frame came from: "video frame" or "still photo". `null` before the first. */
+  source: string | null;
+  /** How long the last frame took, from asking for it to having its pixels. */
+  lastGrabMs: number | null;
+  /** Whether video frames are wanted — the Console's switch. */
+  preferVideo: boolean;
+  /** Why stills are being read although video frames are wanted, when they are. */
+  fallbackReason: string | null;
+  /** How the video frames compared with a still, once they have been. See `frameAgreement`. */
+  agreement: string | null;
 };
 
 let modelPromise: Promise<SkyModel> | null = null;
@@ -118,6 +139,28 @@ export type SegmentedFrame = {
   pixels: FramePixels;
   /** And the size they are at, which is the model's input rather than the frame's. */
   size: Size;
+  /** Where the pass spent its time, for the Console. See `PassTimings`. */
+  timings: PassTimings;
+};
+
+/**
+ * One pass, stage by stage, in milliseconds of wall-clock time.
+ *
+ * Wall clock rather than work, because the question these answer is where a
+ * pass *waits*: the stages that hand the thread back in slices take longer than
+ * their arithmetic, and the native stages are mostly waiting on another
+ * processor. A pass whose `inference` is in the hundreds is not on the Neural
+ * Engine; one whose `frame` is in the hundreds is taking stills.
+ */
+export type PassTimings = {
+  /** Asking for a frame to having its pixels. */
+  frameMs: number;
+  /** Normalising those pixels into the model's input. */
+  tensorMs: number;
+  /** The model itself. */
+  inferenceMs: number;
+  /** Pooling its output into the mask grid. */
+  poolingMs: number;
 };
 
 /**
@@ -136,15 +179,20 @@ export async function segmentSky(
 
   const model = await loadModel();
   const input = modelInputSize(frame);
+  const frameStartedAt = performance.now();
   const captured = await grabber.grab(input, onShutter);
+  const frameMs = performance.now() - frameStartedAt;
   // The capture comes back decoded, and on the phone the decode has just held
   // the thread (`cameraFrameGrabber`). A frame goes through before the tensor
   // is built rather than the two running as one stretch, and the tensor itself
   // is built a slice at a time.
   const tensorSlices = startSlicing();
   await tensorSlices.handOver();
+  const tensorStartedAt = performance.now();
   const tensor = await toModelTensorSliced(captured.pixels, input, captured.channels, tensorSlices);
+  const inferenceStartedAt = performance.now();
   const logits = await model.run(tensor, input);
+  const poolingStartedAt = performance.now();
 
   // The model runs off the JS thread; pooling its output does not, and in one go
   // it is the longest single stretch a pass holds that thread for — frames of a
@@ -158,9 +206,16 @@ export async function segmentSky(
     if (slices.spent()) await slices.handOver();
   }
 
+  const mask = pooling.finish();
   return {
-    mask: pooling.finish(),
+    mask,
     pixels: captured,
-    size: input
+    size: input,
+    timings: {
+      frameMs,
+      tensorMs: inferenceStartedAt - tensorStartedAt,
+      inferenceMs: poolingStartedAt - inferenceStartedAt,
+      poolingMs: performance.now() - poolingStartedAt
+    }
   };
 }

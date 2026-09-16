@@ -14,7 +14,7 @@ import { yieldToEventLoop } from "../timeSlice";
 import { applyHorizonPrior } from "../vision/horizonPrior";
 import { startSegmentationLoop } from "../vision/segmentationLoop";
 import { SkyMaskTemporalFilter, SkyMaskSensorSample } from "../vision/skyMaskTemporalFilter";
-import { FramePixels, segmentSky, SkyFrameGrabber } from "../vision/skySegmenter";
+import { FramePixels, PassTimings, segmentSky, SkyFrameGrabber } from "../vision/skySegmenter";
 import { Size } from "../vision/skySegmentation";
 
 /** How the segmentation loop has been getting on, for the debug overlay. */
@@ -25,6 +25,13 @@ export type SkySegmentationStats = {
   lastPassMs: number | null;
   passes: number;
   failures: number;
+  /**
+   * Where the newest completed pass spent its time, stage by stage, including
+   * what runs after the mask is published: the horizon prior and the blend, and
+   * the backdrop and the sun-and-moon scan on the same pixels. `null` before the
+   * first. See `PassTimings`.
+   */
+  stages: (PassTimings & { afterMs: number }) | null;
 };
 
 /**
@@ -167,7 +174,8 @@ export function useSkySegmentation(
     updatedAtMs: null,
     lastPassMs: null,
     passes: 0,
-    failures: 0
+    failures: 0,
+    stages: null
   });
   const filterRef = useRef(new SkyMaskTemporalFilter(lens));
   const onFatalRef = useRef(onFatal);
@@ -274,7 +282,8 @@ export function useSkySegmentation(
           updatedAtMs: finishedAtMs,
           lastPassMs: finishedAtMs - startedAtMs,
           passes: statsRef.current.passes + 1,
-          failures: statsRef.current.failures
+          failures: statsRef.current.failures,
+          stages: statsRef.current.stages
         };
 
         // Everything from here to the end of the pass runs on the thread the
@@ -313,6 +322,11 @@ export function useSkySegmentation(
           northOffsetDeg,
           capturedAtSeconds
         });
+        if (!active) return;
+        statsRef.current = {
+          ...statsRef.current,
+          stages: { ...pass.timings, afterMs: performance.now() - finishedAtMs }
+        };
       } catch (cause) {
         if (!active) return;
         landed = false;

@@ -289,6 +289,8 @@ export type AnimatedMarkers = {
   markerStatsRef: MutableRefObject<MarkerStats>;
   /** Smoothed display rate, in frames per second. */
   frameRateRef: MutableRefObject<number>;
+  /** The longest stalls between drawn frames, window by window. See `FrameStalls`. */
+  frameStallsRef: MutableRefObject<FrameStalls>;
   /**
    * The newest drawn frame, for asking where the markers are without being
    * told sixty times a second.
@@ -327,6 +329,33 @@ export type AnimatedMarkers = {
 
 /** Weight of the newest interval in the frame-rate estimate. */
 const FRAME_RATE_SMOOTHING = 0.1;
+
+/**
+ * The worst of the frames drawn over a window of a few seconds.
+ *
+ * The smoothed rate says how the loop is doing on average and hides exactly what
+ * a stutter is: one frame that took a quarter of a second among fifty that took
+ * sixteen milliseconds moves a smoothed rate by a frame or two. So the longest
+ * gap between two drawn frames is kept as well, and how many gaps were long
+ * enough to see, over the last complete window — the previous one rather than
+ * the one still filling, so the figure holds still long enough to be read.
+ */
+export type FrameStalls = {
+  /** Longest gap between two drawn frames in the last complete window, in milliseconds. */
+  worstGapMs: number;
+  /** Gaps over `STALL_THRESHOLD_MS` in that window. */
+  stalls: number;
+  /** How long a window is, in milliseconds. */
+  windowMs: number;
+};
+
+/** How long a stall window is. */
+const STALL_WINDOW_MS = 5000;
+/**
+ * A gap at least this long counts as a stall: three frames at 60 Hz, which is
+ * where a pause stops reading as motion and starts reading as a hitch.
+ */
+export const STALL_THRESHOLD_MS = 50;
 
 /**
  * How often the count of drawn markers, and the breakdown behind it, are
@@ -785,6 +814,7 @@ export function useAnimatedMarkers({
   /** Which satellites besides the landmarks are named, and why. */
   const notableRef = useRef(new NotableSatellites());
   const frameRateRef = useRef(0);
+  const frameStallsRef = useRef<FrameStalls>({ worstGapMs: 0, stalls: 0, windowMs: STALL_WINDOW_MS });
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
   const listenersRef = useRef(new Set<(frame: MarkerFrame) => void>());
   const latestFrameRef = useRef<MarkerFrame>(EMPTY_FRAME);
@@ -816,16 +846,37 @@ export function useAnimatedMarkers({
     };
     /** Until when a frozen sky goes on being placed. See `FROZEN_SETTLE_MS`. */
     let settleUntil = 0;
+    /** The stall window still filling. See `FrameStalls`. */
+    let windowStartedAt: number | null = null;
+    let windowWorstGapMs = 0;
+    let windowStalls = 0;
 
     let handle = requestAnimationFrame(function animate(now: number) {
       const previous = previousFrameRef.current;
       previousFrameRef.current = now;
       if (previous !== null && now > previous) {
-        const rate = 1000 / (now - previous);
+        const gap = now - previous;
+        const rate = 1000 / gap;
         frameRateRef.current =
           frameRateRef.current === 0
             ? rate
             : frameRateRef.current + (rate - frameRateRef.current) * FRAME_RATE_SMOOTHING;
+
+        // Three numbers and a comparison, no allocation: the one thing this
+        // loop must not become is the stall it is measuring.
+        if (gap > windowWorstGapMs) windowWorstGapMs = gap;
+        if (gap >= STALL_THRESHOLD_MS) windowStalls += 1;
+        if (windowStartedAt === null) windowStartedAt = previous;
+        if (now - windowStartedAt >= STALL_WINDOW_MS) {
+          frameStallsRef.current = {
+            worstGapMs: windowWorstGapMs,
+            stalls: windowStalls,
+            windowMs: STALL_WINDOW_MS
+          };
+          windowStartedAt = now;
+          windowWorstGapMs = 0;
+          windowStalls = 0;
+        }
       }
 
       const currentMask = maskRef.current;
@@ -1205,6 +1256,7 @@ export function useAnimatedMarkers({
     skyMemory,
     markerStatsRef,
     frameRateRef,
+    frameStallsRef,
     latestFrameRef,
     drawnEpochRef,
     reset,
