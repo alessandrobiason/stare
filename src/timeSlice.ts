@@ -71,3 +71,38 @@ export function startSlicing(budgetMs: number = SLICE_BUDGET_MS): Slices {
     }
   };
 }
+
+/**
+ * A long job written once, with the places it may stop marked in it.
+ *
+ * Each `yield` is a checkpoint — the end of a row of pixels, a few hundred
+ * pixels into a flood fill — and says nothing about whether to stop there. The
+ * two ways of running it decide that: `runToEnd` never stops, for callers with
+ * nothing on screen to keep smooth (the tests, the replay tools), and
+ * `runSliced` stops wherever the slice has had its budget. Same steps, same
+ * state, same order either way, so the two cannot come back with different
+ * answers.
+ *
+ * A generator rather than a hand-rolled `start`/`step`/`finish` object like
+ * `startSkyPooling`, because some of these jobs are not rows: a flood fill
+ * holds a stack and a running centroid between checkpoints, and a generator
+ * keeps those where they are instead of hoisting them all into an object.
+ */
+export type SlicedJob<T> = Generator<void, T, void>;
+
+/** Runs a job straight through. See `SlicedJob`. */
+export function runToEnd<T>(job: SlicedJob<T>): T {
+  for (;;) {
+    const step = job.next();
+    if (step.done) return step.value;
+  }
+}
+
+/** Runs a job, handing the thread back whenever `slices` says to. See `SlicedJob`. */
+export async function runSliced<T>(job: SlicedJob<T>, slices: Slices): Promise<T> {
+  for (;;) {
+    const step = job.next();
+    if (step.done) return step.value;
+    if (slices.spent()) await slices.handOver();
+  }
+}

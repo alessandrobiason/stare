@@ -30,13 +30,14 @@ import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
-import { BackdropBrightness, brightnessGrid } from "../vision/backdropBrightness";
+import { BackdropBrightness, brightnessGridSliced } from "../vision/backdropBrightness";
 import { SkyFrameGrabber } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
 import { CatalogScreen } from "./CatalogScreen";
 import { strings } from "../i18n";
 import { toDegrees } from "../math/angles";
+import { startSlicing } from "../timeSlice";
 import { DebugPanel } from "./DebugPanel";
 import { GuideTour } from "./GuideTour";
 import { HorizonCompass } from "./HorizonCompass";
@@ -388,14 +389,19 @@ export const SkyOverlay: React.FC<Props> = ({
   // light with no edge would vanish into it. A ref, because only the marker
   // loop reads it and it lands once a second. See `backdropBrightness.ts`.
   const backdropRef = useRef<BackdropBrightness | null>(null);
+  //
+  // Both walk every pixel of the frame, so both go a slice at a time: run in one
+  // go, the two of them straight after a mask were the longest freeze a pass
+  // put on the view. See `timeSlice.ts`.
   const onSegmentedFrame = useCallback(
-    (sample: SegmentedFrameSample) => {
+    async (sample: SegmentedFrameSample) => {
+      const grid = await brightnessGridSliced(sample.pixels, sample.size, startSlicing());
       backdropRef.current = {
-        grid: brightnessGrid(sample.pixels, sample.size),
+        grid,
         attitude: sample.attitude,
         capturedAtSeconds: sample.capturedAtSeconds
       };
-      onCelestialFrame(sample);
+      await onCelestialFrame(sample);
     },
     [onCelestialFrame]
   );

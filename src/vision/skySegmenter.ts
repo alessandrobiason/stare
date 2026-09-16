@@ -2,7 +2,13 @@ import { startSlicing } from "../timeSlice";
 import { SkyMask } from "./skyMask";
 import { createSkyModel } from "./skyModel";
 import { SkyModel } from "./skyModelTypes";
-import { maskGridFor, modelInputSize, Size, startSkyPooling, toModelTensor } from "./skySegmentation";
+import {
+  maskGridFor,
+  modelInputSize,
+  Size,
+  startSkyPooling,
+  toModelTensorSliced
+} from "./skySegmentation";
 
 /**
  * Sky segmentation, on whichever platform is running.
@@ -115,7 +121,14 @@ export async function segmentSky(
   const model = await loadModel();
   const input = modelInputSize(frame);
   const captured = await grabber.grab(input, onShutter);
-  const logits = await model.run(toModelTensor(captured.pixels, input, captured.channels), input);
+  // The capture comes back decoded, and on the phone the decode has just held
+  // the thread (`cameraFrameGrabber`). A frame goes through before the tensor
+  // is built rather than the two running as one stretch, and the tensor itself
+  // is built a slice at a time.
+  const tensorSlices = startSlicing();
+  await tensorSlices.handOver();
+  const tensor = await toModelTensorSliced(captured.pixels, input, captured.channels, tensorSlices);
+  const logits = await model.run(tensor, input);
 
   // The model runs off the JS thread; pooling its output does not, and in one go
   // it is the longest single stretch a pass holds that thread for — frames of a

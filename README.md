@@ -895,6 +895,18 @@ first run from a pinned HuggingFace revision named in
 file a build gets is the file that was tested. Point
 `EXPO_PUBLIC_SKYWATER_MODEL_URL` at a mirror to self-host it.
 
+On the phone it runs under Core ML on the Neural Engine, and the published file
+cannot go there as it is: its spatial axes are dynamic, and in that form the Core
+ML provider places only fragments of it. So the first launch rewrites the
+download once — input size fixed to the camera's, scalar-index gathers split into
+a gather and a squeeze, a cache key in the metadata — and keeps the result beside
+it (`skyModelPreparation.ts`); not one computed value changes. Core ML's
+compilation of it is cached too, so only the first launch pays for that. The
+options this needs are not reachable through `onnxruntime-react-native` as
+published, which is what `patches/onnxruntime-react-native+1.24.3.patch` adds
+(and it pins the native runtime to the binding's version). The reasoning is in
+`src/vision/skyModel.ts`.
+
 ### The photographs
 
 The nineteen landmark pictures are named files on **[Wikimedia Commons](https://commons.wikimedia.org)**,

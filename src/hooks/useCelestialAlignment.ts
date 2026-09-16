@@ -9,7 +9,8 @@ import {
 } from "../fusion/celestialNorth";
 import { OrientationFilter } from "../fusion/orientationFilter";
 import { OrbitEpoch } from "../types";
-import { brightBlobs } from "../vision/brightBodies";
+import { startSlicing } from "../timeSlice";
+import { brightBlobsSliced } from "../vision/brightBodies";
 import { SegmentedFrameSample } from "./useSkySegmentation";
 
 /** What the alignment has been doing, for the debug overlay. */
@@ -44,7 +45,7 @@ export type CelestialAlignment = {
    * succeeded on. Stable across renders, so the segmentation loop is not
    * rebuilt for it.
    */
-  onFrame: (frame: SegmentedFrameSample) => void;
+  onFrame: (frame: SegmentedFrameSample) => Promise<void>;
   /** Counters and the last verdict, read by the debug panel on its own timer. */
   statsRef: MutableRefObject<CelestialAlignmentStats>;
   /** Drops the run of sightings. Call on a seek, as the attitude filter does. */
@@ -152,11 +153,8 @@ export function useCelestialAlignment({
   }, [fixStanding]);
 
   const onFrame = useCallback(
-    (frame: SegmentedFrameSample) => {
+    async (frame: SegmentedFrameSample) => {
       if (!enabledRef.current) return;
-
-      const stats = statsRef.current;
-      const frames = stats.frames + 1;
 
       // The epoch of the frame on screen rather than of the capture a second
       // earlier. The two differ by the sun's own motion over that second, which
@@ -167,21 +165,38 @@ export function useCelestialAlignment({
       const looking = bodies.length === 0 ? "nothing up" : bodies.map((body) => body.body).join(", ");
 
       if (bodies.length === 0) {
+        const stats = statsRef.current;
         statsRef.current = {
           ...stats,
-          frames,
+          frames: stats.frames + 1,
           looking,
           status: `Neither body between ${CELESTIAL_ALIGNMENT.minimumAltitudeDeg}° and ${CELESTIAL_ALIGNMENT.maximumAltitudeDeg}° up`
         };
         return;
       }
 
-      const blobs = brightBlobs(frame.pixels, frame.size, {
-        peakDropCounts: CELESTIAL_ALIGNMENT.peakDropCounts,
-        minimumPeakLuminance: CELESTIAL_ALIGNMENT.minimumPeakLuminance,
-        minimumPixels: CELESTIAL_ALIGNMENT.minimumBlobPixels,
-        limit: CELESTIAL_ALIGNMENT.candidateBlobs
-      });
+      // A slice at a time: over a bright daytime sky this is a flood fill of
+      // most of the frame, and in one go it was the longest freeze a pass put
+      // on the view. See `brightBlobsSliced`.
+      const blobs = await brightBlobsSliced(
+        frame.pixels,
+        frame.size,
+        {
+          peakDropCounts: CELESTIAL_ALIGNMENT.peakDropCounts,
+          minimumPeakLuminance: CELESTIAL_ALIGNMENT.minimumPeakLuminance,
+          minimumPixels: CELESTIAL_ALIGNMENT.minimumBlobPixels,
+          limit: CELESTIAL_ALIGNMENT.candidateBlobs
+        },
+        startSlicing()
+      );
+      // Switched off while it was looking: nothing it found may be applied, and
+      // the counters belong to the switch now.
+      if (!enabledRef.current) return;
+
+      // Read after the scan rather than before it, so a change made while it
+      // ran is built on rather than written over.
+      const stats = statsRef.current;
+      const frames = stats.frames + 1;
 
       let sightings = stats.sightings;
       let fixes = stats.fixes;

@@ -144,8 +144,12 @@ export function useSkySegmentation(
    * can. See `SceneFrame.rebuild`.
    */
   rebuildSource?: () => boolean,
-  /** Handed every frame a pass succeeded on, after the mask has been published. */
-  onFrame?: (frame: SegmentedFrameSample) => void,
+  /**
+   * Handed every frame a pass succeeded on, after the mask has been published.
+   * Awaited when it returns a promise, so work it does in slices is part of the
+   * pass and the next pass does not start on top of it.
+   */
+  onFrame?: (frame: SegmentedFrameSample) => void | Promise<void>,
   /**
    * Take no passes, and let the newest mask stand: the view is frozen.
    *
@@ -287,6 +291,11 @@ export function useSkySegmentation(
         // afterwards would have its ground handed back by the very next blend.
         // Applied here it is carried forward with the attitude it was taken at.
         const grounded = applyHorizonPrior(pass.mask, attitude, lens);
+        // And a frame between the prior and the blend: each is a walk of the
+        // whole grid, and together with the render the new mask sets off they
+        // were one stretch the sky did not move on.
+        await yieldToEventLoop();
+        if (!active) return;
         // Published with `attitude` and not with the attitude the phone has by
         // now: the mask describes the frame the model was given, and the whole
         // point of carrying the aim along is that the two are a second apart.
@@ -297,7 +306,7 @@ export function useSkySegmentation(
         // the frame and the first one is what the view is waiting on.
         await yieldToEventLoop();
         if (!active) return;
-        onFrameRef.current?.({
+        await onFrameRef.current?.({
           pixels: pass.pixels,
           size: pass.size,
           attitude,

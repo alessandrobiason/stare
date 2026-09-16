@@ -1,4 +1,5 @@
 import { FramePoint } from "../camera/projection";
+import { runSliced, runToEnd, SlicedJob, Slices } from "../timeSlice";
 import { FramePixels } from "./skySegmenter";
 import { Size } from "./skySegmentation";
 
@@ -82,6 +83,38 @@ export function brightBlobs(
   size: Size,
   options: BrightBlobOptions
 ): BrightBlob[] {
+  return runToEnd(brightBlobJob(frame, size, options));
+}
+
+/**
+ * `brightBlobs`, handing the thread back as it goes.
+ *
+ * What the app runs. Over a daylight sky the part of the frame within
+ * `peakDropCounts` of the brightest pixel is often most of the sky, and the fill
+ * then walks tens of thousands of pixels: on the phone that was the longest
+ * single stretch of a pass, landing on the thread the markers are drawn from a
+ * moment after every mask. Same steps as `brightBlobs`, and so the same blobs.
+ */
+export function brightBlobsSliced(
+  frame: FramePixels,
+  size: Size,
+  options: BrightBlobOptions,
+  slices: Slices
+): Promise<BrightBlob[]> {
+  return runSliced(brightBlobJob(frame, size, options), slices);
+}
+
+/**
+ * How many pixels a scan or a fill takes between checkpoints, where it has no
+ * rows to stop at. About a row of the model's input.
+ */
+const PIXELS_PER_CHECKPOINT = 512;
+
+function* brightBlobJob(
+  frame: FramePixels,
+  size: Size,
+  options: BrightBlobOptions
+): SlicedJob<BrightBlob[]> {
   const { pixels, channels } = frame;
   const plane = size.width * size.height;
   if (pixels.length < plane * channels) {
@@ -90,11 +123,14 @@ export function brightBlobs(
     );
   }
 
-  const luminance = luminanceOf(pixels, plane, channels);
+  const luminance = yield* luminanceOf(pixels, size, channels);
 
   let peak = 0;
-  for (let pixel = 0; pixel < plane; pixel += 1) {
-    if (luminance[pixel] > peak) peak = luminance[pixel];
+  for (let row = 0, pixel = 0; row < size.height; row += 1) {
+    for (const end = pixel + size.width; pixel < end; pixel += 1) {
+      if (luminance[pixel] > peak) peak = luminance[pixel];
+    }
+    yield;
   }
   if (peak < options.minimumPeakLuminance) return [];
 
@@ -105,18 +141,21 @@ export function brightBlobs(
   // membership far more often than there are members.
   const state = new Uint8Array(plane);
   const bright: number[] = [];
-  for (let pixel = 0; pixel < plane; pixel += 1) {
-    if (luminance[pixel] >= threshold) {
-      state[pixel] = UNCLAIMED;
-      bright.push(pixel);
+  for (let row = 0, pixel = 0; row < size.height; row += 1) {
+    for (const end = pixel + size.width; pixel < end; pixel += 1) {
+      if (luminance[pixel] >= threshold) {
+        state[pixel] = UNCLAIMED;
+        bright.push(pixel);
+      }
     }
+    yield;
   }
 
   const blobs: BrightBlob[] = [];
   for (let found = 0; found < options.limit; found += 1) {
-    const seed = brightestUnclaimed(bright, luminance, state);
+    const seed = yield* brightestUnclaimed(bright, luminance, state);
     if (seed === null) break;
-    const blob = growFrom(seed, luminance, state, size, threshold);
+    const blob = yield* growFrom(seed, luminance, state, size, threshold);
     if (blob.area >= options.minimumPixels) blobs.push(blob);
   }
 
@@ -138,31 +177,36 @@ const CLAIMED = 2;
  * The maximum says what this is really asking — is any channel at the top —
  * and treats a warm sun, a white one and a blue-white moon alike.
  */
-function luminanceOf(
+function* luminanceOf(
   pixels: Uint8Array | Uint8ClampedArray,
-  plane: number,
+  size: Size,
   channels: 3 | 4
-): Uint8Array {
-  const luminance = new Uint8Array(plane);
-  for (let pixel = 0; pixel < plane; pixel += 1) {
-    const base = pixel * channels;
-    const red = pixels[base];
-    const green = pixels[base + 1];
-    const blue = pixels[base + 2];
-    luminance[pixel] = red > green ? (red > blue ? red : blue) : green > blue ? green : blue;
+): SlicedJob<Uint8Array> {
+  const luminance = new Uint8Array(size.width * size.height);
+  for (let row = 0, pixel = 0; row < size.height; row += 1) {
+    for (const end = pixel + size.width; pixel < end; pixel += 1) {
+      const base = pixel * channels;
+      const red = pixels[base];
+      const green = pixels[base + 1];
+      const blue = pixels[base + 2];
+      luminance[pixel] = red > green ? (red > blue ? red : blue) : green > blue ? green : blue;
+    }
+    yield;
   }
   return luminance;
 }
 
 /** The brightest pixel not yet part of a blob, or `null` when none are left. */
-function brightestUnclaimed(
+function* brightestUnclaimed(
   bright: number[],
   luminance: Uint8Array,
   state: Uint8Array
-): number | null {
+): SlicedJob<number | null> {
   let best: number | null = null;
   let bestLuminance = -1;
+  let visited = 0;
   for (const pixel of bright) {
+    if (++visited % PIXELS_PER_CHECKPOINT === 0) yield;
     if (state[pixel] !== UNCLAIMED) continue;
     if (luminance[pixel] > bestLuminance) {
       bestLuminance = luminance[pixel];
@@ -187,13 +231,13 @@ function brightestUnclaimed(
  * weight is equal and this is the plain centroid of the saturated region, which
  * is the middle of the disc.
  */
-function growFrom(
+function* growFrom(
   seed: number,
   luminance: Uint8Array,
   state: Uint8Array,
   size: Size,
   threshold: number
-): BrightBlob {
+): SlicedJob<BrightBlob> {
   const stack = [seed];
   state[seed] = CLAIMED;
 
@@ -205,6 +249,9 @@ function growFrom(
   let clipped = false;
 
   while (stack.length > 0) {
+    // Nothing outside this fill reads `state` between checkpoints, so where it
+    // stops changes nothing about what it finds.
+    if (area > 0 && area % PIXELS_PER_CHECKPOINT === 0) yield;
     const pixel = stack.pop() as number;
     const x = pixel % size.width;
     const y = (pixel - x) / size.width;

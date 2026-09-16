@@ -1,0 +1,130 @@
+diff --git a/node_modules/onnxruntime-react-native/cpp/SessionUtils.cpp b/node_modules/onnxruntime-react-native/cpp/SessionUtils.cpp
+index 3e6672e..e123a90 100644
+--- a/node_modules/onnxruntime-react-native/cpp/SessionUtils.cpp
++++ b/node_modules/onnxruntime-react-native/cpp/SessionUtils.cpp
+@@ -2,6 +2,9 @@
+ #include "JsiUtils.h"
+ #include "cpu_provider_factory.h"
+ #include <jsi/jsi.h>
++#include <cmath>
++#include <functional>
++#include <unordered_map>
+ #include "onnxruntime_cxx_api.h"
+ #ifdef USE_NNAPI
+ #include "nnapi_provider_factory.h"
+@@ -270,6 +273,41 @@ void parseSessionOptions(Runtime& runtime, const Value& optionsValue,
+       }
+     }
+ 
++    // extra: session config entries (onnxruntime_session_options_config_keys.h),
++    // as nested objects whose keys are joined with '.', the way onnxruntime-web
++    // reads the same option. `extra: { optimization: { disable_specified_optimizers:
++    // "MatMulAddFusion" } }` is the entry "optimization.disable_specified_optimizers".
++    if (options.hasProperty(runtime, "extra")) {
++      auto prop = options.getProperty(runtime, "extra");
++      if (prop.isObject()) {
++        std::function<void(const std::string&, const Object&)> addEntries =
++            [&](const std::string& prefix, const Object& object) {
++              forEach(runtime, object,
++                      [&](const std::string& key, const Value& value, size_t index) {
++                        const std::string name = prefix + key;
++                        std::string entry;
++                        if (value.isObject()) {
++                          addEntries(name + ".", value.asObject(runtime));
++                          return;
++                        } else if (value.isString()) {
++                          entry = value.asString(runtime).utf8(runtime);
++                        } else if (value.isBool()) {
++                          entry = value.asBool() ? "1" : "0";
++                        } else if (value.isNumber()) {
++                          const double number = value.asNumber();
++                          entry = number == std::floor(number)
++                                      ? std::to_string(static_cast<int64_t>(number))
++                                      : std::to_string(number);
++                        } else {
++                          throw JSError(runtime, "Unsupported type for session config entry: " + name);
++                        }
++                        sessionOptions.AddConfigEntry(name.c_str(), entry.c_str());
++                      });
++            };
++        addEntries("", prop.asObject(runtime));
++      }
++    }
++
+     // executionProviders
+     if (options.hasProperty(runtime, "executionProviders")) {
+       auto prop = options.getProperty(runtime, "executionProviders");
+@@ -303,17 +341,49 @@ void parseSessionOptions(Runtime& runtime, const Value& optionsValue,
+           }
+ #ifdef USE_COREML
+           else if (epName == "coreml") {
++            // Either the legacy `coreMlFlags`, or the provider's own options by
++            // their own names (ModelFormat, MLComputeUnits,
++            // RequireStaticInputShapes, ModelCacheDirectory, ...;
++            // coreml_provider_factory.h), which only the provider-options API
++            // reaches: the flags cannot ask for a model cache, for instance.
+             int flags = 0;
+-            if (providerObj &&
+-                providerObj->hasProperty(runtime, "coreMlFlags")) {
+-              auto flagsValue =
+-                  providerObj->getProperty(runtime, "coreMlFlags");
+-              if (flagsValue.isNumber()) {
+-                flags = static_cast<int>(flagsValue.asNumber());
++            bool hasFlags = false;
++            std::unordered_map<std::string, std::string> coremlOptions;
++            if (providerObj) {
++              forEach(runtime, *providerObj,
++                      [&](const std::string& key, const Value& value, size_t index) {
++                        if (key == "name") {
++                          return;
++                        }
++                        if (key == "coreMlFlags") {
++                          if (value.isNumber()) {
++                            flags = static_cast<int>(value.asNumber());
++                            hasFlags = true;
++                          }
++                          return;
++                        }
++                        if (value.isString()) {
++                          coremlOptions[key] = value.asString(runtime).utf8(runtime);
++                        } else if (value.isBool()) {
++                          coremlOptions[key] = value.asBool() ? "1" : "0";
++                        } else if (value.isNumber()) {
++                          coremlOptions[key] =
++                              std::to_string(static_cast<int64_t>(value.asNumber()));
++                        } else {
++                          throw JSError(runtime, "Unsupported type for CoreML option: " + key);
++                        }
++                      });
++            }
++            if (!coremlOptions.empty()) {
++              if (hasFlags) {
++                throw JSError(runtime,
++                              "coreMlFlags cannot be combined with CoreML provider options");
+               }
++              sessionOptions.AppendExecutionProvider("CoreML", coremlOptions);
++            } else {
++              reinterpret_cast<ExtendedSessionOptions&>(sessionOptions)
++                  .AppendExecutionProvider_CoreML(flags);
+             }
+-            reinterpret_cast<ExtendedSessionOptions&>(sessionOptions)
+-                .AppendExecutionProvider_CoreML(flags);
+           }
+ #endif
+ #ifdef USE_NNAPI
+diff --git a/node_modules/onnxruntime-react-native/onnxruntime-react-native.podspec b/node_modules/onnxruntime-react-native/onnxruntime-react-native.podspec
+index 58bbbda..224cebb 100644
+--- a/node_modules/onnxruntime-react-native/onnxruntime-react-native.podspec
++++ b/node_modules/onnxruntime-react-native/onnxruntime-react-native.podspec
+@@ -23,7 +23,10 @@ Pod::Spec.new do |spec|
+   spec.source_files         = "ios/*.{h,mm}", "cpp/*.{h,cpp}"
+   spec.private_header_files = "ios/*.h", "cpp/*.h"
+ 
+-  spec.dependency "onnxruntime-c"
++  # Pinned to this package's own version. Unpinned, CocoaPods resolves the
++  # newest onnxruntime-c at install time, and the binary under this binding
++  # changes with whatever was published that week.
++  spec.dependency "onnxruntime-c", package["version"]
+ 
+   if respond_to?(:install_modules_dependencies, true)
+     install_modules_dependencies(spec)

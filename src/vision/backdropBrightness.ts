@@ -1,6 +1,7 @@
 import { CameraAttitude } from "../camera/attitude";
 import { FrameLens } from "../camera/projection";
 import { BRIGHT_BACKDROP, SKY_MASK_MAX_AGE_SECONDS } from "../constants";
+import { runSliced, runToEnd, SlicedJob, Slices } from "../timeSlice";
 import { EnuPosition } from "../types";
 import { skyProbe } from "./anchoredMask";
 import { SkyMask } from "./skyMask";
@@ -52,6 +53,26 @@ export function brightnessGrid(
   size: Size,
   cellPx: number = BRIGHT_BACKDROP.cellPx
 ): SkyMask {
+  return runToEnd(brightnessGridJob(frame, size, cellPx));
+}
+
+/**
+ * `brightnessGrid`, handing the thread back between rows of pixels.
+ *
+ * What the app runs: a pass over every pixel of the frame, a moment after every
+ * mask lands, on the thread the markers are drawn from. Same rows in the same
+ * order, and so the same grid.
+ */
+export function brightnessGridSliced(
+  frame: FramePixels,
+  size: Size,
+  slices: Slices,
+  cellPx: number = BRIGHT_BACKDROP.cellPx
+): Promise<SkyMask> {
+  return runSliced(brightnessGridJob(frame, size, cellPx), slices);
+}
+
+function* brightnessGridJob(frame: FramePixels, size: Size, cellPx: number): SlicedJob<SkyMask> {
   const { pixels, channels } = frame;
   const plane = size.width * size.height;
   if (pixels.length < plane * channels) {
@@ -80,6 +101,7 @@ export function brightnessGrid(
       sums[quarter] += red > green ? (red > blue ? red : blue) : green > blue ? green : blue;
       counts[quarter] += 1;
     }
+    yield;
   }
 
   const confidence = new Array<number>(columns * rows);

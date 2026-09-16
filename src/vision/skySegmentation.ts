@@ -1,4 +1,5 @@
 import { SKY_CONFIDENCE_THRESHOLD } from "../constants";
+import { runSliced, runToEnd, SlicedJob, Slices } from "../timeSlice";
 import { SkyMask, SkyMaskDetail } from "./skyMask";
 
 /**
@@ -120,6 +121,31 @@ export function toModelTensor(
   size: Size,
   channels: 3 | 4
 ): Float32Array {
+  return runToEnd(modelTensorJob(pixels, size, channels));
+}
+
+/**
+ * `toModelTensor`, handing the thread back between rows.
+ *
+ * What the app runs. It is the first thing after the capture comes back, and
+ * the capture's own decode has just held the thread too: run in one go the two
+ * were a single stretch of frames the sky did not move on, every pass. Same
+ * rows, same lookups, and so the same tensor to the bit.
+ */
+export function toModelTensorSliced(
+  pixels: Uint8Array | Uint8ClampedArray,
+  size: Size,
+  channels: 3 | 4,
+  slices: Slices
+): Promise<Float32Array> {
+  return runSliced(modelTensorJob(pixels, size, channels), slices);
+}
+
+function* modelTensorJob(
+  pixels: Uint8Array | Uint8ClampedArray,
+  size: Size,
+  channels: 3 | 4
+): SlicedJob<Float32Array> {
   const plane = size.width * size.height;
   if (pixels.length < plane * channels) {
     throw new Error(
@@ -132,10 +158,13 @@ export function toModelTensor(
   const redPlane = data.subarray(0, plane);
   const greenPlane = data.subarray(plane, 2 * plane);
   const bluePlane = data.subarray(2 * plane);
-  for (let pixel = 0, source = 0; pixel < plane; pixel += 1, source += channels) {
-    redPlane[pixel] = red[pixels[source]];
-    greenPlane[pixel] = green[pixels[source + 1]];
-    bluePlane[pixel] = blue[pixels[source + 2]];
+  for (let row = 0, pixel = 0, source = 0; row < size.height; row += 1) {
+    for (const end = pixel + size.width; pixel < end; pixel += 1, source += channels) {
+      redPlane[pixel] = red[pixels[source]];
+      greenPlane[pixel] = green[pixels[source + 1]];
+      bluePlane[pixel] = blue[pixels[source + 2]];
+    }
+    yield;
   }
   return data;
 }
