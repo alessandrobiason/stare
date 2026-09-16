@@ -14,6 +14,7 @@ import { expect, test } from "@playwright/test";
 // selector written against one of them has to know which.
 const BOOTED = '[aria-label$="visible satellites"]';
 const SETTINGS_TAB = '[role="tab"][aria-label="Settings"]';
+const CATALOG_TAB = '[role="tab"][aria-label="Catalog"]';
 const SKY_TAB = '[role="tab"][aria-label="Sky"]';
 const CONSOLE_ROW = '[aria-label="CONSOLE"]';
 const PASSES = '[aria-label="Upcoming passes"]';
@@ -146,6 +147,55 @@ test.describe("replay overlay", () => {
     const facing = page.locator(COMPASS).first();
     await expect(facing).toBeVisible();
     expect(await facing.getAttribute("aria-label")).toMatch(/^Facing (N|NE|E|SE|S|SW|W|NW)$/);
+  });
+
+  /**
+   * The catalog tab, end to end: looked up by name, and put on the sky.
+   *
+   * The one chain no unit test can run. The index is built from the catalog
+   * boot really downloaded, the rows are placed by real SGP4 against the
+   * recording's own clock and GPS, and the tap at the end crosses from a list
+   * into the view the app is — a card, and the object's own pass drawn on the
+   * picture by the same selection a tap on its mark would have made.
+   */
+  test("the catalog finds an object by name and puts it on the sky", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
+
+    // Nothing of the catalog is on screen until its tab is pressed.
+    await expect(page.getByPlaceholder("Search by name")).toHaveCount(0);
+    await page.locator(CATALOG_TAB).click();
+
+    // The fleets, under the headings the sky is coloured by, largest first —
+    // and a landmark listed as the one object it is. Both come off the live
+    // catalog rather than off anything this suite supplies.
+    await expect(page.getByText("HIGHLIGHTS").first()).toBeVisible();
+    await expect(page.locator('[role="button"][aria-label="Starlink"]').first()).toBeVisible();
+    const hubble = page.locator('[role="button"][aria-label="Hubble"]').first();
+    await expect(hubble).toBeVisible();
+
+    // Which way to turn to face it, whether or not it is up: the scan runs in
+    // slices behind the names, so this is the line that arrives a beat later.
+    await expect(hubble.locator("text=/(up|below)$/")).toBeVisible({ timeout: 30000 });
+
+    // A fleet opens onto what is above the horizon now, out of how many there
+    // are — the answer worth having about ten thousand identical spacecraft.
+    await page.locator('[role="button"][aria-label="Starlink"]').first().click();
+    await expect(page.locator("text=/above your horizon/").first()).toBeVisible({
+      timeout: 60000
+    });
+    await page.locator('[aria-label="Back to the catalog"]').click();
+
+    // And the search, which is the question the tab exists for.
+    await page.getByPlaceholder("Search by name").fill("hubble");
+    await expect(page.locator('[role="button"][aria-label="Hubble"]').first()).toBeVisible();
+
+    // Tapping a row is tapping the object's mark: the sky comes back with the
+    // card the sky itself would have opened.
+    await page.locator('[role="button"][aria-label="Hubble"]').first().click();
+    await expect(page.locator(SKY_TAB)).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator(CARD)).toBeVisible();
+    await expect(page.locator(CARD).getByText("Hubble").first()).toBeVisible();
   });
 
   /**

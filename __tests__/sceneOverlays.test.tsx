@@ -1,5 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { CatalogScreen } from "../src/components/CatalogScreen";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
 import { compassMarks, nearestPoint } from "../src/components/HorizonCompass";
@@ -16,8 +17,14 @@ import {
 } from "../src/satellite/landmarkPhotos";
 import { SkySummary } from "../src/hooks/useAnimatedMarkers";
 import { BREAKDOWN_ROWS, FleetBreakdown, tallyFleets } from "../src/satellite/fleets";
-import { allCategories, allSubcategories } from "../src/satellite/categories";
-import { SatelliteDetail } from "../src/types";
+import { SAMPLE_TLE } from "../src/data/sampleTle";
+import { SatelliteCatalog } from "../src/satellite/catalog";
+import {
+  allCategories,
+  allSubcategories,
+  SatelliteCategory
+} from "../src/satellite/categories";
+import { SatelliteDetail, Tle } from "../src/types";
 
 /** The rendered overlay as plain text, the way someone reads it. */
 function textOf(element: React.ReactElement): string {
@@ -852,5 +859,121 @@ describe("the tapped satellite's card", () => {
 
     expect(text).toContain("left the catalog");
     expect(text).not.toContain("km");
+  });
+});
+
+/**
+ * The catalog tab: the whole catalogue as something to look things up in.
+ *
+ * What is checked here is the screen rather than the arithmetic behind it —
+ * `catalogDirectory.test.ts` has the index, the search and the propagation. The
+ * scans themselves never land in a server render, which is exactly the state
+ * this screen has to be legible in: a fleet-sized scan runs in slices, and on a
+ * phone the first frame of an opened fleet is always the one before it arrives.
+ */
+describe("the catalog tab", () => {
+  /** A few objects from the fleets the index is built out of. */
+  function fakeCatalog(): SatelliteCatalog {
+    const named = (name: string, category: SatelliteCategory): Tle => ({
+      ...SAMPLE_TLE,
+      name,
+      category
+    });
+    return new SatelliteCatalog([
+      named("ISS", "LANDMARK"),
+      named("Hubble", "LANDMARK"),
+      named("STARLINK-1007", "INTERNET"),
+      named("STARLINK-1008", "INTERNET"),
+      named("STARLINK-1009", "INTERNET"),
+      named("GPS BIIR-2", "NAVIGATION"),
+      named("NOAA 19", "EARTH"),
+      named("SOMETHING UNRECOGNISED", "OTHER"),
+      named("ANOTHER ODDITY", "OTHER")
+    ]);
+  }
+
+  function screen(catalog = fakeCatalog()) {
+    const epochRef = {
+      current: {
+        time: new Date(Date.UTC(2026, 7, 29, 0, 0, 0)),
+        observer: { latitudeDeg: 60.1699, longitudeDeg: 24.9384, heightM: 20 }
+      }
+    };
+    return <CatalogScreen catalog={catalog} epochRef={epochRef} onSelect={() => undefined} />;
+  }
+
+  test("opens on the whole catalogue, sorted the way the sky is coloured", () => {
+    const text = textOf(screen());
+
+    // The tab's own label, so the bar and the page cannot disagree, and the
+    // legend's own headings, so the catalog and the filter sort the sky alike.
+    expect(text).toContain("Catalog");
+    expect(text).toContain("HIGHLIGHTS");
+    expect(text).toContain("NAVIGATION");
+    expect(text).toContain("INTERNET");
+  });
+
+  test("lists fleets with how many of each there are, not objects one by one", () => {
+    // The shape of what is up there, legible before anything is tapped: the
+    // single most surprising fact about the modern sky is how much of it is
+    // one constellation.
+    const text = textOf(screen());
+
+    expect(text).toContain("Starlink");
+    expect(text).toContain("3 in orbit");
+    expect(text).not.toContain("STARLINK-1007");
+  });
+
+  test("but names the landmarks, because each of them is what somebody wants", () => {
+    const text = textOf(screen());
+
+    expect(text).toContain("ISS");
+    expect(text).toContain("Hubble");
+  });
+
+  test("calls the objects it cannot name what the marker count calls them", () => {
+    // Not an untranslated English phrase in the middle of an Italian list.
+    // See `src/satellite/fleets.ts`.
+    expect(textOf(screen())).toContain("Others");
+  });
+
+  test("a fleet with one object in it is that object, not a way in to a list of one", () => {
+    const text = textOf(screen());
+
+    // `GPS BIIR-2` is the only GPS satellite in this catalog, so its row goes to
+    // the sky like the landmarks' do rather than opening a page that would say
+    // "0 of 1 above your horizon" and stop.
+    expect(text).toContain("GPS BIIR-2");
+    expect(text).not.toContain("1 in orbit");
+  });
+
+  test("draws the names it already knows without waiting for any arithmetic", () => {
+    // No scan has landed here — no effects run in a server render, which is
+    // also every one of these lists' first frame on a phone. The names are
+    // settled before the propagation runs, so they are on screen; only the line
+    // saying which way to turn waits for it.
+    const text = textOf(screen());
+
+    expect(text).toContain("Hubble");
+    expect(text).not.toContain("Working out where these are");
+  });
+
+  test("carries the search field it exists for", () => {
+    // The browse answers "what is up there"; only a name answers "where is the
+    // thing I came looking for", which is the question the tab is for.
+    expect(renderToStaticMarkup(screen())).toContain('placeholder="Search by name"');
+  });
+
+  test("and says all of it in the reader's own language", () => {
+    setLocaleForTesting("it");
+    const text = textOf(screen());
+
+    expect(text).toContain("Catalogo");
+    expect(text).toContain("IMPORTANTI");
+    expect(text).toContain("3 in orbita");
+    // The fleet names are the names their operators gave them, in every
+    // language: there is no Italian for "Starlink".
+    expect(text).toContain("Starlink");
+    setLocaleForTesting(undefined);
   });
 });

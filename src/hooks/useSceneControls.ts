@@ -10,9 +10,9 @@ import {
 /**
  * Which of the three tabs the app is showing.
  *
- * The sky is the app and the other two are what used to be drawn on top of it:
- * a catalog to look things up in, which is not built yet, and everything about
- * the app rather than about the sky. See `TabBar`.
+ * The sky is the app, and the other two are beside it: the catalogue as
+ * something to look things up in by name (`CatalogScreen`), and everything
+ * about the app rather than about the sky. See `TabBar`.
  */
 export type SceneTab = "sky" | "catalog" | "settings";
 

@@ -177,7 +177,7 @@ describe("and says it in the space it is given", () => {
     }
   });
 
-  test.each(LOCALES)("%s fits the two tabs that are not the sky", (locale) => {
+  test.each(LOCALES)("%s fits the settings tab", (locale) => {
     const t = stringsFor(locale);
     // The settings list: 375 less the sheet's 18 either side, less a row's own
     // 14 either side, less the chevron and the gap before it.
@@ -191,9 +191,31 @@ describe("and says it in the space it is given", () => {
     for (const detail of [t.tour.about, t.console.detail]) {
       expect(width(detail, 11)).toBeLessThan(3 * ROW);
     }
+  });
 
-    // The catalog's one line, centred in a 36pt-margined page and wrapping.
-    expect(width(t.catalog.soon, 13)).toBeLessThan(4 * (375 - 36 * 2));
+  test.each(LOCALES)("%s fits the catalog", (locale) => {
+    const t = stringsFor(locale).catalog;
+    // The sheet's own column: 375 less 18 either side.
+    const PAGE = 375 - 18 * 2;
+    // A row inside a group, less the swatch, the chevron and the three gaps.
+    const ROW = PAGE - 14 * 2 - 10 - 14 - 11 * 3;
+
+    // The title's own line, which wraps under it rather than being cut off.
+    expect(width(t.about, 12)).toBeLessThan(3 * PAGE);
+    // The placeholder sits in a 44pt field with 14 of padding either side.
+    expect(width(t.search, 14)).toBeLessThan(PAGE - 14 * 2);
+    // A fleet row is a name, a count and the chevron on one line, so the count
+    // has to leave the name something. The largest fleet is five figures.
+    expect(width(fill(t.objects, { count: "8,192" }), 12)).toBeLessThan(ROW / 2);
+    // An opened fleet's own line, under a name set at 19 beside the back
+    // button: the head is the page less that button and the gap after it.
+    expect(
+      width(fill(t.above, { count: "412", total: "8,192" }), 12)
+    ).toBeLessThan(2 * (PAGE - 34 - 10));
+    // The lines that stand on their own, above or instead of a list. They wrap.
+    for (const note of [t.noneAbove, t.highest, t.working, t.noMatch]) {
+      expect(width(note, 12)).toBeLessThan(2 * PAGE);
+    }
   });
 
   test.each(LOCALES)("%s fits the satellite card", (locale) => {

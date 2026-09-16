@@ -450,6 +450,23 @@ export const SkyOverlay: React.FC<Props> = ({
     []
   );
 
+  /**
+   * A row of the catalog, picked: the same selection again, and the sky back.
+   *
+   * The catalog is a way of finding an object rather than a place to read about
+   * one, so what a row does is hand the screen back to the view the app is,
+   * with that object selected — its card open, and its own pass drawn across
+   * the picture by the selection itself (`useFocusedPath`). For something that
+   * has not risen yet, that arc is the whole answer the tab exists to give.
+   */
+  const selectFromCatalog = useCallback(
+    (name: string) => {
+      setSelection({ names: [name], selected: name });
+      onSelectTab("sky");
+    },
+    [onSelectTab]
+  );
+
   // What the tapped satellite is, resolved on the card's own slow timer against
   // the epoch of whatever frame is on screen when it asks — which on a frozen
   // sky is the moment it froze, so the card describes the mark that was tapped
@@ -632,7 +649,13 @@ export const SkyOverlay: React.FC<Props> = ({
           {/* The other two tabs are sheets over the camera rather than screens
               the app has navigated to: the view underneath keeps running, and
               coming back is one tap onto a sky that never stopped. */}
-          {tab === "catalog" && <CatalogScreen />}
+          {tab === "catalog" && (
+            <CatalogScreen
+              catalog={catalog}
+              epochRef={epochRef}
+              onSelect={selectFromCatalog}
+            />
+          )}
           {tab === "settings" && (
             <SettingsScreen
               onOpenGuide={onOpenGuide}

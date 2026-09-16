@@ -198,8 +198,15 @@ export const en: Strings = {
     unsupported: "This device cannot run the sky view."
   },
   catalog: {
-    soon:
-      "Look up any object in the catalog, whether or not it is over you right now. Not built yet."
+    about: "Everything in orbit, whether or not it is over you. Pick one to put it on the sky.",
+    search: "Search by name",
+    objects: "{count} in orbit",
+    above: "{count} of {total} above your horizon",
+    noneAbove: "None of these is above your horizon right now.",
+    highest: "The {count} highest are listed.",
+    working: "Working out where these are…",
+    noMatch: "Nothing in the catalog is called that.",
+    back: "Back to the catalog"
   },
   language: {
     title: "Language"

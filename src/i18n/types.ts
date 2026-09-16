@@ -41,7 +41,7 @@ export type Strings = {
   tabs: {
     /** The camera with the catalog drawn over it, which is the app. */
     sky: string;
-    /** The catalog to look things up in, which is not built yet. */
+    /** The catalogue as a list, to look things up in by name. */
     catalog: string;
     /** The guide, the language and the console. See `SettingsScreen`. */
     settings: string;
@@ -303,16 +303,51 @@ export type Strings = {
     unsupported: string;
   };
   /**
-   * The catalog tab, which is a promise rather than a feature.
+   * The catalog tab: the whole catalogue as something to look things up in.
    *
    * The sky view answers "what is above me now", and the question it cannot
    * answer is "where is the thing I came looking for" — an object below the
-   * horizon has no mark to tap. That is what the tab is for, and this is the
-   * line it carries until it is built. Its title is `tabs.catalog`.
+   * horizon has no mark to tap, and at any moment most of the catalogue is
+   * below it. So the tab is a list rather than a picture: the fleets under the
+   * six headings the sky is coloured by, a search across every name, and one
+   * line per object saying which way to turn to face it.
+   *
+   * Most of what it says is not here. The headings are the filter's own
+   * category names, a row's position is `lookDirection`, and the fleet names
+   * are the names their operators gave them and are not translated — see
+   * `src/satellite/fleets.ts`. What is here is the screen's own handful of
+   * sentences. Its title is `tabs.catalog`.
    */
   catalog: {
-    /** What will be there, and that it is not there yet. */
-    soon: string;
+    /** The line under the title: what this list is, and what tapping does. */
+    about: string;
+    /** The search field, when nothing has been typed into it. */
+    search: string;
+    /**
+     * How many objects a fleet has, at the end of its row. `{count}`.
+     *
+     * A phrase rather than a noun that would have to agree with the number:
+     * this table has no plural forms in it and is not the place to start — see
+     * `fill`. "1 in orbit" and "7,914 in orbit" are both right.
+     */
+    objects: string;
+    /**
+     * How much of an opened fleet is up. `{count}`, `{total}`.
+     *
+     * The answer the screen exists to give about a fleet: the list underneath
+     * is what is over the horizon, and this is what that is out of.
+     */
+    above: string;
+    /** A fleet with nothing over the horizon, which is the common case. */
+    noneAbove: string;
+    /** Said when a fleet has more up than the list will show. `{count}`. */
+    highest: string;
+    /** While the first scan of a list is still running. See `locateAll`. */
+    working: string;
+    /** A search that matched nothing at all. */
+    noMatch: string;
+    /** The way back out of a fleet, for a screen reader. */
+    back: string;
   };
   /**
    * The language row in the settings tab.

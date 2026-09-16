@@ -192,8 +192,15 @@ export const it: Strings = {
     unsupported: "Questo dispositivo non può mostrare la vista del cielo."
   },
   catalog: {
-    soon:
-      "Cerca qualsiasi oggetto del catalogo, anche quando non è sopra di te. Non ancora disponibile."
+    about: "Tutto ciò che è in orbita, anche se non è sopra di te. Toccane uno per metterlo sul cielo.",
+    search: "Cerca per nome",
+    objects: "{count} in orbita",
+    above: "{count} di {total} sopra il tuo orizzonte",
+    noneAbove: "Nessuno di questi è sopra il tuo orizzonte in questo momento.",
+    highest: "Sono elencati i {count} più alti.",
+    working: "Sto calcolando dove si trovano…",
+    noMatch: "Nel catalogo non c'è niente con questo nome.",
+    back: "Torna al catalogo"
   },
   language: {
     title: "Lingua"

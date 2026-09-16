@@ -11,8 +11,24 @@ The view opens in **normal** mode: the camera picture, the markers, the app's
 name over a count of what is above you, two buttons — one that freezes the view
 and one for the category filter — a
 strip of cardinal points along the bottom of the frame, a card carrying the next
-landmark due over you, and a bar of three tabs — the sky, a catalog that is not
-built yet, and the settings that hold Help (the tour) and the console.
+landmark due over you, and a bar of three tabs — the sky, the catalog, and the
+settings that hold Help (the tour) and the console.
+
+**The catalog tab is the same sixteen thousand objects read the other way
+round** (`src/components/CatalogScreen.tsx`, `src/satellite/directory.ts`). The
+sky answers "what is above me now" and cannot answer "where is the thing I came
+looking for", because an object below the horizon has no mark to tap — and from
+anywhere, at any moment, that is most of the catalogue. So the tab is a list:
+the fleets `fleets.ts` already names, under the six headings the sky is coloured
+by and largest first, so that Starlink at ten thousand and GPS at forty are
+legible side by side; the landmarks listed one object each, with which way to
+turn to face them whether they are up or not; a search across every name; and,
+behind a fleet, what is above the horizon right now, highest first, out of how
+many there are. Tapping any row is the same tap as tapping the object's mark: it
+selects it and hands the screen back to the sky, where the card that opens is
+the card the sky would have opened and the selection draws that object's own
+pass across the picture — which for something that has not risen yet is the
+whole answer.
 
 **Freezing the view** (the pause button beside the filter) holds the camera
 picture, the marks and the compass strip on the frame that was on screen, so the
