@@ -181,12 +181,6 @@ export const CategoryLegend: React.FC<Props> = React.memo(({
           <View style={[styles.swatch, styles.ringSwatch]} />
           <Text style={styles.keyLabel}>{t.ringKey}</Text>
         </View>
-        {/* The other thing a mark's strength says. Drawn at the strength the
-            sky draws it at, so the swatch is the mark. */}
-        <View style={styles.keyRow}>
-          <View style={[styles.swatch, styles.shadowSwatch]} />
-          <Text style={styles.keyLabel}>{t.shadowKey}</Text>
-        </View>
       </ScrollView>
 
       {/* Outside the scroll on purpose: the one row here somebody is likely to
@@ -298,13 +292,6 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     borderWidth: 2.5,
     borderColor: theme.color.textDim
-  },
-  shadowSwatch: {
-    // `SHADOW_ALPHA` in `markerScene.ts`, which is what the sky draws these at.
-    opacity: 0.5,
-    backgroundColor: theme.color.textDim,
-    borderColor: theme.color.textDim,
-    borderWidth: 0
   },
   label: {
     flex: 1,

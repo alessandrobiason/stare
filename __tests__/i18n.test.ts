@@ -159,9 +159,6 @@ describe("and says it in the space it is given", () => {
     // Wraps to a second line if it has to, so this is two lines of the column
     // the key rows keep, less the swatch that heads them.
     expect(width(t.ringKey, 8, 0.4)).toBeLessThan(2 * (COLUMN - 19));
-    // The other key row, the same size and in the same column: why half the
-    // marks on a clear night sky are drawn faintly.
-    expect(width(t.shadowKey, 8, 0.4)).toBeLessThan(2 * (COLUMN - 19));
   });
 
   test.each(LOCALES)("%s fits the header and the tab bar", (locale) => {

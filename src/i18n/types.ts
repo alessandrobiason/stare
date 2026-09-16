@@ -182,16 +182,6 @@ export type Strings = {
     showAll: string;
     /** Why a quarter of a southward sky is rings that never move. */
     ringKey: string;
-    /**
-     * And why half the marks on a clear night are drawn faintly.
-     *
-     * The only channel a mark spends on something other than where the object
-     * is. An object in the Earth's shadow has no sunlight to throw back and
-     * cannot be seen however clear the sky is, so it is drawn at half strength;
-     * without this line that is a difference somebody can see and not account
-     * for. See `src/components/markerScene.ts`.
-     */
-    shadowKey: string;
     categories: Record<SatelliteCategory, string>;
     /**
      * The parts a split category is divided into, each a row under its
@@ -376,8 +366,6 @@ export type TourStrings = {
     moving: TourKeyStrings;
     /** The geostationary belt: rings that never move. */
     parked: TourKeyStrings;
-    /** The same mark in sunlight and in the Earth's shadow. */
-    shadow: TourKeyStrings;
     /** A landmark: the halo, the name, and the dashed line of its pass. */
     landmark: TourKeyStrings;
   };

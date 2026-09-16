@@ -150,7 +150,7 @@ test("a control's view is found while mounted and forgotten after", () => {
 });
 
 describe("the key to the marks is drawn rather than described", () => {
-  const SAMPLES: readonly MarkSample[] = ["moving", "parked", "shadow", "landmark"];
+  const SAMPLES: readonly MarkSample[] = ["moving", "parked", "landmark"];
 
   /** A tile as the sky's renderer draws it. */
   function drawn(sample: MarkSample) {
@@ -184,11 +184,6 @@ describe("the key to the marks is drawn rather than described", () => {
       expect(glyph.tail).toBeNull();
       expect(glyph.core.width).toBeGreaterThan(0);
     }
-
-    // The same mark twice, and the strength is the only thing that differs.
-    const [lit, eclipsed] = drawn("shadow").glyphs;
-    expect(eclipsed.core).toEqual(lit.core);
-    expect(eclipsed.alpha).toBeCloseTo(lit.alpha / 2);
 
     const landmark = drawn("landmark");
     expect(landmark.glyphs[0].halo).not.toBeNull();

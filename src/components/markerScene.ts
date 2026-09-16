@@ -78,14 +78,6 @@ import { Ink, MARK_COLOR, MarkerPalette } from "./palette";
  *   currently on the frame (`NotableSatellites`), and only where two of them
  *   do not collide.
  *
- * And one that is new, and is not about where the object is at all: **how
- * strongly the mark is drawn** says whether the sun is on it. An object in the
- * Earth's shadow has nothing to reflect and cannot be seen however clear the
- * sky is, so its light is drawn at half strength — see `sunlightAlpha`. Its
- * edge is not faded with it, so by day, when the edge is most of what is seen,
- * a mark in shadow is a dark ring round a grey centre rather than a mark half
- * gone.
- *
  * By day the pale fill alone would vanish into the sky, so every mark, tail
  * included, gains a fine edge in a deep shade of its own hue and loses its light: by
  * day the edge is what reads. Both are the palette's business (`glow`, `edge`),
@@ -220,17 +212,15 @@ export type GlyphShape = {
   /** The mark's fill, as `#rrggbb`: its category's colour. */
   color: string;
   /**
-   * How far through a fade the marker is, in `(0, 1]`, times whether the sun is
-   * on it. The fill, glow, halo and tail are drawn at this on top of their own
-   * strength.
+   * How far through a fade the marker is, in `(0, 1]`. The fill, glow, halo
+   * and tail are drawn at this on top of their own strength.
    */
   alpha: number;
   /**
    * How strongly the edges — under the point and under the tail — are drawn:
-   * the fade alone, without the sun (`sunlightAlpha`), times how much edge the
-   * sky calls for (`MarkerPalette.edge`) — none at night, all of it by day —
-   * or the picture behind the mark does, if that asks for more
-   * (`backdropEdge`).
+   * the fade alone, times how much edge the sky calls for
+   * (`MarkerPalette.edge`) — none at night, all of it by day — or the
+   * picture behind the mark does, if that asks for more (`backdropEdge`).
    */
   edgeAlpha: number;
 };
@@ -475,7 +465,7 @@ export function buildMarkerScene(
       edgeColor,
       halo: landmark ? size / 2 + HALO_MARGIN_PX * scale : null,
       color,
-      alpha: marker.opacity * sunlightAlpha(marker),
+      alpha: marker.opacity,
       edgeAlpha: marker.opacity * edge
     });
 
@@ -854,47 +844,6 @@ export const CORE_FADE: readonly FadeStop[] = [
 
 /** Width the marker sizes in `constants.ts` are quoted in. */
 export const DESIGN_FRAME_WIDTH_PX = 720;
-/**
- * How far to fade a marker for want of sunlight, as a factor on its opacity.
- *
- * **A mark at full strength means the sun is on it.** Half of every orbit is
- * spent inside the Earth's shadow, and an object in there is reflecting
- * nothing: the marker is over a piece of sky with nothing in it to see. Until
- * the shadow was worked out (`src/satellite/illumination.ts`) the overlay drew
- * those exactly as it drew the lit ones, which on a clear evening is half the
- * marks on the frame pointing at nothing — and no way to tell which half.
- *
- * Opacity is the channel it costs, and it is the only one going spare. The
- * others the overlay carries are all in use at rest — shape for whether it holds
- * station, size for range, a name for the landmarks — and spending any of them
- * would be trading one fact for another. Opacity is not: at rest a marker is
- * either faded fully in or has been dropped, and everything in between belongs to the crossfade the terrain
- * mask arbitrates (`MarkerVisibilityFilter`), which is a transition rather than
- * something to read. A marker held permanently at half strength is a state
- * nothing else produces.
- *
- * It is also the channel that means the right thing. An object in the Earth's
- * shadow *is* dimmer — infinitely so — and a fainter mark for a fainter object
- * needs no key to be guessed at. Applied here rather than on the marker itself
- * so it lands after the loop has decided what is worth drawing at all: this is
- * how a satellite looks, not whether it is on the frame.
- *
- * A factor rather than a replacement, so an eclipsed marker still fades in and
- * out behind a roof like any other — the two compound, which is honest, since
- * such a marker really is both.
- *
- * The mark's light and nothing else — not its edge, which is what a mark is
- * read by on a bright sky, so that by day a mark in shadow is still plainly a
- * mark, a dark ring round a greyer centre. A landmark's name and the ring around a tapped
- * object are the app's own annotations rather than light coming off a
- * satellite, and both stay at full strength: somebody wants to read `ISS` and
- * to see which mark they have selected exactly as much when the thing is in the
- * Earth's shadow — arguably more, since that is the case they are going to ask
- * a question about.
- */
-function sunlightAlpha(marker: SatelliteMarker): number {
-  return marker.sunlit === "eclipsed" ? SHADOW_ALPHA : 1;
-}
 
 /**
  * The solid point, as a fraction of the footprint the range scale gives a mark.
@@ -987,17 +936,6 @@ const MIN_EDGE_PX = 0.9;
 /** Thickness of the parked ring, as a fraction of its diameter. */
 const RING_RATIO = 0.2;
 const MIN_RING_PX = 1;
-/**
- * What is left of a marker with no sun on it. See `sunlightAlpha`.
- *
- * Half, which is far enough to read as a different kind of mark at a glance and
- * not so far that the object is lost: it is still there, it still has an edge,
- * a size and a heading, and all three are how somebody finds it again when it
- * comes back into the sunlight a few minutes later. Fading it to near nothing
- * would be the overlay deciding on somebody's behalf that an object it can
- * place exactly is not worth showing them.
- */
-const SHADOW_ALPHA = 0.5;
 const HALO_MARGIN_PX = 10;
 /**
  * Clear sky left between a point and the ring saying it is selected, quoted at

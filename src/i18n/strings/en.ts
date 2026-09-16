@@ -46,10 +46,6 @@ export const en: Strings = {
         name: "Ring",
         meaning: "Geostationary: it stays in the same spot."
       },
-      shadow: {
-        name: "Faint",
-        meaning: "In the Earth's shadow, so you can't see it."
-      },
       landmark: {
         name: "Named",
         meaning: "Space stations and big telescopes. The dashed line shows where they'll pass."
@@ -129,7 +125,6 @@ export const en: Strings = {
     open: "Category filter",
     showAll: "SHOW ALL",
     ringKey: "RING = PARKED OVER THE EQUATOR",
-    shadowKey: "FAINT = IN THE EARTH'S SHADOW",
     categories: {
       LANDMARK: "HIGHLIGHTS",
       NAVIGATION: "NAVIGATION",

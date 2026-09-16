@@ -48,7 +48,6 @@ export function tourSteps(): readonly TourStep[] {
       marks: [
         { sample: "moving", ...t.marks.moving },
         { sample: "parked", ...t.marks.parked },
-        { sample: "shadow", ...t.marks.shadow },
         { sample: "landmark", ...t.marks.landmark }
       ]
     },

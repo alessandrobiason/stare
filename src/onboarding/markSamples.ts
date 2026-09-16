@@ -2,7 +2,6 @@ import { FramePoint } from "../camera/projection";
 import { FrameSize } from "../components/markerGeometry";
 import { MarkerFrame, SatelliteMarker } from "../hooks/useAnimatedMarkers";
 import { SatelliteCategory } from "../satellite/categories";
-import { SunlitState } from "../satellite/illumination";
 
 /**
  * The tour's key to the marks, as the frames the overlay would have been handed.
@@ -27,7 +26,7 @@ import { SunlitState } from "../satellite/illumination";
 export const FIGURE_MARK_SCALE = 1;
 
 /** The kinds of mark the tour draws a tile of, in the order it lists them. */
-export type MarkSample = "moving" | "parked" | "shadow" | "landmark";
+export type MarkSample = "moving" | "parked" | "landmark";
 
 /** One tile, in layout points. */
 export const MARK_TILE: FrameSize = { width: 74, height: 44 };
@@ -44,7 +43,6 @@ type Placed = {
   headingDeg: number | null;
   /** How far it went over the trail window, in points — which is how long its tail is. */
   travel?: number;
-  sunlit?: SunlitState;
 };
 
 const MARK_SAMPLES: Record<MarkSample, readonly Placed[]> = {
@@ -60,12 +58,6 @@ const MARK_SAMPLES: Record<MarkSample, readonly Placed[]> = {
     { category: "TELECOM", x: 15, y: 25, rangeKm: 37000, headingDeg: null },
     { category: "TELECOM", x: 37, y: 20, rangeKm: 38200, headingDeg: null },
     { category: "TELECOM", x: 59, y: 25, rangeKm: 36800, headingDeg: null }
-  ],
-  // The same mark twice, in sunlight and in the Earth's shadow: the difference
-  // is the only thing there is to read.
-  shadow: [
-    { category: "EARTH", x: 26, y: 22, rangeKm: 600, headingDeg: 15, travel: 14 },
-    { category: "EARTH", x: 60, y: 22, rangeKm: 600, headingDeg: 15, travel: 14, sunlit: "eclipsed" }
   ],
   // High in the tile, because the name is set under the mark.
   landmark: [
@@ -107,7 +99,7 @@ function markerFor(box: FrameSize, placed: Placed): SatelliteMarker {
             )
           ),
     opacity: 1,
-    sunlit: placed.sunlit ?? "sunlit"
+    sunlit: "sunlit"
   };
 }
 

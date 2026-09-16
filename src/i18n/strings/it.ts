@@ -39,10 +39,6 @@ export const it: Strings = {
         name: "Anello",
         meaning: "Geostazionario: resta sempre nello stesso punto."
       },
-      shadow: {
-        name: "Sbiadito",
-        meaning: "È nell'ombra della Terra, quindi non si vede."
-      },
       landmark: {
         name: "Con nome",
         meaning: "Stazioni spaziali e grandi telescopi. La linea tratteggiata indica dove passeranno."
@@ -122,7 +118,6 @@ export const it: Strings = {
     open: "Filtro per categoria",
     showAll: "MOSTRA TUTTI",
     ringKey: "ANELLO = FERMO SULL'EQUATORE",
-    shadowKey: "SBIADITO = NELL'OMBRA DELLA TERRA",
     categories: {
       LANDMARK: "IMPORTANTI",
       NAVIGATION: "NAVIGAZIONE",
