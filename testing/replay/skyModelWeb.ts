@@ -1,6 +1,6 @@
 import { SKY_MODEL_URL } from "../../src/vision/skyModelSource";
 import { Size } from "../../src/vision/skySegmentation";
-import { SkyModel } from "../../src/vision/skyModelTypes";
+import { SkyModel, SkyModelDiagnostics } from "../../src/vision/skyModelTypes";
 
 /**
  * The sky model under ONNX Runtime Web (WASM): the harness's half of the pair
@@ -40,21 +40,26 @@ const SESSION_OPTIONS = {
  * SharedArrayBuffer, and so no COOP/COEP headers. A page that blocks blob
  * workers outright still gets a working mask, just a stuttering one.
  */
-async function createSession(ort: OrtModule) {
+type OrtSession = Awaited<ReturnType<OrtModule["InferenceSession"]["create"]>>;
+
+async function createSession(ort: OrtModule): Promise<{ session: OrtSession; proxied: boolean }> {
   try {
     ort.env.wasm.proxy = true;
-    return await ort.InferenceSession.create(SKY_MODEL_URL, SESSION_OPTIONS);
+    const session = await ort.InferenceSession.create(SKY_MODEL_URL, SESSION_OPTIONS);
+    return { session, proxied: true };
   } catch (error) {
     console.warn(
       "Sky segmentation could not start its worker; inference will run on the main thread and the view will stutter",
       error
     );
     ort.env.wasm.proxy = false;
-    return ort.InferenceSession.create(SKY_MODEL_URL, SESSION_OPTIONS);
+    const session = await ort.InferenceSession.create(SKY_MODEL_URL, SESSION_OPTIONS);
+    return { session, proxied: false };
   }
 }
 
 export async function createSkyModel(): Promise<SkyModel> {
+  const startedAtMs = performance.now();
   const ort = await import("onnxruntime-web");
   // Single-threaded avoids needing SharedArrayBuffer (and its COOP/COEP
   // headers), which this application does not otherwise require.
@@ -64,7 +69,12 @@ export async function createSkyModel(): Promise<SkyModel> {
   // stall on a 404.
   ort.env.wasm.wasmPaths = WASM_URL;
 
-  const session = await createSession(ort);
+  const { session, proxied } = await createSession(ort);
+  const diagnostics: SkyModelDiagnostics = {
+    backend: `ONNX Runtime Web (WASM${proxied ? ", proxied worker" : ", main thread"})`,
+    detail: `${ort.env.wasm.numThreads} thread`,
+    loadMs: performance.now() - startedAtMs
+  };
 
   return {
     async run(input: Float32Array, size: Size): Promise<Float32Array> {
@@ -77,6 +87,7 @@ export async function createSkyModel(): Promise<SkyModel> {
       // By name from the graph rather than a hard-coded "output", so a remirrored
       // or re-exported model cannot silently hand back `undefined`.
       return outputs[session.outputNames[0]].data as Float32Array;
-    }
+    },
+    diagnostics
   };
 }

@@ -15,6 +15,7 @@ import {
   DebugSection,
   DebugSource,
   maskSection,
+  modelSection,
   skySection,
   viewSection
 } from "../debug/sections";
@@ -31,7 +32,7 @@ import { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { BackdropBrightness, brightnessGridSliced } from "../vision/backdropBrightness";
-import { SkyFrameGrabber } from "../vision/skySegmenter";
+import { SkyFrameGrabber, skyModelDiagnostics } from "../vision/skySegmenter";
 import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
 import { CatalogScreen } from "./CatalogScreen";
@@ -524,6 +525,10 @@ export const SkyOverlay: React.FC<Props> = ({
       chaseAtDeg: aimToleranceDeg(frame.lens, SKY_MASK_CHASE_FRACTION),
       nowMs: performance.now()
     }),
+    // The model's session came up once at boot, so this is a plain read rather
+    // than something sampled off a ref: it never changes underneath the panel's
+    // own timer the way a per-frame stat does. See `skyModelDiagnostics`.
+    modelSection(skyModelDiagnostics()),
     celestialSection({
       stats: celestial.statsRef.current,
       checking: { on: celestialAlignment, onToggle: onToggleCelestialAlignment },

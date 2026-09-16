@@ -4,6 +4,7 @@ import {
   celestialSection,
   deviceSensorSection,
   maskSection,
+  modelSection,
   skySection,
   statusSection,
   viewSection
@@ -540,5 +541,59 @@ describe("the sky-fix page", () => {
     expect(section.switches).toEqual([
       { label: "Check compass against the sky", on: false, onToggle: expect.any(Function) }
     ]);
+  });
+});
+
+describe("the sky model page", () => {
+  test("says the model is still loading rather than showing nothing", () => {
+    const rows = values(modelSection(null).rows);
+    expect(rows.State).toBe("Loading…");
+  });
+
+  test("reports the backend and how long the session took to come up", () => {
+    const rows = values(
+      modelSection({
+        backend: "Core ML (Neural Engine + CPU) on ONNX Runtime",
+        detail: 'MLProgram · 320x448 · cache "skywaterb2w320h448v1" · reused from an earlier launch',
+        loadMs: 842
+      }).rows
+    );
+
+    expect(rows.Backend).toBe("Core ML (Neural Engine + CPU) on ONNX Runtime");
+    expect(rows.Detail).toContain("MLProgram");
+    expect(rows["Session load"]).toBe("842 ms");
+    expect(rows.Preparation).toBeUndefined();
+  });
+
+  test("distinguishes a launch that rewrote the model from one that reused it", () => {
+    const fresh = values(
+      modelSection({
+        backend: "Core ML (Neural Engine + CPU) on ONNX Runtime",
+        detail: "rewritten",
+        loadMs: 21_400,
+        prepared: { freshlyPrepared: true, gathersRewritten: 186, bytes: 99_347_346 }
+      }).rows
+    );
+    expect(fresh.Preparation).toBe("rewritten this launch · 186 gathers split");
+    expect(fresh["Prepared size"]).toBe("94.75 MB");
+
+    const cached = values(
+      modelSection({
+        backend: "Core ML (Neural Engine + CPU) on ONNX Runtime",
+        detail: "cached",
+        loadMs: 640,
+        prepared: { freshlyPrepared: false, gathersRewritten: null, bytes: 99_347_346 }
+      }).rows
+    );
+    expect(cached.Preparation).toBe("reused from an earlier launch");
+  });
+
+  test("keeps a raw millisecond figure rather than rounding a fast load away", () => {
+    // `duration()` rounds to the second, which would read a 300 ms cached load
+    // as "0 s" — indistinguishable from a bug that never actually ran.
+    const rows = values(
+      modelSection({ backend: "ONNX Runtime Web (WASM, proxied worker)", detail: "1 thread", loadMs: 300 }).rows
+    );
+    expect(rows["Session load"]).toBe("300 ms");
   });
 });

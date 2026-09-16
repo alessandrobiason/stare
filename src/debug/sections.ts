@@ -26,6 +26,7 @@ import { ObserverLocation } from "../types";
 import { AnchoredSkyMask, maskOffsetDeg } from "../vision/anchoredMask";
 import { refinedCellCount, skyCoverage } from "../vision/skyMask";
 import { SkyMemoryStats } from "../vision/skyMemory";
+import { SkyModelDiagnostics } from "../vision/skyModelTypes";
 import { bytes, clockTime, degrees, duration, fixed, NONE, position, vector } from "./format";
 
 /**
@@ -228,6 +229,45 @@ export function maskSection({
       { label: "Hide behind terrain", on: filtering.on, onToggle: filtering.onToggle }
     ]
   };
+}
+
+/**
+ * How the sky model's session came up: where it runs, and how long it took.
+ *
+ * The page to read when the mask itself looks fine but the *camera preview* is
+ * what stutters — the thing the Neural Engine move in `skyModel.ts` was for.
+ * "Backend" says whether the graph actually reached Core ML; "Session load"
+ * says whether this launch paid to compile it or found an earlier launch's
+ * compilation waiting. A load in the tens of seconds on every launch is the
+ * compile cache not holding, which is worth knowing before blaming inference
+ * itself for a slow start.
+ */
+export function modelSection(diagnostics: SkyModelDiagnostics | null): DebugSection {
+  if (!diagnostics) {
+    return { id: "model", title: "SKY MODEL", rows: [{ label: "State", value: "Loading…" }] };
+  }
+
+  const rows: DebugRow[] = [
+    { label: "Backend", value: diagnostics.backend, wrap: true },
+    { label: "Detail", value: diagnostics.detail, wrap: true },
+    // Raw milliseconds rather than `duration()`, which rounds to the second:
+    // the distinction this exists to draw — a cached load under a second
+    // against a cold compile in the tens of seconds — would be lost at that
+    // resolution for the case that matters most, the fast one.
+    { label: "Session load", value: `${Math.round(diagnostics.loadMs)} ms` }
+  ];
+  if (diagnostics.prepared) {
+    const { freshlyPrepared, gathersRewritten, bytes: preparedBytes } = diagnostics.prepared;
+    rows.push({
+      label: "Preparation",
+      value: freshlyPrepared
+        ? `rewritten this launch · ${gathersRewritten ?? 0} gathers split`
+        : "reused from an earlier launch"
+    });
+    rows.push({ label: "Prepared size", value: bytes(preparedBytes) });
+  }
+
+  return { id: "model", title: "SKY MODEL", rows };
 }
 
 export type CelestialDebugInput = {

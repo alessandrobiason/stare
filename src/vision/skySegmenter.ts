@@ -1,7 +1,7 @@
 import { startSlicing } from "../timeSlice";
 import { SkyMask } from "./skyMask";
 import { createSkyModel } from "./skyModel";
-import { SkyModel } from "./skyModelTypes";
+import { SkyModel, SkyModelDiagnostics } from "./skyModelTypes";
 import {
   maskGridFor,
   modelInputSize,
@@ -62,16 +62,32 @@ export type SkyFrameGrabber = {
 };
 
 let modelPromise: Promise<SkyModel> | null = null;
+/** The loaded model's own report of itself, once there is one. See `skyModelDiagnostics`. */
+let diagnostics: SkyModelDiagnostics | null = null;
 
 function loadModel(): Promise<SkyModel> {
   if (!modelPromise) {
-    modelPromise = createSkyModel().catch((error: unknown) => {
-      // Allow a later call to retry rather than pinning the failure forever.
-      modelPromise = null;
-      throw error;
-    });
+    modelPromise = createSkyModel()
+      .then((model) => {
+        diagnostics = model.diagnostics;
+        return model;
+      })
+      .catch((error: unknown) => {
+        // Allow a later call to retry rather than pinning the failure forever.
+        modelPromise = null;
+        throw error;
+      });
   }
   return modelPromise;
+}
+
+/**
+ * How the sky model's session came up, for the Console's "Sky model" page.
+ * `null` before the first load has finished — boot waits on that first, so in
+ * practice this is `null` only while the boot screen is still up.
+ */
+export function skyModelDiagnostics(): SkyModelDiagnostics | null {
+  return diagnostics;
 }
 
 /**

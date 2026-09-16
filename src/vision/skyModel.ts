@@ -4,7 +4,7 @@ import { DEVICE_CAMERA } from "../constants";
 import { SKY_MODEL_URL } from "./skyModelSource";
 import { prepareSkyModel } from "./skyModelPreparation";
 import { modelInputSize, Size } from "./skySegmentation";
-import { SkyModel } from "./skyModelTypes";
+import { SkyModel, SkyModelDiagnostics } from "./skyModelTypes";
 
 /**
  * The sky model under ONNX Runtime React Native.
@@ -124,6 +124,14 @@ async function localModel(directory: Directory): Promise<File> {
   return File.downloadFileAsync(SKY_MODEL_URL, file, { idempotent: true });
 }
 
+/** What `preparedModel` did, for the Console's "Sky model" page. */
+type PreparationOutcome = {
+  file: File;
+  freshlyPrepared: boolean;
+  /** `null` when this launch found an earlier one's file rather than rewriting it. */
+  gathersRewritten: number | null;
+};
+
 /**
  * The downloaded model rewritten for Core ML, made once and kept beside it.
  *
@@ -133,11 +141,13 @@ async function localModel(directory: Directory): Promise<File> {
  * another input size — are removed once this one is in place, since each is the
  * size of the model.
  */
-async function preparedModel(directory: Directory, source: File): Promise<File> {
+async function preparedModel(directory: Directory, source: File): Promise<PreparationOutcome> {
   const prepared = new File(directory, PREPARED_FILE);
-  if (prepared.exists && (prepared.size ?? 0) > 0) return prepared;
+  if (prepared.exists && (prepared.size ?? 0) > 0) {
+    return { file: prepared, freshlyPrepared: false, gathersRewritten: null };
+  }
 
-  const { parts } = prepareSkyModel(await source.bytes(), {
+  const { parts, gathersRewritten } = prepareSkyModel(await source.bytes(), {
     dimensions: { batch: 1, height: INPUT_SIZE.height, width: INPUT_SIZE.width },
     coreMlCacheKey: COREML_CACHE_KEY
   });
@@ -160,7 +170,7 @@ async function preparedModel(directory: Directory, source: File): Promise<File> 
       entry.delete();
     }
   }
-  return new File(directory, PREPARED_FILE);
+  return { file: new File(directory, PREPARED_FILE), freshlyPrepared: true, gathersRewritten };
 }
 
 /**
@@ -185,11 +195,12 @@ function coreMlCacheDirectory(directory: Directory): string {
 }
 
 export async function createSkyModel(): Promise<SkyModel> {
+  const startedAtMs = performance.now();
   const directory = new Directory(Paths.document, MODEL_DIRECTORY);
   directory.create({ intermediates: true, idempotent: true });
 
-  const model = await preparedModel(directory, await localModel(directory));
-  const session = await InferenceSession.create(model.uri, {
+  const preparation = await preparedModel(directory, await localModel(directory));
+  const session = await InferenceSession.create(preparation.file.uri, {
     executionProviders: executionProviders(coreMlCacheDirectory(directory)),
     graphOptimizationLevel: "all",
     /**
@@ -221,6 +232,22 @@ export async function createSkyModel(): Promise<SkyModel> {
     }
   });
 
+  // Whichever of the two is slow says what to look at: a slow *load* on every
+  // launch is the compile cache not holding, and a slow first *run* once
+  // segmentation starts is inference having fallen off the Neural Engine.
+  const diagnostics: SkyModelDiagnostics = {
+    backend: "Core ML (Neural Engine + CPU) on ONNX Runtime",
+    detail:
+      `MLProgram · ${INPUT_SIZE.width}x${INPUT_SIZE.height} · cache "${COREML_CACHE_KEY}"` +
+      (preparation.freshlyPrepared ? " · rewritten this launch" : " · reused from an earlier launch"),
+    loadMs: performance.now() - startedAtMs,
+    prepared: {
+      freshlyPrepared: preparation.freshlyPrepared,
+      gathersRewritten: preparation.gathersRewritten,
+      bytes: preparation.file.size ?? 0
+    }
+  };
+
   return {
     async run(input: Float32Array, size: Size): Promise<Float32Array> {
       // The size is compiled in, so another one is a bug upstream rather than
@@ -237,6 +264,7 @@ export async function createSkyModel(): Promise<SkyModel> {
       // By name from the graph rather than a hard-coded "output", so a
       // re-exported model cannot silently hand back `undefined`.
       return outputs[session.outputNames[0]].data as Float32Array;
-    }
+    },
+    diagnostics
   };
 }
