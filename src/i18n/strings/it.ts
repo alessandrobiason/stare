@@ -87,7 +87,7 @@ export const it: Strings = {
     },
     sunlight: {
       daylight: "È giorno — nessuno di questi è ancora visibile",
-      none: "Sono tutti nell'ombra della Terra",
+      none: "Sono tutti nel cono d'ombra della Terra",
       some: "{count} di questi sono illuminati dal Sole",
       all: "Sono tutti illuminati dal Sole"
     },
@@ -99,7 +99,7 @@ export const it: Strings = {
         visible: "visibile a occhio nudo",
         binoculars: "solo col binocolo",
         tooFaint: "troppo debole",
-        eclipsed: "nell'ombra della Terra",
+        eclipsed: "nel cono d'ombra della Terra",
         daylight: "è giorno — niente da vedere",
         unknown: "luminosità non registrata"
       }
@@ -140,17 +140,17 @@ export const it: Strings = {
     close: "Chiudi i dettagli",
     holdsStation: "RESTA FERMO",
     openSite: "Apri {site}",
-    photo: "Fotografia: {name}",
+    photo: "Fotografia di {name}",
     missing: "Questo satellite non è più nel catalogo.",
     seeing: {
       visible: "Abbastanza luminoso da vedersi adesso",
       binoculars: "Illuminato dal Sole, ma servirebbe un binocolo",
       tooFaint: "Illuminato dal Sole, ma troppo debole per vederlo",
-      eclipsed: "Nell'ombra della Terra: non c'è luce da riflettere",
+      eclipsed: "Nel cono d'ombra della Terra: non c'è luce da riflettere",
       daylight: "Qui il Sole è ancora alto — non si vede ancora nulla in orbita",
-      unknown: "Illuminato dal Sole, ma non è registrato quanto rifletta",
+      unknown: "Illuminato dal Sole, ma la sua luminosità non è registrata",
       magnitude: "magnitudine {value}",
-      aboutMagnitude: "magnitudine circa {value}",
+      aboutMagnitude: "circa magnitudine {value}",
       onPass: "Quando passerà, alle {time}: {verdict}"
     },
     facts: {
@@ -180,9 +180,9 @@ export const it: Strings = {
         "da dove sono disegnati."
     },
     magnetic: {
-      title: "Direzioni al nord magnetico",
+      title: "Le direzioni indicano il nord magnetico",
       detail:
-        "Questo telefono non ha comunicato lo scarto dal nord geografico, quindi tutto " +
+        "Questo telefono non indica lo scostamento dal nord geografico, quindi tutto " +
         "è disegnato spostato della declinazione locale — pochi gradi quasi ovunque."
     }
   },
@@ -193,7 +193,7 @@ export const it: Strings = {
   },
   catalog: {
     soon:
-      "Cerca qualsiasi oggetto del catalogo, anche quando non è sopra di te. Non c'è ancora."
+      "Cerca qualsiasi oggetto del catalogo, anche quando non è sopra di te. Non ancora disponibile."
   },
   language: {
     title: "Lingua"

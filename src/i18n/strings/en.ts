@@ -61,7 +61,7 @@ export const en: Strings = {
     },
     freeze: {
       title: "Freeze",
-      body: "Hold the view still, then lower the phone and tap the marks at ease."
+      body: "Hold the view still, then lower the phone and tap the marks at your own pace."
     },
     passes: {
       title: "Coming up",
@@ -153,7 +153,7 @@ export const en: Strings = {
       visible: "Bright enough to see now",
       binoculars: "In sunlight, but you would want binoculars",
       tooFaint: "In sunlight, and far too faint to see",
-      eclipsed: "In the Earth's shadow, with no sunlight on it to see",
+      eclipsed: "In the Earth's shadow, with no light to reflect",
       daylight: "The sun is still up here — nothing in orbit can be seen yet",
       unknown: "In sunlight, though how brightly it shines is not recorded",
       magnitude: "magnitude {value}",
@@ -186,9 +186,9 @@ export const en: Strings = {
         "Until then the satellites can be tens of degrees from where they are drawn."
     },
     magnetic: {
-      title: "Headings are magnetic north",
+      title: "Headings point to magnetic north",
       detail:
-        "This phone has not reported a true-north offset, so everything is drawn out " +
+        "This phone has not reported a true-north offset, so everything is shown shifted " +
         "by the local declination — a few degrees in most places."
     }
   },

@@ -394,7 +394,7 @@ describe("the figures follow the reader's conventions", () => {
         apparentMagnitude: Number.POSITIVE_INFINITY,
         magnitudeMeasured: true
       })
-    ).toBe("In the Earth's shadow, with no sunlight on it to see");
+    ).toBe("In the Earth's shadow, with no light to reflect");
     expect(
       seeing({ nakedEye: "daylight", apparentMagnitude: -1.8, magnitudeMeasured: true })
     ).toBe("The sun is still up here — nothing in orbit can be seen yet");
