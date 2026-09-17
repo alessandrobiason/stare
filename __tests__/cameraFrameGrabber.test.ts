@@ -266,8 +266,58 @@ describe("frames from the video stream", () => {
     }
     expect(camera.grabFrameAsync).toHaveBeenCalledTimes(3);
     expect(grabber.reading?.().fallbackReason).toBe(
-      "3 video frames failed in a row: No video frame arrived in time"
+      "3 video frames failed in a row: No video frame arrived in time · video again in 30 s"
     );
+  });
+
+  test("try video frames again once the stills after a run of failures have had their half minute", async () => {
+    let now = 1_000;
+    const clock = jest.spyOn(performance, "now").mockImplementation(() => now);
+    try {
+      let failing = true;
+      const camera = tappedCamera(async () => {
+        if (failing) throw new Error("No video frame arrived in time");
+        return picture().buffer as ArrayBuffer;
+      });
+      const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+      for (let pass = 0; pass < 3; pass += 1) await grabber.grab(VIDEO, () => undefined);
+      expect(grabber.reading?.().fallbackReason).toMatch(/video again in 30 s$/);
+
+      // Still inside the half minute: stills, and no video asked for.
+      now += 29_000;
+      await grabber.grab(VIDEO, () => undefined);
+      expect(camera.grabFrameAsync).toHaveBeenCalledTimes(3);
+
+      // Past it, with the camera working again: video frames, and the fallback gone.
+      now += 2_000;
+      failing = false;
+      await grabber.grab(VIDEO, () => undefined);
+      expect(camera.grabFrameAsync).toHaveBeenCalledTimes(4);
+      expect(grabber.reading?.()).toMatchObject({ source: "video frame", fallbackReason: null });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("wait out a camera that is not running, rather than count it against video frames", async () => {
+    // The phone locked and unlocked: the session is stopped while it restarts.
+    const stopped = new Error(
+      "Calling the 'grabFrame' function has failed → Caused by: CameraFrameTapNotRunningException: The capture session is not running"
+    );
+    const camera = tappedCamera(async () => {
+      throw stopped;
+    });
+    const grabber = cameraFrameGrabber(() => camera as never, FRAME);
+
+    for (let pass = 0; pass < 5; pass += 1) {
+      mockOrder.length = 0;
+      // The pass fails, and no still is taken: it would be refused the same way.
+      await expect(grabber.grab(VIDEO, () => undefined)).rejects.toBe(stopped);
+      expect(mockOrder).not.toContain("capture requested");
+    }
+    // Five of them, and video frames are still what is asked for.
+    expect(camera.grabFrameAsync).toHaveBeenCalledTimes(5);
+    expect(grabber.reading?.().fallbackReason).toBeNull();
   });
 
   test("refuse a frame of the wrong size rather than segmenting garbage", async () => {

@@ -86,10 +86,10 @@ index 424294b..d3873be 100644
      "Failed to save image: \(param)"
 diff --git a/node_modules/expo-camera/ios/Current/CameraFrameTap.swift b/node_modules/expo-camera/ios/Current/CameraFrameTap.swift
 new file mode 100644
-index 0000000..f27c287
+index 0000000..03820ee
 --- /dev/null
 +++ b/node_modules/expo-camera/ios/Current/CameraFrameTap.swift
-@@ -0,0 +1,288 @@
+@@ -0,0 +1,310 @@
 +import Accelerate
 +@preconcurrency import AVFoundation
 +import CoreVideo
@@ -104,6 +104,16 @@ index 0000000..f27c287
 +internal final class CameraFrameTapTimeoutException: Exception {
 +  override var reason: String {
 +    "No video frame arrived in time"
++  }
++}
++
++/// The session is stopped or interrupted — the phone locked, the app in the
++/// background, another app on the camera. Not the tap's fault, and not a frame
++/// that timed out: reported at once, and separately, so a caller can wait it out
++/// rather than count it against the tap.
++internal final class CameraFrameTapNotRunningException: Exception {
++  override var reason: String {
++    "The capture session is not running"
 +  }
 +}
 +
@@ -182,6 +192,17 @@ index 0000000..f27c287
 +        self.pending = Pending(id: id, target: target, continuation: continuation)
 +
 +        self.sessionQueue.async {
++          // Checked here rather than when the request was made: this block runs
++          // behind whatever the session queue was already doing, and after the
++          // phone is unlocked that is the session being started again, which
++          // takes a second or two. Asked before it, a running session looked
++          // stopped; timed from before it, a healthy tap timed out.
++          guard self.session.isRunning, !self.session.isInterrupted else {
++            self.queue.async {
++              self.finish(id, with: .failure(CameraFrameTapNotRunningException()))
++            }
++            return
++          }
 +          guard let output = self.attachedOutput() else {
 +            self.queue.async {
 +              self.finish(id, with: .failure(CameraFrameTapUnavailableException()))
@@ -189,9 +210,10 @@ index 0000000..f27c287
 +            return
 +          }
 +          output.connection(with: .video)?.isEnabled = true
-+        }
-+        self.queue.asyncAfter(deadline: .now() + timeout) {
-+          self.finish(id, with: .failure(CameraFrameTapTimeoutException()))
++          // The wait starts once frames can flow, not when they were asked for.
++          self.queue.asyncAfter(deadline: .now() + timeout) {
++            self.finish(id, with: .failure(CameraFrameTapTimeoutException()))
++          }
 +        }
 +      }
 +    }

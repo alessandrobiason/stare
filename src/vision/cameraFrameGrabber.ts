@@ -137,6 +137,27 @@ function decodeNatively(bytes: Uint8Array): DecodedFrame | null {
 const VIDEO_FAILURES_BEFORE_STILLS = 3;
 
 /**
+ * How long stills are read after a run of failed video frames before video
+ * frames are tried again.
+ *
+ * Not for good. The run that first sent a phone back to stills was three frames
+ * timing out while the camera was being restarted after the phone was unlocked —
+ * nothing wrong with the tap, and nothing that lasts — and a fallback with no way
+ * back left that session on stills, and its stutter, until someone found the
+ * switch. Half a minute of stills is a price worth paying to find out again.
+ * A frame that came back the wrong way round is different, and stays a fallback:
+ * see `checkedAgainstStill`.
+ */
+const VIDEO_RETRY_AFTER_MS = 30_000;
+
+/**
+ * How the native tap says the capture session is stopped or interrupted: the
+ * phone locked, the app in the background, another app on the camera. Matched
+ * on the class name, which is in the message the error reaches JavaScript with.
+ */
+const SESSION_NOT_RUNNING = "CameraFrameTapNotRunningException";
+
+/**
  * How many times the video frames are compared with a still before giving up on
  * getting a decisive answer. Each check costs one still — the very thing the
  * video frames are there to avoid — so the count is small.
@@ -158,6 +179,8 @@ export function cameraFrameGrabber(
   let preferVideo = true;
   let videoFailures = 0;
   let fallbackReason: string | null = null;
+  /** When video frames are tried again, if the fallback is one that ends. */
+  let retryVideoAt: number | null = null;
   let source: string | null = null;
   let lastGrabMs: number | null = null;
   let agreement: string | null = null;
@@ -311,6 +334,12 @@ export function cameraFrameGrabber(
       if (!view) throw new Error("The camera is not open");
       const startedAt = performance.now();
 
+      if (fallbackReason !== null && retryVideoAt !== null && startedAt >= retryVideoAt) {
+        fallbackReason = null;
+        retryVideoAt = null;
+        videoFailures = 0;
+      }
+
       if (preferVideo && fallbackReason === null && typeof view.grabFrameAsync === "function") {
         // The shutter is the request, as it is for a still, and much nearer the
         // photons: the frame is the next one the preview produces.
@@ -326,11 +355,19 @@ export function cameraFrameGrabber(
           }
           fallbackReason = "This build's camera has no video frame tap";
         } catch (cause) {
-          videoFailures += 1;
           const message = cause instanceof Error ? cause.message : String(cause);
+          if (message.includes(SESSION_NOT_RUNNING)) {
+            // The camera is not running, which is a pass with nothing to read
+            // rather than a tap that does not work: not counted against video
+            // frames, and no still tried either, since it would be refused for
+            // the same reason. The loop's own failure count waits it out.
+            throw cause;
+          }
+          videoFailures += 1;
           console.warn(`A video frame could not be read (${videoFailures} in a row)`, cause);
           if (videoFailures >= VIDEO_FAILURES_BEFORE_STILLS) {
             fallbackReason = `${videoFailures} video frames failed in a row: ${message}`;
+            retryVideoAt = performance.now() + VIDEO_RETRY_AFTER_MS;
           }
         }
       }
@@ -342,7 +379,17 @@ export function cameraFrameGrabber(
     },
 
     reading(): FrameReading {
-      return { source, lastGrabMs, preferVideo, fallbackReason, agreement };
+      const retrying =
+        fallbackReason !== null && retryVideoAt !== null
+          ? ` · video again in ${Math.max(0, Math.ceil((retryVideoAt - performance.now()) / 1000))} s`
+          : "";
+      return {
+        source,
+        lastGrabMs,
+        preferVideo,
+        fallbackReason: fallbackReason === null ? null : fallbackReason + retrying,
+        agreement
+      };
     },
 
     setPreferVideo(on: boolean): void {
@@ -351,6 +398,7 @@ export function cameraFrameGrabber(
         // Asked for again, so everything that ruled video frames out is asked
         // again too — the check against a still included.
         fallbackReason = null;
+        retryVideoAt = null;
         videoFailures = 0;
         agreement = null;
         agreementAttempts = 0;
