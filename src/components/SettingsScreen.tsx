@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import appConfig from "../../app.json";
 import { describeBuild } from "../debug/buildIdentity";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
@@ -7,13 +8,17 @@ import { LANGUAGE_NAMES, LOCALES, Locale, setLocale } from "../i18n/locale";
 import { CONSOLE_LABEL } from "./consoleLabel";
 import { Icon } from "./Icon";
 import { theme } from "./theme";
-import { APP_NAME } from "./wordmark";
 
 /** Where the source lives, and whose name goes beside it. Kept in one place
  * rather than in `i18n`, since a GitHub handle and an author's name are not
  * words that translate. */
 const GITHUB_URL = "https://github.com/alessandrobiason/stare";
 const AUTHOR_NAME = "Alessandro Biason";
+/**
+ * The version people are told, which is the one the store shows: `app.json`'s,
+ * read from the file rather than copied here so the two cannot disagree.
+ */
+const APP_VERSION = appConfig.expo.version;
 
 type Props = {
   /** Starts the tour over the sky. */
@@ -28,10 +33,9 @@ type Props = {
  * Everything about the app rather than about the sky.
  *
  * Four rows: Help, which runs the tour of the sky view again, the language,
- * the console, and the link to where this is built. None of them is
- * about what is overhead, none is touched more than once in a session, and the
- * first three used to spend a corner of a photograph saying so. A tab is where
- * they belong.
+ * the console, and About. None of them is about what is overhead, none is
+ * touched more than once in a session, and the first three used to spend a
+ * corner of a photograph saying so. A tab is where they belong.
  *
  * It covers the sky while it is open — a list of settings read against a
  * moving camera picture is a list nobody can read — but the camera keeps
@@ -45,11 +49,20 @@ type Props = {
  * **The console keeps its English name** — see `CONSOLE_LABEL` — and its row
  * carries the warning dot when boot reported something degraded, because the
  * page that says what was degraded is behind it.
+ *
+ * **About opens in place, like the language.** It used to be a link straight to
+ * the repository, which is one of three things somebody asking "about" might
+ * want and the only one that leaves the app. So it is a short list instead —
+ * the author, the project with its link, and the version — and the version is
+ * no longer a footnote under the rows: the build line that says exactly which
+ * binary this is (`describeBuild`) goes with it, under the number people are
+ * told.
  */
 export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, warned = false }) => {
   const locale = useLocale();
   const t = strings();
   const [languages, setLanguages] = useState(false);
+  const [about, setAbout] = useState(false);
   // Read once: it cannot change while the app is running.
   const [build] = useState(describeBuild);
 
@@ -77,7 +90,7 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
             onPress={() => setLanguages((was) => !was)}
           />
           {languages && (
-            <View accessibilityRole="radiogroup" style={styles.languages}>
+            <View accessibilityRole="radiogroup" style={styles.sublist}>
               {LOCALES.map((option) => {
                 const on = option === locale;
                 return (
@@ -109,18 +122,36 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
           />
 
           <Row
-            label="About"
-            detail={AUTHOR_NAME}
-            onPress={() => void Linking.openURL(GITHUB_URL).catch(() => undefined)}
-            last
+            label={t.about.title}
+            detail={t.about.detail}
+            open={about}
+            onPress={() => setAbout((was) => !was)}
+            last={!about}
           />
+          {about && (
+            <View style={[styles.sublist, styles.sublistLast]}>
+              <Fact label={t.about.author} value={AUTHOR_NAME} />
+              {/* The one fact here that goes somewhere: written as the address
+                  it opens rather than as "GitHub", so where a tap leads is on
+                  the screen before the tap. */}
+              <Fact
+                label={t.about.project}
+                value={GITHUB_URL.replace(/^https:\/\//, "")}
+                onPress={() => void Linking.openURL(GITHUB_URL).catch(() => undefined)}
+              />
+              {/* Which binary this is, under the number. See `describeBuild`: a
+                  fix that never reached the phone reads exactly like a fix that
+                  did not work, and the difference has to be legible from the
+                  screen someone photographs. Empty in the replay harness, which
+                  has no updates module. */}
+              <Fact
+                label={t.about.version}
+                value={APP_VERSION}
+                detail={build || null}
+              />
+            </View>
+          )}
         </View>
-
-        {/* Which binary this is. See `describeBuild`: a fix that never reached
-            the phone reads exactly like a fix that did not work, and the
-            difference has to be legible from the screen someone photographs.
-            Empty in the replay harness, which has no updates module. */}
-        <Text style={styles.build}>{build ? `${APP_NAME} · ${build}` : APP_NAME}</Text>
       </ScrollView>
     </View>
   );
@@ -137,6 +168,55 @@ function choose(next: Locale, close: (open: boolean) => void): void {
   close(false);
   setLocale(next);
 }
+
+type FactProps = {
+  label: string;
+  value: string;
+  /** A second, quieter line under the fact, for what the value alone does not say. */
+  detail?: string | null;
+  /** Where the fact leads, for the one that is a link. */
+  onPress?: () => void;
+};
+
+/**
+ * One line of About: a word and what it is. Plain text unless it leads
+ * somewhere, in which case the value is lit and the row takes the tap.
+ */
+const Fact: React.FC<FactProps> = ({ label, value, detail = null, onPress }) => {
+  const content = (
+    <>
+      <View style={styles.factHead}>
+        <Text style={styles.factLabel}>{label}</Text>
+        <Text
+          numberOfLines={1}
+          style={[styles.factValue, onPress && styles.factLink]}
+          selectable={!onPress}
+        >
+          {value}
+        </Text>
+        {onPress && <Icon name="chevron" size={14} color={theme.color.textFaint} />}
+      </View>
+      {detail ? (
+        <Text style={styles.factDetail} selectable>
+          {detail}
+        </Text>
+      ) : null}
+    </>
+  );
+
+  return onPress ? (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`${label}: ${value}`}
+      style={styles.fact}
+      onPress={onPress}
+    >
+      {content}
+    </Pressable>
+  ) : (
+    <View style={styles.fact}>{content}</View>
+  );
+};
 
 type RowProps = {
   label: string;
@@ -262,10 +342,15 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: theme.color.warning
   },
-  languages: {
+  /** A row's own list, opened under it: the languages, or About. */
+  sublist: {
     borderBottomWidth: StyleSheet.hairlineWidth * 2,
     borderBottomColor: theme.color.divider,
     backgroundColor: "rgba(0, 0, 0, 0.2)"
+  },
+  /** At the foot of the group, where the group's own border is the rule. */
+  sublistLast: {
+    borderBottomWidth: 0
   },
   language: {
     flexDirection: "row",
@@ -289,12 +374,38 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.color.accent
   },
-  build: {
-    marginTop: 16,
-    textAlign: "center",
+  fact: {
+    justifyContent: "center",
+    // A thumb-sized row, like the languages beside it.
+    minHeight: 44,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    gap: 3
+  },
+  factHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  factLabel: {
+    color: theme.color.textDim,
+    fontSize: 13
+  },
+  factValue: {
+    flex: 1,
+    textAlign: "right",
+    color: theme.color.text,
+    fontSize: 13
+  },
+  factLink: {
+    color: theme.color.accent
+  },
+  factDetail: {
     color: theme.color.textFaint,
     fontSize: 10,
-    letterSpacing: 0.3
+    lineHeight: 14,
+    letterSpacing: 0.3,
+    textAlign: "right"
   }
 });
 

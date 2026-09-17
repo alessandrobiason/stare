@@ -320,26 +320,32 @@ const JOIN_EPSILON = 1e-9;
  * A label is the most expensive thing the overlay can spend, so the ones it
  * spends have to be readable: crew and cargo vehicles share a coordinate with
  * the station they are docked to, and left alone they print four names on top
- * of each other exactly where the one name matters. Earlier points win, so
- * callers order by whatever they want to survive the collision.
+ * of each other exactly where the one name matters. And not only readable one
+ * at a time — a handful of names each clear of the next by a pixel is a block
+ * of text over the sky — so each claims an ellipse of space around it
+ * (`SATELLITE_MARKERS.labelSpacingPx`), and a name whose anchor falls inside
+ * one already claimed is not written. Earlier points win, so callers order by
+ * whatever they want to survive the collision.
  *
- * The clearance is in layout pixels and does not scale with the frame, because
+ * The spacing is in layout pixels and does not scale with the frame, because
  * the thing being kept apart does not either: a label is set at a fixed size
  * whatever the window is, so shrinking the window brings the names closer
- * together rather than further apart.
+ * together rather than further apart — and fewer of them fit.
  */
 export function labellablePoints(points: FramePoint[], frame: FrameSize): boolean[] {
-  const clearX = SATELLITE_MARKERS.labelClearancePx.x;
-  const clearY = SATELLITE_MARKERS.labelClearancePx.y;
+  const spaceX = SATELLITE_MARKERS.labelSpacingPx.x;
+  const spaceY = SATELLITE_MARKERS.labelSpacingPx.y;
   const placed: { x: number; y: number }[] = [];
 
   return points.map((point) => {
     const x = (point.left / 100) * frame.width;
     const y = (point.top / 100) * frame.height;
-    const collides = placed.some(
-      (other) => Math.abs(other.x - x) < clearX && Math.abs(other.y - y) < clearY
-    );
-    if (collides) return false;
+    const crowded = placed.some((other) => {
+      const across = (other.x - x) / spaceX;
+      const down = (other.y - y) / spaceY;
+      return across * across + down * down < 1;
+    });
+    if (crowded) return false;
     placed.push({ x, y });
     return true;
   });

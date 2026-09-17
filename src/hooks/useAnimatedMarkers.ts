@@ -780,9 +780,18 @@ export function useAnimatedMarkers({
     epochRef,
     enabled: enabledCategories.has("LANDMARK")
   });
+  /** What the newest frame was placed with, and — while frozen — the one held. */
+  const placedRef = useRef<PlacedAt | null>(null);
+  const heldRef = useRef<PlacedAt | null>(null);
+  const drawnEpochRef = useRef<OrbitEpoch>(epochRef.current);
   // The tapped satellite's own plan, replanned the same way but for one
   // object of any category. See `useFocusedPath`.
-  const focusedPathRef = useFocusedPath({ tracker, epochRef, name: selectedName });
+  //
+  // Planned against the epoch on screen rather than the live one: on a frozen
+  // sky that is the moment it froze, and a mark tapped there has to get the
+  // pass it is on in that picture — not whichever one the object has moved on
+  // to since the phone came down.
+  const focusedPathRef = useFocusedPath({ tracker, epochRef: drawnEpochRef, name: selectedName });
 
   const maskRef = useLatestRef(mask);
   const fallbackBackdropRef = useRef<BackdropBrightness | null>(null);
@@ -795,10 +804,6 @@ export function useAnimatedMarkers({
   const enabledSubcategoriesRef = useLatestRef(enabledSubcategories);
   const onSkyChangeRef = useLatestRef(onSkyChange);
   const frozenRef = useLatestRef(frozen);
-  /** What the newest frame was placed with, and — while frozen — the one held. */
-  const placedRef = useRef<PlacedAt | null>(null);
-  const heldRef = useRef<PlacedAt | null>(null);
-  const drawnEpochRef = useRef<OrbitEpoch>(epochRef.current);
   const previousFrameRef = useRef<number | null>(null);
   const markerStatsRef = useRef<MarkerStats>({
     drawn: 0,
@@ -842,7 +847,10 @@ export function useAnimatedMarkers({
       filtering: undefined as boolean | undefined,
       categories: undefined as Set<SatelliteCategory> | undefined,
       subcategories: undefined as Set<SatelliteSubcategory> | undefined,
-      viewport: undefined as FrameViewport | undefined
+      viewport: undefined as FrameViewport | undefined,
+      // The tapped satellite's pass: a tap on a frozen sky is a change like any
+      // other, and without it the card opened but its trajectory never did.
+      focused: undefined as SkyPass | null | undefined
     };
     /** Until when a frozen sky goes on being placed. See `FROZEN_SETTLE_MS`. */
     let settleUntil = 0;
@@ -893,17 +901,20 @@ export function useAnimatedMarkers({
       const held = heldRef.current;
 
       const viewportNow = viewportRef.current;
+      const focusedNow = focusedPathRef.current;
       const changed =
         currentMask !== seen.mask ||
         filtering !== seen.filtering ||
         categories !== seen.categories ||
         subcategories !== seen.subcategories ||
-        viewportNow !== seen.viewport;
+        viewportNow !== seen.viewport ||
+        focusedNow !== seen.focused;
       seen.mask = currentMask;
       seen.filtering = filtering;
       seen.categories = categories;
       seen.subcategories = subcategories;
       seen.viewport = viewportNow;
+      seen.focused = focusedNow;
       if (held) {
         if (changed) settleUntil = now + FROZEN_SETTLE_MS;
         // Nothing moving and nothing changed: the frame on screen is already
@@ -958,7 +969,7 @@ export function useAnimatedMarkers({
       // not a sighting — it is where to point the phone, which is worth
       // drawing over the roof the object will come out from behind. Its
       // marker still waits for the mask, as every marker does.
-      const focusedPass = focusedPathRef.current;
+      const focusedPass = focusedNow;
       const landmarkPasses = categories.has("LANDMARK") ? pathsRef.current : [];
       // The tapped satellite's own plan stands in for the landmark tier's
       // shorter-wake version of the same pass, on the rare occasion it is one

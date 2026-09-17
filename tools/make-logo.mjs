@@ -69,7 +69,7 @@ const TAIL_DASH = {
   gapGrowth: 1.34,
   maxDashes: 32
 };
-/** Must match CATEGORY_COLORS.LANDMARK and CATEGORY_BLOOMS.LANDMARK in src/satellite/categories.ts. */
+/** Must match BOOT_LIGHT_COLORS in src/components/bootSky.ts. */
 const LIGHT_COLOR = "#fbe6af";
 const LIGHT_BLOOM = "#e6c77c";
 

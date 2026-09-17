@@ -116,8 +116,8 @@ test("keeps the label clearance in layout pixels, not in frame percent", () => {
   // window brings two names closer together on screen rather than further
   // apart — and the pair that fitted at full size no longer does.
   const points = [
-    { left: 45, top: 50 },
-    { left: 55, top: 50 }
+    { left: 40, top: 50 },
+    { left: 60, top: 50 }
   ];
   expect(labellablePoints(points, FRAME)).toEqual([true, true]);
   expect(labellablePoints(points, { width: 360, height: 640 })).toEqual([true, false]);
@@ -128,6 +128,35 @@ test("gives a label to the first of two landmarks sharing a coordinate", () => {
   const station = { left: 50, top: 50 };
   const docked = { left: 50.5, top: 50.2 };
   expect(labellablePoints([station, docked], FRAME)).toEqual([true, false]);
+});
+
+test("keeps names apart by more than their own width, so a strip of sky is not a block of text", () => {
+  // Side by side, a label's width apart: the two boxes would not overlap, but
+  // two names edge to edge read as one line. Not written.
+  const x = (px: number) => (px / FRAME.width) * 100;
+  const y = (px: number) => (px / FRAME.height) * 100;
+  expect(
+    labellablePoints([{ left: x(300), top: y(400) }, { left: x(420), top: y(400) }], FRAME)
+  ).toEqual([true, false]);
+  // Two lines of label and a gap stacked above each other: the same.
+  expect(
+    labellablePoints([{ left: x(300), top: y(400) }, { left: x(300), top: y(440) }], FRAME)
+  ).toEqual([true, false]);
+  // And diagonally, where the two names would sit at each other's corners.
+  expect(
+    labellablePoints([{ left: x(300), top: y(400) }, { left: x(390), top: y(430) }], FRAME)
+  ).toEqual([true, false]);
+  // With room round them, all three are written.
+  expect(
+    labellablePoints(
+      [
+        { left: x(100), top: y(400) },
+        { left: x(260), top: y(400) },
+        { left: x(180), top: y(470) }
+      ],
+      FRAME
+    )
+  ).toEqual([true, true, true]);
 });
 
 test("labels landmarks that are far enough apart to be read", () => {

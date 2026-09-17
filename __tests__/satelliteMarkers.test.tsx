@@ -603,11 +603,15 @@ describe("the ring around a tapped satellite", () => {
   test("sits as close around a landmark as around any other mark", () => {
     // A halo is light fading to nothing, not a shape with an edge to clear, and
     // a ring drawn outside it would be a hand's width across around a point a
-    // few pixels wide.
+    // few pixels wide. The landmark's point is itself drawn larger, so what is
+    // the same is the gap between the point and the ring, not the ring.
     const landmark = selectedScene([marker({ name: "ISS", category: "LANDMARK" })], "ISS");
     const other = selectedScene([marker({ name: "SAT" })], "SAT");
 
-    expect(landmark.selection!.radius).toBeCloseTo(other.selection!.radius, 6);
+    expect(landmark.selection!.radius - landmark.glyphs[0].core.radius).toBeCloseTo(
+      other.selection!.radius - other.glyphs[0].core.radius,
+      6
+    );
     expect(landmark.selection!.radius - landmark.selection!.width / 2).toBeGreaterThan(
       landmark.glyphs[0].rim.radius
     );

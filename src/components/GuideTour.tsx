@@ -34,13 +34,20 @@ type Props = {
 };
 
 /** Every control a step can point at, measured together. */
-const TARGETS: readonly TourTarget[] = ["count", "filter", "freeze", "passes", "settings"];
+const TARGETS: readonly TourTarget[] = [
+  "count",
+  "filter",
+  "freeze",
+  "passes",
+  "catalog",
+  "settings"
+];
 
 /**
  * How often the controls are measured again while the tour is up.
  *
  * Often enough to follow the layout when it moves — a card arriving pushes the
- * compass up, the count grows a digit — and cheap: five measurements.
+ * compass up, the count grows a digit — and cheap: six measurements.
  */
 const MEASURE_EVERY_MS = 300;
 

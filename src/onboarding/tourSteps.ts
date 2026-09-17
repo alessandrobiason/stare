@@ -12,14 +12,16 @@ import type { MarkSample } from "./markSamples";
  * replaces them with a few steps over the live view, each lighting up the real
  * control beside a sentence about it, so the explanation is read against the
  * thing it explains. The operating system's prompts explain themselves
- * (`locales/`), and the compass strip and the tab bar need no explaining.
+ * (`locales/`), and the compass strip needs no explaining. Of the tab bar, the
+ * catalog is pointed at — a list of names is not obviously a way of finding
+ * where something in the sky will be — and the settings tab closes the tour.
  *
  * The words are in `src/i18n`; which steps, in what order and pointing at what
  * is here, so it cannot drift between the two languages.
  */
 
 /** The controls a step can point at. See `useTourTarget`. */
-export type TourTarget = "count" | "filter" | "freeze" | "passes" | "settings";
+export type TourTarget = "count" | "filter" | "freeze" | "passes" | "catalog" | "settings";
 
 export type TourMark = TourKeyStrings & { sample: MarkSample };
 
@@ -58,6 +60,8 @@ export function tourSteps(): readonly TourStep[] {
     // here: the sky held still, so the phone can come down and be read.
     { id: "freeze", target: "freeze", ...t.freeze },
     { id: "passes", target: "passes", ...t.passes },
+    // The two tabs that are not the sky, in the bar's own order.
+    { id: "catalog", target: "catalog", ...t.catalog },
     { id: "settings", target: "settings", ...t.settings }
   ];
 }

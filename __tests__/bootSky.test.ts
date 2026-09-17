@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  BOOT_LIGHT_COLORS,
   BOOT_PASSES,
   BOOT_SKY_DESIGN,
   bootSkyScene,
@@ -18,11 +19,10 @@ import {
   GLOW_FADE,
   TAIL_FADE
 } from "../src/components/markerScene";
-import { CATEGORY_BLOOMS, CATEGORY_COLORS } from "../src/satellite/categories";
 
-/** The colours the one light is drawn in: a landmark's. */
-const LIGHT_COLOR = CATEGORY_COLORS.LANDMARK;
-const LIGHT_BLOOM = CATEGORY_BLOOMS.LANDMARK;
+/** The colours the one light is drawn in: the app's own, which the icon is. */
+const LIGHT_COLOR = BOOT_LIGHT_COLORS.color;
+const LIGHT_BLOOM = BOOT_LIGHT_COLORS.bloom;
 
 const PHONE = { width: 390, height: 844 };
 /** The smallest screen this ships to, and a current large one. */

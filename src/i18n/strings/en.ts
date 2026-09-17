@@ -67,9 +67,13 @@ export const en: Strings = {
       title: "Coming up",
       body: "What will pass over you next. Tap to see the next few hours."
     },
+    catalog: {
+      title: "Catalog",
+      body: "Find any satellite by name, even below the horizon, and see where it will pass."
+    },
     settings: {
       title: "Settings",
-      body: "Change the language, or see this tour again."
+      body: "Settings and information about the app are all in here."
     }
   },
   tabs: {
@@ -213,5 +217,12 @@ export const en: Strings = {
   },
   console: {
     detail: "Technical readings."
+  },
+  about: {
+    title: "About",
+    detail: "Author, project and version.",
+    author: "Author",
+    project: "Project",
+    version: "Version"
   }
 };

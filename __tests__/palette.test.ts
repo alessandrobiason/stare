@@ -169,9 +169,21 @@ describe("the marks themselves", () => {
 
   test("keep the six categories apart", () => {
     // Pastels give up distance for softness: every pair is still at least
-    // 0.11 apart in OKLab, which reads as a different colour side by side and
+    // 0.135 apart in OKLab, which reads as a different colour side by side and
     // at a glance.
-    expect(closestPair(CATEGORY_COLORS)).toBeGreaterThan(0.11);
+    expect(closestPair(CATEGORY_COLORS)).toBeGreaterThan(0.135);
+  });
+
+  test("keep every category clear of the Starlinks' lavender, which is most of any sky", () => {
+    // Half the catalogue is one constellation, so the colour the eye has to
+    // pick the rest out of is the internet category's, and each of the others
+    // is held further from it than the pairs are from each other.
+    const [one, other, third] = oklab(CATEGORY_COLORS.INTERNET);
+    for (const category of SATELLITE_CATEGORIES) {
+      if (category === "INTERNET") continue;
+      const [l, a, b] = oklab(CATEGORY_COLORS[category]);
+      expect(Math.hypot(l - one, a - other, b - third)).toBeGreaterThan(0.145);
+    }
   });
 
   test("bloom in their own hue, deeper than the fill", () => {

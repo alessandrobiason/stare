@@ -60,9 +60,13 @@ export const it: Strings = {
       title: "In arrivo",
       body: "Cosa passerà sopra di te a breve. Tocca per vedere le prossime ore."
     },
+    catalog: {
+      title: "Catalogo",
+      body: "Cerca un satellite per nome, anche sotto l'orizzonte, e scopri dove passerà."
+    },
     settings: {
       title: "Impostazioni",
-      body: "Cambia la lingua o rivedi questa guida."
+      body: "Qui trovi le impostazioni e le informazioni sull'app."
     }
   },
   tabs: {
@@ -207,5 +211,12 @@ export const it: Strings = {
   },
   console: {
     detail: "Dati tecnici."
+  },
+  about: {
+    title: "Informazioni",
+    detail: "Autore, progetto e versione.",
+    author: "Autore",
+    project: "Progetto",
+    version: "Versione"
   }
 };

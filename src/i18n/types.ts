@@ -364,6 +364,19 @@ export type Strings = {
   console: {
     detail: string;
   };
+  /**
+   * The last row in settings, and the list it opens: who made the app, where
+   * its source is, and which version this is. The name and the address
+   * themselves are not words and are not here (`SettingsScreen`).
+   */
+  about: {
+    title: string;
+    /** The line under the row, saying what is behind it. */
+    detail: string;
+    author: string;
+    project: string;
+    version: string;
+  };
 };
 
 type Notice = { title: string; detail: string };
@@ -412,7 +425,12 @@ export type TourStrings = {
   freeze: TourStepStrings;
   /** The passes card over the tab bar. Skipped when there is none on screen. */
   passes: TourStepStrings;
-  /** The settings tab. */
+  /** The catalog tab: any object looked up by name, risen or not. */
+  catalog: TourStepStrings;
+  /**
+   * The settings tab, which ends the tour. Said in general terms rather than
+   * as a list of its rows, which grow and would leave this sentence behind.
+   */
   settings: TourStepStrings;
 };
 

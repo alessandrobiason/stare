@@ -29,7 +29,7 @@ export const FIGURE_MARK_SCALE = 1;
 export type MarkSample = "moving" | "parked" | "landmark";
 
 /** One tile, in layout points. */
-export const MARK_TILE: FrameSize = { width: 74, height: 44 };
+export const MARK_TILE: FrameSize = { width: 74, height: 56 };
 
 /** A made-up satellite, in the terms a tile is laid out in. */
 type Placed = {
@@ -49,19 +49,20 @@ const MARK_SAMPLES: Record<MarkSample, readonly Placed[]> = {
   // Near and far, in one colour and on one heading, so that size and the length
   // of the tail are the only two things that differ.
   moving: [
-    { category: "EARTH", x: 34, y: 17, rangeKm: 450, headingDeg: 20, travel: 30 },
-    { category: "EARTH", x: 62, y: 31, rangeKm: 20000, headingDeg: 20, travel: 8 }
+    { category: "EARTH", x: 34, y: 23, rangeKm: 450, headingDeg: 20, travel: 30 },
+    { category: "EARTH", x: 62, y: 37, rangeKm: 20000, headingDeg: 20, travel: 8 }
   ],
   // A stretch of the geostationary belt, which is how rings are met on the sky:
   // several in a row, small, and none of them moving.
   parked: [
-    { category: "TELECOM", x: 15, y: 25, rangeKm: 37000, headingDeg: null },
-    { category: "TELECOM", x: 37, y: 20, rangeKm: 38200, headingDeg: null },
-    { category: "TELECOM", x: 59, y: 25, rangeKm: 36800, headingDeg: null }
+    { category: "TELECOM", x: 15, y: 31, rangeKm: 37000, headingDeg: null },
+    { category: "TELECOM", x: 37, y: 26, rangeKm: 38200, headingDeg: null },
+    { category: "TELECOM", x: 59, y: 31, rangeKm: 36800, headingDeg: null }
   ],
-  // High in the tile, because the name is set under the mark.
+  // In the middle of the tile, which is as tall as it is so that the halo of a
+  // landmark — the largest mark on the sky — fits inside it.
   landmark: [
-    { name: "ISS", category: "LANDMARK", x: 37, y: 15, rangeKm: 420, headingDeg: 20, travel: 18 }
+    { name: "ISS", category: "LANDMARK", x: 37, y: 28, rangeKm: 420, headingDeg: 20, travel: 18 }
   ]
 };
 

@@ -364,15 +364,33 @@ export const SATELLITE_MARKERS = {
   /** Trails shorter than this, in frame pixels, are not worth drawing. */
   minimumTrailPx: 4,
   /**
-   * Half-width and half-height of the box a label claims, in frame pixels.
+   * Half-width and half-height of the box a label is set in, in frame pixels.
+   *
+   * Wide enough for a catalogue name like `STARLINK-37118` on one line, which a
+   * notable satellite's often is (`NotableSatellites`). How far apart two of
+   * these boxes have to be is `labelSpacingPx`, not this.
+   */
+  labelClearancePx: { x: 60, y: 11 },
+  /**
+   * How much sky a name keeps to itself, in layout pixels: the half-axes of an
+   * ellipse round its anchor that no other name's anchor may be inside.
    *
    * Few marks are labelled, and even they yield to each other: crew and cargo
    * vehicles sit on the station they are docked to, so without this the one
-   * place a name matters most is where the names pile up. Wide enough for a
-   * catalogue name like `STARLINK-37118` on one line, which a notable
-   * satellite's often is (`NotableSatellites`).
+   * place a name matters most is where the names pile up. It used to be the
+   * label's own box, which only kept two names from being printed over each
+   * other — and was not enough. With a whole screen of sky the landmarks and
+   * the one name per category spread out across it, but with a strip of sky
+   * over a roofline every one of them is chosen from that strip, and names
+   * that merely did not overlap read as one block of text.
+   *
+   * So a name now needs clear sky around it as well as room: a label's width
+   * and a gap either side of it across, and two lines and a gap between them
+   * down, with the corners between the two eased by the ellipse — which is also
+   * what keeps a diagonal neighbour from counting as far away. Where the sky is
+   * crowded, fewer names are written, in the order `labelRank` puts them.
    */
-  labelClearancePx: { x: 60, y: 11 }
+  labelSpacingPx: { x: 125, y: 52 }
 } as const;
 
 /**

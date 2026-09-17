@@ -45,7 +45,14 @@ export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = fal
   // console's picker changes the language. See `useLocale`.
   useLocale();
   const t = strings().tabs;
+  // The two tabs the tour points at. The sky's own tab is where the tour is
+  // already standing, and needs no introduction.
+  const catalogRef = useTourTarget("catalog");
   const settingsRef = useTourTarget("settings");
+  const tourRefs: Partial<Record<SceneTab, React.RefCallback<View>>> = {
+    catalog: catalogRef,
+    settings: settingsRef
+  };
 
   return (
     <View style={styles.bar} accessibilityRole="tablist">
@@ -54,7 +61,7 @@ export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = fal
         return (
           <Pressable
             key={id}
-            ref={id === "settings" ? settingsRef : undefined}
+            ref={tourRefs[id]}
             accessibilityRole="tab"
             accessibilityLabel={t[id]}
             // The `aria-` form rather than `accessibilityState`, which is what

@@ -60,6 +60,7 @@ describe("the steps", () => {
         "filter",
         "freeze",
         "passes",
+        "catalog",
         "settings"
       ]);
       for (const step of steps) {
@@ -84,10 +85,17 @@ describe("the steps", () => {
     // No passes card: nothing is coming, or a satellite's card has its place.
     const available = availableSteps(steps, (target) => target !== "passes");
 
-    expect(available.map((step) => step.id)).toEqual(["marks", "count", "filter", "freeze", "settings"]);
-    expect(stepAfter(steps, available, "freeze")?.id).toBe("settings");
+    expect(available.map((step) => step.id)).toEqual([
+      "marks",
+      "count",
+      "filter",
+      "freeze",
+      "catalog",
+      "settings"
+    ]);
+    expect(stepAfter(steps, available, "freeze")?.id).toBe("catalog");
     // Sitting on the passes step when the card goes: the tour moves on.
-    expect(stepAt(steps, available, "passes")?.id).toBe("settings");
+    expect(stepAt(steps, available, "passes")?.id).toBe("catalog");
     expect(stepAfter(steps, available, "settings")).toBeNull();
   });
 });

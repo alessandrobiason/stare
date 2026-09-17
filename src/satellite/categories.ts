@@ -93,25 +93,35 @@ export const SUBCATEGORIES_OF: Record<SatelliteCategory, readonly SatelliteSubca
  *
  * Set in OKLCH and converted, so the hues are spaced by eye rather than by RGB:
  *
- * - `LANDMARK` champagne, the lightest and warmest, for the couple of dozen
+ * - `LANDMARK` a pale gold, the lightest and warmest, for the couple of dozen
  *   objects worth looking up for.
- * - `NAVIGATION` a coral blush, `EARTH` a mint sage.
- * - `INTERNET` a lavender, and `TELECOM` a sky blue: the two halves of what was
- *   one category, on either side of the wheel from the warm hues.
+ * - `NAVIGATION` a peach, `EARTH` a soft green.
+ * - `INTERNET` a lavender, and `TELECOM` a clear sky cyan: the two halves of
+ *   what was one category, on either side of the wheel from the warm hues.
  * - `OTHER` a warm stone grey, with next to no chroma and the least light, so
  *   the residual is the quietest thing on the frame.
  *
- * No two are closer than 0.11 in OKLab, which is as far apart as six colours
- * can get while all staying pastel; every one is over seven to one against a
+ * Tuned for the sky as it actually is, which is mostly one colour: Starlink is
+ * half the catalogue, so on any frame the lavender is the ground every other
+ * mark has to be picked out of. The set before this one was spaced evenly and
+ * softly, and its closest pairs were the ones that mattered most — a coral
+ * navigation mark leaning towards the lavender, a pale sky-blue telecom one
+ * leaning towards it from the other side, a grey barely apart from it, and a
+ * mint that was nearly the landmarks' champagne. So each hue is pushed to the
+ * far side of its own range and given the chroma a pastel can take there (up
+ * to 0.12, against 0.085 to 0.12 before).
+ *
+ * No two are closer than 0.135 in OKLab (it was 0.11), none is closer than 0.145
+ * to the lavender (0.13), and every one is still over seven to one against a
  * night sky.
  */
 export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
-  LANDMARK: "#fbe6af",
-  NAVIGATION: "#faa29f",
-  EARTH: "#a1e4ae",
-  INTERNET: "#c09aeb",
-  TELECOM: "#85d0ee",
-  OTHER: "#a9a49e"
+  LANDMARK: "#f7eb97",
+  NAVIGATION: "#ffa383",
+  EARTH: "#8cd897",
+  INTERNET: "#cfa8f9",
+  TELECOM: "#5fcef1",
+  OTHER: "#a5a39f"
 };
 
 /**
@@ -123,12 +133,12 @@ export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
  * in the air around it.
  */
 export const CATEGORY_BLOOMS: Record<SatelliteCategory, string> = {
-  LANDMARK: "#e6c77c",
-  NAVIGATION: "#ea7d76",
-  EARTH: "#6bc987",
-  INTERNET: "#a573da",
-  TELECOM: "#46b2dd",
-  OTHER: "#8e8479"
+  LANDMARK: "#dbca58",
+  NAVIGATION: "#ea7b53",
+  EARTH: "#59bc6c",
+  INTERNET: "#b482e6",
+  TELECOM: "#0bafd7",
+  OTHER: "#8b8479"
 };
 
 /**
@@ -140,15 +150,15 @@ export const CATEGORY_BLOOMS: Record<SatelliteCategory, string> = {
  * work, since what separates a pale fill from a bright sky is the drop in
  * lightness rather than the absence of hue, and it keeps the mark one object
  * in one colour rather than a coloured centre in a black ring. Every one is at
- * OKLCH lightness 0.36 to 0.40, which is dark enough to hold against cloud.
+ * OKLCH lightness 0.35 to 0.38, which is dark enough to hold against cloud.
  */
 export const CATEGORY_EDGES: Record<SatelliteCategory, string> = {
-  LANDMARK: "#564519",
-  NAVIGATION: "#632d2a",
-  EARTH: "#255032",
-  INTERNET: "#482f62",
-  TELECOM: "#09495f",
-  OTHER: "#413c38"
+  LANDMARK: "#4b4306",
+  NAVIGATION: "#67301d",
+  EARTH: "#1c4e27",
+  INTERNET: "#4e3566",
+  TELECOM: "#044a5c",
+  OTHER: "#3c3a38"
 };
 
 export function allCategories(): Set<SatelliteCategory> {

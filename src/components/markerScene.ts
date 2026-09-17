@@ -901,8 +901,11 @@ const SELECTED_GROWTH = 1.25;
  * A landmark is a permanently-tracked object someone is meant to find at a
  * glance among the ordinary traffic around it, so it is drawn distinctly
  * larger rather than left to the same range-based scale as everything else.
+ * Twice: at 1.6 a station in low orbit was still only a shade larger than the
+ * Starlinks at the same height either side of it, which on a sky of them is
+ * one mark among dozens rather than the one worth looking up for.
  */
-const LANDMARK_GROWTH = 1.6;
+const LANDMARK_GROWTH = 2;
 /**
  * Trail width, as a fraction of the point's diameter.
  *
@@ -1002,8 +1005,9 @@ function notableDetail(marker: SatelliteMarker): string | null {
 /**
  * The box a label is drawn in, centred on its marker.
  *
- * Exactly the width the de-clutter keeps clear, so what is drawn and what was
- * reserved for it are the same box.
+ * Narrower than the space the de-clutter keeps round a name
+ * (`SATELLITE_MARKERS.labelSpacingPx`), so two names that both survive it have
+ * clear sky between their boxes rather than touching edges.
  */
 export const LABEL_BOX_PX = SATELLITE_MARKERS.labelClearancePx.x * 2;
 const LABEL_GAP_PX = 5;

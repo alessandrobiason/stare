@@ -1,5 +1,4 @@
 import { clamp } from "../math/angles";
-import { CATEGORY_BLOOMS, CATEGORY_COLORS } from "../satellite/categories";
 import { FrameSize } from "./markerGeometry";
 import { dashedRuns } from "./markerScene";
 
@@ -143,8 +142,17 @@ const LIGHT = {
   tail: { width: 1.7, length: 170, alpha: 0.85, dashScale: 0.75 }
 } as const;
 
-/** The category whose colours the light is drawn in. */
-export const BOOT_LIGHT_CATEGORY = "LANDMARK";
+/**
+ * The colours the light is drawn in: its fill and the bloom it sits in.
+ *
+ * A landmark's champagne, as the landmarks were coloured when the logo was
+ * drawn — held here rather than read from `CATEGORY_COLORS`, because the light
+ * is also the app's icon (`assets/icon.svg`, `tools/make-logo.mjs`). The marks'
+ * palette is tuned against a sky full of Starlinks and changes when that tuning
+ * does; an icon on somebody's home screen is the app's name, and does not
+ * change colour with it.
+ */
+export const BOOT_LIGHT_COLORS = { color: "#fbe6af", bloom: "#e6c77c" } as const;
 
 /**
  * The star field, as the parameters that generate it.
@@ -404,8 +412,8 @@ function lightAtRest(
   return {
     x,
     y,
-    color: CATEGORY_COLORS[BOOT_LIGHT_CATEGORY],
-    bloomColor: CATEGORY_BLOOMS[BOOT_LIGHT_CATEGORY],
+    color: BOOT_LIGHT_COLORS.color,
+    bloomColor: BOOT_LIGHT_COLORS.bloom,
     coreRadius: LIGHT.coreRadius * scale,
     glow: { radius: LIGHT.glow.radius * scale, alpha: LIGHT.glow.alpha },
     bloom: { radius: LIGHT.bloom.radius * scale, alpha: LIGHT.bloom.alpha },
