@@ -7,7 +7,8 @@ import {
   GlyphShape,
   shortName,
   TAIL_DASH,
-  TAIL_FADE
+  TAIL_FADE,
+  TRAIL_OUTLINE_RATIO
 } from "../src/components/markerScene";
 import { DAYLIGHT_PALETTE, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
@@ -317,7 +318,9 @@ describe("a moving mark", () => {
     // part of a mark that says which way the object is going.
     const [glyph] = scene([marker()]).glyphs;
     expect(glyph.tail!.rim).toBeGreaterThan(0);
-    expect(glyph.tail!.rim).toBeCloseTo(glyph.rim.radius - glyph.core.radius, 6);
+    // Under the mark's own rim by TRAIL_OUTLINE_RATIO, or a full-strength
+    // outline reads as a dark stripe down the tail rather than a fine edge.
+    expect(glyph.tail!.rim).toBeCloseTo((glyph.rim.radius - glyph.core.radius) * TRAIL_OUTLINE_RATIO, 6);
   });
 
   test("is light rather than a disc at night: no edge, and a bloom around its glow", () => {

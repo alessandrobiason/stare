@@ -8,6 +8,7 @@ import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SkyHeader } from "../src/components/SkyHeader";
 import { TabBar } from "../src/components/TabBar";
 import { SettingsScreen } from "../src/components/SettingsScreen";
+import { CONSOLE_LABEL } from "../src/components/consoleLabel";
 import { UpcomingPasses } from "../src/components/UpcomingPasses";
 import { fill, setLocaleForTesting, strings } from "../src/i18n";
 import { UpcomingPass } from "../src/satellite/upcomingPasses";
@@ -142,7 +143,7 @@ describe("the header", () => {
     // sky, and the sky is what the screen is for.
     const text = textOf(header(sky(17)));
 
-    expect(text).toContain("Stare");
+    expect(text).toContain("STARE");
     expect(text).toContain("17 visible satellites");
     expect(text).not.toContain("Starlink");
     expect(text).not.toContain("IN VIEW");
@@ -220,7 +221,7 @@ describe("the settings tab", () => {
 
     expect(text).toContain("Help");
     // The one word in the app that is not translated. See `CONSOLE_LABEL`.
-    expect(text).toContain("CONSOLE");
+    expect(text).toContain(CONSOLE_LABEL);
     expect(text).toContain("English");
   });
 
@@ -230,7 +231,7 @@ describe("the settings tab", () => {
 
     expect(text).toContain("Impostazioni");
     expect(text).toContain("Aiuto");
-    expect(text).toContain("CONSOLE");
+    expect(text).toContain(CONSOLE_LABEL);
   });
 });
 

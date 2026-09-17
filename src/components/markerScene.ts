@@ -933,7 +933,7 @@ const OUTLINE_RATIO = 0.1;
  * its middle rather than as a line with a fine, parting edge — right for a
  * mark's own rim, too heavy stretched the length of a tail.
  */
-const TRAIL_OUTLINE_RATIO = 0.45;
+export const TRAIL_OUTLINE_RATIO = 0.45;
 /** The thinnest a line's rim is drawn, in layout pixels. */
 const MIN_OUTLINE_PX = 1;
 /**

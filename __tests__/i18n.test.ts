@@ -26,8 +26,7 @@ import {
   LOCALES,
   resolveLocale,
   setLocaleForTesting,
-  stringsFor,
-  strings
+  stringsFor
 } from "../src/i18n";
 import { SATELLITE_CATEGORIES, SUBCATEGORIES_OF } from "../src/satellite/categories";
 
@@ -639,13 +638,6 @@ describe("the satellite descriptions", () => {
   });
 });
 
-test("the console is the one thing that stays in English", () => {
-  // Its rows are the names of things in this codebase, read against the source
-  // by whoever is diagnosing a phone that is drawing the sky in the wrong
-  // place. Its row in settings says as much.
-  setLocaleForTesting("it");
-  expect(strings().console.detail).toMatch(/inglese/);
-});
 
 /**
  * How tall the tour's bubbles come out, per language.

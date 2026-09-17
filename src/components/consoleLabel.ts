@@ -10,8 +10,6 @@
  *
  * "Console" rather than "Debug" because it is the more portable of the two
  * words: it is a loanword in most of the languages this app ships in, where
- * "debug" is jargon that has only travelled among programmers. The line under
- * its row in settings says outright that what is behind it is in English, so
- * the one untranslated word is explained rather than surprising.
+ * "debug" is jargon that has only travelled among programmers.
  */
 export const CONSOLE_LABEL = "Console";
