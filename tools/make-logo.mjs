@@ -134,9 +134,9 @@ const ICON = {
   headDeg: -66,
   sweepDeg: 58,
   direction: 1,
-  coreRadius: 34,
-  glow: { radius: 150, alpha: 0.8 },
-  bloom: { radius: 320, alpha: 0.45 },
+  coreRadius: 39,
+  glow: { radius: 172, alpha: 0.8 },
+  bloom: { radius: 368, alpha: 0.45 },
   tail: { width: 15, alpha: 0.95, dashScale: 4.4 },
   tailFade: [
     { at: 0, strength: 1 },
