@@ -448,7 +448,7 @@ export function buildMarkerScene(
           path,
           Math.max(MIN_TRAIL_WIDTH_PX * scale, diameter * TRAIL_WIDTH_RATIO),
           TAIL_ALPHA * strength,
-          outline,
+          outline * TRAIL_OUTLINE_RATIO,
           scale
         ),
       rim:
@@ -925,6 +925,15 @@ const MIN_TRAIL_WIDTH_PX = 1.4;
  * round the mark rather than as the mark's own shading.
  */
 const OUTLINE_RATIO = 0.1;
+/**
+ * How much of the point's own edge a trail's rim is drawn at, by day (its
+ * alpha is already near zero at night, same as the point's).
+ *
+ * Under half: at the full `OUTLINE_RATIO` a trail read as a dark stripe down
+ * its middle rather than as a line with a fine, parting edge — right for a
+ * mark's own rim, too heavy stretched the length of a tail.
+ */
+const TRAIL_OUTLINE_RATIO = 0.45;
 /** The thinnest a line's rim is drawn, in layout pixels. */
 const MIN_OUTLINE_PX = 1;
 /**
