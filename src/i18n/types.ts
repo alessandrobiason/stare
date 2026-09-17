@@ -449,7 +449,7 @@ export type IntroStrings = {
   /** The second page: the two things the phone is about to ask permission for. */
   access: {
     title: string;
-    body: string;
+    body?: string;
     camera: IntroAccessStrings;
     location: IntroAccessStrings;
     /** A short line under both, on where the location goes. */

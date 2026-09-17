@@ -7,7 +7,6 @@ export const it: Strings = {
     },
     access: {
       title: "Due permessi veloci",
-      body: "Il telefono sta per chiedertene due.",
       camera: {
         name: "Fotocamera",
         reason: "Per mostrarti il cielo che hai davanti."

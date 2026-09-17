@@ -14,7 +14,6 @@ export const en: Strings = {
     },
     access: {
       title: "Two quick permissions",
-      body: "Your phone is about to ask for these.",
       camera: {
         name: "Camera",
         reason: "To show you the sky in front of you."
