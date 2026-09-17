@@ -664,10 +664,12 @@ describe("the view page's stall readout", () => {
         fieldOfView: { horizontalDeg: 53.7, verticalDeg: 68 },
         attitude: { headingDeg: 14.7, pitchDeg: -4, rollDeg: -0.7, rotationRateDegPerSecond: 0 },
         frameRate: 58,
-        stalls: { worstGapMs: 243.6, stalls: 4, windowMs: 5000 }
+        stalls: { worstGapMs: 243.6, stalls: 4, windowMs: 5000, loopMs: 6.24 },
+        draw: { sceneMs: 4.06, recordMs: 11.42, nativeCalls: 3121.4 }
       }).rows
     );
     expect(rows["Draw rate"]).toBe("58 fps");
     expect(rows["Worst frame"]).toBe("244 ms · 4 over 50 ms in 5 s");
+    expect(rows["JS per frame"]).toBe("tracking 6.2 · shapes 4.1 · Skia 11.4 ms (3121 calls)");
   });
 });

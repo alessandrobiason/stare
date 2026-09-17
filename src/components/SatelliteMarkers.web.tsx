@@ -292,3 +292,11 @@ function trace(context: CanvasRenderingContext2D, runs: number[][]): void {
 }
 
 const TWO_PI = Math.PI * 2;
+
+/**
+ * The native overlay's drawing cost, for the Console. The browser draws into a
+ * 2D canvas instead, where there are no calls across to native code to count.
+ */
+export function markerDrawStats(): null {
+  return null;
+}

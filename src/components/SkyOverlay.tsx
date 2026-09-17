@@ -55,7 +55,7 @@ import { pressPoint } from "./pressPoint";
 import { TourTargetsProvider } from "./tourTargets";
 import { SafeAreaLayer } from "./SafeAreaLayer";
 import { SatelliteCard } from "./SatelliteCard";
-import { SatelliteMarkers } from "./SatelliteMarkers";
+import { markerDrawStats, SatelliteMarkers } from "./SatelliteMarkers";
 import { SettingsScreen } from "./SettingsScreen";
 import { SkyHeader } from "./SkyHeader";
 import { SkyMaskOverlay } from "./SkyMaskOverlay";
@@ -564,7 +564,8 @@ export const SkyOverlay: React.FC<Props> = ({
         fieldOfView: frame.fieldOfView,
         attitude: smoothed.filterRef.current.sample(performance.now() / 1000),
         frameRate: frameRateRef.current,
-        stalls: frameStallsRef.current
+        stalls: frameStallsRef.current,
+        draw: markerDrawStats()
       })
     ];
   };

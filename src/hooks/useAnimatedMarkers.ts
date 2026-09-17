@@ -347,6 +347,12 @@ export type FrameStalls = {
   stalls: number;
   /** How long a window is, in milliseconds. */
   windowMs: number;
+  /**
+   * Mean time this loop's own body took per frame in that window: sweeping and
+   * placing the satellites and handing the frame on, without the drawing it
+   * sets off. See `MarkerDrawStats` for that half.
+   */
+  loopMs: number;
 };
 
 /** How long a stall window is. */
@@ -819,7 +825,7 @@ export function useAnimatedMarkers({
   /** Which satellites besides the landmarks are named, and why. */
   const notableRef = useRef(new NotableSatellites());
   const frameRateRef = useRef(0);
-  const frameStallsRef = useRef<FrameStalls>({ worstGapMs: 0, stalls: 0, windowMs: STALL_WINDOW_MS });
+  const frameStallsRef = useRef<FrameStalls>({ worstGapMs: 0, stalls: 0, windowMs: STALL_WINDOW_MS, loopMs: 0 });
   /** Who is drawing the frames, and the newest one, for whoever subscribes late. */
   const listenersRef = useRef(new Set<(frame: MarkerFrame) => void>());
   const latestFrameRef = useRef<MarkerFrame>(EMPTY_FRAME);
@@ -858,8 +864,11 @@ export function useAnimatedMarkers({
     let windowStartedAt: number | null = null;
     let windowWorstGapMs = 0;
     let windowStalls = 0;
+    let windowLoopMs = 0;
+    let windowFrames = 0;
 
     let handle = requestAnimationFrame(function animate(now: number) {
+      const workStarted = performance.now();
       const previous = previousFrameRef.current;
       previousFrameRef.current = now;
       if (previous !== null && now > previous) {
@@ -879,11 +888,14 @@ export function useAnimatedMarkers({
           frameStallsRef.current = {
             worstGapMs: windowWorstGapMs,
             stalls: windowStalls,
-            windowMs: STALL_WINDOW_MS
+            windowMs: STALL_WINDOW_MS,
+            loopMs: windowFrames > 0 ? windowLoopMs / windowFrames : 0
           };
           windowStartedAt = now;
           windowWorstGapMs = 0;
           windowStalls = 0;
+          windowLoopMs = 0;
+          windowFrames = 0;
         }
       }
 
@@ -920,6 +932,8 @@ export function useAnimatedMarkers({
         // Nothing moving and nothing changed: the frame on screen is already
         // the one this would place.
         if (now >= settleUntil) {
+          windowLoopMs += performance.now() - workStarted;
+          windowFrames += 1;
           handle = requestAnimationFrame(animate);
           return;
         }
@@ -1218,6 +1232,8 @@ export function useAnimatedMarkers({
           onSkyChangeRef.current({ count: onScreen.length, fleets, sunlit, darkness });
         }
       }
+      windowLoopMs += performance.now() - workStarted;
+      windowFrames += 1;
       handle = requestAnimationFrame(animate);
     });
 

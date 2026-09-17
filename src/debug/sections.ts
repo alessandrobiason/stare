@@ -28,6 +28,7 @@ import { SkyMemoryStats } from "../vision/skyMemory";
 import { SkyModelDiagnostics } from "../vision/skyModelTypes";
 import { FrameReading } from "../vision/skySegmenter";
 import { FrameStalls, MarkerStats, STALL_THRESHOLD_MS } from "../hooks/useAnimatedMarkers";
+import type { MarkerDrawStats } from "../components/SatelliteMarkers";
 import { bytes, clockTime, degrees, duration, fixed, NONE, position, vector } from "./format";
 
 /**
@@ -539,6 +540,8 @@ export type ViewDebugInput = {
   frameRate: number;
   /** The worst of the recent frames, which an average hides. See `FrameStalls`. */
   stalls?: FrameStalls | null;
+  /** What drawing the markers costs a frame. See `MarkerDrawStats`. */
+  draw?: MarkerDrawStats | null;
 };
 
 /** What the markers were projected against: the frame, the lens and the aim. */
@@ -549,7 +552,8 @@ export function viewSection({
   fieldOfView,
   attitude,
   frameRate,
-  stalls = null
+  stalls = null,
+  draw = null
 }: ViewDebugInput): DebugSection {
   return {
     id: "view",
@@ -577,6 +581,25 @@ export function viewSection({
               value: `${Math.round(stalls.worstGapMs)} ms · ${stalls.stalls} over ${STALL_THRESHOLD_MS} ms in ${Math.round(
                 stalls.windowMs / 1000
               )} s`
+            }
+          ]
+        : []),
+      // Where a frame's JavaScript goes: placing the satellites, working out
+      // their shapes, and recording those into Skia — with the recording's
+      // calls counted, since on a phone they are its cost. Whatever the frame
+      // interval has left over is React, and the thread's other work.
+      ...(stalls || draw
+        ? [
+            {
+              label: "JS per frame",
+              value: [
+                stalls ? `tracking ${fixed(stalls.loopMs, 1)}` : null,
+                draw ? `shapes ${fixed(draw.sceneMs, 1)}` : null,
+                draw ? `Skia ${fixed(draw.recordMs, 1)} ms (${Math.round(draw.nativeCalls)} calls)` : null
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              wrap: true
             }
           ]
         : [])
