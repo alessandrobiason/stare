@@ -24,9 +24,9 @@ export const en: Strings = {
       },
       notifications: {
         name: "Notifications — optional",
-        reason: "To tell you when something you can actually see is about to pass over."
+        reason: "To tell you when something you can see is about to pass over."
       },
-      footnote: "Your location stays on your phone — it's never sent anywhere."
+      footnote: "Your location is never shared with others."
     },
     next: "NEXT",
     allowAccess: "ALLOW ACCESS"
@@ -111,10 +111,10 @@ export const en: Strings = {
       now: "now",
       seeing: {
         visible: "visible to the eye",
-        binoculars: "binoculars only",
-        tooFaint: "too faint to see",
-        eclipsed: "in the Earth's shadow",
-        daylight: "daylight — nothing to see",
+        binoculars: "visible with binoculars",
+        tooFaint: "not visible (too faint)",
+        eclipsed: "not visible (in the Earth's shadow)",
+        daylight: "not visible (daylight)",
         unknown: "brightness not recorded"
       }
     },
@@ -157,12 +157,12 @@ export const en: Strings = {
     photo: "Photograph of {name}",
     missing: "This satellite has left the catalog.",
     seeing: {
-      visible: "Bright enough to see now",
-      binoculars: "In sunlight, but you would want binoculars",
-      tooFaint: "In sunlight, and far too faint to see",
-      eclipsed: "In the Earth's shadow, with no light to reflect",
-      daylight: "The sun is still up here — nothing in orbit can be seen yet",
-      unknown: "In sunlight, though how brightly it shines is not recorded",
+      visible: "Visible to the eye",
+      binoculars: "Visible with binoculars",
+      tooFaint: "Not visible (too faint)",
+      eclipsed: "Not visible (in the Earth's shadow)",
+      daylight: "Not visible (daylight)",
+      unknown: "Brightness not recorded",
       magnitude: "magnitude {value}",
       aboutMagnitude: "around magnitude {value}",
       onPass: "When it comes over at {time}: {verdict}"
@@ -225,9 +225,9 @@ export const en: Strings = {
     title: "Pass alerts",
     on: "On",
     off: "Off",
-    granted: "You'll be told before a pass you can really see. Tap to change it in Settings.",
+    granted: "You'll be told before a pass you can see. Tap to change it in Settings.",
     undetermined:
-      "Get a notification before a pass you can really see, even with the app closed.",
+      "Get a notification before a pass you can see, even with the app closed.",
     denied: "Notifications are off for Stare. Tap to turn them on in Settings.",
     notification: {
       title: "{name} passes over in {minutes} min"

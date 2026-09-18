@@ -17,9 +17,9 @@ export const it: Strings = {
       },
       notifications: {
         name: "Notifiche — facoltativo",
-        reason: "Per avvisarti quando sta per passare qualcosa che puoi davvero vedere."
+        reason: "Per avvisarti quando sta per passare qualcosa che puoi vedere."
       },
-      footnote: "La tua posizione resta sul telefono: non viene mai inviata altrove."
+      footnote: "La tua posizione non viene mai condivisa con altri."
     },
     next: "AVANTI",
     allowAccess: "CONSENTI"
@@ -104,10 +104,10 @@ export const it: Strings = {
       now: "ora",
       seeing: {
         visible: "visibile a occhio nudo",
-        binoculars: "solo col binocolo",
-        tooFaint: "troppo debole",
-        eclipsed: "nel cono d'ombra della Terra",
-        daylight: "è giorno — niente da vedere",
+        binoculars: "visible col binocolo",
+        tooFaint: "non visible (troppo debole)",
+        eclipsed: "non visibile (nel cono d'ombra della Terra)",
+        daylight: "non visibile (è giorno)",
         unknown: "luminosità non registrata"
       }
     },
@@ -150,12 +150,12 @@ export const it: Strings = {
     photo: "Fotografia di {name}",
     missing: "Questo satellite non è più nel catalogo.",
     seeing: {
-      visible: "Abbastanza luminoso da vedersi adesso",
-      binoculars: "Illuminato dal Sole, ma servirebbe un binocolo",
-      tooFaint: "Illuminato dal Sole, ma troppo debole per vederlo",
-      eclipsed: "Nel cono d'ombra della Terra: non c'è luce da riflettere",
-      daylight: "Qui il Sole è ancora alto — non si vede ancora nulla in orbita",
-      unknown: "Illuminato dal Sole, ma la sua luminosità non è registrata",
+      visible: "Visibile a occhio nudo",
+      binoculars: "Visibile con un binocolo",
+      tooFaint: "Non visibile (troppo debole)",
+      eclipsed: "Non visible (nel cono d'ombra della Terra)",
+      daylight: "Non visible (è giorno)",
+      unknown: "La sua luminosità non è registrata",
       magnitude: "magnitudine {value}",
       aboutMagnitude: "circa magnitudine {value}",
       onPass: "Quando passerà, alle {time}: {verdict}"
@@ -220,9 +220,9 @@ export const it: Strings = {
     on: "Attivi",
     off: "Non attivi",
     granted:
-      "Ti avvisiamo prima di un passaggio che puoi davvero vedere. Tocca per cambiare nelle Impostazioni.",
+      "Ti avvisiamo prima di un passaggio che puoi vedere. Tocca per cambiare nelle Impostazioni.",
     undetermined:
-      "Ricevi una notifica prima di un passaggio che puoi davvero vedere, anche ad app chiusa.",
+      "Ricevi una notifica prima di un passaggio che puoi vedere, anche ad app chiusa.",
     denied: "Le notifiche di Stare sono disattivate. Tocca per attivarle nelle Impostazioni.",
     notification: {
       title: "{name} passa tra {minutes} min"
