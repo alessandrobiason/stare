@@ -520,7 +520,7 @@ describe("the sky-fix page", () => {
     // No age for a fix that never landed, rather than a figure counted from
     // nothing.
     expect(rows).not.toHaveProperty("Age");
-    expect(rows["Usable band"]).toBe("10–70° up");
+    expect(rows["Usable band"]).toBe("15–70° up");
   });
 
   test("the switch that tells a corrected heading from an uncorrected one", () => {

@@ -108,7 +108,7 @@ describe("recovering the heading from the sun", () => {
     [-75, 20, -30],
     [40, -25, 60],
     [12, 155, 8],
-    [-60, -100, 75]
+    [-60, -100, 55]
   ])(
     "at pitch %p, roll %p the error of %p degrees comes back exactly",
     (pitchDeg, rollDeg, errorDeg) => {
@@ -140,7 +140,7 @@ describe("recovering the heading from the sun", () => {
     const truth: CameraAttitude = { headingDeg: 20, pitchDeg: 40, rollDeg: -18 };
     const sun = bodyAt(35, 44);
 
-    for (const errorDeg of [-60, -20, 0, 15, 70]) {
+    for (const errorDeg of [-55, -20, 0, 15, 55]) {
       const { sighting } = sightWith(truth, { ...truth, headingDeg: 20 + errorDeg }, sun);
       expect((sighting as CelestialSighting).elevationResidualDeg).toBeCloseTo(0, 6);
     }
@@ -251,20 +251,24 @@ describe("nothing is believed once", () => {
     offAxisDeg: 0
   });
 
-  test("the first sighting only arms the second", () => {
+  test("the first two sightings only arm the third", () => {
     const reference = new CelestialNorthReference();
     expect(reference.confirm(sighting(30), 0)).toBeNull();
-    expect(reference.confirm(sighting(30.4), 1.5)).not.toBeNull();
+    expect(reference.confirm(sighting(30.4), 1.5)).toBeNull();
+    expect(reference.confirm(sighting(30.5), 3)).not.toBeNull();
   });
 
-  test("a second sighting that disagrees confirms nothing", () => {
+  test("a sighting that disagrees restarts the run rather than ending it", () => {
     // A reflection off a window moves with the phone; the sun does not. What
-    // separates them is that the implied bearing is the same twice.
+    // separates them is that the implied bearing is the same three times running.
     const reference = new CelestialNorthReference();
     reference.confirm(sighting(30), 0);
-    expect(reference.confirm(sighting(30 + CELESTIAL_ALIGNMENT.agreementDeg + 1), 1.5)).toBeNull();
-    // And it becomes the one to agree with, so a settled sighting still lands.
-    expect(reference.confirm(sighting(30 + CELESTIAL_ALIGNMENT.agreementDeg + 1), 3)).not.toBeNull();
+    const restarted = 30 + CELESTIAL_ALIGNMENT.agreementDeg + 1;
+    expect(reference.confirm(sighting(restarted), 1.5)).toBeNull();
+    // The disagreement becomes the new run's first sighting rather than a dead
+    // end, so two more agreeing with it still land.
+    expect(reference.confirm(sighting(restarted), 3)).toBeNull();
+    expect(reference.confirm(sighting(restarted), 4.5)).not.toBeNull();
   });
 
   test("two sightings far apart in time are not of the same sky", () => {
@@ -276,12 +280,13 @@ describe("nothing is believed once", () => {
   });
 
   test("each body confirms itself", () => {
-    // A spurious moon between two real suns must not disarm the sun, which is
-    // why the run is kept per body rather than as one last sighting.
+    // A spurious moon in the middle of a run of suns must not disarm the sun,
+    // which is why the run is kept per body rather than as one last sighting.
     const reference = new CelestialNorthReference();
     expect(reference.confirm(sighting(30, "sun"), 0)).toBeNull();
     expect(reference.confirm(sighting(-70, "moon"), 0.5)).toBeNull();
-    expect(reference.confirm(sighting(30.2, "sun"), 1)).not.toBeNull();
+    expect(reference.confirm(sighting(30.2, "sun"), 1)).toBeNull();
+    expect(reference.confirm(sighting(30.1, "sun"), 2)).not.toBeNull();
   });
 
   test("a reset drops the run", () => {
@@ -515,7 +520,8 @@ test("a photograph of the sun corrects a compass that is twenty-five degrees out
     if (step % 20 === 0) {
       const confirmed = new CelestialNorthReference();
       confirmed.confirm(sighting as CelestialSighting, step * 0.05);
-      const again = confirmed.confirm(sighting as CelestialSighting, step * 0.05 + 1);
+      confirmed.confirm(sighting as CelestialSighting, step * 0.05 + 1);
+      const again = confirmed.confirm(sighting as CelestialSighting, step * 0.05 + 2);
       if (again) filter.correctNorthOffset(again.northOffsetDeg, again.noiseDeg);
     }
   }

@@ -220,23 +220,25 @@ export function sightingNoiseDeg(altitudeDeg: number, offAxisDeg: number): numbe
 }
 
 /**
- * Holds a sighting back until a second one agrees with it.
+ * Holds a sighting back until `CELESTIAL_ALIGNMENT.confirmationsRequired` in a
+ * row agree with it.
  *
  * The gates in `sightBody` are geometric and strong, but they are all applied
  * to one frame, and one frame is exactly what a reflection off a window gets
  * right by accident. What it does not get right is the same implied bearing
- * again a second or two later, usually from a slightly different aim — the
- * reflection moves with the phone and the sun does not. So the first sighting
- * of a body only arms the next one.
+ * again and again a second or two apart, usually from a slightly different aim
+ * — the reflection moves with the phone and the sun does not. So a run has to
+ * build up before any sighting in it is acted on, and a sighting that breaks
+ * the chain starts a new run rather than ending the search.
  *
- * Kept per body rather than as a single last-sighting, so that a real sun seen
- * in every frame is not disarmed by a spurious moon between two of them: each
- * body confirms itself.
+ * Kept per body rather than as a single run, so that a real sun seen in every
+ * frame is not disarmed by a spurious moon in between: each body confirms
+ * itself.
  */
 export class CelestialNorthReference {
   private readonly previous = new Map<
     CelestialBodyName,
-    { sighting: CelestialSighting; atSeconds: number }
+    { sighting: CelestialSighting; atSeconds: number; streak: number }
   >();
 
   /** Drops the run. Call on a seek or a jump, as the attitude filter does. */
@@ -246,18 +248,22 @@ export class CelestialNorthReference {
 
   /**
    * Offers a sighting, and returns it if it is one to act on — which it is
-   * once a sighting of the same body, recent enough to be of the same sky,
-   * has already implied the same bearing.
+   * once a run of sightings of the same body, recent enough to be of the same
+   * sky and close enough to each other in bearing, has reached the required
+   * length.
    */
   confirm(sighting: CelestialSighting, atSeconds: number): CelestialSighting | null {
     const previous = this.previous.get(sighting.body);
-    this.previous.set(sighting.body, { sighting, atSeconds });
 
-    if (!previous) return null;
-    if (atSeconds - previous.atSeconds > CELESTIAL_ALIGNMENT.holdSeconds) return null;
-    const disagreement = Math.abs(
-      wrapDegrees180(sighting.northOffsetDeg - previous.sighting.northOffsetDeg)
-    );
-    return disagreement <= CELESTIAL_ALIGNMENT.agreementDeg ? sighting : null;
+    const agrees =
+      previous !== undefined &&
+      atSeconds - previous.atSeconds <= CELESTIAL_ALIGNMENT.holdSeconds &&
+      Math.abs(wrapDegrees180(sighting.northOffsetDeg - previous.sighting.northOffsetDeg)) <=
+        CELESTIAL_ALIGNMENT.agreementDeg;
+
+    const streak = agrees ? previous.streak + 1 : 1;
+    this.previous.set(sighting.body, { sighting, atSeconds, streak });
+
+    return streak >= CELESTIAL_ALIGNMENT.confirmationsRequired ? sighting : null;
   }
 }

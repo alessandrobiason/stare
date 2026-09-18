@@ -1325,7 +1325,7 @@ export const CELESTIAL_ALIGNMENT = {
    * to redden and spread it, and the horizon is where the lamps, headlights and
    * lit windows that could be mistaken for it all live.
    */
-  minimumAltitudeDeg: 10,
+  minimumAltitudeDeg: 15,
   /**
    * And how far up it stops being a bearing at all.
    *
@@ -1348,40 +1348,64 @@ export const CELESTIAL_ALIGNMENT = {
    * its elevation alone — so it tests the sighting without assuming the answer.
    *
    * A street lamp at four degrees is not a sun at forty; a reflection in a
-   * window is at the wrong height almost always. Four degrees covers the
+   * window is at the wrong height almost always. Two degrees covers the
    * attitude filter's own error and the lens being assumed rather than
-   * measured, and admits very little else.
+   * measured, and admits very little else — tighter than the four this used to
+   * be, because four was still letting the occasional wrong blob through and a
+   * wrong lock is far more costly than a missed one.
    */
-  elevationAgreementDeg: 4,
+  elevationAgreementDeg: 2,
   /**
    * The largest heading correction a sighting is allowed to ask for.
    *
    * A compass captured by a magnet is tens of degrees out, which is the whole
    * point of this, so the bound has to be generous. Past it the disagreement is
    * more likely to be a sighting of the wrong object than a compass that wrong,
-   * and adopting it would swing the view somewhere new and confident.
+   * and adopting it would swing the view somewhere new and confident. Sixty
+   * rather than the eighty this used to be: a body found further than that from
+   * where the compass says to look is, in practice, the wrong body more often
+   * than the compass is a magnet that badly fooled.
    */
-  maximumCorrectionDeg: 80,
+  maximumCorrectionDeg: 60,
   /**
    * How far two consecutive sightings may disagree and still count as the same
    * body seen twice.
    *
-   * Nothing is fed to the filter on one sighting. Two agreeing is what
-   * separates the sun from the one bright thing that happened to pass every
-   * other gate: a false positive has to be repeated, at the same implied
-   * bearing, from a frame the phone has usually moved between — which a
-   * reflection does not manage and the sun does trivially.
+   * Nothing is fed to the filter on fewer than `confirmationsRequired`
+   * sightings in a row agreeing this closely. Agreement is what separates the
+   * sun from the one bright thing that happened to pass every other gate: a
+   * false positive has to be repeated, at the same implied bearing, from
+   * frames the phone has usually moved between — which a reflection does not
+   * manage and the sun does trivially. Half what it used to be, since a lock
+   * arriving late costs nothing and a wrong one costs a jump.
    */
-  agreementDeg: 3,
+  agreementDeg: 1.5,
+  /**
+   * How many sightings of a body in a row must agree, within `agreementDeg` and
+   * no further apart in time than `holdSeconds`, before one of them is handed
+   * to the filter.
+   *
+   * Two used to be enough, and two is also what an unlucky reflection manages
+   * occasionally: it only has to survive the gates in `sightBody` twice, and a
+   * phone does not always move enough between two frames a second apart to
+   * shake it loose. Three is a harder bar to clear by accident — the run has to
+   * hold across an extra frame the reflection is unlikely to still be lined up
+   * for, while the sun or moon, which is not moving relative to the gates at
+   * all, clears it without noticing.
+   */
+  confirmationsRequired: 3,
   /**
    * How long a sighting stands as something for the next one to agree with.
    *
    * Longer than the gap between segmentation passes by enough to survive a few
-   * failed ones, and short enough that two sightings either side of it are not
-   * treated as consecutive: the phone can be carried a long way in half a
-   * minute, and the agreement test assumes the two are of the same sky.
+   * failed ones, and short enough that sightings either side of it are not
+   * treated as part of the same run: the phone can be carried a long way in
+   * that time, and the agreement test assumes the run is of the same sky.
+   * Shorter than the twenty seconds this used to be, now that a run has to
+   * reach three sightings rather than two — the old window sized for two would
+   * let the third arrive after enough of a walk to no longer mean anything.
    */
-  holdSeconds: 20,
+  holdSeconds: 12,
   /**
    * Angular error assumed in a sighting at the centre of the frame, in degrees,
    * before the two terms below are applied.

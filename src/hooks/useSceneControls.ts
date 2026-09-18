@@ -93,12 +93,14 @@ export type SceneControls = {
   skyMaskFiltering: boolean;
   toggleSkyMaskFiltering: () => void;
   /**
-   * Whether the sun and the moon are used to check the compass. On, because a
-   * heading that has been checked against the sky is the better heading in
-   * every case where one is available, and because there is nothing to weigh up
-   * — a sighting is a measurement like the magnetometer's, and the filter
-   * decides what it is worth. The debug menu's switch turns it off, which is
-   * how a correction is confirmed to have come from here.
+   * Whether the sun and the moon are used to check the compass.
+   *
+   * Off by default: a wrong sighting is worth tens of degrees of heading and is
+   * held confidently, and in practice this has locked onto the wrong thing
+   * often enough to jump a heading that was fine on its own. The gates in
+   * `celestialNorth.ts` have been hardened since, but the console's switch is
+   * still how someone chooses to trust it rather than the app deciding for
+   * them.
    */
   celestialAlignment: boolean;
   toggleCelestialAlignment: () => void;
@@ -141,7 +143,7 @@ export function useSceneControls({ tourOnFirstRun = false }: SceneControlOptions
   const [debug, setDebug] = useState(false);
   const [guide, setGuide] = useState(false);
   const [skyMaskFiltering, setSkyMaskFiltering] = useState(true);
-  const [celestialAlignment, setCelestialAlignment] = useState(true);
+  const [celestialAlignment, setCelestialAlignment] = useState(false);
 
   const toggleCategory = useCallback((category: SatelliteCategory) => {
     setEnabledCategories((current) => {
