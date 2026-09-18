@@ -559,11 +559,12 @@ function drawable(passes: SkyPass[]): SkyPass[] {
  * nothing — and there is no deadline on it, because the plan it replaces goes
  * on being drawn until this one lands. See `src/timeSlice.ts`.
  *
- * Two callers, with two windows and two purposes. `planSkyPaths` takes the next
- * three hours and keeps four of them to draw; the alert planner takes the next
- * day and keeps the ones that can be *seen* (`src/satellite/passAlerts.ts`).
- * Neither cares which objects the other kept, and both want exactly this: the
- * tier's real passes, once each.
+ * Three callers, with three windows and three purposes. `planSkyPaths` takes
+ * the next three hours and keeps four of them to draw; the passes panel takes
+ * the next day and lists all of it (`useOrbitPaths`); the alert planner takes
+ * the next week and keeps the ones that can be *seen*
+ * (`src/satellite/passAlerts.ts`). None cares which objects another kept, and
+ * all three want exactly this: the tier's real passes, once each.
  */
 export async function landmarkPasses(
   catalog: SatelliteCatalog,

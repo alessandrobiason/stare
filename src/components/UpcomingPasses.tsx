@@ -4,6 +4,7 @@ import {
   Easing,
   PanResponder,
   Pressable,
+  ScrollView,
   StyleProp,
   StyleSheet,
   Text,
@@ -23,7 +24,7 @@ type Props = {
   /**
    * The landmarks' next passes, soonest first, as `upcomingPasses` describes
    * them. Empty while the landmark tier is filtered off, and on a sky where
-   * nothing rises for the next three hours.
+   * nothing rises for the next day (`PASSES_PANEL.windowHours`).
    */
   passes: readonly UpcomingPass[];
   /**
@@ -50,12 +51,13 @@ type Props = {
  * facts about this instant — and the question neither answers is the one asked
  * before the phone goes up at all: is anything worth waiting for.
  *
- * The app has always known. The landmarks carry their next three hours of sky
- * with them (`orbitPath.ts`), drawn as the arc each will trace — but an arc is
- * only an answer to somebody already pointing the phone at the piece of sky it
- * crosses, and for most of those three hours that is nobody: the plan covers
- * the whole sky and the camera holds sixty degrees of it. So the same plan is
- * read out here, where it can be seen without hunting for it.
+ * The app has always known. The landmarks carry their next day of sky with
+ * them (`PASSES_PANEL.windowHours`), further out than the three hours actually
+ * drawn as arcs (`orbitPath.ts`) — an arc is only an answer to somebody already
+ * pointing the phone at the piece of sky it crosses, and for most of even
+ * those three hours that is nobody: the plan covers the whole sky and the
+ * camera holds sixty degrees of it. So the same plan is read out here, where
+ * it can be seen without hunting for it, a day further than any of it is drawn.
  *
  * **Shut, it is the next pass** — the object, how long there is, where to stand
  * and whether it can be seen — which is the whole answer for most of the times
@@ -65,13 +67,13 @@ type Props = {
  * a time, and it is always the thing most worth reading.
  *
  * **Open, it is the rest of the plan**: each pass with where to stand for it,
- * how high it gets, and whether it can be seen when it comes.
+ * how high it gets, and whether it can be seen when it comes — as much as a day
+ * of them, the first few shown and the rest a scroll away.
  *
  * **Nothing at all when there is nothing coming.** The tier filtered off, or a
- * sky where none of the landmarks clear the roofline for three hours — which at
- * high latitudes is most of them, most of the time — and the card is not drawn.
- * A permanent card saying "nothing" is a piece of the picture spent on the
- * absence of news.
+ * sky where none of the landmarks clear the roofline for a day — which at high
+ * latitudes can still happen — and the card is not drawn. A permanent card
+ * saying "nothing" is a piece of the picture spent on the absence of news.
  *
  * A row is a target, like the names written along the paths (`namesUnder`): it
  * opens the same details the object's own mark would, which for a pass that has
@@ -145,6 +147,17 @@ const SLIDE_MS = 260;
  * the moment it is mounted and its own height replaces this.
  */
 const ROW_ESTIMATE = 52;
+/**
+ * How many rows the open card shows before the rest is a scroll away.
+ *
+ * A day of passes (`PASSES_PANEL.windowHours`) can be a few dozen rows across
+ * a whole tier, and a card that grew to fit all of them would push the sky off
+ * the top of the screen for the sake of a plan for tomorrow morning. Six is
+ * what is on screen without hunting for it, the same as when four or five
+ * landmarks each just cleared the drawn three hours; the rest is still there,
+ * a drag away rather than a fact the card had to be tall to hold.
+ */
+const VISIBLE_ROWS = 6;
 
 /**
  * The card as it is drawn: the plan, and how far open it is.
@@ -153,12 +166,15 @@ const ROW_ESTIMATE = 52;
  * it keeps of its own is the slide — how far open the list is at this instant,
  * which a finger moves directly and nothing outside the card needs to know.
  *
- * **The whole card is the handle.** It used to be the grip alone, a strip a
- * couple of dozen points tall that a thumb aiming at the card mostly missed;
- * now a vertical drag anywhere on it opens or shuts the list, a tap on its top
- * does the same, and the rows keep their own taps. The list follows the finger
- * while it is down and slides the rest of the way when it lets go, which is how
- * a sheet on this platform is worked — it no longer appears in one frame.
+ * **The header is the handle.** It used to be the grip alone, a strip a couple
+ * of dozen points tall that a thumb aiming at the card mostly missed; now a
+ * vertical drag anywhere on the header opens or shuts the list, a tap on it
+ * does the same, and the rows keep their own taps — and, once the list is
+ * longer than `VISIBLE_ROWS`, their own scroll, which is why the drag is kept
+ * to the header rather than reaching down over rows it would otherwise steal
+ * from. The list follows the finger while it is down and slides the rest of
+ * the way when it lets go, which is how a sheet on this platform is worked —
+ * it no longer appears in one frame.
  */
 export const PassesPanel: React.FC<PanelProps> = ({
   passes,
@@ -237,7 +253,7 @@ export const PassesPanel: React.FC<PanelProps> = ({
       },
       onPanResponderMove: (_evt, gesture) => {
         const { listHeight: measured, rowCount: rows } = liveRef.current;
-        const span = Math.max(1, measured ?? rows * ROW_ESTIMATE);
+        const span = Math.max(1, openHeightOf(measured, rows));
         progress.setValue(clamp01(dragFromRef.current - gesture.dy / span));
       },
       onPanResponderRelease: (_evt, gesture) => {
@@ -256,109 +272,123 @@ export const PassesPanel: React.FC<PanelProps> = ({
   const toggle = () => slideTo(targetRef.current === 1 ? 0 : 1);
 
   return (
-    <View ref={viewRef} style={[styles.card, style]} {...panResponder.panHandlers}>
+    <View ref={viewRef} style={[styles.card, style]}>
       {/* The grip and the line under it, as one target: a tap anywhere on the
-          top of the card opens it or shuts it, and a drag anywhere on the card
-          does the same while following the finger. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t.open}
-        accessibilityState={{ expanded }}
-        aria-expanded={expanded}
-        onPress={toggle}
-      >
-        <View style={styles.gripRow}>
-          <View style={styles.grip} />
-        </View>
-
-        <View style={styles.head}>
-          <View style={styles.badge}>
-            <Icon name="sky" size={20} color={theme.color.accent} />
+          header opens it or shuts it, and a drag anywhere on the header does
+          the same while following the finger. Kept to the header rather than
+          the whole card now that the list below it can be long enough to
+          scroll — a drag that starts on a row is the row's own scroll, not a
+          reach for the card underneath it. */}
+      <View {...panResponder.panHandlers}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t.open}
+          accessibilityState={{ expanded }}
+          aria-expanded={expanded}
+          onPress={toggle}
+        >
+          <View style={styles.gripRow}>
+            <View style={styles.grip} />
           </View>
 
-          <View style={styles.headText}>
-            {expanded ? (
-              <Text style={styles.title}>{t.title}</Text>
-            ) : (
-              <>
-                <View style={styles.nameRow}>
-                  {/* Capped and clipped rather than wrapped: shut, this line is
-                      one row and `Einstein Probe` is the longest name the tier
-                      has. */}
-                  <Text numberOfLines={1} style={styles.name}>
-                    {next.name}
+          <View style={styles.head}>
+            <View style={styles.badge}>
+              <Icon name="sky" size={20} color={theme.color.accent} />
+            </View>
+
+            <View style={styles.headText}>
+              {expanded ? (
+                <Text style={styles.title}>{t.title}</Text>
+              ) : (
+                <>
+                  <View style={styles.nameRow}>
+                    {/* Capped and clipped rather than wrapped: shut, this line
+                        is one row and `Einstein Probe` is the longest name
+                        the tier has. */}
+                    <Text numberOfLines={1} style={styles.name}>
+                      {next.name}
+                    </Text>
+                    <Text style={styles.when}>{timeUntil(next.startsAtMs - nowMs)}</Text>
+                  </View>
+                  {/* Two lines rather than one: this is a bearing, a height
+                      and a verdict, and in the longer languages that runs
+                      past the width of the card. Clipped, what goes first is
+                      the verdict, which is the half that decides whether the
+                      countdown is worth acting on. */}
+                  <Text numberOfLines={2} style={styles.meta}>
+                    {passDirection(next)} ·{" "}
+                    <Text style={seeingStyle(next)}>{passSeeing(next.nakedEye)}</Text>
                   </Text>
-                  <Text style={styles.when}>{timeUntil(next.startsAtMs - nowMs)}</Text>
-                </View>
-                {/* Two lines rather than one: this is a bearing, a height and a
-                    verdict, and in the longer languages that runs past the width
-                    of the card. Clipped, what goes first is the verdict, which
-                    is the half that decides whether the countdown is worth
-                    acting on. */}
-                <Text numberOfLines={2} style={styles.meta}>
-                  {passDirection(next)} ·{" "}
-                  <Text style={seeingStyle(next)}>{passSeeing(next.nakedEye)}</Text>
-                </Text>
-              </>
-            )}
+                </>
+              )}
+            </View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
 
       {listShown && (
-        // Clipped to however far open the slide is. The list inside is laid out
-        // at its own full height whatever this box is, which is what lets it be
-        // measured before it has been opened at all.
+        // Clipped to however far open the slide is, and never past
+        // `VISIBLE_ROWS` worth even once the list itself is measured taller
+        // than that: a day of passes can be dozens of rows, and the card opens
+        // to a handful of them rather than to all of it.
         <Animated.View
           style={[
             styles.listClip,
             {
               height: progress.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, listHeight ?? rowCount * ROW_ESTIMATE]
+                outputRange: [0, openHeightOf(listHeight, rowCount)]
               })
             }
           ]}
         >
           {/* A list, and said to be one: what is under the card is several
               passes rather than one panel's worth of prose, and the rows are
-              the targets. */}
-          <View
-            accessibilityRole="list"
-            style={styles.list}
-            onLayout={({ nativeEvent }) => setListHeight(nativeEvent.layout.height)}
+              the targets. Scrollable past `VISIBLE_ROWS`, so the rest of a
+              day's plan is a drag inside the card away rather than a card
+              that grew to hold all of it. */}
+          <ScrollView
+            style={styles.listScroll}
+            scrollEnabled={(listHeight ?? rowCount * ROW_ESTIMATE) > VISIBLE_ROWS * ROW_ESTIMATE}
+            nestedScrollEnabled
           >
-            {passes.map((pass) => (
-              <Pressable
-                // The catalogue number, not the name: a station and the ferry
-                // docked to it share a piece of sky and a minute, and two passes
-                // of the same object are two rows.
-                key={`${pass.noradId}-${pass.startsAtMs}`}
-                accessibilityRole="button"
-                accessibilityLabel={pass.name}
-                style={styles.row}
-                onPress={() => onSelect(pass.name)}
-              >
-                <View style={styles.rowText}>
-                  <View style={styles.nameRow}>
-                    <Text numberOfLines={1} style={styles.rowName}>
-                      {pass.name}
+            <View
+              accessibilityRole="list"
+              style={styles.list}
+              onLayout={({ nativeEvent }) => setListHeight(nativeEvent.layout.height)}
+            >
+              {passes.map((pass) => (
+                <Pressable
+                  // The catalogue number, not the name: a station and the
+                  // ferry docked to it share a piece of sky and a minute, and
+                  // two passes of the same object are two rows.
+                  key={`${pass.noradId}-${pass.startsAtMs}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={pass.name}
+                  style={styles.row}
+                  onPress={() => onSelect(pass.name)}
+                >
+                  <View style={styles.rowText}>
+                    <View style={styles.nameRow}>
+                      <Text numberOfLines={1} style={styles.rowName}>
+                        {pass.name}
+                      </Text>
+                      <Text style={styles.when}>{timeUntil(pass.startsAtMs - nowMs)}</Text>
+                    </View>
+                    {/* Where to stand and what it is worth, then whether it
+                        can be seen at all — in that order, because the first
+                        two are facts about the sky and the third is the one
+                        that decides whether either is worth acting on. */}
+                    <Text style={styles.meta}>
+                      {passDirection(pass)} ·{" "}
+                      <Text style={seeingStyle(pass)}>{passSeeing(pass.nakedEye)}</Text>
                     </Text>
-                    <Text style={styles.when}>{timeUntil(pass.startsAtMs - nowMs)}</Text>
                   </View>
-                  {/* Where to stand and what it is worth, then whether it can
-                      be seen at all — in that order, because the first two are
-                      facts about the sky and the third is the one that decides
-                      whether either is worth acting on. */}
-                  <Text style={styles.meta}>
-                    {passDirection(pass)} ·{" "}
-                    <Text style={seeingStyle(pass)}>{passSeeing(pass.nakedEye)}</Text>
-                  </Text>
-                </View>
-                <Icon name="chevron" size={14} color={theme.color.textFaint} />
-              </Pressable>
-            ))}
-          </View>
+                  <Icon name="chevron" size={14} color={theme.color.textFaint} />
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
         </Animated.View>
       )}
     </View>
@@ -367,6 +397,19 @@ export const PassesPanel: React.FC<PanelProps> = ({
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * How tall the card opens to: the list's own height once measured, an
+ * estimate before that, and never more than `VISIBLE_ROWS` worth either way.
+ *
+ * Read by the slide animation and by a drag in progress alike, so the two
+ * agree on what "fully open" is — a drag that covered this much distance
+ * reaches exactly as open as the animation would have finished, whether or
+ * not the rest of the list still lies below it under a scroll.
+ */
+function openHeightOf(measuredHeight: number | null, rowCount: number): number {
+  return Math.min(measuredHeight ?? rowCount * ROW_ESTIMATE, VISIBLE_ROWS * ROW_ESTIMATE);
 }
 
 /**
@@ -479,6 +522,9 @@ const styles = StyleSheet.create({
   },
   listClip: {
     overflow: "hidden"
+  },
+  listScroll: {
+    flex: 1
   },
   list: {
     paddingHorizontal: 14,

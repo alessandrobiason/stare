@@ -68,7 +68,7 @@ export const en: Strings = {
     },
     passes: {
       title: "Coming up",
-      body: "What will pass over you next. Tap to see the next few hours."
+      body: "What will pass over you next. Tap to see the next day."
     },
     catalog: {
       title: "Catalog",

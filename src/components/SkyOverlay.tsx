@@ -765,11 +765,13 @@ export const SkyOverlay: React.FC<Props> = ({
  * something that has happened. The list is soonest first, so the first match is
  * the next one.
  *
- * Answered from the plan the sky is already drawing rather than by asking for
- * one, which is why a name with no line on the sky — anything outside the
- * landmark tier — gets `null` and the card's present tense. That is the right
- * answer for those: nothing plans their passes, and the card would have nothing
- * to name a time from.
+ * Answered from the panel's own plan rather than by asking for one, which
+ * reaches a day ahead — further than the three hours actually drawn
+ * (`PASSES_PANEL`), so a match here may still be a pass with no line on the
+ * sky yet. A name with no plan at all — anything outside the landmark tier —
+ * gets `null` and the card's present tense. That is the right answer for
+ * those: nothing plans their passes, and the card would have nothing to name a
+ * time from.
  */
 function passAhead(passes: readonly UpcomingPass[], name: string): UpcomingPass | null {
   return passes.find((pass) => pass.name === name && !pass.started) ?? null;

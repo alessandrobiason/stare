@@ -1,7 +1,7 @@
 import { MutableRefObject, useEffect, useRef, useState } from "react";
-import { LANDMARK_PATHS } from "../constants";
+import { LANDMARK_PATHS, PASSES_PANEL } from "../constants";
 import { SatelliteCatalog } from "../satellite/catalog";
-import { planSkyPaths, SkyPass } from "../satellite/orbitPath";
+import { landmarkPasses, planSkyPaths, SkyPass } from "../satellite/orbitPath";
 import { UpcomingPass, upcomingPasses } from "../satellite/upcomingPasses";
 import { startSlicing } from "../timeSlice";
 import { ObserverLocation, OrbitEpoch } from "../types";
@@ -35,14 +35,17 @@ export type OrbitPaths = {
    */
   pathsRef: MutableRefObject<SkyPass[]>;
   /**
-   * The same passes as a list, for the panel that says what is coming.
+   * A wider plan than the one above, for the panel that says what is coming.
    *
-   * State, because this one is read by a view rather than by the loop, and a
-   * ref nothing re-renders for would leave the panel showing the plan it
-   * mounted with. The cost is the render this hook's owner does when a plan
-   * lands, which is once a minute against the sixty a second the loop is
-   * already doing — and the loop itself is untouched by it, since everything it
-   * reads is a ref. Identity is stable between plans, so a render that changes
+   * Searched over `PASSES_PANEL.windowHours` rather than the three hours the
+   * arcs are drawn over: a row past that window opens the same card any other
+   * row does, just with no line yet on the sky for it to point at. State,
+   * because this one is read by a view rather than by the loop, and a ref
+   * nothing re-renders for would leave the panel showing the plan it mounted
+   * with. The cost is the render this hook's owner does when a plan lands,
+   * which is once a minute against the sixty a second the loop is already
+   * doing — and the loop itself is untouched by it, since everything it reads
+   * is a ref. Identity is stable between plans, so a render that changes
    * nothing else does not reach the panel either. See `upcomingPasses`.
    */
   upcoming: UpcomingPass[];
@@ -90,15 +93,24 @@ export function useOrbitPaths({ catalog, epochRef, enabled }: Options): OrbitPat
       // catches, either — the arithmetic below is the same SGP4 the frame loop
       // runs sixty times a second, so a failure here is a bug rather than a
       // condition, and one swallowed on a timer is a bug that never surfaces.
-      planSkyPaths(catalog, atMs, observer, startSlicing())
-        .then((passes) => {
+      //
+      // Two searches, sliced independently, because they answer different
+      // questions over different windows: the arcs are three hours of sky and
+      // the panel is a day of it (`PASSES_PANEL`). Both are marched at the
+      // same instant, so a row in the panel and a line on the frame never
+      // disagree about what "now" was.
+      Promise.all([
+        planSkyPaths(catalog, atMs, observer, startSlicing()),
+        landmarkPasses(catalog, atMs, observer, startSlicing(), PASSES_PANEL.windowHours)
+      ])
+        .then(([drawn, found]) => {
           if (dropped) return;
-          pathsRef.current = passes;
+          pathsRef.current = drawn;
           // Described here rather than in the panel, because what it costs is a
           // propagation and a sun position per pass and this is the one place
           // that already knows a plan is new. Off the frame thread, on the same
           // background job, against the observer the plan was made for.
-          setUpcoming(passes.length === 0 ? NO_PASSES : upcomingPasses(passes, catalog, observer));
+          setUpcoming(found.length === 0 ? NO_PASSES : upcomingPasses(found, catalog, observer));
           plannedAtMs = atMs;
           plannedFrom = observer;
         })
@@ -122,10 +134,10 @@ export function useOrbitPaths({ catalog, epochRef, enabled }: Options): OrbitPat
  * The empty list, shared.
  *
  * A plan with nothing in it happens twice — the landmark tier switched off, and
- * a sky where nothing rises for three hours, which at high latitudes is most of
- * the tier most of the time. Handing back the same array both times is what
- * lets React bail out of the render instead of taking a new empty array as a
- * change.
+ * a sky where nothing rises in the panel's own day (`PASSES_PANEL.windowHours`),
+ * which at high latitudes can still happen. Handing back the same array both
+ * times is what lets React bail out of the render instead of taking a new
+ * empty array as a change.
  */
 const NO_PASSES: UpcomingPass[] = [];
 

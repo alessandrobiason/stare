@@ -61,7 +61,7 @@ export const it: Strings = {
     },
     passes: {
       title: "In arrivo",
-      body: "Cosa passerà sopra di te a breve. Tocca per vedere le prossime ore."
+      body: "Cosa passerà sopra di te a breve. Tocca per vedere il prossimo giorno."
     },
     catalog: {
       title: "Catalogo",

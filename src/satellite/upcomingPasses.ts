@@ -79,23 +79,24 @@ export type UpcomingPass = {
 /**
  * What to say about the passes that have been planned, soonest first.
  *
- * The same set the sky is drawing and no other — every row is a line someone
- * can go and find, and tapping one opens the card its mark would have. A list
- * that reached further than the lines would be offering passes with nothing on
- * the frame to connect them to, and `maximumPaths` is a limit on legibility
- * rather than on the plan: what it leaves out is a fifth arc crossing a view
- * that already has four, not a pass nobody was told about.
+ * Wider than what the sky is drawing (`PASSES_PANEL.windowHours` against
+ * `LANDMARK_PATHS.windowHours`): every row is a pass someone can go and find,
+ * but a row further out than the three drawn hours has no line on the frame
+ * yet to point at — tapping it opens the same card the sky's own marks would,
+ * just ahead of the arc appearing. What is never widened is which objects
+ * answer at all: only the landmark tier, the same one the arcs are drawn for.
  *
  * Ordered by when it comes up rather than in the order the plan produced,
- * which is breadth first across the landmarks (`drawable`) — the right order
- * for spending four lines on four different objects, and the wrong one for a
- * list whose whole subject is what happens next.
+ * which is breadth first across the landmarks (`drawable`, for the arcs
+ * alone) — the right order for spending four lines on four different objects,
+ * and the wrong one for a list whose whole subject is what happens next.
  *
  * One other caller asks the same question of a different plan. The pass alerts
- * describe a day of sky rather than the three hours that are drawn
+ * describe a week of sky rather than the day the panel does
  * (`src/satellite/passAlerts.ts`), for the same reason and with the same
- * arithmetic: what they need to know about a pass hours away is whether it can
- * be seen when it comes, and there is one place in the app that answers that.
+ * arithmetic: what they need to know about a pass hours or days away is
+ * whether it can be seen when it comes, and there is one place in the app that
+ * answers that.
  */
 export function upcomingPasses(
   passes: readonly SkyPass[],

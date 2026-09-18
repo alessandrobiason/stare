@@ -646,6 +646,25 @@ export const LANDMARK_PATHS = {
 } as const;
 
 /**
+ * How the passes panel reads out further than the sky draws.
+ *
+ * A line only earns its place on the frame for the three hours someone is
+ * actually standing under (`LANDMARK_PATHS.windowHours`) — past four crossings
+ * the arcs read as a mesh rather than a route each. A list has no such limit:
+ * read sitting down rather than glanced at over the phone, it can answer "is
+ * anything worth waiting up for tonight" instead of only "what's up right
+ * now." A day ahead is long enough for that and short enough to still be
+ * tonight's plan.
+ *
+ * Rows past the three drawn hours open the same card any other row does; there
+ * is simply no line on the sky yet for that one to point at, which is no
+ * different from tapping an object from the catalog before it has risen.
+ */
+export const PASSES_PANEL = {
+  windowHours: 24
+} as const;
+
+/**
  * When the phone is worth interrupting for (`src/satellite/passAlerts.ts`).
  *
  * Everything else in the app answers a question somebody has already asked by
