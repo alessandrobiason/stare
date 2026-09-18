@@ -12,7 +12,7 @@ import { AlertGateway, PassAlertAccess, ScheduledAlert } from "./alertTypes";
  * handed to iOS to deliver. That is what makes it work with the app closed,
  * and it is also the whole of its limit: iOS runs nothing of ours in the
  * meantime, so what is delivered while the app is shut is exactly what was
- * queued the last time it was open. See `PASS_ALERTS.windowHours`.
+ * queued the last time it was open. See `PASS_ALERTS.horizonDays`.
  *
  * **Nothing here throws.** Every call is into a native module that may be
  * missing (a dev client without it built in), refused, or in a state nobody

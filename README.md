@@ -135,15 +135,20 @@ canvas in the browser harness.
 
 **A notification is a promise, and the app is not there to keep it.** iOS runs
 nothing of a closed app, so every alert somebody gets at nine in the evening was
-worked out the last time they had it open: a day of sky is planned in the
+worked out the last time they had it open: a week of sky is planned in the
 background and queued as dated local notifications
-([`src/notifications/`](src/notifications/)), and that window is the promise
-rather than a tuning knob. What goes *into* it is the narrow part. The app draws
+([`src/notifications/`](src/notifications/)). A week because that is how far
+SGP4 can be trusted to name the minute — measured against CelesTrak's own
+elements 26 days apart, the passive observatories drifted by seconds to two
+minutes, but the station ran thirteen minutes late, and five minutes of that is
+the budget ([`PASS_ALERTS.horizonDays`](src/constants.ts)). The horizon is
+counted from each object's element epoch, so a stale cached catalogue alerts on
+nothing. What goes *into* the queue is the narrow part. The app draws
 sixteen thousand objects and almost none of them can be seen at any moment, so
 the same arithmetic the card uses — sunlight on the object, darkness here, a
 recorded magnitude against what this sky gives up — decides each pass at its own
 high point, and only *visible* and *binoculars* are queued, above twenty degrees,
-outside the small hours. Not the eclipsed pass, not the daylit one, and not the
+outside the small hours, two a day at most. Not the eclipsed pass, not the daylit one, and not the
 object whose reflectivity nobody has written down, however high it goes. An arc
 drawn for a pass that turns out to be too faint costs nothing; a phone buzzing
 for one costs the permission, and every pass after it.
@@ -203,10 +208,15 @@ what the harness substitutes and what it does not.
   against a 100 ms budget, which is why the tracker sweeps a slice per frame.
 - The first run downloads a 95 MB model, and the catalogue is cached for two
   hours because that is CelesTrak's rate limit.
-- **Pass alerts are only as fresh as the last time the app was open.** A day of
-  them is queued at a time, so an app left shut for two days delivers the first
-  day and then goes quiet. There is no background refresh; adding one would
-  spend a permission and a wake-up budget to buy a second day.
+- **Pass alerts are only as fresh as the last time the app was open.** A week
+  of them is queued at a time, so an app left shut for longer goes quiet once
+  the week runs out. There is no background refresh; the week is the limit of
+  what the elements can promise, and a refresh would spend a permission and a
+  wake-up budget to fetch new ones.
+- **A reboost is invisible to the queue.** The station changes its orbit on
+  dates no element set knows about, and an alert queued before one can be a
+  few minutes out by the end of the week — inside the ten minutes of notice,
+  but not by much.
 - **They are planned for where the phone was**, and a queued notification does
   not follow it. Fly somewhere and the evening's alerts are for the sky you
   left, until the app is opened again.

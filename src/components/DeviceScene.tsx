@@ -46,7 +46,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
   useLocale();
   const { observer, epochRef } = useLiveSky(boot.observer);
   /**
-   * The pass alerts: what the phone allows, and the day's worth of
+   * The pass alerts: what the phone allows, and the week's worth of
    * notifications queued against it.
    *
    * Here rather than anywhere else because this is where the two things a plan

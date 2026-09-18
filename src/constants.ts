@@ -662,21 +662,43 @@ export const LANDMARK_PATHS = {
  */
 export const PASS_ALERTS = {
   /**
-   * How far ahead passes are planned for alerting, in hours.
+   * How far past its own elements a pass may be and still be alerted on, in
+   * days — and so how far ahead the alerts are planned.
    *
-   * Eight times the window the sky itself draws (`LANDMARK_PATHS.windowHours`),
-   * for a different reader: an arc is drawn for somebody holding the phone up
-   * now, and an alert is scheduled for somebody who has put the phone away.
    * The phone will not be asked again until the app is next opened — iOS runs
-   * nothing of ours in between — so the window *is* the promise. A day of it
-   * means an app opened at lunchtime still has tonight's passes in hand, and
-   * one opened in the evening carries through the following night.
+   * nothing of ours in between — so this *is* the promise: the longer it is,
+   * the longer an app left shut goes on telling somebody when to look up. What
+   * bounds it is the elements, not the planner. SGP4 is a fit to one moment of
+   * an orbit, and the error it carries forward is almost all along the track:
+   * the object is on the arc predicted, early or late. The budget this is set
+   * against is five minutes of that, which is half the notice an alert gives
+   * (`leadMinutes`) and about the length of a pass — late by that, the alert
+   * still names a sky that is going to happen.
    *
-   * What it costs is a background job eight times the plan's, sliced so it
-   * never lands on a frame (`passSearch`), run a couple of times an hour. What
-   * a shorter one would cost is the pass someone actually wanted.
+   * Measured rather than quoted, against CelesTrak's own elements for the
+   * landmark tier 26 days apart (2026-08-23 and 2026-09-18). The passive
+   * observatories stayed well inside the budget for the whole of it — Hubble
+   * 27 s, NuSTAR under two minutes, CHEOPS one second. Two did not: the station
+   * and everything docked to it ran thirteen minutes late, and Swift, sinking
+   * fast through a thick upper atmosphere, fourteen minutes early. Drag error
+   * grows with the square of time, so thirteen minutes at 26 days is five at
+   * sixteen; a reboost is worse, because it changes the orbit on a date no
+   * element set can know — a typical one of a metre a second shifts the
+   * station's timing by half a minute a day from the burn onwards, five
+   * minutes in about nine days.
+   *
+   * A week is inside both: about a minute of drag error at the station's
+   * measured rate, and four minutes if it reboosted the moment its elements were
+   * cut. Counted from each object's own epoch rather than from now, so the age
+   * of the elements when they were fetched is already inside it — and a
+   * catalogue read from the cache after a week offline alerts on nothing rather
+   * than on an orbit that has moved on without it (`planPassAlerts`).
+   *
+   * What it costs is a background job fifty-six times the drawn plan's — about
+   * two seconds of arithmetic on a laptop — sliced so it never lands on a
+   * frame (`passSearch`), and made at most once per `refreshMinutes`.
    */
-  windowHours: 24,
+  horizonDays: 7,
   /**
    * How long before the pass rises the notification lands, in minutes.
    *
@@ -707,23 +729,26 @@ export const PASS_ALERTS = {
    *
    * Twenty clears a three-storey building from across a street, which is the
    * sky most people can actually get to. It is the one figure here that was
-   * tuned rather than reasoned: at twenty-five, a month of a real northern sky
-   * came out nearly empty, and an alert nobody ever gets is not a cautious
+   * tuned rather than reasoned: at twenty-five, a real late-August day over
+   * Helsinki came out empty, and an alert nobody ever gets is not a cautious
    * feature but an absent one.
    */
   minimumPeakElevationDeg: 20,
   /**
-   * How many alerts are pending at once.
+   * How many alerts one day may carry, on the phone's own calendar.
    *
-   * iOS keeps the sixty-four soonest local notifications an app has scheduled
-   * and silently drops the rest, so this is not the limit — it is well under
-   * it, on purpose. What is being protected is the reader rather than the
-   * queue: a day of a good sky at the right latitude is a dozen visible passes,
-   * and a phone that buzzes a dozen times is a phone whose owner turns this
-   * off. Six is a couple a night, which is the rate this can go on being
-   * welcome at.
+   * A rate rather than a total, because the total would be spent on the first
+   * nights of the horizon: six for the week would be two evenings of alerts and
+   * five of silence for somebody who does not open the app in between, which is
+   * exactly who this is for. What is being protected is the reader rather than
+   * the queue — a good evening at the right latitude has several visible passes
+   * in it, and a phone that buzzes all evening is a phone whose owner turns this
+   * off. The soonest two are kept.
+   *
+   * iOS keeps the sixty-four soonest local notifications an app has queued and
+   * silently drops the rest; two a day over `horizonDays` is a sixth of that.
    */
-  maximumScheduled: 6,
+  maximumPerDay: 2,
   /**
    * The hours no alert is delivered in, on the phone's own clock: from this
    * hour at night until this one in the morning.
@@ -738,13 +763,14 @@ export const PASS_ALERTS = {
   quietUntilHour: 6,
   /**
    * How often the schedule is worked out again while the app is open, in
-   * minutes.
+   * minutes — on a timer, or on a return to the foreground, whichever comes
+   * first after this long.
    *
-   * Not how fresh it has to be — the passes it names are hours out and the
-   * elements they are propagated from are two hours old at worst — but how long
-   * a session has to run before the day ahead of it is in the queue. Every
-   * foreground return replans as well (`usePassAlerts`), which is what makes
-   * this the floor rather than the cadence.
+   * Not how fresh it has to be — the passes it names are days out, and
+   * `horizonDays` is what says how far that can be trusted — but how much of a
+   * week-long plan the app is prepared to redo. A plan is a couple of seconds
+   * of arithmetic, and a phone that is picked up twenty times an evening should
+   * not make it twenty times (`usePassAlerts`).
    */
   refreshMinutes: 30
 } as const;

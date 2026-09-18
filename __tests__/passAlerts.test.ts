@@ -6,8 +6,14 @@ import { setLocaleForTesting } from "../src/i18n";
 import { scheduledAlertsFor } from "../src/notifications/alertQueue";
 import { SatelliteCatalog } from "../src/satellite/catalog";
 import { NakedEyeVerdict } from "../src/satellite/nakedEye";
-import { landmarkPasses } from "../src/satellite/orbitPath";
-import { alertsWorthSending, isQuietHour, planPassAlerts } from "../src/satellite/passAlerts";
+import { landmarkPasses, SkyPass } from "../src/satellite/orbitPath";
+import {
+  alertsWorthSending,
+  isQuietHour,
+  PassAlert,
+  planPassAlerts,
+  withinHorizon
+} from "../src/satellite/passAlerts";
 import { UpcomingPass, upcomingPasses } from "../src/satellite/upcomingPasses";
 import { startSlicing } from "../src/timeSlice";
 import { ObserverLocation } from "../src/types";
@@ -171,12 +177,39 @@ describe("how many, and in what order", () => {
     expect(times).toEqual([...times].sort((one, other) => one - other));
   });
 
-  test("and never more than a phone can be buzzed without regretting it", () => {
-    const alerts = alertsWorthSending(everyHour(PASS_ALERTS.maximumScheduled + 5), MORNING);
+  test("and never more in a day than a phone can be buzzed without regretting it", () => {
+    const alerts = alertsWorthSending(everyHour(11), MORNING);
 
-    expect(alerts).toHaveLength(PASS_ALERTS.maximumScheduled);
+    expect(alerts).toHaveLength(PASS_ALERTS.maximumPerDay);
     // The ones kept are the soonest, not the first that happened to be found.
-    expect(alerts[0].name).toBe("SAT 0");
+    expect(alerts.map((alert) => alert.name)).toEqual(["SAT 0", "SAT 1"]);
+  });
+
+  test("a rate rather than a total, so a busy first night does not starve the week", () => {
+    // Three alertable evening passes a night for five nights. A cap on the whole
+    // queue would be spent by the second evening, and the people this is for —
+    // the ones who do not open the app in between — would hear nothing after.
+    const nights = Array.from({ length: 5 }, (_, night) =>
+      [0, 40, 80].map((minutes, index) => {
+        const startsAtMs =
+          new Date(2026, 7, 29 + night, 20, 0, 0).getTime() + minutes * MS_PER_MINUTE;
+        return pass({
+          noradId: 41000 + night * 10 + index,
+          startsAtMs,
+          peakAtMs: startsAtMs + 3 * MS_PER_MINUTE,
+          endsAtMs: startsAtMs + 6 * MS_PER_MINUTE
+        });
+      })
+    ).flat();
+
+    const alerts = alertsWorthSending(nights, new Date(2026, 7, 29, 12, 0, 0).getTime());
+    const perDay = new Map<number, number>();
+    for (const alert of alerts) {
+      const day = new Date(alert.deliverAtMs).getDate();
+      perDay.set(day, (perDay.get(day) ?? 0) + 1);
+    }
+
+    expect([...perDay.values()]).toEqual(Array(5).fill(PASS_ALERTS.maximumPerDay));
   });
 
   test("one pass is one alert, however often the plan is made again", () => {
@@ -231,7 +264,7 @@ describe("what the notification says", () => {
 });
 
 /**
- * The same rules against a real sky: the committed catalogue, a day of it, and
+ * The same rules against a real sky: the committed catalogue, a week of it, and
  * whatever it turns out to hold.
  *
  * Nairobi rather than the northern places the other suites use, and for a
@@ -239,10 +272,14 @@ describe("what the notification says", () => {
  * day carries alertable passes at both ends of it, so the quiet-hours rule —
  * which is read on the clock of whichever machine runs this — cannot take all
  * of them whatever timezone that machine is set to.
+ *
+ * Planned from the day after the fixture's elements were cut (2026-08-23), so
+ * that nearly the whole horizon is one the elements can be trusted over.
  */
 describe("against a real sky", () => {
   const observer: ObserverLocation = { latitudeDeg: -1.29, longitudeDeg: 36.82, heightM: 1795 };
-  const MIDNIGHT = Date.UTC(2026, 7, 29, 0, 0, 0);
+  const FROM = Date.UTC(2026, 7, 24, 0, 0, 0);
+  const HORIZON_MS = PASS_ALERTS.horizonDays * 24 * 60 * MS_PER_MINUTE;
 
   const catalog = new SatelliteCatalog(
     parseTleCatalog(
@@ -250,59 +287,99 @@ describe("against a real sky", () => {
     )
   );
 
-  test("a day of sky produces alerts, and every one of them is a sighting", async () => {
-    const alerts = await planPassAlerts(catalog, MIDNIGHT, observer, startSlicing());
+  /** Every landmark's element epoch, in epoch milliseconds. */
+  const epochOf = (noradId: number): number => {
+    const entry = catalog.entries.find((one) => one.noradId === noradId);
+    if (!entry) throw new Error(`no ${noradId} in the fixture`);
+    return (entry.satrec.jdsatepoch - 2440587.5) * 24 * 60 * MS_PER_MINUTE;
+  };
 
+  // Planned once and read by every test below: a week of the tier is a couple
+  // of seconds, and each of these is a different question about the same plan.
+  let week: SkyPass[] = [];
+  let alerts: PassAlert[] = [];
+  beforeAll(async () => {
+    week = await landmarkPasses(
+      catalog,
+      FROM,
+      observer,
+      startSlicing(),
+      PASS_ALERTS.horizonDays * 24
+    );
+    alerts = await planPassAlerts(catalog, FROM, observer, startSlicing());
+  }, 60_000);
+
+  test("a week of sky produces alerts, and every one of them is a sighting", () => {
     expect(alerts.length).toBeGreaterThan(0);
-    expect(alerts.length).toBeLessThanOrEqual(PASS_ALERTS.maximumScheduled);
     for (const alert of alerts) {
       expect(["visible", "binoculars"]).toContain(alert.nakedEye);
       expect(alert.peakElevationDeg).toBeGreaterThanOrEqual(PASS_ALERTS.minimumPeakElevationDeg);
-      expect(alert.deliverAtMs).toBeGreaterThan(MIDNIGHT);
+      expect(alert.deliverAtMs).toBeGreaterThan(FROM);
       expect(alert.deliverAtMs).toBeLessThan(alert.startsAtMs);
       expect(isQuietHour(new Date(alert.deliverAtMs).getHours())).toBe(false);
     }
     expect(new Set(alerts.map((alert) => alert.id)).size).toBe(alerts.length);
+  });
+
+  test("spread across the days rather than spent on the first of them", () => {
+    const days = new Map<string, number>();
+    for (const alert of alerts) {
+      const when = new Date(alert.deliverAtMs);
+      const day = `${when.getMonth()}-${when.getDate()}`;
+      days.set(day, (days.get(day) ?? 0) + 1);
+    }
+
+    expect(days.size).toBeGreaterThan(1);
+    for (const count of days.values()) expect(count).toBeLessThanOrEqual(PASS_ALERTS.maximumPerDay);
+  });
+
+  test("and never further from its own elements than they can be trusted", () => {
+    // Five minutes of along-track error is the budget, and a week of SGP4 is
+    // what stays inside it for the station. See `PASS_ALERTS.horizonDays`.
+    for (const alert of alerts) {
+      expect(alert.peakAtMs - epochOf(alert.noradId)).toBeLessThanOrEqual(HORIZON_MS);
+    }
+    // And the cut is real: the week planned from the day after the epoch runs
+    // past it, and what runs past it is left out.
+    const trusted = withinHorizon(week, catalog);
+    expect(trusted.length).toBeGreaterThan(0);
+    expect(trusted.length).toBeLessThan(week.length);
+  });
+
+  test("elements too old to trust alert on nothing at all", async () => {
+    // A catalogue read from the cache after a fortnight offline. Every pass it
+    // would find is one whose minute has drifted by more than the notice an
+    // alert gives, so none of them is worth a notification.
+    const late = await planPassAlerts(
+      catalog,
+      FROM + 2 * HORIZON_MS,
+      observer,
+      startSlicing()
+    );
+
+    expect(late).toEqual([]);
   }, 60_000);
 
-  test("and it is a day of it, because the app will not be opened before then", async () => {
+  test("and it is a week of it, because the app will not be opened before then", async () => {
     // The drawn arcs reach three hours, which is the sky somebody standing
     // outside is under. Nothing of ours runs while the app is shut, so an alert
     // planned for the same three hours would only ever reach somebody who
     // already had the app open — which is the one person who does not need it.
-    const slices = startSlicing();
-    const drawn = await landmarkPasses(catalog, MIDNIGHT, observer, slices);
-    const alerted = await landmarkPasses(
-      catalog,
-      MIDNIGHT,
-      observer,
-      slices,
-      PASS_ALERTS.windowHours
-    );
+    const drawn = await landmarkPasses(catalog, FROM, observer, startSlicing());
 
-    expect(alerted.length).toBeGreaterThan(drawn.length);
-    // And the day's plan is the same sky: everything the three hours found is
+    expect(week.length).toBeGreaterThan(drawn.length);
+    // And the week's plan is the same sky: everything the three hours found is
     // still in it, at the same minute.
-    const heads = new Set(alerted.map((one) => `${one.noradId}@${Math.round(one.peakAtMs / 1000)}`));
+    const heads = new Set(week.map((one) => `${one.noradId}@${Math.round(one.peakAtMs / 1000)}`));
     for (const one of drawn) {
       expect(heads).toContain(`${one.noradId}@${Math.round(one.peakAtMs / 1000)}`);
     }
-  }, 60_000);
+  });
 
-  test("most of what the sky is doing is not worth a notification", async () => {
+  test("most of what the sky is doing is not worth a notification", () => {
     // The honest proportion, and the reason this feature is not a firehose: at
     // any hour most passes are in daylight, in the Earth's shadow, or too faint
     // — and the app is drawing all of them quite happily.
-    const passes = await landmarkPasses(
-      catalog,
-      MIDNIGHT,
-      observer,
-      startSlicing(),
-      PASS_ALERTS.windowHours
-    );
-    const described = upcomingPasses(passes, catalog, observer);
-    const alerts = alertsWorthSending(described, MIDNIGHT);
-
-    expect(described.length).toBeGreaterThan(alerts.length);
-  }, 60_000);
+    expect(upcomingPasses(week, catalog, observer).length).toBeGreaterThan(alerts.length);
+  });
 });

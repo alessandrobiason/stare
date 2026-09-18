@@ -3,7 +3,7 @@ import { Slices } from "../timeSlice";
 import { ObserverLocation } from "../types";
 import { SatelliteCatalog } from "./catalog";
 import { NakedEyeVerdict } from "./nakedEye";
-import { landmarkPasses } from "./orbitPath";
+import { landmarkPasses, SkyPass } from "./orbitPath";
 import { UpcomingPass, upcomingPasses } from "./upcomingPasses";
 
 /**
@@ -80,16 +80,22 @@ export type SightableVerdict = "visible" | "binoculars";
 const SIGHTABLE = new Set<NakedEyeVerdict>(["visible", "binoculars"]);
 
 /**
- * The whole day's alerts, planned from the catalogue.
+ * The week's alerts, planned from the catalogue.
  *
- * A day rather than the three hours the sky draws, because the two are read by
- * different people: an arc is for somebody holding the phone up now, and this
- * is for somebody who has put it away and will not open it again before the
- * pass. Nothing of ours runs while the app is closed — iOS delivers what was
- * queued and nothing more — so the window is the promise. See
- * `PASS_ALERTS.windowHours`.
+ * A week rather than the three hours the sky draws, because the two are read
+ * by different people: an arc is for somebody holding the phone up now, and
+ * this is for somebody who has put it away and will not open it again before
+ * the pass. Nothing of ours runs while the app is closed — iOS delivers what was
+ * queued and nothing more — so the horizon is the promise, and what limits it
+ * is how far the elements can be trusted. See `PASS_ALERTS.horizonDays`.
  *
- * Sliced throughout: this is eight times the work the drawn plan does, and it
+ * That limit is per object and counted from its own epoch, not from now: a
+ * pass is kept only while it is within the horizon of the elements it was
+ * propagated from. The planned window is the same horizon from now, which is
+ * the furthest any pass could be kept, and a catalogue fetched this hour loses
+ * only the day or so its elements were already old.
+ *
+ * Sliced throughout: this is many times the work the drawn plan does, and it
  * runs behind a view that is drawing sixty times a second. It has no deadline
  * at all — the alerts already queued stay queued until this finishes — so it
  * can take as many slices as it needs.
@@ -105,13 +111,39 @@ export async function planPassAlerts(
     fromMs,
     observer,
     slices,
-    PASS_ALERTS.windowHours
+    PASS_ALERTS.horizonDays * HOURS_PER_DAY
   );
-  if (passes.length === 0) return [];
+  const trusted = withinHorizon(passes, catalog);
+  if (trusted.length === 0) return [];
 
   // The same description the panel reads — one propagation and one sun position
   // per pass, deciding each at its own high point — over a longer plan.
-  return alertsWorthSending(upcomingPasses(passes, catalog, observer), fromMs);
+  return alertsWorthSending(upcomingPasses(trusted, catalog, observer), fromMs);
+}
+
+/**
+ * The passes whose high point is close enough to their own elements' epoch
+ * for the minute an alert names to still be the minute it happens.
+ *
+ * By catalogue number, because that is what a pass carries — and after
+ * `oneArcEach` the number on a station's pass is the station's own, whose
+ * elements are the ones it was propagated from.
+ */
+export function withinHorizon(
+  passes: readonly SkyPass[],
+  catalog: SatelliteCatalog
+): SkyPass[] {
+  const epochs = new Map<number, number>();
+  for (const entry of catalog.entries) {
+    if (entry.category !== "LANDMARK" || epochs.has(entry.noradId)) continue;
+    epochs.set(entry.noradId, (entry.satrec.jdsatepoch - UNIX_EPOCH_JD) * MS_PER_DAY);
+  }
+
+  const horizonMs = PASS_ALERTS.horizonDays * MS_PER_DAY;
+  return passes.filter((pass) => {
+    const epochMs = epochs.get(pass.noradId);
+    return epochMs !== undefined && pass.peakAtMs - epochMs <= horizonMs;
+  });
 }
 
 /**
@@ -120,7 +152,8 @@ export async function planPassAlerts(
  * Five tests, and the first is the only one about the sky: can it be seen when
  * it comes over. The rest are about the person being told — high enough to be
  * above the houses, far enough ahead to act on, not in the middle of the night,
- * and not so many of them that the next one is an annoyance rather than news.
+ * and not so many in one day that the next one is an annoyance rather than news
+ * (`PASS_ALERTS.maximumPerDay`).
  *
  * A pass already under way is left out. Its object is on the frame and the app
  * is the better answer for it; a notification for something that is already
@@ -140,7 +173,27 @@ export function alertsWorthSending(
     .filter((alert) => alert.deliverAtMs >= earliestMs)
     .filter((alert) => !isQuietHour(new Date(alert.deliverAtMs).getHours()))
     .sort((one, other) => one.deliverAtMs - other.deliverAtMs)
-    .slice(0, PASS_ALERTS.maximumScheduled);
+    .filter(soonestEachDay());
+}
+
+/**
+ * A filter keeping the first `maximumPerDay` alerts of each day, for a list
+ * already in delivery order.
+ *
+ * The day is the phone's calendar day, for the reason the quiet hours are read
+ * on its clock: what is being rationed is how often one person's phone buzzes
+ * between one morning and the next.
+ */
+function soonestEachDay(): (alert: PassAlert) => boolean {
+  const kept = new Map<string, number>();
+  return (alert) => {
+    const when = new Date(alert.deliverAtMs);
+    const day = `${when.getFullYear()}-${when.getMonth()}-${when.getDate()}`;
+    const count = kept.get(day) ?? 0;
+    if (count >= PASS_ALERTS.maximumPerDay) return false;
+    kept.set(day, count + 1);
+    return true;
+  };
 }
 
 /** One described pass, as the alert it would be sent as. */
@@ -185,3 +238,7 @@ export function isQuietHour(hour: number): boolean {
 }
 
 const MS_PER_MINUTE = 60_000;
+const HOURS_PER_DAY = 24;
+const MS_PER_DAY = HOURS_PER_DAY * 60 * MS_PER_MINUTE;
+/** The Julian date of 1970-01-01T00:00Z, where epoch milliseconds start. */
+const UNIX_EPOCH_JD = 2440587.5;

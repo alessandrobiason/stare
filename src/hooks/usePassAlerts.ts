@@ -17,17 +17,22 @@ type Options = {
 };
 
 /**
- * Queueing the day's visible passes with the operating system, in the
+ * Queueing the week's visible passes with the operating system, in the
  * background, while the app is open.
  *
  * This is the whole of the feature's timing, and it rests on one fact: **an app
  * that is not running cannot decide anything.** iOS delivers local
  * notifications that were queued before it was shut and runs none of our code
  * in between, so every alert somebody gets at nine in the evening was worked
- * out the last time they had the app open. That is why the plan reaches a day
- * ahead (`PASS_ALERTS.windowHours`) where the drawn arcs reach three hours, and
- * why the queue is rebuilt on every foreground return rather than on a timer
- * alone: a return is the one moment the app knows it is allowed to think.
+ * out the last time they had the app open. That is why the plan reaches a week
+ * ahead (`PASS_ALERTS.horizonDays`) where the drawn arcs reach three hours, and
+ * why a foreground return rebuilds the queue as well as the timer: a return is
+ * the one moment the app knows it is allowed to think.
+ *
+ * Not on *every* return, though. A week of plan is a couple of seconds of
+ * arithmetic, and a phone picked up twenty times in an evening would otherwise
+ * spend most of a minute redoing a queue that had not changed. A return replans
+ * only once `refreshMinutes` have passed since the last plan was started.
  *
  * Nothing here renders. There is no state, no ref anyone reads and no value
  * returned — mounting this hook is the whole of the effect, and what it changes
@@ -47,10 +52,14 @@ export function usePassAlerts({ catalog, epochRef, access }: Options): void {
 
     let dropped = false;
     let planning = false;
+    /** Wall-clock milliseconds when the last plan was started, if one has been. */
+    let plannedAtMs: number | null = null;
+    const refreshMs = PASS_ALERTS.refreshMinutes * MS_PER_MINUTE;
 
     const plan = () => {
       if (planning || dropped) return;
       planning = true;
+      plannedAtMs = Date.now();
       const { time, observer } = epochRef.current;
 
       // Not awaited, and not caught: this is a background job whose result is
@@ -70,11 +79,15 @@ export function usePassAlerts({ catalog, epochRef, access }: Options): void {
     };
 
     plan();
-    const timer = setInterval(plan, PASS_ALERTS.refreshMinutes * MS_PER_MINUTE);
+    const timer = setInterval(plan, refreshMs);
     // A session left open for days replans on the timer; a phone picked up
-    // again in the evening replans because it came back. Most sessions are the
-    // second kind, which is why the timer is the slower half of this.
-    const foreground = watchForeground(plan);
+    // again in the evening replans because it came back — unless it was last
+    // planned a moment ago. A background interval is suspended with the app,
+    // so after a long absence it is the return rather than the timer that
+    // notices.
+    const foreground = watchForeground(() => {
+      if (plannedAtMs === null || Date.now() - plannedAtMs >= refreshMs) plan();
+    });
 
     return () => {
       dropped = true;
