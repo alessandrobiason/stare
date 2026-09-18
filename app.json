@@ -60,7 +60,8 @@
           "motionPermission": "Stare uses motion data to track where you're pointing your device in the sky."
         }
       ],
-      "onnxruntime-react-native"
+      "onnxruntime-react-native",
+      "./plugins/withoutPushEntitlement"
     ],
     "locales": {
       "en": "./locales/en.json",

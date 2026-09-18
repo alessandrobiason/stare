@@ -87,7 +87,9 @@ an app record — at the very end of a 25-minute 10x job. Do both by hand:
 1. developer.apple.com -> Certificates, Identifiers & Profiles -> Identifiers
    -> + -> App IDs -> App -> `com.alessandrobiason.stare`. No capabilities
    need enabling; camera, location and motion are Info.plist strings, not
-   entitlements.
+   entitlements, and pass alerts are local notifications, which need none
+   either — see "A config plugin that edits after the others" below for why
+   installing `expo-notifications` does not change that.
 2. appstoreconnect.apple.com -> Apps -> + -> New App: iOS, bundle ID
    `com.alessandrobiason.stare`, any SKU. Names are unique across the whole App
    Store, and plain "Stare" was not available, so the record is **"Stare -
@@ -288,6 +290,39 @@ delivery unconditionally and reports the underlying error: delete the file, and
 `npm ci` will stop applying it. `patch-package` fails loudly if the package
 version moves and the patch no longer applies, so an upgrade cannot silently
 drop it.
+
+### A config plugin that edits after the others
+
+`expo-notifications` is only here for the pass alerts
+(`src/satellite/passAlerts.ts`), and everything the app schedules is a *local*
+notification — a date and a message handed to iOS, never registered with APNs.
+That is not what installing the package gets you. Expo autolinks its config
+plugin the moment the package is in `node_modules`, whether or not it is listed
+in `app.json`'s own `plugins`, and that plugin always writes an
+`aps-environment` entitlement — the flag for *remote* push, which the same
+package also has APIs for and which this app never calls. Left in, the archive
+fails signing over a capability the app does not use:
+
+```
+error: Provisioning profile "xcode profile" doesn't include the Push
+Notifications capability.
+error: Provisioning profile "xcode profile" doesn't include the
+aps-environment entitlement.
+```
+
+The other way to fix that is turning Push Notifications on for the App ID in
+the Apple Developer portal and reissuing the profile the `APPLE_DIST_PROFILE_BASE64`
+secret holds. `plugins/withoutPushEntitlement.ts` is the one that does not ask
+for that: it removes the entitlement `expo-notifications` added, right after
+prebuild finishes writing it, so a profile that predates this feature keeps
+working exactly as it did.
+
+It has to be a `finalized` mod rather than a second edit of the same
+entitlements file, and the plugin's own comment is where that reasoning is
+written down — read it before touching this, because the obvious version (a
+plain `withEntitlementsPlist` that deletes the key) runs *before*
+`expo-notifications`'s own edit and would delete a key that has not been
+written yet.
 
 ## Shipping a fix without a rebuild
 
@@ -490,6 +525,13 @@ target, which is what `tools/set-ios-signing.mjs` does; passing them to
 
 `No suitable application records were found` from `altool` is the missing app
 record — step 3 above, and the only failure here that wastes a full run.
+
+`doesn't include the Push Notifications capability` or `doesn't include the
+aps-environment entitlement`, naming the app's own target, means
+`plugins/withoutPushEntitlement.ts` did not run — see "A config plugin that
+edits after the others" below. Check that it is still listed in `app.json`'s
+`plugins` and that `expo prebuild` in the Archive step's log did not error out
+before reaching it.
 
 The Archive step is also where an unsigned Program License Agreement lands, as
 an authentication failure rather than anything mentioning agreements — step 6

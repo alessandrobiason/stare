@@ -16,6 +16,6 @@
     },
     "types": ["jest", "node"]
   },
-  "include": ["src", "__tests__", "testing", "tools", "App.tsx", "App.web.tsx"],
+  "include": ["src", "__tests__", "testing", "tools", "plugins", "App.tsx", "App.web.tsx"],
   "exclude": ["node_modules", "dist", ".expo"]
 }
