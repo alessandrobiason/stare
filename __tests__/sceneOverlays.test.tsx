@@ -7,10 +7,12 @@ import { compassMarks, nearestPoint } from "../src/components/HorizonCompass";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SkyHeader } from "../src/components/SkyHeader";
 import { TabBar } from "../src/components/TabBar";
+import { introPages } from "../src/components/IntroScreen";
 import { SettingsScreen } from "../src/components/SettingsScreen";
 import { CONSOLE_LABEL } from "../src/components/consoleLabel";
 import { UpcomingPasses } from "../src/components/UpcomingPasses";
 import { fill, setLocaleForTesting, strings } from "../src/i18n";
+import { setPassAlertAccessForTesting } from "../src/notifications/alertAccess";
 import { UpcomingPass } from "../src/satellite/upcomingPasses";
 import {
   clearLandmarkPhotosForTesting,
@@ -232,6 +234,96 @@ describe("the settings tab", () => {
     expect(text).toContain("Impostazioni");
     expect(text).toContain("Aiuto");
     expect(text).toContain(CONSOLE_LABEL);
+  });
+
+  /**
+   * The row for the one permission the app asks for and can be refused.
+   *
+   * It is not a switch of the app's own — iOS raises its prompt once per
+   * install and the switch afterwards is the phone's — so what this row has to
+   * do is say which of three states the permission is in, and lead to the one
+   * place it can be changed from. See `usePassAlertAccess`.
+   */
+  describe("the pass alerts row", () => {
+    afterEach(() => setPassAlertAccessForTesting(null));
+
+    test("says the alerts are on, once the phone is letting them through", () => {
+      setPassAlertAccessForTesting("granted");
+      const text = textOf(settings);
+
+      expect(text).toContain(strings().alerts.title);
+      expect(text).toContain(strings().alerts.on);
+      // A fragment of the line rather than the whole of it: the markup escapes
+      // the apostrophe in "You'll", and what is under test is which of the
+      // three lines the row chose.
+      expect(text).toContain("before a pass you can really see");
+    });
+
+    test("offers them where nobody has been asked yet", () => {
+      setPassAlertAccessForTesting("undetermined");
+      const text = textOf(settings);
+
+      expect(text).toContain(strings().alerts.off);
+      expect(text).toContain(strings().alerts.undetermined);
+    });
+
+    test("and points at the phone's own settings once it has been refused", () => {
+      // The only door left. An app cannot put that prompt back on the screen,
+      // and a row that pretended otherwise would be a row that does nothing.
+      setPassAlertAccessForTesting("denied");
+      const text = textOf(settings);
+
+      expect(text).toContain(strings().alerts.off);
+      expect(text).toContain(strings().alerts.denied);
+    });
+
+    test("and is not drawn at all where there are no notifications to have", () => {
+      // The replay harness in a browser, and the moment before the platform
+      // has answered for the first time. A row saying "off" that does nothing
+      // when tapped is worse than no row.
+      setPassAlertAccessForTesting("unsupported");
+      expect(textOf(settings)).not.toContain(strings().alerts.title);
+
+      setPassAlertAccessForTesting(null);
+      expect(textOf(settings)).not.toContain(strings().alerts.title);
+    });
+  });
+});
+
+/**
+ * The pages the app opens on the very first time it is run, which are the only
+ * warning anybody gets before the operating system starts asking.
+ *
+ * Checked as a list rather than as a rendered screen: the pager measures itself
+ * before it draws anything, and there is no layout in a test runner. What is
+ * worth pinning here is not the typography — it is that a prompt the phone is
+ * about to raise cannot be added without a line on this page explaining it.
+ */
+describe("the intro's access page", () => {
+  afterEach(() => setLocaleForTesting(undefined));
+
+  const accessPage = () => introPages().find((page) => page.access)?.access ?? [];
+
+  test("names all three permissions, in the order they are asked for", () => {
+    const t = strings().intro.access;
+
+    expect(accessPage()).toEqual([t.camera, t.location, t.notifications]);
+  });
+
+  test("each with a name and a reason for it", () => {
+    for (const access of accessPage()) {
+      expect(access.name.trim()).not.toBe("");
+      expect(access.reason.trim()).not.toBe("");
+    }
+  });
+
+  test("and says the notifications are the optional one", () => {
+    // The two above it are what the view is made of; this one is an offer, and
+    // the page it is read on is the only place that can say so before the
+    // prompt arrives.
+    expect(strings().intro.access.notifications.name.toLowerCase()).toContain("optional");
+    setLocaleForTesting("it");
+    expect(strings().intro.access.notifications.name.toLowerCase()).toContain("facoltativo");
   });
 });
 

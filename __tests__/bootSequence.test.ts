@@ -7,6 +7,7 @@ import { BootTasks, initialSteps, runBootSequence } from "../src/boot/bootSequen
 import { ActiveCatalog } from "../src/data/tleProvider";
 import { SAMPLE_TLE } from "../src/data/sampleTle";
 import { DeviceCapabilities } from "../src/device/capabilities";
+import { PassAlertAccess } from "../src/notifications/alertTypes";
 
 /**
  * The app's boot: a phone, its own sensors, its own fix and its own camera.
@@ -33,6 +34,7 @@ function tasks(overrides: Partial<BootTasks> = {}): BootTasks {
     locateObserver: () => Promise.resolve(observer),
     readDeclination: () => Promise.resolve(10),
     requestCamera: () => Promise.resolve(),
+    requestAlerts: () => Promise.resolve<PassAlertAccess>("granted"),
     ...overrides
   };
 }
@@ -118,7 +120,8 @@ test("steps run together rather than one after another", async () => {
       checkSensors: overlapping(allSensors),
       locateObserver: overlapping(observer),
       readDeclination: overlapping(10),
-      requestCamera: overlapping(undefined)
+      requestCamera: overlapping(undefined),
+      requestAlerts: overlapping<PassAlertAccess>("granted")
     },
     () => undefined
   );
@@ -156,7 +159,8 @@ describe("what the phone is asked for, and when", () => {
       ...base,
       requestCamera: watched("camera", base.requestCamera),
       locateObserver: watched("location", base.locateObserver),
-      readDeclination: watched("declination", base.readDeclination)
+      readDeclination: watched("declination", base.readDeclination),
+      requestAlerts: watched("alerts", base.requestAlerts)
     };
   }
 
@@ -180,7 +184,9 @@ describe("what the phone is asked for, and when", () => {
       "location asked",
       "location answered",
       "declination asked",
-      "declination answered"
+      "declination answered",
+      "alerts asked",
+      "alerts answered"
     ]);
   });
 
@@ -240,6 +246,60 @@ describe("what the phone is asked for, and when", () => {
     expect(log).toEqual(["camera asked", "camera answered", "location asked", "location refused"]);
   });
 
+  test("notifications are asked for last, after the two that boot cannot do without", async () => {
+    const log: string[] = [];
+    await runBootSequence(asking(log), () => undefined);
+
+    expect(log.indexOf("alerts asked")).toBeGreaterThan(log.indexOf("camera answered"));
+    expect(log.indexOf("alerts asked")).toBeGreaterThan(log.indexOf("location answered"));
+  });
+
+  test("and not at all by a boot that has already failed", async () => {
+    // One more prompt for an app that is not going to open, and one more thing
+    // refused for the next launch to live with.
+    const log: string[] = [];
+    const failure = runBootSequence(
+      asking(log, { requestCamera: () => Promise.reject(new Error("Camera access is off")) }),
+      () => undefined
+    );
+
+    await expect(failure).rejects.toMatchObject({ step: "camera" });
+    expect(log).not.toContain("alerts asked");
+  });
+});
+
+/**
+ * The one permission the app is allowed to be told no about.
+ *
+ * Notifications buy the pass alerts and nothing else — no marker, no mask, no
+ * fix — so a refusal has to leave a working app behind it. These are the tests
+ * that say so, because the cheapest way to get this wrong is to treat the ask
+ * like the two above it and lose the sky over a notification.
+ */
+describe("the notification permission, which boot does not need", () => {
+  test("a refusal is carried out of boot rather than thrown", async () => {
+    const result = await runBootSequence(
+      tasks({ requestAlerts: () => Promise.resolve<PassAlertAccess>("denied") }),
+      () => undefined
+    );
+
+    expect(result.alerts).toBe("denied");
+    // And everything else is exactly the boot it would have been.
+    expect(result).toMatchObject({ observer, declinationDeg: 10 });
+    expect(result.catalog.size).toBe(2);
+  });
+
+  test("and so is an ask that fails outright", async () => {
+    // A native module missing from this build, or a notification centre that
+    // will not answer. Neither is a reason to keep somebody out of the sky.
+    const result = await runBootSequence(
+      tasks({ requestAlerts: () => Promise.reject(new Error("no such module")) }),
+      () => undefined
+    );
+
+    expect(result.alerts).toBe("denied");
+    expect(result.observer).toEqual(observer);
+  });
 });
 
 describe("the fix", () => {

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
+import type { IntroAccessStrings } from "../i18n/types";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
@@ -22,12 +23,52 @@ type Props = {
   onDone: () => void;
 };
 
+/** One page of the intro: whatever of these it has, in this order. */
+type IntroPage = {
+  /** The app's name over the sky, on the page that is mostly sky. */
+  wordmark?: boolean;
+  title?: string;
+  body?: string;
+  /** The things the operating system is about to ask about, one per block. */
+  access?: IntroAccessStrings[];
+  footnote?: string;
+};
+
+/**
+ * The pages, in the language the app is in.
+ *
+ * Pulled out of the component because it is the one part of this screen worth
+ * checking without a layout: the page cannot render until it has measured
+ * itself, and what matters here is the list — that every prompt the phone is
+ * about to raise is named on it, and none that it will not.
+ */
+export function introPages(t = strings().intro): IntroPage[] {
+  return [
+    { wordmark: true, body: t.what.body },
+    {
+      title: t.access.title,
+      body: t.access.body,
+      // In the order boot asks for them (`requestAccess`): the two the view
+      // cannot open without, then the one it can.
+      access: [t.access.camera, t.access.location, t.access.notifications],
+      footnote: t.access.footnote
+    }
+  ];
+}
+
 /**
  * The screen the app opens on the very first time it runs on a device.
  *
  * Two pages over the same moving sky the boot screen shows, so the intro and
  * the launch after it are one continuous thing rather than two designs: what
- * the app does, and the two permissions it is about to ask for.
+ * the app does, and the three permissions it is about to ask for.
+ *
+ * The third of them is the odd one out and is written as such: the camera and
+ * the fix are what the view is made of, and notifications are an offer — a
+ * message before a pass that can actually be seen, and nothing lost by saying
+ * no to it. Listed here anyway, and listed last, because the whole purpose of
+ * this page is that no prompt arrives unexplained. See
+ * `src/satellite/passAlerts.ts`.
  *
  * The copy sits in a card at the foot of the screen rather than over the middle
  * of it. The upper half is where the satellite crosses, and text there is read
@@ -57,15 +98,7 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
   // worth memoising.
   useLocale();
   const t = strings().intro;
-  const pages = [
-    { wordmark: true, body: t.what.body },
-    {
-      title: t.access.title,
-      body: t.access.body,
-      access: [t.access.camera, t.access.location],
-      footnote: t.access.footnote
-    }
-  ];
+  const pages = introPages(t);
 
   const measure = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;

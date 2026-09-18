@@ -1,5 +1,6 @@
 import { ActiveCatalog } from "../data/tleProvider";
 import { DeviceCapabilities } from "../device/capabilities";
+import { PassAlertAccess } from "../notifications/alertTypes";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { ObserverLocation } from "../types";
 import {
@@ -61,6 +62,17 @@ export type BootResult = {
    * (`subscribeToCompass`), and says which of the two it is holding meanwhile.
    */
   declinationDeg: number | null;
+  /**
+   * Whether the phone will let a pass alert through — the one permission boot
+   * asks for and does not need.
+   *
+   * `"undetermined"` where boot never got as far as asking, which is any boot
+   * that had already failed by then. Nothing reads this to decide whether to
+   * queue anything: the answer is published where both the scheduler and the
+   * settings row can see it (`src/notifications/alertAccess.ts`), and this is
+   * here so that what boot did is part of what boot returns.
+   */
+  alerts: PassAlertAccess;
 };
 
 /**
@@ -76,6 +88,12 @@ export type BootTasks = {
   readDeclination(): Promise<number | null>;
   /** Rejects when the camera cannot be opened or is refused. */
   requestCamera(): Promise<void>;
+  /**
+   * Asks for notifications, and never rejects: this is the one thing boot asks
+   * for that boot does not need. A refusal is an app with no pass alerts in it
+   * and everything else exactly as it was.
+   */
+  requestAlerts(): Promise<PassAlertAccess>;
   /** Downloads the segmentation model and starts the runtime. */
   loadSkyModel(): Promise<void>;
 };
@@ -87,11 +105,14 @@ type Access = {
   observer: ObserverLocation | Error | null;
   /** `null` when there was no fix to read it against, or none to be had. */
   declinationDeg: number | null;
+  /** What the phone said about notifications, or `"undetermined"` if unasked. */
+  alerts: PassAlertAccess;
 };
 
 /**
- * Everything boot needs the operating system's permission for, asked for one
- * prompt at a time: the camera, then the location.
+ * Everything boot asks the operating system's permission for, one prompt at a
+ * time: the camera, then the location, then — once both are granted —
+ * notifications.
  *
  * One at a time because two prompts are two system alerts: asked together, the
  * order they arrive in is the operating system's to decide, and one raised
@@ -114,15 +135,26 @@ type Access = {
  */
 async function requestAccess(boot: BootRun, tasks: BootTasks): Promise<Access> {
   const camera = await boot.run("camera", tasks.requestCamera);
-  if (camera instanceof Error) return { camera, observer: null, declinationDeg: null };
+  if (camera instanceof Error) {
+    return { camera, observer: null, declinationDeg: null, alerts: "undetermined" };
+  }
 
   const observer = await boot.run("location", tasks.locateObserver);
-  if (observer instanceof Error) return { camera, observer, declinationDeg: null };
+  if (observer instanceof Error) {
+    return { camera, observer, declinationDeg: null, alerts: "undetermined" };
+  }
 
   // Folded into the location step: same subsystem, same permission, and not
   // worth a line of its own on screen.
   const declinationDeg = await tasks.readDeclination().catch(() => null);
-  return { camera, observer, declinationDeg };
+
+  // Last, and no step of its own, because it is the only prompt here that can
+  // be refused and leave the app working. A phone is asked for what the view
+  // needs before it is asked for what the view would like — and by the time
+  // this one is put, the person has already said yes twice, which is the best
+  // moment there is to ask for the third. See `src/satellite/passAlerts.ts`.
+  const alerts = await tasks.requestAlerts().catch((): PassAlertAccess => "denied");
+  return { camera, observer, declinationDeg, alerts };
 }
 
 /**
@@ -139,7 +171,12 @@ async function requestAccess(boot: BootRun, tasks: BootTasks): Promise<Access> {
  * has to grant is requested in a single chain, one prompt at a time, for the
  * reasons in `requestAccess`.
  *
- * Nothing here is optional. Without a catalogue there is nothing to draw;
+ * Nothing here is optional except the last thing it asks for. Notifications
+ * are requested once the camera and the fix have both been granted, and a
+ * refusal is carried out in `BootResult.alerts` rather than thrown: the app
+ * opens on the same view either way, with or without pass alerts in it.
+ *
+ * Everything else is a stop. Without a catalogue there is nothing to draw;
  * without the sensors there is no attitude to aim with; without a fix there is
  * nowhere to place a satellite; and without the camera and the sky model the
  * view cannot say what is behind a building, and would be drawing every
@@ -199,6 +236,7 @@ export async function runBootSequence(
     capabilities: sensors.capabilities,
     warnings: [],
     observer,
-    declinationDeg: access.declinationDeg
+    declinationDeg: access.declinationDeg,
+    alerts: access.alerts
   };
 }

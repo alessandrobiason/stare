@@ -646,6 +646,110 @@ export const LANDMARK_PATHS = {
 } as const;
 
 /**
+ * When the phone is worth interrupting for (`src/satellite/passAlerts.ts`).
+ *
+ * Everything else in the app answers a question somebody has already asked by
+ * opening it. This is the one thing it says unasked, to a phone in a pocket —
+ * and the whole of what makes that bearable is that it is never wrong: the
+ * notification is only sent for a pass the same arithmetic the card uses has
+ * already decided can be *seen*, from here, at the minute it names. A single
+ * alert for an empty sky costs the permission itself, and with it every alert
+ * after it.
+ *
+ * So the figures below are all the cautious end of their range. What they cost
+ * when they are too strict is a pass nobody was told about, which is where this
+ * app was before any of this existed.
+ */
+export const PASS_ALERTS = {
+  /**
+   * How far ahead passes are planned for alerting, in hours.
+   *
+   * Eight times the window the sky itself draws (`LANDMARK_PATHS.windowHours`),
+   * for a different reader: an arc is drawn for somebody holding the phone up
+   * now, and an alert is scheduled for somebody who has put the phone away.
+   * The phone will not be asked again until the app is next opened — iOS runs
+   * nothing of ours in between — so the window *is* the promise. A day of it
+   * means an app opened at lunchtime still has tonight's passes in hand, and
+   * one opened in the evening carries through the following night.
+   *
+   * What it costs is a background job eight times the plan's, sliced so it
+   * never lands on a frame (`passSearch`), run a couple of times an hour. What
+   * a shorter one would cost is the pass someone actually wanted.
+   */
+  windowHours: 24,
+  /**
+   * How long before the pass rises the notification lands, in minutes.
+   *
+   * Long enough to put shoes on and get out from under a roof, short enough
+   * that it is still the same evening's decision — and read against the rise
+   * rather than the peak, because the rise is when there is something in the
+   * sky to catch.
+   */
+  leadMinutes: 10,
+  /**
+   * The least notice worth sending, in minutes.
+   *
+   * A pass planned while the app is open can be closer than `leadMinutes`, and
+   * an alert that lands as the object is already crossing is a notification for
+   * something the person cannot get outside for. Under this, nothing is sent:
+   * the sky view itself is the better answer for a pass this close, and it is
+   * on screen.
+   */
+  minimumLeadMinutes: 3,
+  /**
+   * How high a pass has to reach to be worth a notification, in degrees.
+   *
+   * Twice the floor a path is drawn at (`minimumPeakElevationDeg`, ten),
+   * because the two are answering different questions. A ten-degree arc is
+   * worth drawing on a frame somebody is already pointing at that piece of sky;
+   * it is not worth telling somebody to go outside for, since ten degrees is
+   * behind the houses from most places anyone stands.
+   *
+   * Twenty clears a three-storey building from across a street, which is the
+   * sky most people can actually get to. It is the one figure here that was
+   * tuned rather than reasoned: at twenty-five, a month of a real northern sky
+   * came out nearly empty, and an alert nobody ever gets is not a cautious
+   * feature but an absent one.
+   */
+  minimumPeakElevationDeg: 20,
+  /**
+   * How many alerts are pending at once.
+   *
+   * iOS keeps the sixty-four soonest local notifications an app has scheduled
+   * and silently drops the rest, so this is not the limit — it is well under
+   * it, on purpose. What is being protected is the reader rather than the
+   * queue: a day of a good sky at the right latitude is a dozen visible passes,
+   * and a phone that buzzes a dozen times is a phone whose owner turns this
+   * off. Six is a couple a night, which is the rate this can go on being
+   * welcome at.
+   */
+  maximumScheduled: 6,
+  /**
+   * The hours no alert is delivered in, on the phone's own clock: from this
+   * hour at night until this one in the morning.
+   *
+   * The visibility window this fires on is a twilight one — an hour or two
+   * after sunset, and the same before dawn — so most of what these bounds cut
+   * is the deep-night pass that only a hobbyist would thank us for. A
+   * notification at four in the morning is not a sighting somebody missed; it
+   * is the reason the permission gets revoked.
+   */
+  quietFromHour: 23,
+  quietUntilHour: 6,
+  /**
+   * How often the schedule is worked out again while the app is open, in
+   * minutes.
+   *
+   * Not how fresh it has to be — the passes it names are hours out and the
+   * elements they are propagated from are two hours old at worst — but how long
+   * a session has to run before the day ahead of it is in the queue. Every
+   * foreground return replans as well (`usePassAlerts`), which is what makes
+   * this the floor rather than the cadence.
+   */
+  refreshMinutes: 30
+} as const;
+
+/**
  * How far back the wake reaches for the one satellite someone has tapped, in
  * degrees of sky (`src/satellite/orbitPath.ts`'s `focusedPassFor`).
  *

@@ -90,6 +90,12 @@ export type UpcomingPass = {
  * which is breadth first across the landmarks (`drawable`) — the right order
  * for spending four lines on four different objects, and the wrong one for a
  * list whose whole subject is what happens next.
+ *
+ * One other caller asks the same question of a different plan. The pass alerts
+ * describe a day of sky rather than the three hours that are drawn
+ * (`src/satellite/passAlerts.ts`), for the same reason and with the same
+ * arithmetic: what they need to know about a pass hours away is whether it can
+ * be seen when it comes, and there is one place in the app that answers that.
  */
 export function upcomingPasses(
   passes: readonly SkyPass[],

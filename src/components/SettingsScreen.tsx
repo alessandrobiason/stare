@@ -3,8 +3,11 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-na
 import appConfig from "../../app.json";
 import { describeBuild } from "../debug/buildIdentity";
 import { useLocale } from "../hooks/useLocale";
+import { usePassAlertAccess } from "../hooks/usePassAlertAccess";
 import { strings } from "../i18n";
 import { LANGUAGE_NAMES, LOCALES, Locale, setLocale } from "../i18n/locale";
+import { askForPassAlerts, openPassAlertSettings } from "../notifications/alertAccess";
+import { PassAlertAccess } from "../notifications/alertTypes";
 import { CONSOLE_LABEL } from "./consoleLabel";
 import { Icon } from "./Icon";
 import { theme } from "./theme";
@@ -32,10 +35,10 @@ type Props = {
 /**
  * Everything about the app rather than about the sky.
  *
- * Four rows: Help, which runs the tour of the sky view again, the language,
- * the console, and About. None of them is about what is overhead, none is
- * touched more than once in a session, and the first three used to spend a
- * corner of a photograph saying so. A tab is where they belong.
+ * Five rows: Help, which runs the tour of the sky view again, the language, the
+ * pass alerts, the console, and About. None of them is about what is overhead,
+ * none is touched more than once in a session, and the first few used to spend
+ * a corner of a photograph saying so. A tab is where they belong.
  *
  * It covers the sky while it is open — a list of settings read against a
  * moving camera picture is a list nobody can read — but the camera keeps
@@ -60,6 +63,10 @@ type Props = {
  */
 export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, warned = false }) => {
   const locale = useLocale();
+  // Re-read whenever the app comes back to the foreground, which is how a
+  // switch moved out in the phone's settings reaches this row. `null` only for
+  // the moment before the first answer. See `usePassAlertAccess`.
+  const alerts = usePassAlertAccess();
   const t = strings();
   const [languages, setLanguages] = useState(false);
   const [about, setAbout] = useState(false);
@@ -114,6 +121,21 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
             </View>
           )}
 
+          {/* Not drawn at all where there is no notification centre to point
+              at, which is the replay harness: a row that says "off" and does
+              nothing when tapped is worse than no row. See `alertGateway`. */}
+          {alerts && alerts !== "unsupported" && (
+            <Row
+              label={t.alerts.title}
+              // A different line for each state, because what somebody needs to
+              // be told differs: what they would get, that they are getting it,
+              // or that the phone is holding it back and where to change that.
+              detail={t.alerts[alerts]}
+              value={alerts === "granted" ? t.alerts.on : t.alerts.off}
+              onPress={() => tapAlerts(alerts)}
+            />
+          )}
+
           <Row
             label={CONSOLE_LABEL}
             detail={t.console.detail}
@@ -156,6 +178,22 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
     </View>
   );
 };
+
+/**
+ * What a tap on the alerts row does, which depends on what the phone has
+ * already said.
+ *
+ * iOS puts its notification prompt up exactly once per install. Before that,
+ * this row *is* the switch and a tap raises it; after it, whichever way it was
+ * answered, the only switch left is the one in the phone's own settings, and
+ * the honest thing for a row in an app to do is open that page rather than
+ * pretend to a control it does not have. Hence a row with a chevron rather than
+ * a toggle: both outcomes are a door, and only one of them is ours.
+ */
+function tapAlerts(access: PassAlertAccess): void {
+  if (access === "undetermined") void askForPassAlerts();
+  else void openPassAlertSettings();
+}
 
 /**
  * Sets the language, closing the list first.

@@ -26,8 +26,9 @@ export type Strings = {
   tour: TourStrings;
   /**
    * The boot screen's own two pages, shown once on the very first launch
-   * before anything else: what the app does, and the two permissions the
-   * phone is about to ask for. See `IntroScreen`.
+   * before anything else: what the app does, and the three permissions the
+   * phone is about to ask for — two it cannot open without, and the
+   * notifications it can. See `IntroScreen`.
    */
   intro: IntroStrings;
   /**
@@ -365,6 +366,38 @@ export type Strings = {
     detail: string;
   };
   /**
+   * The alerts row in settings, and the words a notification carries.
+   *
+   * The one thing the app says when nobody is looking at it — a pass that can
+   * be seen, ten minutes before it comes up (`src/satellite/passAlerts.ts`).
+   * The row's line under it says something different in each of the three
+   * states the permission can be in, because what somebody needs to be told
+   * differs: what they would get, that they are getting it, or that the phone
+   * is holding it back and where to change that.
+   *
+   * The figures in the notification itself are not here. A bearing is a compass
+   * point, a height is `units.up` and the verdict is `scene.passes.seeing` —
+   * all of them already written, and all meaning the same thing on a lock
+   * screen as in the row about the same pass.
+   */
+  alerts: {
+    /** Names the settings row. */
+    title: string;
+    /** What the row says it is worth, at the right-hand end: on, or off. */
+    on: string;
+    off: string;
+    /** The line under the row, once the phone is letting the alerts through. */
+    granted: string;
+    /** The same line before anyone has been asked: what turning it on gets. */
+    undetermined: string;
+    /** And once it has been refused, which is a trip to the phone's settings. */
+    denied: string;
+    /** What a notification says. `{name}` and `{minutes}` until it comes up. */
+    notification: {
+      title: string;
+    };
+  };
+  /**
    * The last row in settings, and the list it opens: who made the app, where
    * its source is, and which version this is. The name and the address
    * themselves are not words and are not here (`SettingsScreen`).
@@ -446,13 +479,20 @@ export type IntroStrings = {
   what: {
     body: string;
   };
-  /** The second page: the two things the phone is about to ask permission for. */
+  /** The second page: the three things the phone is about to ask permission for. */
   access: {
     title: string;
     body?: string;
     camera: IntroAccessStrings;
     location: IntroAccessStrings;
-    /** A short line under both, on where the location goes. */
+    /**
+     * The one of the three the app opens without, and the only one worth
+     * anything while the app is shut: a notification before a pass that can
+     * actually be seen. Said to be optional in the same breath, because it is —
+     * a refusal costs the alerts and nothing else. See `src/notifications/`.
+     */
+    notifications: IntroAccessStrings;
+    /** A short line under all three, on where the location goes. */
     footnote: string;
   };
   /** The button on every page but the last. */

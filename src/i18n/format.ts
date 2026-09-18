@@ -326,6 +326,45 @@ export function passDirection(pass: {
   return `${point} · ${height}`;
 }
 
+/**
+ * What a pass alert says on a lock screen: a line, and a line under it.
+ *
+ * The one thing this app writes that is read without the app being open, and
+ * so the one that has to carry the whole answer in two lines with nothing
+ * around them — no sky behind it, no card to tap through to, and no chance to
+ * ask what "NE" meant. The name and the countdown are the headline, because
+ * what a phone buzzing at nine in the evening has to answer first is *what*
+ * and *how long have I got*; where to stand and what will be seen go
+ * underneath, in the same words the panel uses for the same pass
+ * (`passDirection`, `passSeeing`).
+ *
+ * The countdown is read off the alert itself rather than off the clock: this is
+ * written when the alert is scheduled and read when it is delivered, which are
+ * hours apart, and the one number that is true at delivery is the gap the
+ * schedule was built on (`PASS_ALERTS.leadMinutes`). See
+ * `src/satellite/passAlerts.ts`.
+ *
+ * No magnitude, for the reason `passSeeing` gives: there is room here for the
+ * answer, not for the figure it rests on.
+ */
+export function passAlertText(alert: {
+  name: string;
+  deliverAtMs: number;
+  startsAtMs: number;
+  riseAzimuthDeg: number;
+  peakElevationDeg: number;
+  nakedEye: NakedEyeVerdict;
+}): { title: string; body: string } {
+  const minutes = Math.max(1, Math.round((alert.startsAtMs - alert.deliverAtMs) / MS_PER_MINUTE));
+  return {
+    title: fill(strings().alerts.notification.title, {
+      name: alert.name,
+      minutes: groupNumber(minutes)
+    }),
+    body: `${passDirection(alert)} · ${passSeeing(alert.nakedEye)}`
+  };
+}
+
 /** The verdicts that rest on a magnitude, and so are worth printing one beside. */
 const JUDGED_ON_BRIGHTNESS = new Set<NakedEyeVerdict>(["visible", "binoculars", "tooFaint"]);
 

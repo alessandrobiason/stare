@@ -2,6 +2,7 @@ import { Camera } from "expo-camera";
 import { loadActiveCatalog } from "../data/tleProvider";
 import { readDeviceCapabilities } from "../device/deviceOrientation";
 import { readMagneticDeclinationDeg, requestObserverFix } from "../device/location";
+import { askForPassAlerts } from "../notifications/alertAccess";
 import { preloadSkySegmenter } from "../vision/skySegmenter";
 import { BootTasks } from "./bootSequence";
 
@@ -37,6 +38,12 @@ export function bootTasks({ force = false }: { force?: boolean } = {}): BootTask
     locateObserver: requestObserverFix,
     readDeclination: readMagneticDeclinationDeg,
     requestCamera,
+    // Asking is also what publishes the answer to the two screens that read it
+    // (`alertAccess`), which is why boot calls this rather than reading the
+    // permission and leaving the asking to the settings row: the one prompt iOS
+    // ever shows is worth spending where somebody has just been told it is
+    // coming, on the page before this.
+    requestAlerts: askForPassAlerts,
     loadSkyModel: preloadSkySegmenter
   };
 }

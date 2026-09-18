@@ -7,7 +7,7 @@ import {
   ObserverFrame
 } from "../coordinates/transform";
 import { clamp, toDegrees } from "../math/angles";
-import { Slices } from "../timeSlice";
+import { runSliced, runToEnd, SlicedJob, Slices } from "../timeSlice";
 import { EnuPosition, ObserverLocation } from "../types";
 import { CatalogEntry, SatelliteCatalog } from "./catalog";
 import { SatelliteCategory } from "./categories";
@@ -384,15 +384,49 @@ function middleOf(samples: SkySample[]): SkyTick {
  * `pastArcDeg` bounds how far back that wake reaches: a landmark's short one
  * by default, or `FOCUSED_TRAJECTORY.pastArcDeg` for the one object someone
  * has tapped. See `focusedPassFor`.
+ *
+ * `windowHours` is how far ahead to look, and the reason there is an argument
+ * for it is `PASS_ALERTS.windowHours`: the sky draws three hours because that
+ * is the sky somebody is standing under, and the notifications plan a day
+ * because the app will not be opened again in between. Straight through here
+ * — the search for one object over three hours is a few milliseconds — and
+ * sliced over a longer window, which is what `passSearch` is for.
  */
 export function passesFor(
   entry: CatalogEntry,
   fromMs: number,
   observer: ObserverLocation,
-  pastArcDeg: number = LANDMARK_PATHS.pastArcDeg
+  pastArcDeg: number = LANDMARK_PATHS.pastArcDeg,
+  windowHours: number = LANDMARK_PATHS.windowHours
 ): SkyPass[] {
+  return runToEnd(passSearch(entry, fromMs, observer, pastArcDeg, windowHours));
+}
+
+/**
+ * The same search, written as a job that can be stopped between steps.
+ *
+ * `passesFor` is this run straight through, and is what the drawn plan uses:
+ * three hours of one object is a couple of hundred propagations, which is
+ * under a frame and not worth the machinery. The alert plan is the same search
+ * over a day (`PASS_ALERTS.windowHours`), which is not — a landmark's day is
+ * tens of milliseconds, and a tier of them run in one go is a second of
+ * dropped frames on a view that is drawing sixty times a second.
+ *
+ * The checkpoint is the top of the search loop, where the state is one clock
+ * reading and the last time the object was below the floor: the arc walk
+ * itself runs whole, which is a few hundred propagations at the very most and
+ * the one place the loop is carrying a shape it has not finished. See
+ * `SlicedJob`.
+ */
+export function* passSearch(
+  entry: CatalogEntry,
+  fromMs: number,
+  observer: ObserverLocation,
+  pastArcDeg: number = LANDMARK_PATHS.pastArcDeg,
+  windowHours: number = LANDMARK_PATHS.windowHours
+): SlicedJob<SkyPass[]> {
   const frame = createObserverFrame(observer);
-  const untilMs = fromMs + LANDMARK_PATHS.windowHours * MS_PER_HOUR;
+  const untilMs = fromMs + windowHours * MS_PER_HOUR;
   const searchMs = LANDMARK_PATHS.searchStepSeconds * 1000;
   const passes: SkyPass[] = [];
 
@@ -401,6 +435,7 @@ export function passesFor(
   let belowMs: number | null = null;
 
   while (atMs < untilMs) {
+    yield;
     const position = enuAt(entry.satrec, atMs, frame);
     if (!position || !(elevationDeg(position) > FLOOR_DEG)) {
       belowMs = atMs;
@@ -474,25 +509,35 @@ function sameArc(one: SkyPass, other: SkyPass): boolean {
 }
 
 /**
- * Which of the passes found are actually drawn.
+ * One arc per crossing, whatever the catalogue calls the thing on it.
  *
- * Two rules, in this order. A crew ferry docked to a station is the station's
- * own arc under another name, so of two passes over the same piece of sky at
- * the same minute only the older catalogue number survives. What is left is
- * then taken breadth first — every landmark's next pass before any landmark's
- * second — so the allowance is spent on as many different objects as there are
- * rather than on the one that comes round most often.
+ * A crew ferry docked to a station is the station's own arc under another name,
+ * and both are landmarks, so the same line would otherwise be found three or
+ * four times over. Of two passes over the same piece of sky at the same minute
+ * only the older catalogue number survives: a ferry is launched to a station,
+ * so the station is the older number of the two.
  */
-function drawable(passes: SkyPass[]): SkyPass[] {
+function oneArcEach(passes: SkyPass[]): SkyPass[] {
   const kept: SkyPass[] = [];
   for (const pass of [...passes].sort((one, other) => one.startsAtMs - other.startsAtMs)) {
     const twin = kept.findIndex((other) => sameArc(other, pass));
     if (twin < 0) kept.push(pass);
     else if (pass.noradId < kept[twin].noradId) kept[twin] = pass;
   }
+  return kept;
+}
 
+/**
+ * Which of the passes found are actually drawn: as many different objects as
+ * there are, soonest first.
+ *
+ * Breadth first — every landmark's next pass before any landmark's second — so
+ * the allowance is spent across the tier rather than on the one that comes
+ * round most often.
+ */
+function drawable(passes: SkyPass[]): SkyPass[] {
   const seen = new Map<number, number>();
-  return kept
+  return passes
     .map((pass) => {
       const round = seen.get(pass.noradId) ?? 0;
       seen.set(pass.noradId, round + 1);
@@ -504,29 +549,50 @@ function drawable(passes: SkyPass[]): SkyPass[] {
 }
 
 /**
- * The paths to draw over the next few hours, for the whole landmark tier.
+ * Every pass the landmark tier makes over the observer in a window, deduped.
  *
  * Sliced, because this is the one piece of satellite arithmetic in the app that
  * is neither per frame nor spread across frames: a few thousand propagations in
  * one go is tens of milliseconds, which is several dropped frames of an overlay
- * that is drawing sixty times a second. Handing the thread back between objects
- * costs the plan a little wall-clock time and costs the sky nothing — and there
- * is no deadline on it, because the plan it replaces goes on being drawn until
- * this one lands. See `src/timeSlice.ts`.
+ * that is drawing sixty times a second. Handing the thread back inside each
+ * object's own search costs the plan a little wall-clock time and costs the sky
+ * nothing — and there is no deadline on it, because the plan it replaces goes
+ * on being drawn until this one lands. See `src/timeSlice.ts`.
+ *
+ * Two callers, with two windows and two purposes. `planSkyPaths` takes the next
+ * three hours and keeps four of them to draw; the alert planner takes the next
+ * day and keeps the ones that can be *seen* (`src/satellite/passAlerts.ts`).
+ * Neither cares which objects the other kept, and both want exactly this: the
+ * tier's real passes, once each.
  */
+export async function landmarkPasses(
+  catalog: SatelliteCatalog,
+  fromMs: number,
+  observer: ObserverLocation,
+  slices: Slices,
+  windowHours: number = LANDMARK_PATHS.windowHours
+): Promise<SkyPass[]> {
+  const found: SkyPass[] = [];
+  for (const entry of catalog.entries) {
+    if (entry.category !== "LANDMARK") continue;
+    found.push(
+      ...(await runSliced(
+        passSearch(entry, fromMs, observer, LANDMARK_PATHS.pastArcDeg, windowHours),
+        slices
+      ))
+    );
+  }
+  return oneArcEach(found);
+}
+
+/** The paths to draw over the next few hours, for the whole landmark tier. */
 export async function planSkyPaths(
   catalog: SatelliteCatalog,
   fromMs: number,
   observer: ObserverLocation,
   slices: Slices
 ): Promise<SkyPass[]> {
-  const found: SkyPass[] = [];
-  for (const entry of catalog.entries) {
-    if (entry.category !== "LANDMARK") continue;
-    found.push(...passesFor(entry, fromMs, observer));
-    if (slices.spent()) await slices.handOver();
-  }
-  return drawable(found);
+  return drawable(await landmarkPasses(catalog, fromMs, observer, slices));
 }
 
 /**

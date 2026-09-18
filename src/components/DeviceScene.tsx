@@ -10,6 +10,8 @@ import { useCompassAccuracy } from "../hooks/useCompassAccuracy";
 import { useLocale } from "../hooks/useLocale";
 import { useDeviceOrientation } from "../hooks/useDeviceOrientation";
 import { useLiveSky } from "../hooks/useLiveSky";
+import { usePassAlertAccess } from "../hooks/usePassAlertAccess";
+import { usePassAlerts } from "../hooks/usePassAlerts";
 import { useSceneControls } from "../hooks/useSceneControls";
 import { AttitudeSource } from "../hooks/useSmoothedOrientation";
 import { cameraFrameGrabber } from "../vision/cameraFrameGrabber";
@@ -43,6 +45,19 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
   // any reason to render again. See `useLocale`.
   useLocale();
   const { observer, epochRef } = useLiveSky(boot.observer);
+  /**
+   * The pass alerts: what the phone allows, and the day's worth of
+   * notifications queued against it.
+   *
+   * Here rather than anywhere else because this is where the two things a plan
+   * needs already are — the catalogue boot downloaded and the clock and fix the
+   * frame loop keeps — and because it is mounted for as long as the app is
+   * open. Nothing on this screen changes for it: queueing a notification is
+   * something the operating system holds, not something the view draws. See
+   * `usePassAlerts`.
+   */
+  const alertAccess = usePassAlertAccess();
+  usePassAlerts({ catalog: boot.catalog, epochRef, access: alertAccess });
   const orientation = useDeviceOrientation(boot.capabilities, boot.declinationDeg);
   // The one thing about the sensors this view renders from, and it renders only
   // when the platform regrades its compass — a handful of times a session
@@ -219,7 +234,12 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
                 value: `${observer.latitudeDeg.toFixed(4)}, ${observer.longitudeDeg.toFixed(4)} · ${observer.heightM.toFixed(0)} m`
               },
               { label: "Aim", value: aimReadout(orientation.latestRef.current) },
-              { label: "Sky mask", value: maskStatusRef.current }
+              { label: "Sky mask", value: maskStatusRef.current },
+              // What the phone is allowing, in the permission's own words. An
+              // alert that never arrives looks the same from the outside as a
+              // sky with nothing worth alerting on in it, and this is the line
+              // that tells the two apart.
+              { label: "Pass alerts", value: alertAccess ?? "not asked yet" }
             ],
             warnings: boot.warnings
           })

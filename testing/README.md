@@ -34,6 +34,7 @@ only the things a phone would otherwise:
 | Attitude | `expo-sensors` motion + magnetometer | ARKit poses from the recording |
 | Frame pixels | `cameraFrameGrabber` | `videoFrameGrabber` |
 | Sky model | ONNX Runtime React Native | ONNX Runtime Web, same graph |
+| Pass alerts | queued with iOS by `expo-notifications` | nothing at all — `alertGateway.web.ts` reports no notification centre, and the settings row is not drawn |
 
 Everything else — the overlay, the markers, the segmentation pipeline, the
 temporal filter, the orientation fusion, the catalogue, the boot screen, the

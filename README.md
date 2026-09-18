@@ -54,6 +54,7 @@ sizes. **The sky behind them is drawn rather than photographed** — see
 | **What is in the way** | A segmentation model reads the sky out of the frame; anything over a roof or a tree is dropped. |
 | **Whether you would see it** | Sunlight on the object, darkness here, and its magnitude. For most of the day the honest answer is no, and it says so. |
 | **When to look up** | Every landmark pass for the next three hours, drawn as an arc across the sky and listed as a countdown. |
+| **When to go outside** | A notification ten minutes before a pass you could actually see — naked eye or binoculars — with the app shut and the phone in a pocket. Nothing at all for a sky with nothing in it. |
 | **What it is** | Tap any mark — or any name written along an arc — for a briefing, the range, the speed and the orbit. |
 | **Where to find one** | The catalogue tab is the same 16,000 objects read the other way round: by fleet, by name, by what is up right now. |
 
@@ -95,12 +96,16 @@ flowchart LR
 | Sky mask, and the six filters between it and a hidden marker | [`src/vision/`](src/vision/) |
 | What a satellite looks like, in one place | [`src/components/markerScene.ts`](src/components/markerScene.ts) |
 | Passes: the arcs, and the same plan as a list | [`src/satellite/orbitPath.ts`](src/satellite/orbitPath.ts), [`src/satellite/upcomingPasses.ts`](src/satellite/upcomingPasses.ts) |
+| Which passes are worth waking somebody for, and queueing them | [`src/satellite/passAlerts.ts`](src/satellite/passAlerts.ts), [`src/notifications/`](src/notifications/) |
 
 **Boot is all or nothing** ([`src/boot/`](src/boot/)). Catalogue, sensors, GPS,
 declination, camera permission and the segmentation model, or the view does not
-open — there is no degraded mode that looks like it is working.
+open — there is no degraded mode that looks like it is working. Notifications
+are the one exception: asked for last, and only once the camera and the fix have
+both been granted. Refuse them and the app is exactly what it was, minus the
+alerts.
 
-### Three parts that were not obvious
+### Four parts that were not obvious
 
 **A compass is a soft-failing sensor.** A magnetic case or a car door biases it
 by tens of degrees with no dropout and no shimmer — just a sky drawn steadily in
@@ -127,6 +132,21 @@ position, size and opacity sixty times a second. On an iPhone 12 mini it held
 under 10 Hz over a full sky. `markerScene.ts` now turns a frame into circles and
 polygons that one backend draws into a single node: Skia on the phone, a 2D
 canvas in the browser harness.
+
+**A notification is a promise, and the app is not there to keep it.** iOS runs
+nothing of a closed app, so every alert somebody gets at nine in the evening was
+worked out the last time they had it open: a day of sky is planned in the
+background and queued as dated local notifications
+([`src/notifications/`](src/notifications/)), and that window is the promise
+rather than a tuning knob. What goes *into* it is the narrow part. The app draws
+sixteen thousand objects and almost none of them can be seen at any moment, so
+the same arithmetic the card uses — sunlight on the object, darkness here, a
+recorded magnitude against what this sky gives up — decides each pass at its own
+high point, and only *visible* and *binoculars* are queued, above twenty degrees,
+outside the small hours. Not the eclipsed pass, not the daylit one, and not the
+object whose reflectivity nobody has written down, however high it goes. An arc
+drawn for a pass that turns out to be too faint costs nothing; a phone buzzing
+for one costs the permission, and every pass after it.
 
 ## Running it
 
@@ -183,6 +203,13 @@ what the harness substitutes and what it does not.
   against a 100 ms budget, which is why the tracker sweeps a slice per frame.
 - The first run downloads a 95 MB model, and the catalogue is cached for two
   hours because that is CelesTrak's rate limit.
+- **Pass alerts are only as fresh as the last time the app was open.** A day of
+  them is queued at a time, so an app left shut for two days delivers the first
+  day and then goes quiet. There is no background refresh; adding one would
+  spend a permission and a wake-up budget to buy a second day.
+- **They are planned for where the phone was**, and a queued notification does
+  not follow it. Fly somewhere and the evening's alerts are for the sky you
+  left, until the app is opened again.
 
 ## Licence and credits
 

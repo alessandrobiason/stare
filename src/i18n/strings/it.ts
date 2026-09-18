@@ -6,7 +6,7 @@ export const it: Strings = {
       body: "Punta il telefono verso il cielo e muovilo piano: vedrai i satelliti sopra di te, esattamente dove si trovano."
     },
     access: {
-      title: "Due permessi veloci",
+      title: "Tre permessi veloci",
       camera: {
         name: "Fotocamera",
         reason: "Per mostrarti il cielo che hai davanti."
@@ -14,6 +14,10 @@ export const it: Strings = {
       location: {
         name: "Posizione",
         reason: "Per sapere quali satelliti hai sopra di te."
+      },
+      notifications: {
+        name: "Notifiche — facoltativo",
+        reason: "Per avvisarti quando sta per passare qualcosa che puoi davvero vedere."
       },
       footnote: "La tua posizione resta sul telefono: non viene mai inviata altrove."
     },
@@ -210,6 +214,19 @@ export const it: Strings = {
   },
   console: {
     detail: "Dati tecnici."
+  },
+  alerts: {
+    title: "Avvisi di passaggio",
+    on: "Attivi",
+    off: "Non attivi",
+    granted:
+      "Ti avvisiamo prima di un passaggio che puoi davvero vedere. Tocca per cambiare nelle Impostazioni.",
+    undetermined:
+      "Ricevi una notifica prima di un passaggio che puoi davvero vedere, anche ad app chiusa.",
+    denied: "Le notifiche di Stare sono disattivate. Tocca per attivarle nelle Impostazioni.",
+    notification: {
+      title: "{name} passa tra {minutes} min"
+    }
   },
   about: {
     title: "Informazioni",

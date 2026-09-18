@@ -186,8 +186,19 @@ describe("and says it in the space it is given", () => {
     // longest endonym is the one this has to leave room for.
     expect(width(t.tour.open, 14)).toBeLessThan(ROW / 2);
     expect(width(t.language.title, 14) + width("Português", 13)).toBeLessThan(ROW);
-    // The line under a row's label, which wraps rather than being cut off.
-    for (const detail of [t.tour.about, t.console.detail]) {
+    // The alerts row carries a value beside its label too — the longer of the
+    // two words the permission can be in.
+    const state = Math.max(width(t.alerts.on, 13), width(t.alerts.off, 13));
+    expect(width(t.alerts.title, 14) + state).toBeLessThan(ROW);
+    // The line under a row's label, which wraps rather than being cut off. The
+    // alerts row has three of them, one per state the permission can be in.
+    for (const detail of [
+      t.tour.about,
+      t.console.detail,
+      t.alerts.granted,
+      t.alerts.undetermined,
+      t.alerts.denied
+    ]) {
       expect(width(detail, 11)).toBeLessThan(3 * ROW);
     }
   });

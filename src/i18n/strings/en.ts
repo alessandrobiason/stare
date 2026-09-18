@@ -13,7 +13,7 @@ export const en: Strings = {
       body: "Point your phone up at the sky and move it slowly — you'll see the satellites above you, exactly where they are."
     },
     access: {
-      title: "Two quick permissions",
+      title: "Three quick permissions",
       camera: {
         name: "Camera",
         reason: "To show you the sky in front of you."
@@ -21,6 +21,10 @@ export const en: Strings = {
       location: {
         name: "Location",
         reason: "To know which satellites are above you."
+      },
+      notifications: {
+        name: "Notifications — optional",
+        reason: "To tell you when something you can actually see is about to pass over."
       },
       footnote: "Your location stays on your phone — it's never sent anywhere."
     },
@@ -216,6 +220,18 @@ export const en: Strings = {
   },
   console: {
     detail: "Technical readings."
+  },
+  alerts: {
+    title: "Pass alerts",
+    on: "On",
+    off: "Off",
+    granted: "You'll be told before a pass you can really see. Tap to change it in Settings.",
+    undetermined:
+      "Get a notification before a pass you can really see, even with the app closed.",
+    denied: "Notifications are off for Stare. Tap to turn them on in Settings.",
+    notification: {
+      title: "{name} passes over in {minutes} min"
+    }
   },
   about: {
     title: "About",
