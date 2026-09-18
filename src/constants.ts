@@ -771,8 +771,45 @@ export const PASS_ALERTS = {
    * week-long plan the app is prepared to redo. A plan is a couple of seconds
    * of arithmetic, and a phone that is picked up twenty times an evening should
    * not make it twenty times (`usePassAlerts`).
+   *
+   * Also the floor `observerCheckMinutes` replans against once movement alone
+   * has not: staying under it is what keeps a session left open for days from
+   * going an entire evening on a plan from that morning.
    */
-  refreshMinutes: 30
+  refreshMinutes: 30,
+  /**
+   * How far the observer may move before the week's plan is redone early, in
+   * metres.
+   *
+   * Two orders of magnitude past the drawn sky's own two-fifty
+   * (`LANDMARK_PATHS.observerDriftMetres`), because the two are protecting
+   * different things. That figure keeps a line's bearing correct to a fraction
+   * of a degree while it is drawn on a camera picture; this is asking a coarser
+   * question of a plan that only ever speaks in compass points and whole
+   * degrees — *is this still roughly the sky in front of the reader* — and a
+   * normal day of walking round a city, or even most commutes, should not
+   * answer that "no". Twenty kilometres is past an ordinary commute and short
+   * of what changes the answer outright: a business trip, a flight, a family
+   * visit across the country. That is also comfortably past where the pass
+   * geometry itself starts to move — a satellite a few hundred kilometres up
+   * barely notices twenty on the ground — so what this is catching is *place*,
+   * not *angle*.
+   *
+   * The plan does not chase a moving phone between here and there: it is meant
+   * for someone who has arrived and put the phone away, so the one useful
+   * moment to notice a move at all is once it has clearly finished.
+   */
+  observerDriftMetres: 20_000,
+  /**
+   * How often the drift above is checked while the app is open, in minutes.
+   *
+   * A cheap check — one distance, against a plan already in hand — run far
+   * more often than the plan itself is redone, so a real relocation is caught
+   * while the phone is still in flight or in the car rather than waiting for
+   * the half-hourly floor. Five minutes is well inside the time even a fast
+   * mode of travel takes to cover the drift distance above.
+   */
+  observerCheckMinutes: 5
 } as const;
 
 /**

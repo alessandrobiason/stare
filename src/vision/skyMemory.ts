@@ -1,6 +1,7 @@
 import { axesFromAttitude } from "../camera/attitude";
 import { FrameLens } from "../camera/projection";
 import { SKY_MEMORY } from "../constants";
+import { metresBetween } from "../coordinates/distance";
 import { clamp, toDegrees, toRadians, wrapDegrees360 } from "../math/angles";
 import { EnuPosition, ObserverLocation } from "../types";
 import { AnchoredSkyMask, skyProbe } from "./anchoredMask";
@@ -18,9 +19,6 @@ export type SkyMemoryStats = {
    */
   coverage: number;
 };
-
-/** Metres per degree of latitude, near enough for a walk across a square. */
-const METRES_PER_DEGREE = 111320;
 
 /**
  * Everything the segmenter has said about the sky, kept where the sky is
@@ -317,18 +315,12 @@ export class SkyMemory {
 
   /**
    * Whether the observer has left the neighbourhood the memory was collected
-   * from. Flat-Earth arithmetic, which is exact enough over the tens of metres
-   * this is comparing against.
+   * from. See `metresBetween`.
    */
   private hasMovedFrom(observer: ObserverLocation): boolean {
     const origin = this.origin;
     if (!origin) return false;
 
-    const north = (observer.latitudeDeg - origin.latitudeDeg) * METRES_PER_DEGREE;
-    const east =
-      (observer.longitudeDeg - origin.longitudeDeg) *
-      METRES_PER_DEGREE *
-      Math.cos(toRadians(origin.latitudeDeg));
-    return Math.hypot(north, east) > SKY_MEMORY.observerDriftMetres;
+    return metresBetween(origin, observer) > SKY_MEMORY.observerDriftMetres;
   }
 }

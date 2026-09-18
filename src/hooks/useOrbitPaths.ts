@@ -1,11 +1,11 @@
 import { MutableRefObject, useEffect, useRef, useState } from "react";
 import { LANDMARK_PATHS } from "../constants";
-import { toRadians } from "../math/angles";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { planSkyPaths, SkyPass } from "../satellite/orbitPath";
 import { UpcomingPass, upcomingPasses } from "../satellite/upcomingPasses";
 import { startSlicing } from "../timeSlice";
 import { ObserverLocation, OrbitEpoch } from "../types";
+import { isStale } from "./planFreshness";
 
 type Options = {
   catalog: SatelliteCatalog;
@@ -136,7 +136,10 @@ const NO_PASSES: UpcomingPass[] = [];
  * comparison rather than a countdown: time passing, the observer walking away
  * from where the plan was made, and the clock *jumping* — which is a seek under
  * the replay harness, and which an elapsed-time test would read as no time
- * having passed at all when the video is scrubbed backwards.
+ * having passed at all when the video is scrubbed backwards. The general shape
+ * of this check is shared (`isStale`); what is here is only this plan's own
+ * numbers — a few hundred metres and a minute, because what is drawn from it
+ * is a line whose bearing has to hold to a fraction of a degree.
  */
 export function stale(
   plannedAtMs: number | null,
@@ -144,26 +147,15 @@ export function stale(
   atMs: number,
   observer: ObserverLocation
 ): boolean {
-  if (plannedAtMs === null || plannedFrom === null) return true;
-  if (Math.abs(atMs - plannedAtMs) >= LANDMARK_PATHS.refreshSeconds * 1000) return true;
-  return movedFrom(plannedFrom, observer) > LANDMARK_PATHS.observerDriftMetres;
+  return isStale({
+    plannedAtMs,
+    plannedFrom,
+    atMs,
+    observer,
+    refreshMs: LANDMARK_PATHS.refreshSeconds * 1000,
+    driftMetres: LANDMARK_PATHS.observerDriftMetres
+  });
 }
-
-/**
- * How far the observer is from where the plan was made, in metres. Flat-Earth
- * arithmetic, as in `SkyMemory`: exact enough over the few hundred metres this
- * is comparing against.
- */
-function movedFrom(origin: ObserverLocation, observer: ObserverLocation): number {
-  const north = (observer.latitudeDeg - origin.latitudeDeg) * METRES_PER_DEGREE;
-  const east =
-    (observer.longitudeDeg - origin.longitudeDeg) *
-    METRES_PER_DEGREE *
-    Math.cos(toRadians(origin.latitudeDeg));
-  return Math.hypot(north, east);
-}
-
-const METRES_PER_DEGREE = 111320;
 
 /**
  * How often the plan is checked against the clock, in milliseconds.

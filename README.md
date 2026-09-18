@@ -217,9 +217,16 @@ what the harness substitutes and what it does not.
   dates no element set knows about, and an alert queued before one can be a
   few minutes out by the end of the week — inside the ten minutes of notice,
   but not by much.
-- **They are planned for where the phone was**, and a queued notification does
-  not follow it. Fly somewhere and the evening's alerts are for the sky you
-  left, until the app is opened again.
+- **They are planned for where the phone was — while the app was open.** A
+  session left running notices it has moved: `usePassAlerts` replans against
+  the observer as well as the clock, the same way the drawn landmark paths do
+  (`useOrbitPaths.stale`), just at a much coarser distance — twenty kilometres
+  rather than a couple of hundred metres, since a plan that only ever speaks in
+  compass points and whole degrees is asking whether the reader is still
+  roughly in the same place, not whether a bearing still holds to a fraction of
+  a degree. What it cannot do is notice a move made with the app *shut*: iOS
+  runs nothing of ours then, so board a flight with the app closed and the
+  evening's alerts are still for the place you left, until it is opened again.
 
 ## Licence and credits
 
