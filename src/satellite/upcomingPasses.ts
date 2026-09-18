@@ -23,7 +23,7 @@ import { propagateAt } from "./propagator";
 import { standardMagnitudeFor } from "./standardMagnitude";
 
 /**
- * The landmarks' next passes, as a list rather than as lines on the sky.
+ * Passes still to come, as a list rather than as lines on the sky.
  *
  * The paths answer "where do I point this" for someone already holding the
  * phone up, and they answer it in the one place the answer belongs: on the sky
@@ -33,11 +33,12 @@ import { standardMagnitudeFor } from "./standardMagnitude";
  * time that is every line there is: the arcs are three hours of sky and the
  * camera holds sixty degrees of it.
  *
- * So this is the same plan read the other way round. Nothing here is planned,
- * searched or propagated over: `planSkyPaths` has already decided which passes
- * are worth drawing, and this takes those and works out what to *say* about
- * each — when it comes up, where to stand, how high it gets, and whether it can
- * be seen when it does.
+ * So this reads a plan the other way round. Nothing here is planned, searched
+ * or propagated over: a plan has already decided which passes there are — the
+ * drawn arcs' (`planSkyPaths`), or the day and the week of naked-eye passes the
+ * panel and the alerts are made from (`nakedEyePasses.ts`) — and this works out
+ * what to *say* about each: when it comes up, where to stand, how high it gets,
+ * and whether it can be seen when it does.
  *
  * That last one is the reason the module exists rather than the panel reading
  * `SkyPass` directly. A countdown is a promise. Told "ISS, 14 min" and sent
@@ -79,38 +80,30 @@ export type UpcomingPass = {
 /**
  * What to say about the passes that have been planned, soonest first.
  *
- * Wider than what the sky is drawing (`PASSES_PANEL.windowHours` against
- * `LANDMARK_PATHS.windowHours`): every row is a pass someone can go and find,
- * but a row further out than the three drawn hours has no line on the frame
- * yet to point at — tapping it opens the same card the sky's own marks would,
- * just ahead of the arc appearing. What is never widened is which objects
- * answer at all: only the landmark tier, the same one the arcs are drawn for.
- *
  * Ordered by when it comes up rather than in the order the plan produced,
- * which is breadth first across the landmarks (`drawable`, for the arcs
- * alone) — the right order for spending four lines on four different objects,
- * and the wrong one for a list whose whole subject is what happens next.
+ * which for the drawn arcs is breadth first across the landmarks (`drawable`)
+ * — the right order for spending four lines on four different objects, and
+ * the wrong one for a list whose whole subject is what happens next.
  *
- * One other caller asks the same question of a different plan. The pass alerts
- * describe a week of sky rather than the day the panel does
- * (`src/satellite/passAlerts.ts`), for the same reason and with the same
- * arithmetic: what they need to know about a pass hours or days away is
- * whether it can be seen when it comes, and there is one place in the app that
- * answers that.
+ * Any object answers, not only the landmarks: the passes panel and the alerts
+ * describe the naked-eye passes of whatever can be seen (`nakedEyePasses.ts`),
+ * and the card describes the one object somebody tapped. What each needs to
+ * know about a pass hours or days away is whether it can be seen when it
+ * comes, and there is one place in the app that answers that.
  */
 export function upcomingPasses(
   passes: readonly SkyPass[],
-  catalog: SatelliteCatalog,
+  catalog: Pick<SatelliteCatalog, "entries">,
   observer: ObserverLocation
 ): UpcomingPass[] {
   if (passes.length === 0) return [];
 
-  const landmarks = landmarkIndex(catalog);
+  const entries = entriesFor(passes, catalog);
   const frame = createObserverFrame(observer);
 
   return [...passes]
     .sort((one, other) => one.startsAtMs - other.startsAtMs)
-    .map((pass) => describePass(pass, landmarks.get(pass.noradId), observer, frame))
+    .map((pass) => describePass(pass, entries.get(pass.noradId), observer, frame))
     .filter((pass): pass is UpcomingPass => pass !== null);
 }
 
@@ -160,11 +153,11 @@ type Visibility = Pick<
  * Whether this object can be seen from here at `atMs`, decided the same way the
  * card decides it for the object under the finger.
  *
- * One propagation and one sun position per pass, at most four passes, once a
- * minute — the cost of the plan itself is a couple of thousand propagations, so
- * this is under a thousandth of what has already been spent by the time it
+ * One propagation and one sun position per pass — against the couple of
+ * thousand propagations it took to find each object's passes in the first
+ * place, so under a thousandth of what has already been spent by the time it
  * runs. It rides along on the plan's own background job for that reason
- * (`useOrbitPaths`) rather than being worked out per render.
+ * (`useNakedEyePasses`) rather than being worked out per render.
  *
  * A propagation that fails is the honest "nobody has recorded this": SGP4
  * placed this object all the way along the arc a moment ago, so a failure here
@@ -204,19 +197,23 @@ function visibilityAt(
 }
 
 /**
- * The landmark tier by catalogue number.
+ * The planned objects' catalogue entries, by catalogue number.
  *
- * Built per call rather than kept, because a call is once a minute and the
- * thing it walks is the whole catalog — sixteen thousand entries, of which the
- * couple of dozen that pass the category test are the only ones a plan can
- * name. The number rather than the name, for the reason `categories.ts` gives:
- * a ferry is renamed every mission and the catalogue number outlives it.
+ * Built per call rather than kept, because a call is once per plan and the
+ * thing it walks is the whole catalog — sixteen thousand entries, of which only
+ * the handful a plan names are kept. The number rather than the name, for the
+ * reason `categories.ts` gives: a ferry is renamed every mission and the
+ * catalogue number outlives it.
  */
-function landmarkIndex(catalog: SatelliteCatalog): Map<number, CatalogEntry> {
-  const landmarks = new Map<number, CatalogEntry>();
+function entriesFor(
+  passes: readonly SkyPass[],
+  catalog: Pick<SatelliteCatalog, "entries">
+): Map<number, CatalogEntry> {
+  const wanted = new Set(passes.map((pass) => pass.noradId));
+  const entries = new Map<number, CatalogEntry>();
   for (const entry of catalog.entries) {
-    if (entry.category !== "LANDMARK") continue;
-    if (!landmarks.has(entry.noradId)) landmarks.set(entry.noradId, entry);
+    if (!wanted.has(entry.noradId) || entries.has(entry.noradId)) continue;
+    entries.set(entry.noradId, entry);
   }
-  return landmarks;
+  return entries;
 }

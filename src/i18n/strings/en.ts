@@ -68,7 +68,7 @@ export const en: Strings = {
     },
     passes: {
       title: "Coming up",
-      body: "What will pass over you next. Tap to see the next day."
+      body: "What you can see overhead with the naked eye. Tap to see the next day."
     },
     catalog: {
       title: "Catalog",
@@ -167,6 +167,7 @@ export const en: Strings = {
       aboutMagnitude: "around magnitude {value}",
       onPass: "When it comes over at {time}: {verdict}"
     },
+    sighting: "Visible to the eye at {time}",
     facts: {
       distance: "Distance",
       altitude: "Altitude",

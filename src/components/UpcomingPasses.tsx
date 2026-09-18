@@ -1,4 +1,4 @@
-import React, { MutableRefObject, useEffect, useRef, useState } from "react";
+import React, { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -22,9 +22,9 @@ import { useTourTarget } from "./tourTargets";
 
 type Props = {
   /**
-   * The landmarks' next passes, soonest first, as `upcomingPasses` describes
-   * them. Empty while the landmark tier is filtered off, and on a sky where
-   * nothing rises for the next day (`PASSES_PANEL.windowHours`).
+   * The next day's naked-eye passes, soonest first, as `planSightings` finds
+   * them. Empty on a sky where nothing can be seen for the next day
+   * (`PASSES_PANEL.windowHours`).
    */
   passes: readonly UpcomingPass[];
   /**
@@ -51,13 +51,13 @@ type Props = {
  * facts about this instant — and the question neither answers is the one asked
  * before the phone goes up at all: is anything worth waiting for.
  *
- * The app has always known. The landmarks carry their next day of sky with
- * them (`PASSES_PANEL.windowHours`), further out than the three hours actually
- * drawn as arcs (`orbitPath.ts`) — an arc is only an answer to somebody already
+ * The app has always known. Every pass that can be seen with the naked eye
+ * over the next day is planned (`nakedEyePasses.ts`), whatever object makes it
+ * — further out than the three hours the landmarks' arcs are drawn over
+ * (`orbitPath.ts`), because an arc is only an answer to somebody already
  * pointing the phone at the piece of sky it crosses, and for most of even
- * those three hours that is nobody: the plan covers the whole sky and the
- * camera holds sixty degrees of it. So the same plan is read out here, where
- * it can be seen without hunting for it, a day further than any of it is drawn.
+ * those three hours that is nobody. So the plan is read out here, where it can
+ * be seen without hunting for it.
  *
  * **Shut, it is the next pass** — the object, how long there is, where to stand
  * and whether it can be seen — which is the whole answer for most of the times
@@ -70,9 +70,9 @@ type Props = {
  * how high it gets, and whether it can be seen when it comes — as much as a day
  * of them, the first few shown and the rest a scroll away.
  *
- * **Nothing at all when there is nothing coming.** The tier filtered off, or a
- * sky where none of the landmarks clear the roofline for a day — which at high
- * latitudes can still happen — and the card is not drawn. A permanent card
+ * **Nothing at all when there is nothing coming.** A sky where nothing can be
+ * seen for a day — which at high latitudes in summer, with the sun never far
+ * enough down, is most days — and the card is not drawn. A permanent card
  * saying "nothing" is a piece of the picture spent on the absence of news.
  *
  * A row is a target, like the names written along the paths (`namesUnder`): it
@@ -91,10 +91,17 @@ export const UpcomingPasses: React.FC<Props> = React.memo(({
   const [expanded, setExpanded] = useState(false);
   const nowMs = useEpochSeconds(epochRef);
   const viewRef = useTourTarget("passes");
+  // The plan is made every few minutes (`PASSES_PANEL.refreshMinutes`) and the
+  // clock ticks every second, so a pass that has ended since is dropped here
+  // rather than left counting "now" until the next one lands.
+  const ahead = useMemo(
+    () => passes.filter((pass) => pass.endsAtMs > nowMs),
+    [passes, nowMs]
+  );
 
   return (
     <PassesPanel
-      passes={passes}
+      passes={ahead}
       nowMs={nowMs}
       expanded={expanded}
       onExpandedChange={setExpanded}
@@ -150,12 +157,12 @@ const ROW_ESTIMATE = 52;
 /**
  * How many rows the open card shows before the rest is a scroll away.
  *
- * A day of passes (`PASSES_PANEL.windowHours`) can be a few dozen rows across
- * a whole tier, and a card that grew to fit all of them would push the sky off
- * the top of the screen for the sake of a plan for tomorrow morning. Six is
- * what is on screen without hunting for it, the same as when four or five
- * landmarks each just cleared the drawn three hours; the rest is still there,
- * a drag away rather than a fact the card had to be tall to hold.
+ * A day of naked-eye passes (`PASSES_PANEL.windowHours`) can be a few dozen
+ * rows — a fresh launch alone is a string of them — and a card that grew to
+ * fit all of them would push the sky off the top of the screen for the sake of
+ * a plan for tomorrow morning. Six is what is on screen without hunting for
+ * it; the rest is still there, a drag away rather than a fact the card had to
+ * be tall to hold.
  */
 const VISIBLE_ROWS = 6;
 
@@ -303,8 +310,8 @@ export const PassesPanel: React.FC<PanelProps> = ({
                 <>
                   <View style={styles.nameRow}>
                     {/* Capped and clipped rather than wrapped: shut, this line
-                        is one row and `Einstein Probe` is the longest name
-                        the tier has. */}
+                        is one row, and a constellation's catalogue names run
+                        longer than any landmark's. */}
                     <Text numberOfLines={1} style={styles.name}>
                       {next.name}
                     </Text>

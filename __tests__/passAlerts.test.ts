@@ -63,11 +63,12 @@ function pass(overrides: Partial<UpcomingPass> = {}): UpcomingPass {
 }
 
 describe("which passes are worth a notification", () => {
-  test("the ones that can be seen, and only those", () => {
+  test("the ones that can be seen with the naked eye, and only those", () => {
     // The whole promise. A verdict is worked out at the pass's own high point
     // from the sun here, the sunlight up there and the object's brightness
     // (`nakedEye.ts`), and everything short of a sighting is a phone buzzing
-    // for an empty sky.
+    // for an empty sky — binoculars included, since nobody can be assumed to
+    // own a pair.
     const verdicts: NakedEyeVerdict[] = [
       "visible",
       "binoculars",
@@ -80,7 +81,7 @@ describe("which passes are worth a notification", () => {
       (nakedEye) => alertsWorthSending([pass({ nakedEye })], EVENING).length > 0
     );
 
-    expect(sent).toEqual(["visible", "binoculars"]);
+    expect(sent).toEqual(["visible"]);
   });
 
   test("a brightness nobody recorded is not a promise, however high the pass", () => {
@@ -237,13 +238,17 @@ describe("what the notification says", () => {
     expect(alert.body).toBe("SW · 62° up · visible to the eye");
   });
 
-  test("binoculars are said to be binoculars", () => {
-    // Nobody goes out expecting the naked eye and finds they needed a pair.
+  test("any object that can be seen, not only a landmark", () => {
+    // A fresh launch coming over is as much a sighting as the station is.
     const [alert] = scheduledAlertsFor(
-      alertsWorthSending([pass({ nakedEye: "binoculars", apparentMagnitude: 5.2 })], EVENING)
+      alertsWorthSending(
+        [pass({ name: "STARLINK-99999", noradId: 99999, category: "INTERNET", apparentMagnitude: 3.1 })],
+        EVENING
+      )
     );
 
-    expect(alert.body).toContain("binoculars");
+    expect(alert.title).toContain("STARLINK-99999");
+    expect(alert.body).toContain("visible to the eye");
   });
 
   test("in the language the app is in when the alert is queued", () => {
@@ -312,7 +317,7 @@ describe("against a real sky", () => {
   test("a week of sky produces alerts, and every one of them is a sighting", () => {
     expect(alerts.length).toBeGreaterThan(0);
     for (const alert of alerts) {
-      expect(["visible", "binoculars"]).toContain(alert.nakedEye);
+      expect(alert.nakedEye).toBe("visible");
       expect(alert.peakElevationDeg).toBeGreaterThanOrEqual(PASS_ALERTS.minimumPeakElevationDeg);
       expect(alert.deliverAtMs).toBeGreaterThan(FROM);
       expect(alert.deliverAtMs).toBeLessThan(alert.startsAtMs);

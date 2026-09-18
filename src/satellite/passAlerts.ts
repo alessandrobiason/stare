@@ -2,8 +2,8 @@ import { PASS_ALERTS } from "../constants";
 import { Slices } from "../timeSlice";
 import { ObserverLocation } from "../types";
 import { SatelliteCatalog } from "./catalog";
-import { NakedEyeVerdict } from "./nakedEye";
-import { landmarkPasses, SkyPass } from "./orbitPath";
+import { isSighting, nakedEyeCandidatePasses } from "./nakedEyePasses";
+import { SkyPass } from "./orbitPath";
 import { UpcomingPass, upcomingPasses } from "./upcomingPasses";
 
 /**
@@ -14,11 +14,12 @@ import { UpcomingPass, upcomingPasses } from "./upcomingPasses";
  * makes that bearable is the word *verified*: a notification goes out only for
  * a pass that the same arithmetic the card uses has already decided can be
  * **seen**, from here, at the minute it names. Lit by the sun, dark on the
- * ground here, and bright enough for eyes or for binoculars
- * (`nakedEye.ts`). Everything else the sky is doing — the sixteen thousand
- * objects overhead at noon, the arcs drawn through a daylit sky, the pass that
- * is real and eclipsed — is a fact the app is happy to draw and has no business
- * waking anyone for.
+ * ground here, and bright enough for the naked eye (`nakedEye.ts`) — the same
+ * sightings the passes panel lists, from any object that makes one rather than
+ * only the landmarks (`nakedEyePasses.ts`). Everything else the sky is doing —
+ * the sixteen thousand objects overhead at noon, the arcs drawn through a
+ * daylit sky, the pass that is real and eclipsed — is a fact the app is happy
+ * to draw and has no business waking anyone for.
  *
  * That is also why an object nobody has recorded a reflectivity for
  * (`"unknown"`) is not alerted on, though its card says something useful and
@@ -59,28 +60,23 @@ export type PassAlert = {
   peakElevationDeg: number;
   /** Where it comes up, in degrees clockwise from north: where to stand. */
   riseAzimuthDeg: number;
-  /** Only ever one of the two that mean it can be seen. See above. */
+  /** Only ever the one that means it can be seen. See above. */
   nakedEye: SightableVerdict;
   apparentMagnitude: number | null;
   magnitudeMeasured: boolean;
 };
 
-/** The verdicts that mean somebody standing outside would see something. */
-export type SightableVerdict = "visible" | "binoculars";
-
 /**
- * The two verdicts worth a notification.
+ * The verdict that means somebody standing outside would see something.
  *
- * Binoculars as well as the naked eye, because "step outside with the
- * binoculars" is a real evening and the app has no way of knowing who owns a
- * pair — and the alert says which of the two it is, so nobody goes out
- * expecting the other. Everything below this is either invisible or unknown,
- * and neither is a reason to make a phone buzz.
+ * The naked eye alone, as in the passes panel (`isSighting`). Binoculars are a
+ * real evening, but the app has no way of knowing who owns a pair, and an alert
+ * is read as "go outside and look up" — which has to be true without one.
  */
-const SIGHTABLE = new Set<NakedEyeVerdict>(["visible", "binoculars"]);
+export type SightableVerdict = "visible";
 
 /**
- * The week's alerts, planned from the catalogue.
+ * The week's alerts, planned from the catalogue's naked-eye candidates.
  *
  * A week rather than the three hours the sky draws, because the two are read
  * by different people: an arc is for somebody holding the phone up now, and
@@ -106,7 +102,7 @@ export async function planPassAlerts(
   observer: ObserverLocation,
   slices: Slices
 ): Promise<PassAlert[]> {
-  const passes = await landmarkPasses(
+  const passes = await nakedEyeCandidatePasses(
     catalog,
     fromMs,
     observer,
@@ -128,6 +124,11 @@ export async function planPassAlerts(
  * By catalogue number, because that is what a pass carries — and after
  * `oneArcEach` the number on a station's pass is the station's own, whose
  * elements are the ones it was propagated from.
+ *
+ * The same horizon for every object, though what it was measured against is
+ * the landmark tier (`PASS_ALERTS.horizonDays`). A constellation satellite low
+ * enough to be a naked-eye candidate is dragged on harder than the station,
+ * so for those a week is the optimistic end of what its elements can carry.
  */
 export function withinHorizon(
   passes: readonly SkyPass[],
@@ -135,7 +136,7 @@ export function withinHorizon(
 ): SkyPass[] {
   const epochs = new Map<number, number>();
   for (const entry of catalog.entries) {
-    if (entry.category !== "LANDMARK" || epochs.has(entry.noradId)) continue;
+    if (epochs.has(entry.noradId)) continue;
     epochs.set(entry.noradId, (entry.satrec.jdsatepoch - UNIX_EPOCH_JD) * MS_PER_DAY);
   }
 
@@ -167,7 +168,7 @@ export function alertsWorthSending(
 
   return passes
     .filter((pass) => !pass.started)
-    .filter((pass) => SIGHTABLE.has(pass.nakedEye))
+    .filter(isSighting)
     .filter((pass) => pass.peakElevationDeg >= PASS_ALERTS.minimumPeakElevationDeg)
     .map(alertFor)
     .filter((alert) => alert.deliverAtMs >= earliestMs)
@@ -207,7 +208,7 @@ function alertFor(pass: UpcomingPass): PassAlert {
     peakAtMs: pass.peakAtMs,
     peakElevationDeg: pass.peakElevationDeg,
     riseAzimuthDeg: pass.riseAzimuthDeg,
-    // Narrowed by the filter above, which the type cannot see through.
+    // Narrowed by `isSighting` above, which the type cannot see through.
     nakedEye: pass.nakedEye as SightableVerdict,
     apparentMagnitude: pass.apparentMagnitude,
     magnitudeMeasured: pass.magnitudeMeasured

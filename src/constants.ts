@@ -656,12 +656,92 @@ export const LANDMARK_PATHS = {
  * now." A day ahead is long enough for that and short enough to still be
  * tonight's plan.
  *
+ * What it lists is not the landmark tier but every pass that can be seen with
+ * the naked eye (`src/satellite/nakedEyePasses.ts`), whatever the object is.
  * Rows past the three drawn hours open the same card any other row does; there
  * is simply no line on the sky yet for that one to point at, which is no
  * different from tapping an object from the catalog before it has risen.
  */
 export const PASSES_PANEL = {
-  windowHours: 24
+  windowHours: 24,
+  /**
+   * How often the day's plan is worked out again, in minutes.
+   *
+   * Slower than the drawn arcs' minute (`LANDMARK_PATHS.refreshSeconds`),
+   * because nothing here is a line whose head has to sit on its marker: a row
+   * is a clock time and a bearing, and both are as true ten minutes later. The
+   * countdowns tick on the panel's own clock, and a pass that has ended is
+   * dropped there as well (`UpcomingPasses`), so a plan this old is the same
+   * list with less of it left. What it saves is a day of every naked-eye
+   * candidate being searched sixty times an hour.
+   */
+  refreshMinutes: 10,
+  /**
+   * How far the observer may move before the day's plan is redone early, in
+   * metres.
+   *
+   * A kilometre shifts a low-orbit pass by a few seconds and its bearings by a
+   * fraction of a degree, which a row written to the minute and to a compass
+   * point does not show.
+   */
+  observerDriftMetres: 1000
+} as const;
+
+/**
+ * Which objects can be seen with the naked eye at all
+ * (`src/satellite/nakedEyePasses.ts`).
+ *
+ * Whether a *pass* can be seen is decided at its high point, the same way the
+ * card decides it (`nakedEye.ts`). What this decides is which objects are worth
+ * searching for passes in the first place: a day of passes is a couple of
+ * thousand propagations per object, and ten thousand of the catalogue's objects
+ * have a recorded brightness.
+ */
+export const NAKED_EYE_PASSES = {
+  /**
+   * How bright an object has to be able to look, at best, to be searched: its
+   * magnitude straight overhead at the low point of its orbit with the whole of
+   * its lit face turned down, which is a geometry no night allows.
+   *
+   * A magnitude and a quarter brighter than the dark-sky limit
+   * (`SKY_VISIBILITY.nakedEyeMagnitude`), and the room is on purpose. That best
+   * case is a few tenths brighter than any real night can offer — the sun has
+   * to be below the observer's horizon and still light the object from behind
+   * them — and the constellations' figures are the typical member of a fleet
+   * rather than the one overhead, set so that at their working altitudes they
+   * stay off the naked-eye ladder (`standardMagnitude.ts`). Nearer the limit
+   * than this, a whole shell of ten thousand identical satellites comes in at
+   * magnitude four on the best night of the year: a list of them would be too
+   * long to read and too marginal to act on, and a day of searching them would
+   * be most of a minute of arithmetic.
+   *
+   * What passes are the stations, Hubble and the larger low observatories, and
+   * a constellation's satellites while they are still low — a fresh launch on
+   * its way up, or one coming down — which is when they are the well-known
+   * string of lights rather than a fleet.
+   */
+  candidateMagnitude: 2.75,
+  /**
+   * How finely the plan's window is read for when it is dark enough to see
+   * anything, in minutes.
+   *
+   * Nothing can be seen while the sun is above `SKY_VISIBILITY.daylightAboveDeg`,
+   * so the candidates are only searched in the hours it is below — about half
+   * of any day at mid-latitudes, and far less in a northern summer. A sun
+   * position is a fraction of a propagation, and this is one per step for the
+   * whole plan rather than per object.
+   */
+  darknessStepMinutes: 5,
+  /**
+   * How far past each end of the dark hours a search reaches, in minutes.
+   *
+   * A pass is judged at its high point, and a pass that peaks just after dark
+   * rose a few minutes before it; searching from dusk itself would find it
+   * already up, with no rise to count down to. Fifteen is more than the half of
+   * the longest low-orbit pass that can fall before its peak, on top of the
+   * step the dusk itself was read to.
+   */
+  darknessPadMinutes: 15
 } as const;
 
 /**
@@ -713,9 +793,10 @@ export const PASS_ALERTS = {
    * catalogue read from the cache after a week offline alerts on nothing rather
    * than on an orbit that has moved on without it (`planPassAlerts`).
    *
-   * What it costs is a background job fifty-six times the drawn plan's — about
-   * two seconds of arithmetic on a laptop — sliced so it never lands on a
-   * frame (`passSearch`), and made at most once per `refreshMinutes`.
+   * What it costs is a week of every naked-eye candidate, searched only in the
+   * dark hours (`nakedEyePasses.ts`) — about four seconds of arithmetic on a
+   * laptop — sliced so it never lands on a frame (`passSearch`), and made at
+   * most once per `refreshMinutes`.
    */
   horizonDays: 7,
   /**

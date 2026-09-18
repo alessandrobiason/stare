@@ -627,7 +627,8 @@ describe("the tapped satellite's card", () => {
     details: Record<string, SatelliteDetail | null>,
     names = Object.keys(details),
     selected = names[0],
-    pass: UpcomingPass | null = null
+    pass: UpcomingPass | null = null,
+    sighting: UpcomingPass | null = null
   ) {
     const describeRef = { current: (name: string) => details[name] ?? null };
     return (
@@ -638,6 +639,7 @@ describe("the tapped satellite's card", () => {
         onClose={() => undefined}
         describeRef={describeRef}
         pass={pass}
+        sighting={sighting}
         />
     );
   }
@@ -717,6 +719,57 @@ describe("the tapped satellite's card", () => {
 
       expect(text).toContain("The sun is still up here");
       expect(text).not.toContain("When it comes over");
+    });
+  });
+
+  describe("a naked-eye pass in the next day", () => {
+    const sighting: UpcomingPass = {
+      name: "ISS",
+      noradId: 25544,
+      category: "LANDMARK",
+      startsAtMs: Date.UTC(2026, 7, 29, 19, 24, 0),
+      endsAtMs: Date.UTC(2026, 7, 29, 19, 34, 0),
+      peakAtMs: Date.UTC(2026, 7, 29, 19, 31, 0),
+      peakElevationDeg: 68,
+      riseAzimuthDeg: 247,
+      setAzimuthDeg: 51,
+      started: false,
+      nakedEye: "visible",
+      apparentMagnitude: -2.2,
+      magnitudeMeasured: true
+    };
+    const overhead = detail({
+      name: "ISS",
+      noradId: 25544,
+      category: "LANDMARK",
+      elevationDeg: 41.2,
+      nakedEye: "daylight",
+      sunAltitudeDeg: 2
+    });
+
+    test("is said on a line of its own, beside what is true now", () => {
+      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", null, sighting));
+
+      expect(text).toMatch(/Visible to the eye at \d{1,2}:31/);
+      // Where to stand and how bright, as the passes panel says it.
+      expect(text).toContain("68° up");
+      expect(text).toContain("magnitude -2.2");
+      // And the seeing line is still about the sky overhead now.
+      expect(text).toContain("Not visible (daylight)");
+    });
+
+    test("is not said twice when the seeing line is already about that pass", () => {
+      const below = { ...overhead, elevationDeg: -32.5 };
+      const text = textOf(card({ ISS: below }, ["ISS"], "ISS", sighting, sighting));
+
+      expect(text).toMatch(/When it comes over at \d{1,2}:31/);
+      expect(text).not.toMatch(/Visible to the eye at/);
+    });
+
+    test("and nothing is said without one", () => {
+      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", null, null));
+
+      expect(text).not.toMatch(/Visible to the eye at/);
     });
   });
 

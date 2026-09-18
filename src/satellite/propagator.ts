@@ -147,3 +147,23 @@ export function propagate(satrec: SatRec, when: Date): EciPosition {
 export function orbitPeriodMinutes(satrec: SatRec): number {
   return (2 * Math.PI) / satrec.no;
 }
+
+/**
+ * How high the low point of the orbit is, in kilometres above the equator's
+ * radius, from the elements themselves.
+ *
+ * The semi-major axis from the mean motion by Kepler's third law, then the
+ * eccentricity. Not what SGP4 would place the object at on any given pass —
+ * the Earth is not a sphere and the orbit is not fixed — but within a few
+ * kilometres of it, which is all a bound on how close the object can come is
+ * asked to be. See `nakedEyeCandidates`.
+ */
+export function perigeeAltitudeKm(satrec: SatRec): number {
+  const radiansPerSecond = satrec.no / 60;
+  const semiMajorAxisKm = Math.cbrt(MU_KM3_S2 / (radiansPerSecond * radiansPerSecond));
+  return semiMajorAxisKm * (1 - satrec.ecco) - EQUATORIAL_RADIUS_KM;
+}
+
+/** The Earth's gravitational parameter, in km³/s². */
+const MU_KM3_S2 = 398600.4418;
+const EQUATORIAL_RADIUS_KM = 6378.137;

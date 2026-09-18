@@ -34,6 +34,7 @@ import { MarkerVisibilityFilter } from "../vision/markerVisibility";
 import { SkyMemory } from "../vision/skyMemory";
 import { useFocusedPath } from "./useFocusedPath";
 import { useLatestRef } from "./useLatestRef";
+import { useNakedEyePasses } from "./useNakedEyePasses";
 import { useOrbitPaths } from "./useOrbitPaths";
 
 export type SatelliteMarker = {
@@ -317,12 +318,13 @@ export type AnimatedMarkers = {
    */
   reset: () => void;
   /**
-   * The passes those paths are, as a list: what the panel in the corner says is
-   * coming, soonest first.
+   * The next day's naked-eye passes, as a list: what the panel at the bottom
+   * says is coming, soonest first.
    *
    * The one value here that is state rather than a ref, and the one read by a
-   * view rather than by the loop. It changes when a plan does — once a minute —
-   * so the render it costs is not on the frame path. See `useOrbitPaths`.
+   * view rather than by the loop. It changes when a plan does — every few
+   * minutes — so the render it costs is not on the frame path. See
+   * `useNakedEyePasses`.
    */
   upcoming: UpcomingPass[];
 };
@@ -781,11 +783,14 @@ export function useAnimatedMarkers({
   // The landmarks' upcoming passes, replanned on their own slow schedule off
   // this loop entirely. What the loop does with them is project them, which is
   // a few hundred dot products against the same axes the markers use.
-  const { pathsRef, upcoming } = useOrbitPaths({
+  const { pathsRef } = useOrbitPaths({
     catalog,
     epochRef,
     enabled: enabledCategories.has("LANDMARK")
   });
+  // What can be seen over the next day, for the panel: planned apart from the
+  // arcs, on its own slower schedule and whatever the filter is drawing.
+  const upcoming = useNakedEyePasses({ catalog, epochRef });
   /** What the newest frame was placed with, and — while frozen — the one held. */
   const placedRef = useRef<PlacedAt | null>(null);
   const heldRef = useRef<PlacedAt | null>(null);

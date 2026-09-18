@@ -559,12 +559,10 @@ function drawable(passes: SkyPass[]): SkyPass[] {
  * nothing — and there is no deadline on it, because the plan it replaces goes
  * on being drawn until this one lands. See `src/timeSlice.ts`.
  *
- * Three callers, with three windows and three purposes. `planSkyPaths` takes
- * the next three hours and keeps four of them to draw; the passes panel takes
- * the next day and lists all of it (`useOrbitPaths`); the alert planner takes
- * the next week and keeps the ones that can be *seen*
- * (`src/satellite/passAlerts.ts`). None cares which objects another kept, and
- * all three want exactly this: the tier's real passes, once each.
+ * `planSkyPaths` takes the next three hours and keeps four of them to draw.
+ * The passes panel and the alert planner ask the same question of a different
+ * set of objects — the ones that can be seen with the naked eye, landmark or
+ * not (`src/satellite/nakedEyePasses.ts`) — through `passesOf`.
  */
 export async function landmarkPasses(
   catalog: SatelliteCatalog,
@@ -573,15 +571,48 @@ export async function landmarkPasses(
   slices: Slices,
   windowHours: number = LANDMARK_PATHS.windowHours
 ): Promise<SkyPass[]> {
+  const landmarks = catalog.entries.filter((entry) => entry.category === "LANDMARK");
+  const whole = { fromMs, untilMs: fromMs + windowHours * MS_PER_HOUR };
+  return passesOf(landmarks, fromMs, observer, slices, [whole]);
+}
+
+/** A stretch of a plan's window, in epoch milliseconds. */
+export type TimeSpan = { fromMs: number; untilMs: number };
+
+/**
+ * Every pass a set of objects makes over the observer in some stretches of a
+ * plan made at `fromMs`, deduped.
+ *
+ * The search behind `landmarkPasses`, for whichever objects a caller has
+ * chosen and over whichever parts of the window it cares about — the whole of
+ * it for the drawn arcs, and only the hours dark enough to see anything in for
+ * the naked-eye plans (`nakedEyePasses.ts`). None of the callers cares which
+ * objects another kept, and all of them want exactly this: those objects' real
+ * passes, once each.
+ *
+ * A pass already up when a stretch opens is only kept for a stretch that opens
+ * at `fromMs`, where it is the pass under way. Anywhere else it is a pass the
+ * stretch has cut in two, and what is left of it has no rise to count down to.
+ */
+export async function passesOf(
+  entries: readonly CatalogEntry[],
+  fromMs: number,
+  observer: ObserverLocation,
+  slices: Slices,
+  spans: readonly TimeSpan[]
+): Promise<SkyPass[]> {
   const found: SkyPass[] = [];
-  for (const entry of catalog.entries) {
-    if (entry.category !== "LANDMARK") continue;
-    found.push(
-      ...(await runSliced(
-        passSearch(entry, fromMs, observer, LANDMARK_PATHS.pastArcDeg, windowHours),
+  for (const entry of entries) {
+    for (const span of spans) {
+      const hours = (span.untilMs - span.fromMs) / MS_PER_HOUR;
+      const passes = await runSliced(
+        passSearch(entry, span.fromMs, observer, LANDMARK_PATHS.pastArcDeg, hours),
         slices
-      ))
-    );
+      );
+      for (const pass of passes) {
+        if (!pass.started || span.fromMs === fromMs) found.push(pass);
+      }
+    }
   }
   return oneArcEach(found);
 }

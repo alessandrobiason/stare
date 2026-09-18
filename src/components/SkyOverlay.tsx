@@ -22,6 +22,7 @@ import {
 import { SkySummary, useAnimatedMarkers } from "../hooks/useAnimatedMarkers";
 import { useCelestialAlignment } from "../hooks/useCelestialAlignment";
 import { useLatestRef } from "../hooks/useLatestRef";
+import { useSelectedPasses } from "../hooks/useSelectedPasses";
 import { useSkyPalette } from "../hooks/useSkyPalette";
 import { SegmentedFrameSample, useSkySegmentation } from "../hooks/useSkySegmentation";
 import { SceneTab } from "../hooks/useSceneControls";
@@ -29,7 +30,6 @@ import { AttitudeSource, useSmoothedOrientation } from "../hooks/useSmoothedOrie
 import { OrbitEpoch } from "../types";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories";
-import { UpcomingPass } from "../satellite/upcomingPasses";
 import { aimToleranceDeg, AnchoredSkyMask } from "../vision/anchoredMask";
 import { BackdropBrightness, brightnessGridSliced } from "../vision/backdropBrightness";
 import { SkyFrameGrabber, skyModelDiagnostics } from "../vision/skySegmenter";
@@ -448,6 +448,15 @@ export const SkyOverlay: React.FC<Props> = ({
     selectedName: selection?.selected ?? null
   });
 
+  // The tapped satellite's day ahead, for its card: the next pass it makes, for
+  // the tense of the seeing line, and the next one that can be seen at all.
+  // Against the epoch on screen, like everything else the card says.
+  const selectedPasses = useSelectedPasses({
+    tracker,
+    epochRef: drawnEpochRef,
+    name: selection?.selected ?? null
+  });
+
   // A row of the passes panel, picked: the same selection a tap on the object's
   // own mark makes, so the card that opens is the card the sky would have
   // opened. One name rather than a cluster: a row is one object by
@@ -722,7 +731,8 @@ export const SkyOverlay: React.FC<Props> = ({
                     onSelect={(name) => setSelection({ names: selection.names, selected: name })}
                     onClose={() => setSelection(null)}
                     describeRef={describeRef}
-                    pass={passAhead(upcoming, selection.selected)}
+                    pass={selectedPasses.next}
+                    sighting={selectedPasses.sighting}
                   />
                 )}
 
@@ -755,27 +765,6 @@ export const SkyOverlay: React.FC<Props> = ({
     </TourTargetsProvider>
   );
 };
-
-/**
- * The pass this object still has ahead of it, if it has one.
- *
- * What the card needs it for is the tense of its seeing line, so a pass already
- * under way is not one: its object is on the frame, the figures beside the line
- * are about that object now, and "when it comes over" is a clause about
- * something that has happened. The list is soonest first, so the first match is
- * the next one.
- *
- * Answered from the panel's own plan rather than by asking for one, which
- * reaches a day ahead — further than the three hours actually drawn
- * (`PASSES_PANEL`), so a match here may still be a pass with no line on the
- * sky yet. A name with no plan at all — anything outside the landmark tier —
- * gets `null` and the card's present tense. That is the right answer for
- * those: nothing plans their passes, and the card would have nothing to name a
- * time from.
- */
-function passAhead(passes: readonly UpcomingPass[], name: string): UpcomingPass | null {
-  return passes.find((pass) => pass.name === name && !pass.started) ?? null;
-}
 
 /** One line saying what the sky mask is doing, for the scenes' status panels. */
 function describeMask(anchored: AnchoredSkyMask | null, error: string | null): string {

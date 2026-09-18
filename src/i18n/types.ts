@@ -264,6 +264,16 @@ export type Strings = {
        */
       onPass: string;
     };
+    /**
+     * The next pass that can be seen with the naked eye, within the next day.
+     * `{time}`, the clock time it is highest.
+     *
+     * A line of its own under the seeing line, which answers about now; this
+     * answers whether the object is worth going outside for later. Where to
+     * stand and how bright it will be are appended to it, in the words the
+     * passes panel uses for the same pass. See `sightingLine`.
+     */
+    sighting: string;
     facts: {
       distance: string;
       altitude: string;

@@ -19,6 +19,7 @@ import {
   orbitPeriod,
   seeing,
   seeingOnPass,
+  sightingLine,
   speed
 } from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
@@ -61,10 +62,20 @@ type Props = {
    * the frame, and the wrong one for an object that is under the horizon until
    * this evening, because "can it be seen" is a question about the sky at the
    * moment it comes over rather than about the sky now. `null` for an object
-   * already up, for one with no planned pass, and for every scene that does not
-   * plan them. See `seeingOnPass`.
+   * with no pass ahead in the next day, and for every scene that does not plan
+   * them. See `seeingOnPass`.
    */
   pass?: UpcomingPass | null;
+  /**
+   * The next pass this object makes that can be seen with the naked eye, within
+   * the next day, or `null` for none.
+   *
+   * Its own line, under the seeing line: that one is about now (or about the
+   * very next pass, for an object under the floor), and whether the object is
+   * worth going outside for later is a different question with a different
+   * answer most of the time. See `sightingLine`.
+   */
+  sighting?: UpcomingPass | null;
   /** Where it sits: laid over the card's own, by the stack that arranges it. */
   style?: StyleProp<ViewStyle>;
 };
@@ -127,6 +138,7 @@ export const SatelliteCard: React.FC<Props> = ({
   onClose,
   describeRef,
   pass = null,
+  sighting = null,
   style
 }) => {
   const t = strings();
@@ -284,6 +296,14 @@ export const SatelliteCard: React.FC<Props> = ({
           <Text style={styles.seeing}>
             {answersForPass(detail, pass) ? seeingOnPass(pass) : seeing(detail)}
           </Text>
+        )}
+
+        {/* And whether it is worth going out for later: the next pass that can
+            be seen without help, in the accent a sighting has in the passes
+            panel. Left off when the line above is already about that same
+            pass, which would be saying it twice. */}
+        {detail && sighting && !(answersForPass(detail, pass) && pass.peakAtMs === sighting.peakAtMs) && (
+          <Text style={styles.sighting}>{sightingLine(sighting)}</Text>
         )}
 
         {detail ? (
@@ -641,6 +661,14 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth * 2,
     borderTopColor: theme.color.divider,
     color: theme.color.textBright,
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 18
+  },
+  sighting: {
+    marginHorizontal: 14,
+    marginTop: 4,
+    color: theme.color.accent,
     fontSize: 12.5,
     fontWeight: "600",
     lineHeight: 18

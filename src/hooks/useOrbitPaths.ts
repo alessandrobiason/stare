@@ -1,8 +1,7 @@
-import { MutableRefObject, useEffect, useRef, useState } from "react";
-import { LANDMARK_PATHS, PASSES_PANEL } from "../constants";
+import { MutableRefObject, useEffect, useRef } from "react";
+import { LANDMARK_PATHS } from "../constants";
 import { SatelliteCatalog } from "../satellite/catalog";
-import { landmarkPasses, planSkyPaths, SkyPass } from "../satellite/orbitPath";
-import { UpcomingPass, upcomingPasses } from "../satellite/upcomingPasses";
+import { planSkyPaths, SkyPass } from "../satellite/orbitPath";
 import { startSlicing } from "../timeSlice";
 import { ObserverLocation, OrbitEpoch } from "../types";
 import { isStale } from "./planFreshness";
@@ -22,7 +21,7 @@ type Options = {
   enabled: boolean;
 };
 
-/** A plan, in the two forms the app reads it in. */
+/** A plan, as the frame loop reads it. */
 export type OrbitPaths = {
   /**
    * The arcs themselves, for the frame loop to project.
@@ -32,23 +31,12 @@ export type OrbitPaths = {
    * display rate and does not need React to tell it that a new plan has
    * landed. Publishing them would re-render the whole scene once a minute to
    * hand a value to something that reads it sixty times a second anyway.
+   *
+   * The passes panel is planned apart from this (`useNakedEyePasses`): it
+   * lists what can be seen rather than what the landmarks are doing, over a
+   * day rather than three hours, and whether or not the tier is drawn.
    */
   pathsRef: MutableRefObject<SkyPass[]>;
-  /**
-   * A wider plan than the one above, for the panel that says what is coming.
-   *
-   * Searched over `PASSES_PANEL.windowHours` rather than the three hours the
-   * arcs are drawn over: a row past that window opens the same card any other
-   * row does, just with no line yet on the sky for it to point at. State,
-   * because this one is read by a view rather than by the loop, and a ref
-   * nothing re-renders for would leave the panel showing the plan it mounted
-   * with. The cost is the render this hook's owner does when a plan lands,
-   * which is once a minute against the sixty a second the loop is already
-   * doing — and the loop itself is untouched by it, since everything it reads
-   * is a ref. Identity is stable between plans, so a render that changes
-   * nothing else does not reach the panel either. See `upcomingPasses`.
-   */
-  upcoming: UpcomingPass[];
 };
 
 /**
@@ -62,17 +50,10 @@ export type OrbitPaths = {
  */
 export function useOrbitPaths({ catalog, epochRef, enabled }: Options): OrbitPaths {
   const pathsRef = useRef<SkyPass[]>([]);
-  const [upcoming, setUpcoming] = useState<UpcomingPass[]>(NO_PASSES);
 
   useEffect(() => {
     if (!enabled) {
       pathsRef.current = [];
-      // The tier is filtered off, so there are no lines to point anyone at and
-      // the panel goes with them: a list of passes with nothing drawn for them
-      // is a list of rows that open a card about an object the sky is not
-      // showing. `NO_PASSES` rather than a fresh array, so switching the filter
-      // twice does not render the panel's owner for an unchanged empty list.
-      setUpcoming(NO_PASSES);
       return;
     }
 
@@ -93,24 +74,10 @@ export function useOrbitPaths({ catalog, epochRef, enabled }: Options): OrbitPat
       // catches, either — the arithmetic below is the same SGP4 the frame loop
       // runs sixty times a second, so a failure here is a bug rather than a
       // condition, and one swallowed on a timer is a bug that never surfaces.
-      //
-      // Two searches, sliced independently, because they answer different
-      // questions over different windows: the arcs are three hours of sky and
-      // the panel is a day of it (`PASSES_PANEL`). Both are marched at the
-      // same instant, so a row in the panel and a line on the frame never
-      // disagree about what "now" was.
-      Promise.all([
-        planSkyPaths(catalog, atMs, observer, startSlicing()),
-        landmarkPasses(catalog, atMs, observer, startSlicing(), PASSES_PANEL.windowHours)
-      ])
-        .then(([drawn, found]) => {
+      planSkyPaths(catalog, atMs, observer, startSlicing())
+        .then((drawn) => {
           if (dropped) return;
           pathsRef.current = drawn;
-          // Described here rather than in the panel, because what it costs is a
-          // propagation and a sun position per pass and this is the one place
-          // that already knows a plan is new. Off the frame thread, on the same
-          // background job, against the observer the plan was made for.
-          setUpcoming(found.length === 0 ? NO_PASSES : upcomingPasses(found, catalog, observer));
           plannedAtMs = atMs;
           plannedFrom = observer;
         })
@@ -127,19 +94,8 @@ export function useOrbitPaths({ catalog, epochRef, enabled }: Options): OrbitPat
     };
   }, [catalog, enabled, epochRef]);
 
-  return { pathsRef, upcoming };
+  return { pathsRef };
 }
-
-/**
- * The empty list, shared.
- *
- * A plan with nothing in it happens twice — the landmark tier switched off, and
- * a sky where nothing rises in the panel's own day (`PASSES_PANEL.windowHours`),
- * which at high latitudes can still happen. Handing back the same array both
- * times is what lets React bail out of the render instead of taking a new
- * empty array as a change.
- */
-const NO_PASSES: UpcomingPass[] = [];
 
 /**
  * Whether the plan in hand still describes the sky.

@@ -61,7 +61,7 @@ export const it: Strings = {
     },
     passes: {
       title: "In arrivo",
-      body: "Cosa passerà sopra di te a breve. Tocca per vedere il prossimo giorno."
+      body: "Cosa potrai vedere a occhio nudo sopra di te. Tocca per vedere il prossimo giorno."
     },
     catalog: {
       title: "Catalogo",
@@ -160,6 +160,7 @@ export const it: Strings = {
       aboutMagnitude: "circa magnitudine {value}",
       onPass: "Quando passerà, alle {time}: {verdict}"
     },
+    sighting: "Visibile a occhio nudo alle {time}",
     facts: {
       distance: "Distanza",
       altitude: "Quota",

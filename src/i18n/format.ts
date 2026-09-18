@@ -208,6 +208,29 @@ export function seeingOnPass(pass: {
 }
 
 /**
+ * When this object can next be seen with the naked eye, in one line: the clock
+ * time it is highest, where to stand, and how bright it will be.
+ *
+ * The card's answer to "is it worth going outside for", which is a different
+ * question from the seeing line's "can I see it now" — so it is said beside
+ * that line rather than instead of it. The time is the high point, for the
+ * reason `seeingOnPass` gives: it is the instant the verdict belongs to. No
+ * countdown: the card is about the object rather than about the clock, and the
+ * passes panel is where the waiting is counted.
+ */
+export function sightingLine(pass: {
+  nakedEye: NakedEyeVerdict;
+  apparentMagnitude: number | null;
+  magnitudeMeasured: boolean;
+  peakAtMs: number;
+  riseAzimuthDeg: number;
+  peakElevationDeg: number;
+}): string {
+  const when = fill(strings().card.sighting, { time: clockTime(new Date(pass.peakAtMs)) });
+  return withMagnitude(`${when} · ${passDirection(pass)}`, pass);
+}
+
+/**
  * A verdict with the brightness it rests on, where there is one and it is what
  * is being judged.
  *
