@@ -47,11 +47,12 @@ type Placed = {
 
 const MARK_SAMPLES: Record<MarkSample, readonly Placed[]> = {
   // Low orbit: it crosses the sky in minutes, so over the trail window it
-  // leaves a long tail behind it.
-  longTail: [{ category: "EARTH", x: 37, y: 28, rangeKm: 450, headingDeg: 20, travel: 30 }],
-  // Medium orbit: far slower across the sky, so the same window leaves only a
-  // short one.
-  shortTail: [{ category: "EARTH", x: 37, y: 28, rangeKm: 20000, headingDeg: 20, travel: 8 }],
+  // leaves a long tail behind it. Placed off-centre so the tail has room to
+  // stretch without running off the tile.
+  longTail: [{ category: "EARTH", x: 40, y: 27, rangeKm: 450, headingDeg: 20, travel: 40 }],
+  // Medium orbit: slower across the sky, so the same window leaves a shorter
+  // tail — but still a clearly visible one, not a bare dot.
+  shortTail: [{ category: "EARTH", x: 37, y: 28, rangeKm: 20000, headingDeg: 20, travel: 18 }],
   // A stretch of the geostationary belt, which is how rings are met on the sky:
   // several in a row, small, and none of them moving.
   parked: [
