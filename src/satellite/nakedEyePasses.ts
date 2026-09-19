@@ -1,4 +1,4 @@
-import { NAKED_EYE_PASSES, PASSES_PANEL } from "../constants";
+import { FULL_TRAJECTORY, LANDMARK_PATHS, NAKED_EYE_PASSES, PASSES_PANEL } from "../constants";
 import { runSliced, Slices } from "../timeSlice";
 import { ObserverLocation } from "../types";
 import { CatalogEntry, SatelliteCatalog } from "./catalog";
@@ -137,11 +137,12 @@ export async function nakedEyeCandidatePasses(
   fromMs: number,
   observer: ObserverLocation,
   slices: Slices,
-  windowHours: number
+  windowHours: number,
+  pastArcDeg: number = LANDMARK_PATHS.pastArcDeg
 ): Promise<SkyPass[]> {
   const spans = darkSpans(fromMs, fromMs + windowHours * MS_PER_HOUR, observer);
   if (spans.length === 0) return [];
-  return passesOf(nakedEyeCandidates(catalog), fromMs, observer, slices, spans);
+  return passesOf(nakedEyeCandidates(catalog), fromMs, observer, slices, spans, pastArcDeg);
 }
 
 /** Whether a described pass is one somebody could see without help. */
@@ -160,8 +161,79 @@ export async function planSightings(
   slices: Slices,
   windowHours: number = PASSES_PANEL.windowHours
 ): Promise<UpcomingPass[]> {
-  const passes = await nakedEyeCandidatePasses(catalog, fromMs, observer, slices, windowHours);
-  return upcomingPasses(passes, catalog, observer).filter(isSighting);
+  return (await planSightingPaths(catalog, fromMs, observer, slices, windowHours)).passes;
+}
+
+/** The panel's sightings, and the lines on the sky they are drawn as. */
+export type SightingPlan = {
+  /** Soonest first, as `planSightings` gives them. */
+  passes: UpcomingPass[];
+  /** The same passes as arcs across the sky, soonest first. See `drawnSightings`. */
+  paths: SkyPass[];
+};
+
+/**
+ * The naked-eye passes of the next `windowHours`, and the same passes as
+ * arcs across the sky: what the passes panel lists, and where on the sky each
+ * of them will be.
+ *
+ * One search for both, so the list and the lines can never disagree about
+ * what is coming — a row is always a line, and a line is always a row. The
+ * pass under way when the plan is made carries its wake back to the rise
+ * (`FULL_TRAJECTORY`), since what is drawn is the whole trajectory.
+ */
+export async function planSightingPaths(
+  catalog: SatelliteCatalog,
+  fromMs: number,
+  observer: ObserverLocation,
+  slices: Slices,
+  windowHours: number = PASSES_PANEL.windowHours
+): Promise<SightingPlan> {
+  const found = await nakedEyeCandidatePasses(
+    catalog,
+    fromMs,
+    observer,
+    slices,
+    windowHours,
+    FULL_TRAJECTORY.pastArcDeg
+  );
+  const passes = upcomingPasses(found, catalog, observer).filter(isSighting);
+  const listed = new Set(passes.map(passKey));
+  const paths = found
+    .filter((pass) => listed.has(passKey(pass)))
+    .sort((one, other) => one.startsAtMs - other.startsAtMs);
+  return { passes, paths };
+}
+
+/**
+ * Which of the sightings' arcs are drawn at `atMs`: each object's soonest pass
+ * not yet over, soonest first, and no more than
+ * `LANDMARK_PATHS.maximumSightingPaths` of them.
+ *
+ * One per object because a line is a direction to turn, and the station's pass
+ * in an hour and its pass after midnight are two directions for the same name.
+ * Chosen against the clock rather than when the plan is made, so the second
+ * appears the moment the first is over instead of at the next plan. Capped
+ * for the evening a fresh launch is dozens of lights on nearly the same line.
+ *
+ * `paths` is soonest first, as `planSightingPaths` leaves it; this is a walk of
+ * a few dozen entries at most, and it runs once a frame.
+ */
+export function drawnSightings(paths: readonly SkyPass[], atMs: number): SkyPass[] {
+  const drawn: SkyPass[] = [];
+  const objects = new Set<number>();
+  for (const pass of paths) {
+    if (drawn.length >= LANDMARK_PATHS.maximumSightingPaths) break;
+    if (pass.endsAtMs <= atMs || objects.has(pass.noradId)) continue;
+    objects.add(pass.noradId);
+    drawn.push(pass);
+  }
+  return drawn;
+}
+
+/** What identifies one pass of one object, the same in a plan and in its description. */
+function passKey(pass: { noradId: number; startsAtMs: number }): string {
+  return `${pass.noradId}@${pass.startsAtMs}`;
 }
 
 /**

@@ -10,7 +10,7 @@ import {
   WHOLE_FRAME
 } from "../components/markerGeometry";
 import {
-  FOCUSED_TRAJECTORY,
+  FULL_TRAJECTORY,
   LANDMARK_PATHS,
   MARKER_VISIBILITY,
   MINIMUM_SATELLITE_ELEVATION_DEG
@@ -23,6 +23,7 @@ import { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories
 import { breakdownSignature, FleetBreakdown, tallyFleets } from "../satellite/fleets";
 import { SunlitState } from "../satellite/illumination";
 import { SkyDarkness, skyDarknessAt } from "../satellite/nakedEye";
+import { drawnSightings } from "../satellite/nakedEyePasses";
 import { NotableCandidate, NotableSatellites } from "../satellite/notable";
 import { ArcPiece, cutAlong, pathBehind, pathFrom, SkyPass } from "../satellite/orbitPath";
 import { EnuPosition, OrbitEpoch } from "../types";
@@ -35,7 +36,6 @@ import { SkyMemory } from "../vision/skyMemory";
 import { useFocusedPath } from "./useFocusedPath";
 import { useLatestRef } from "./useLatestRef";
 import { useNakedEyePasses } from "./useNakedEyePasses";
-import { useOrbitPaths } from "./useOrbitPaths";
 
 export type SatelliteMarker = {
   name: string;
@@ -87,14 +87,13 @@ export type SatelliteMarker = {
 };
 
 /**
- * A pass across the sky, projected onto the frame: a landmark's upcoming one,
- * or the one belonging to whichever satellite someone has tapped.
+ * A pass across the sky, projected onto the frame: one the passes panel says
+ * can be seen, or the one belonging to whichever satellite someone has tapped.
  *
  * The line the marks are read against: where the object will cross, drawn
  * whether or not the object itself is anywhere near the view. See
- * `src/satellite/orbitPath.ts` for what a pass is, `LANDMARK_PATHS` for why
- * the landmarks always get one, and `useFocusedPath` for the one other object
- * that can.
+ * `src/satellite/orbitPath.ts` for what a pass is, `drawnSightings` for which
+ * of the panel's are drawn, and `useFocusedPath` for the tapped one.
  */
 export type MarkerPath = {
   /** The object's name, which is what the arc is labelled with. */
@@ -112,8 +111,7 @@ export type MarkerPath = {
   /**
    * The arc already behind the object, as the steps its wake fades in, nearest
    * the object first. Each carries how far back it is, in `(0, 1)` of the
-   * pass's own reach — `LANDMARK_PATHS.pastArcDeg`, or `FOCUSED_TRAJECTORY`'s
-   * longer one for the object someone tapped — which is what it is faded by.
+   * wake's reach (`FULL_TRAJECTORY.pastArcDeg`), which is what it is faded by.
    * Empty for a pass that has not begun, and for steps nowhere near the frame.
    */
   past: { points: FramePoint[]; behind: number }[];
@@ -151,7 +149,7 @@ export type PathAnchor = {
 };
 
 /**
- * One drawn frame: where every marker goes, the landmarks' paths across it, and
+ * One drawn frame: where every marker goes, the passes drawn across it, and
  * the camera roll they are drawn against. The roll travels with them because it
  * comes from the same filter at the same instant — published separately, it
  * would cost a second state update per frame and leave labels tilted for an
@@ -263,12 +261,13 @@ export type MarkerStats = {
    */
   eclipsed: number;
   /**
-   * Landmark paths crossing the frame, out of the handful planned.
+   * Paths crossing the frame, out of the sightings planned and the tapped one.
    *
-   * Zero with the tier filtered out, and zero for a plan whose arcs are all
-   * somewhere else — which is the figure to look at when a line is expected and
-   * nothing is drawn, since it separates "the plan has nothing in it" from
-   * "the plan has something and the phone is pointed away from it".
+   * Zero with nothing to see today or their categories filtered out, and zero
+   * for a plan whose arcs are all somewhere else — which is the figure to look
+   * at when a line is expected and nothing is drawn, since it separates "the
+   * plan has nothing in it" from "the plan has something and the phone is
+   * pointed away from it".
    */
   paths: number;
 };
@@ -501,18 +500,16 @@ function projectPieces(pieces: ArcPiece[], axes: CameraAxes, lens: FrameLens): F
  * fixed piece of sky rather than sliding along the line as the phone turns.
  * See `anchorFor`.
  *
- * `focusedName` is the one pass, if any, whose wake reaches all the way back
- * to its rise rather than a landmark's short one — the satellite someone has
- * tapped, drawn with `FOCUSED_TRAJECTORY` in place of `LANDMARK_PATHS`. See
- * `useFocusedPath`.
+ * Every path's wake reaches back to its rise (`FULL_TRAJECTORY`): what is
+ * drawn is a pass somebody could go out and see, or the one somebody tapped,
+ * and for either of them the whole of the crossing is the answer.
  */
 export function projectPaths(
   passes: readonly SkyPass[],
   atMs: number,
   axes: CameraAxes,
   lens: FrameLens,
-  anchors: Map<string, number> = new Map(),
-  focusedName: string | null = null
+  anchors: Map<string, number> = new Map()
 ): MarkerPath[] {
   const windowMs = LANDMARK_PATHS.windowHours * 60 * 60 * 1000;
   const drawn: MarkerPath[] = [];
@@ -538,12 +535,9 @@ export function projectPaths(
     );
 
     // And the wake, from the object backwards, in steps of equal arc: each
-    // one's distance back is what it is faded by (`markerScene`). The tapped
-    // satellite's own wake is longer, so it gets more steps to fade across —
-    // `behind` is a share of `pastArcDeg` either way, which is what keeps
-    // `markerScene` itself from needing to know which is which.
-    const { pastArcDeg, pastSteps } =
-      pass.name === focusedName ? FOCUSED_TRAJECTORY : LANDMARK_PATHS;
+    // one's distance back is what it is faded by (`markerScene`), as a share
+    // of `pastArcDeg`.
+    const { pastArcDeg, pastSteps } = FULL_TRAJECTORY;
     const stepDeg = pastArcDeg / pastSteps;
     const behind = pathBehind(pass, atMs, pastArcDeg);
     const nearBehind = segmentsNearFrame(behind, axes, lens);
@@ -732,9 +726,8 @@ type AnimatedMarkerOptions = {
    * The satellite someone has tapped, or `null` with nothing selected.
    *
    * Drawn as its own full crossing of the sky in place of its short comet
-   * tail — see `useFocusedPath` and `projectPaths`' `focusedName` — rather
-   * than gated on the landmark tier or the object's own category: a tap picks
-   * the object, not the filter.
+   * tail — see `useFocusedPath` — rather than gated on the object's own
+   * category: a tap picks the object, not the filter.
    */
   selectedName?: string | null;
 };
@@ -780,17 +773,11 @@ export function useAnimatedMarkers({
   );
   // Outlives every mask that feeds it, which is the point: see `SkyMemory`.
   const skyMemory = useMemo(() => new SkyMemory(), []);
-  // The landmarks' upcoming passes, replanned on their own slow schedule off
-  // this loop entirely. What the loop does with them is project them, which is
-  // a few hundred dot products against the same axes the markers use.
-  const { pathsRef } = useOrbitPaths({
-    catalog,
-    epochRef,
-    enabled: enabledCategories.has("LANDMARK")
-  });
-  // What can be seen over the next day, for the panel: planned apart from the
-  // arcs, on its own slower schedule and whatever the filter is drawing.
-  const upcoming = useNakedEyePasses({ catalog, epochRef });
+  // What can be seen over the next day: a list for the panel, and the same
+  // passes as arcs for this loop, replanned on their own slow schedule off it
+  // entirely. What the loop does with the arcs is project them, which is a few
+  // hundred dot products against the same axes the markers use.
+  const { passes: upcoming, pathsRef } = useNakedEyePasses({ catalog, epochRef });
   /** What the newest frame was placed with, and — while frozen — the one held. */
   const placedRef = useRef<PlacedAt | null>(null);
   const heldRef = useRef<PlacedAt | null>(null);
@@ -981,32 +968,29 @@ export function useAnimatedMarkers({
       // them too, and the paths are drawn whether or not there is a mask.
       const axes = axesFromAttitude(attitude);
 
-      // The lines the landmarks are about to travel along, and the tapped
-      // satellite's own line alongside them regardless of category or filter
-      // — a selection is not the landmark tier. Not the mask's business: what
-      // it answers is whether an object can be *seen* from here, and a path is
-      // not a sighting — it is where to point the phone, which is worth
-      // drawing over the roof the object will come out from behind. Its
-      // marker still waits for the mask, as every marker does.
+      // The lines the passes panel's sightings are about to travel along —
+      // each object's next, as long as the filter is drawing its kind — and
+      // the tapped satellite's own line alongside them regardless of category
+      // or filter: a tap picks the object, not the filter. Not the mask's
+      // business: what it answers is whether an object can be *seen* from
+      // here, and a path is where to point the phone, which is worth drawing
+      // over the roof the object will come out from behind. Its marker still
+      // waits for the mask, as every marker does.
       const focusedPass = focusedNow;
-      const landmarkPasses = categories.has("LANDMARK") ? pathsRef.current : [];
-      // The tapped satellite's own plan stands in for the landmark tier's
-      // shorter-wake version of the same pass, on the rare occasion it is one
-      // of theirs — never both, or the object would carry two lines through
+      const sightings = drawnSightings(pathsRef.current, time.getTime()).filter(
+        (pass) =>
+          categories.has(pass.category) &&
+          (pass.subcategory === null || subcategories.has(pass.subcategory))
+      );
+      // The tapped satellite's own plan stands in for its sighting's line when
+      // it has one — never both, or the object would carry two lines through
       // the same piece of sky.
       const passesToShow = focusedPass
-        ? [...landmarkPasses.filter((pass) => pass.name !== focusedPass.name), focusedPass]
-        : landmarkPasses;
+        ? [...sightings.filter((pass) => pass.noradId !== focusedPass.noradId), focusedPass]
+        : sightings;
       const paths =
         passesToShow.length > 0
-          ? projectPaths(
-              passesToShow,
-              time.getTime(),
-              axes,
-              lens,
-              pathAnchorsRef.current,
-              focusedPass?.name ?? null
-            )
+          ? projectPaths(passesToShow, time.getTime(), axes, lens, pathAnchorsRef.current)
           : [];
 
       // No mask, no markers. Drawing them anyway — which is what happens the

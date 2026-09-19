@@ -4,7 +4,7 @@ import { SkyTracker } from "../satellite/skyTracker";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { startSlicing } from "../timeSlice";
 import { ObserverLocation, OrbitEpoch } from "../types";
-import { CHECK_INTERVAL_MS, stale } from "./useOrbitPaths";
+import { CHECK_INTERVAL_MS, pathPlanStale } from "./planFreshness";
 
 type Options = {
   tracker: SkyTracker;
@@ -16,12 +16,6 @@ type Options = {
 
 /** What the card says about the tapped satellite's day ahead. */
 export type SelectedPasses = {
-  /**
-   * The next pass it has not begun, whatever can be seen of it: what the card's
-   * seeing line answers about while the object is under the floor. See
-   * `SatelliteCard`'s `pass`.
-   */
-  next: UpcomingPass | null;
   /**
    * The next pass it has not begun that can be seen with the naked eye, within
    * the panel's day (`PASSES_PANEL.windowHours`), or `null` for none.
@@ -36,7 +30,7 @@ export type SelectedPasses = {
  * can be opened on anything, from the sky or from the catalog, so this
  * searches the one object it is showing. A day of one object is a couple of
  * thousand propagations — sliced, because it lands on a tap, and replanned on
- * the drawn paths' own cadence (`stale`) so a pass that has begun or ended
+ * the drawn paths' own cadence (`pathPlanStale`) so a pass that has begun or ended
  * stops being talked about as one still to come.
  *
  * Emptied the instant the selection changes, rather than left to describe the
@@ -58,7 +52,7 @@ export function useSelectedPasses({ tracker, epochRef, name }: Options): Selecte
       if (planning) return;
       const { time, observer } = epochRef.current;
       const atMs = time.getTime();
-      if (!stale(plannedAtMs, plannedFrom, atMs, observer)) return;
+      if (!pathPlanStale(plannedAtMs, plannedFrom, atMs, observer)) return;
 
       const entry = tracker.entryFor(name);
       if (!entry) {
@@ -70,10 +64,8 @@ export function useSelectedPasses({ tracker, epochRef, name }: Options): Selecte
       passesAheadFor(entry, atMs, observer, startSlicing())
         .then((ahead) => {
           if (dropped) return;
-          const coming = ahead.filter((pass) => !pass.started);
-          const next = coming[0] ?? null;
-          const sighting = coming.find(isSighting) ?? null;
-          setPasses(next === null && sighting === null ? NOTHING_AHEAD : { next, sighting });
+          const sighting = ahead.find((pass) => !pass.started && isSighting(pass)) ?? null;
+          setPasses(sighting === null ? NOTHING_AHEAD : { sighting });
           plannedAtMs = atMs;
           plannedFrom = observer;
         })
@@ -94,4 +86,4 @@ export function useSelectedPasses({ tracker, epochRef, name }: Options): Selecte
 }
 
 /** Nothing planned, shared, so an empty answer twice is not a change. */
-const NOTHING_AHEAD: SelectedPasses = { next: null, sighting: null };
+const NOTHING_AHEAD: SelectedPasses = { sighting: null };

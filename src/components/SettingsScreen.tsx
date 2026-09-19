@@ -320,8 +320,9 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingTop: 14,
-    // Clear of the tab bar, which is drawn over the foot of this sheet.
-    paddingBottom: 96
+    // The sheet itself stops at the tab bar (`SkyOverlay`), so this is only
+    // the room a list leaves under its last row.
+    paddingBottom: 24
   },
   title: {
     color: theme.color.textBright,

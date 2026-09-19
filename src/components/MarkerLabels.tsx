@@ -31,6 +31,10 @@ export const MarkerLabels: React.FC<Props> = ({ labels, rollDeg, palette }) => {
   // name carries a shadow the other way round from itself, and both flip with
   // the day. See `MarkerPalette.labelShadow`.
   const shadowColor = cssColor(palette.labelShadow);
+  // A line's name stands on a backing of that same shadow colour, thinned: it
+  // is written over open sky, and a shadow alone is not enough to hold two
+  // lines of small type over a bright cloud or a lit roof.
+  const chipColor = cssColor({ color: palette.labelShadow.color, alpha: PATH_CHIP_ALPHA });
   return (
     <>
       {labels.map((label) => (
@@ -43,9 +47,11 @@ export const MarkerLabels: React.FC<Props> = ({ labels, rollDeg, palette }) => {
           above={label.above}
           offsetY={label.offsetY}
           alpha={label.alpha}
+          path={label.path}
           rollDeg={rollDeg}
           color={palette.label}
           shadowColor={shadowColor}
+          chipColor={chipColor}
         />
       ))}
     </>
@@ -60,9 +66,11 @@ type LabelProps = {
   above: boolean;
   offsetY: number;
   alpha: number;
+  path: boolean;
   rollDeg: number;
   color: string;
   shadowColor: string;
+  chipColor: string;
 };
 
 const Label = React.memo(function Label({
@@ -73,9 +81,11 @@ const Label = React.memo(function Label({
   above,
   offsetY,
   alpha,
+  path,
   rollDeg,
   color,
-  shadowColor
+  shadowColor,
+  chipColor
 }: LabelProps) {
   return (
     <View
@@ -95,17 +105,19 @@ const Label = React.memo(function Label({
           above ? { bottom: LABEL_BOX_PX / 2 + offsetY } : { top: LABEL_BOX_PX / 2 + offsetY }
         ]}
       >
-        <Text
-          // Two, for a name written on a path: the object, and the clock time it
-          // is at that point of the line, which is a line each (`markerScene`). A
-          // marker's own name is one word and takes one of them — unless it is
-          // long enough not to fit the box, and `Einstein Probe` is, in which
-          // case wrapping it says more than cutting it did.
-          numberOfLines={2}
-          style={[styles.label, { color, textShadowColor: shadowColor }]}
-        >
-          {name}
-        </Text>
+        <View style={path ? [styles.chip, { backgroundColor: chipColor }] : undefined}>
+          <Text
+            // Two, for a name written on a path: the object, and the clock time
+            // it is at that point of the line, which is a line each
+            // (`markerScene`). A marker's own name is one word and takes one of
+            // them — unless it is long enough not to fit the box, and `Einstein
+            // Probe` is, in which case wrapping it says more than cutting it did.
+            numberOfLines={2}
+            style={[styles.label, path && styles.pathLabel, { color, textShadowColor: shadowColor }]}
+          >
+            {name}
+          </Text>
+        </View>
         {detail !== null && (
           <Text
             numberOfLines={1}
@@ -133,8 +145,10 @@ function unmoved(previous: LabelProps, next: LabelProps): boolean {
     previous.name === next.name &&
     previous.detail === next.detail &&
     previous.above === next.above &&
+    previous.path === next.path &&
     previous.color === next.color &&
     previous.shadowColor === next.shadowColor &&
+    previous.chipColor === next.chipColor &&
     within(previous.x, next.x, POSITION_EPSILON_PX) &&
     within(previous.y, next.y, POSITION_EPSILON_PX) &&
     within(previous.offsetY, next.offsetY, POSITION_EPSILON_PX) &&
@@ -152,6 +166,13 @@ const POSITION_EPSILON_PX = 0.25;
 const ANGLE_EPSILON_DEG = 0.25;
 /** The same, for a fade: a hundredth of the way through one. */
 const OPACITY_EPSILON = 0.01;
+
+/**
+ * How solid the backing under a line's name is. Enough to part the type from
+ * whatever the camera has behind it, not so much that it reads as a panel
+ * stuck on the sky.
+ */
+const PATH_CHIP_ALPHA = 0.55;
 
 const styles = StyleSheet.create({
   box: {
@@ -174,7 +195,26 @@ const styles = StyleSheet.create({
   block: {
     position: "absolute",
     left: 0,
-    right: 0
+    right: 0,
+    // Centred rather than stretched, so a line's backing is as wide as its
+    // name rather than as wide as the box.
+    alignItems: "center"
+  },
+  /** The backing a line's name stands on. See `PATH_CHIP_ALPHA`. */
+  chip: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6
+  },
+  /**
+   * A line's name: a size up and heavier than a mark's, because it is the one
+   * the sky has most to say with — whose line this is and when — and it has to
+   * outrank the marks' names around it rather than sit behind them.
+   */
+  pathLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.4
   },
   label: {
     textAlign: "center",

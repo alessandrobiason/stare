@@ -2,7 +2,7 @@ import { MutableRefObject, useEffect, useRef } from "react";
 import { focusedPassFor, SkyPass } from "../satellite/orbitPath";
 import { SkyTracker } from "../satellite/skyTracker";
 import { ObserverLocation, OrbitEpoch } from "../types";
-import { CHECK_INTERVAL_MS, stale } from "./useOrbitPaths";
+import { CHECK_INTERVAL_MS, pathPlanStale } from "./planFreshness";
 
 type Options = {
   tracker: SkyTracker;
@@ -15,13 +15,11 @@ type Options = {
 /**
  * The one satellite someone has tapped, as its own crossing of the sky.
  *
- * `useOrbitPaths` plans every landmark's next few hours at once, on a shared
- * timer, because that is what the passes panel needs. This plans one object's
- * current pass, on demand, because that is what a tap needs — and unlike the
- * landmark tier it does not care whether that tier is switched on, or whether
- * the object tapped is one of its landmarks: any category answers here, with
- * a wake that reaches back to the rise rather than the short one a landmark's
- * own path carries. See `focusedPassFor`.
+ * The passes panel's sightings are drawn on the sky as well
+ * (`useNakedEyePasses`), but only the ones that can be seen. This plans one
+ * object's current or next pass, on demand, because that is what a tap needs —
+ * whatever the object is and whatever the filter is drawing, with a wake that
+ * reaches back to the rise. See `focusedPassFor`.
  *
  * A ref, for the reason every other path in the loop is one: the frame loop
  * reads it sixty times a second and does not need React to tell it a new plan
@@ -44,7 +42,7 @@ export function useFocusedPath({ tracker, epochRef, name }: Options): MutableRef
     const plan = () => {
       const { time, observer } = epochRef.current;
       const atMs = time.getTime();
-      if (!stale(plannedAtMs, plannedFrom, atMs, observer)) return;
+      if (!pathPlanStale(plannedAtMs, plannedFrom, atMs, observer)) return;
 
       const entry = tracker.entryFor(name);
       pathRef.current = entry ? focusedPassFor(entry, atMs, observer) : null;

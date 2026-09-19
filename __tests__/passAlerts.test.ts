@@ -1,12 +1,12 @@
 import * as fs from "fs";
 import * as path from "path";
-import { PASS_ALERTS } from "../src/constants";
+import { LANDMARK_PATHS, PASS_ALERTS } from "../src/constants";
 import { parseTleCatalog } from "../src/data/tleCatalog";
 import { setLocaleForTesting } from "../src/i18n";
 import { scheduledAlertsFor } from "../src/notifications/alertQueue";
 import { SatelliteCatalog } from "../src/satellite/catalog";
 import { NakedEyeVerdict } from "../src/satellite/nakedEye";
-import { landmarkPasses, SkyPass } from "../src/satellite/orbitPath";
+import { passesOf, SkyPass } from "../src/satellite/orbitPath";
 import {
   alertsWorthSending,
   isQuietHour,
@@ -42,6 +42,24 @@ const EVENING = new Date(2026, 7, 29, 21, 0, 0).getTime();
  * own suite, and a fixture that has to be a real orbit cannot be moved one
  * degree at a time across the threshold it is testing.
  */
+/**
+ * Every pass the landmark tier makes in a window, as a plan of real sky to
+ * check the alert plan against: the station, the ferries docked to it and the
+ * observatories, whose passes are known well enough to reason about.
+ */
+function landmarkPasses(
+  catalog: SatelliteCatalog,
+  fromMs: number,
+  observer: ObserverLocation,
+  slices: ReturnType<typeof startSlicing>,
+  windowHours: number = LANDMARK_PATHS.windowHours
+): Promise<SkyPass[]> {
+  const landmarks = catalog.entries.filter((entry) => entry.category === "LANDMARK");
+  return passesOf(landmarks, fromMs, observer, slices, [
+    { fromMs, untilMs: fromMs + windowHours * 60 * MS_PER_MINUTE }
+  ]);
+}
+
 function pass(overrides: Partial<UpcomingPass> = {}): UpcomingPass {
   const startsAtMs = EVENING + 30 * MS_PER_MINUTE;
   return {

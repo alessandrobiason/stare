@@ -1,7 +1,11 @@
-import React, { MutableRefObject, useEffect, useState } from "react";
+import React, { MutableRefObject, useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   Image,
+  LayoutChangeEvent,
   Linking,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleProp,
@@ -11,14 +15,12 @@ import {
   View,
   ViewStyle
 } from "react-native";
-import { MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import { fill, strings } from "../i18n";
 import {
   kilometres,
   lookDirection,
   orbitPeriod,
   seeing,
-  seeingOnPass,
   sightingLine,
   speed
 } from "../i18n/format";
@@ -55,25 +57,12 @@ type Props = {
    */
   describeRef: MutableRefObject<(name: string) => SatelliteDetail | null>;
   /**
-   * The pass this object is about to make, when it has one still ahead of it.
-   *
-   * What it changes is the tense of one line. Everything `describeRef` returns
-   * is resolved at the instant it is read — the right answer for an object on
-   * the frame, and the wrong one for an object that is under the horizon until
-   * this evening, because "can it be seen" is a question about the sky at the
-   * moment it comes over rather than about the sky now. `null` for an object
-   * with no pass ahead in the next day, and for every scene that does not plan
-   * them. See `seeingOnPass`.
-   */
-  pass?: UpcomingPass | null;
-  /**
    * The next pass this object makes that can be seen with the naked eye, within
    * the next day, or `null` for none.
    *
-   * Its own line, under the seeing line: that one is about now (or about the
-   * very next pass, for an object under the floor), and whether the object is
-   * worth going outside for later is a different question with a different
-   * answer most of the time. See `sightingLine`.
+   * Its own line, under the seeing line: that one is about now, and whether the
+   * object is worth going outside for later is a different question with a
+   * different answer most of the time. See `sightingLine`.
    */
   sighting?: UpcomingPass | null;
   /** Where it sits: laid over the card's own, by the stack that arranges it. */
@@ -88,6 +77,29 @@ type Props = {
  * second is faster than the eye and costs one propagation of one satellite.
  */
 const SAMPLE_INTERVAL_MS = 500;
+
+/**
+ * How far down, in points, the card has to be dragged before letting go puts
+ * it away. Short of it, it slides back up to where it was.
+ *
+ * Further than the passes card's (`UpcomingPasses`), which only opens or
+ * shuts: this one is gone once it goes, and the tap that brought it back is a
+ * tap on a moving mark.
+ */
+const DISMISS_THRESHOLD = 56;
+/**
+ * A quick flick down puts it away whatever distance it covered: the release
+ * velocity, in points per millisecond, past which it does. The passes card's.
+ */
+const FLING_VELOCITY = 0.5;
+/**
+ * How far a finger has to move before the header takes the touch as a drag,
+ * in points — the passes card's, and for its reason: past it a press on the
+ * close button or a chip is a drag of the card rather than a tap on either.
+ */
+const DRAG_SLOP = 6;
+/** How long the card takes to slide back into place, or out of sight, in milliseconds. */
+const SLIDE_MS = 220;
 
 /**
  * What a tapped satellite is, at the bottom of the screen.
@@ -137,7 +149,6 @@ export const SatelliteCard: React.FC<Props> = ({
   onSelect,
   onClose,
   describeRef,
-  pass = null,
   sighting = null,
   style
 }) => {
@@ -174,98 +185,109 @@ export const SatelliteCard: React.FC<Props> = ({
     return () => clearInterval(handle);
   }, [describeRef, selected]);
 
+  const drag = useSwipeToDismiss(onClose);
+
   return (
-    <View style={[styles.sheet, { maxHeight }, style]} accessibilityLabel={t.card.details}>
-      {/* The same grip the passes card wears, because they are the same card:
-          the bottom of the sky view says one thing at a time, and this is what
-          it says while a satellite is selected. */}
-      <View style={styles.gripRow}>
-        <View style={styles.grip} />
-      </View>
-
-      {names.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.strip}
-          contentContainerStyle={styles.stripContent}
-        >
-          {names.map((name) => {
-            const on = name === selected;
-            return (
-              <Pressable
-                key={name}
-                // A tab, which is what this is: one panel of figures, and a
-                // strip of names deciding whose. The debug pages are built the
-                // same way, and it is the role that carries "selected".
-                accessibilityRole="tab"
-                // The `aria-` form rather than `accessibilityState`, which is
-                // what actually reaches the DOM under react-native-web — the
-                // category filter's `aria-expanded` is the same story.
-                aria-selected={on}
-                style={[styles.chip, on && styles.chipOn]}
-                onPress={() => onSelect(name)}
-              >
-                <Text numberOfLines={1} style={[styles.chipLabel, on && styles.chipLabelOn]}>
-                  {name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      <View style={styles.header}>
-        {/* The mark that was tapped, as the thing the name hangs off: a point,
-            or the ring the sky draws for an object parked over the equator, in
-            the colour the sky and the filter's list both draw its purpose in —
-            so the card is tied to the dot that was tapped rather than merely
-            being about it. */}
-        <View
-          style={[
-            styles.badge,
-            detail && {
-              borderColor: cssColor({ color: CATEGORY_COLORS[detail.category], alpha: 0.35 })
-            }
-          ]}
-        >
-          {detail && (
-            <View
-              style={[
-                styles.badgeMark,
-                detail.parked
-                  ? [styles.badgeRing, { borderColor: CATEGORY_COLORS[detail.category] }]
-                  : {
-                      backgroundColor: CATEGORY_COLORS[detail.category],
-                      borderColor: cssColor({
-                        color: CATEGORY_COLORS[detail.category],
-                        alpha: 0.3
-                      })
-                    }
-              ]}
-            />
-          )}
+    <Animated.View
+      style={[styles.sheet, { maxHeight }, style, drag.style]}
+      accessibilityLabel={t.card.details}
+      onLayout={drag.onLayout}
+    >
+      {/* The top of the card is its handle, as the passes card's is: the same
+          grip, because they are the same card — the bottom of the sky view
+          says one thing at a time — and the same gesture on it. A drag down
+          anywhere across the grip, the names and the heading follows the
+          finger and, let go far enough or fast enough, puts the card away
+          the way the close button does. The body below keeps its own scroll. */}
+      <View {...drag.panHandlers}>
+        <View style={styles.gripRow}>
+          <View style={styles.grip} />
         </View>
 
-        <View style={styles.heading}>
-          <Text numberOfLines={1} style={styles.name}>
-            {selected}
-          </Text>
-          {detail && (
-            <Text numberOfLines={1} style={styles.purposeLabel}>
-              {purposeLabel(detail)}
+        {names.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.strip}
+            contentContainerStyle={styles.stripContent}
+          >
+            {names.map((name) => {
+              const on = name === selected;
+              return (
+                <Pressable
+                  key={name}
+                  // A tab, which is what this is: one panel of figures, and a
+                  // strip of names deciding whose. The debug pages are built the
+                  // same way, and it is the role that carries "selected".
+                  accessibilityRole="tab"
+                  // The `aria-` form rather than `accessibilityState`, which is
+                  // what actually reaches the DOM under react-native-web — the
+                  // category filter's `aria-expanded` is the same story.
+                  aria-selected={on}
+                  style={[styles.chip, on && styles.chipOn]}
+                  onPress={() => onSelect(name)}
+                >
+                  <Text numberOfLines={1} style={[styles.chipLabel, on && styles.chipLabelOn]}>
+                    {name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        <View style={styles.header}>
+          {/* The mark that was tapped, as the thing the name hangs off: a point,
+              or the ring the sky draws for an object parked over the equator, in
+              the colour the sky and the filter's list both draw its purpose in —
+              so the card is tied to the dot that was tapped rather than merely
+              being about it. */}
+          <View
+            style={[
+              styles.badge,
+              detail && {
+                borderColor: cssColor({ color: CATEGORY_COLORS[detail.category], alpha: 0.35 })
+              }
+            ]}
+          >
+            {detail && (
+              <View
+                style={[
+                  styles.badgeMark,
+                  detail.parked
+                    ? [styles.badgeRing, { borderColor: CATEGORY_COLORS[detail.category] }]
+                    : {
+                        backgroundColor: CATEGORY_COLORS[detail.category],
+                        borderColor: cssColor({
+                          color: CATEGORY_COLORS[detail.category],
+                          alpha: 0.3
+                        })
+                      }
+                ]}
+              />
+            )}
+          </View>
+
+          <View style={styles.heading}>
+            <Text numberOfLines={1} style={styles.name}>
+              {selected}
             </Text>
-          )}
-        </View>
+            {detail && (
+              <Text numberOfLines={1} style={styles.purposeLabel}>
+                {purposeLabel(detail)}
+              </Text>
+            )}
+          </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t.card.close}
-          style={styles.close}
-          onPress={onClose}
-        >
-          <Icon name="close" size={14} color={theme.color.textDim} />
-        </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t.card.close}
+            style={styles.close}
+            onPress={onClose}
+          >
+            <Icon name="close" size={14} color={theme.color.textDim} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Under the name, and scrolling: the picture and the paragraph are the
@@ -284,26 +306,31 @@ export const SatelliteCard: React.FC<Props> = ({
           </View>
         )}
 
-      {/* Between what the thing is and where it is, because that is the order
-          somebody who has just tapped a mark asks in: what is that, can I see
-          it, where do I look.
+        {/* Ruled off above rather than below: what follows belongs with the
+            figures, which are the other things true of this object at this
+            instant, and what it is being separated from is the paragraph
+            about what the object is — which is true whatever the sky is
+            doing. */}
+        <View style={styles.rule} />
 
-          In the future tense for an object that has not risen yet: the figures
-          under this line are all about where it is now, and this one alone is
-          about a sky three hours from now, so it names the clock time it
-          answers for. See `seeingOnPass`. */}
-        {detail && (
-          <Text style={styles.seeing}>
-            {answersForPass(detail, pass) ? seeingOnPass(pass) : seeing(detail)}
-          </Text>
+        {/* Between what the thing is and where it is, because that is the order
+            somebody who has just tapped a mark asks in: what is that, can I see
+            it, where do I look — about now, like every figure under it.
+
+            Nothing at all by day. That the sun rules out the whole sky is true
+            of every object on it at once, and a line saying so on every card
+            tells nobody anything they did not know by looking up. */}
+        {detail && showsSeeing(detail) && (
+          <Text style={styles.seeing}>{seeing(detail)}</Text>
         )}
 
         {/* And whether it is worth going out for later: the next pass that can
             be seen without help, in the accent a sighting has in the passes
-            panel. Left off when the line above is already about that same
-            pass, which would be saying it twice. */}
-        {detail && sighting && !(answersForPass(detail, pass) && pass.peakAtMs === sighting.peakAtMs) && (
-          <Text style={styles.sighting}>{sightingLine(sighting)}</Text>
+            panel. */}
+        {detail && sighting && (
+          <Text style={[styles.sighting, !showsSeeing(detail) && styles.lineFirst]}>
+            {sightingLine(sighting)}
+          </Text>
         )}
 
         {detail ? (
@@ -321,9 +348,85 @@ export const SatelliteCard: React.FC<Props> = ({
           <Text style={styles.missing}>{t.card.missing}</Text>
         )}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 };
+
+/**
+ * The card's own slide: dragged down by its header, and either put away or
+ * sprung back when the finger lets go.
+ *
+ * The passes card's gesture (`PassesPanel`), with one end instead of two. It is
+ * claimed in the capture phase and only for a move that is mostly vertical,
+ * so a tap on the close button or on a chip still lands on it, and a sideways
+ * swipe along the chips still scrolls them. The card follows the finger down,
+ * and a little way against it going up — a sheet that will not move at all
+ * reads as a sheet that is stuck.
+ *
+ * Put away by sliding out past its own foot and only then closing, rather than
+ * closing on release: the card is taken off the screen by its owner
+ * (`onClose`), and doing that mid-drag drops it from under the finger.
+ */
+function useSwipeToDismiss(onClose: () => void) {
+  const offset = useRef(new Animated.Value(0)).current;
+  const heightRef = useRef(0);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_evt, gesture) =>
+        Math.abs(gesture.dy) > DRAG_SLOP && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderGrant: () => offset.stopAnimation(),
+      onPanResponderMove: (_evt, gesture) => {
+        offset.setValue(gesture.dy >= 0 ? gesture.dy : gesture.dy / 4);
+      },
+      onPanResponderRelease: (_evt, gesture) => {
+        if (gesture.vy > FLING_VELOCITY || gesture.dy > DISMISS_THRESHOLD) {
+          Animated.timing(offset, {
+            // Past its own height, so it is off the bottom of the stack
+            // rather than resting on the tab bar when it is taken away.
+            toValue: Math.max(heightRef.current, DISMISS_THRESHOLD) + 24,
+            duration: SLIDE_MS,
+            easing: Easing.in(Easing.cubic),
+            useNativeDriver: false
+          }).start(({ finished }) => {
+            if (finished) onCloseRef.current();
+          });
+        } else {
+          springBack();
+        }
+      },
+      onPanResponderTerminate: () => springBack()
+    })
+  ).current;
+
+  function springBack() {
+    Animated.timing(offset, {
+      toValue: 0,
+      duration: SLIDE_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false
+    }).start();
+  }
+
+  return {
+    panHandlers: panResponder.panHandlers,
+    onLayout: ({ nativeEvent }: LayoutChangeEvent) => {
+      heightRef.current = nativeEvent.layout.height;
+    },
+    style: {
+      transform: [{ translateY: offset }],
+      // Fading as it goes, so the last of it leaving is not a hard edge
+      // sliding under the tab bar.
+      opacity: offset.interpolate({
+        inputRange: [0, 240],
+        outputRange: [1, 0.35],
+        extrapolate: "clamp"
+      })
+    }
+  };
+}
 
 /**
  * The picture of the thing, with the credit that comes with using it.
@@ -441,25 +544,13 @@ const Fact: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 );
 
 /**
- * Whether the seeing line is about the pass ahead rather than about now.
+ * Whether the card says whether this object can be seen now.
  *
- * Two things have to be true, and the second is not implied by the first. There
- * has to be a pass to talk about — and the object has to be somewhere nobody
- * can look at it yet, which is what makes the present tense the wrong answer.
- *
- * An object can have both: the plan carries a landmark's *next* pass even while
- * it is crossing the sky, so a station on the frame with another turn of the
- * orbit ahead of it would otherwise be described by the pass in ninety minutes
- * while its own mark sits on the picture. The elevation decides it, and it is
- * re-read on this card's own timer -- so a card left open through a rise stops
- * talking about the evening at the moment the object clears the floor and the
- * marker appears, rather than at the next replan a minute later.
+ * Every verdict but one: by day the answer is the same for everything overhead,
+ * and the sun in the sky has already given it. See the seeing line.
  */
-function answersForPass(
-  detail: SatelliteDetail,
-  pass: UpcomingPass | null
-): pass is UpcomingPass {
-  return pass !== null && detail.elevationDeg <= MINIMUM_SATELLITE_ELEVATION_DEG;
+function showsSeeing(detail: SatelliteDetail): boolean {
+  return detail.nakedEye !== "daylight";
 }
 
 const BADGE_SIZE = 38;
@@ -650,16 +741,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.3
   },
-  seeing: {
+  rule: {
     marginHorizontal: 14,
     marginTop: 10,
-    paddingTop: 9,
-    // Ruled off above rather than below: what it belongs with is the figures
-    // under it, which are the other things true of this object at this instant,
-    // and what it is being separated from is the paragraph about what the
-    // object is — which is true whatever the sky is doing.
-    borderTopWidth: StyleSheet.hairlineWidth * 2,
-    borderTopColor: theme.color.divider,
+    height: StyleSheet.hairlineWidth * 2,
+    backgroundColor: theme.color.divider
+  },
+  seeing: {
+    marginHorizontal: 14,
+    marginTop: 9,
     color: theme.color.textBright,
     fontSize: 12.5,
     fontWeight: "600",
@@ -672,6 +762,10 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "600",
     lineHeight: 18
+  },
+  /** The sighting line with no seeing line above it, spaced off the rule instead. */
+  lineFirst: {
+    marginTop: 9
   },
   facts: {
     paddingHorizontal: 14,

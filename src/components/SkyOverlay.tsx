@@ -324,6 +324,12 @@ export const SkyOverlay: React.FC<Props> = ({
   const [sky, setSky] = useState<SkySummary>(NO_SKY);
   const [available, setAvailable] = useState<FrameSize | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
+  /**
+   * How much of the safe area the tab bar takes, which is where the catalog
+   * and settings sheets stop. Measured rather than assumed: the bar's height
+   * is its labels', and those follow the reader's text size.
+   */
+  const [tabBarHeight, setTabBarHeight] = useState(TAB_BAR_ESTIMATE);
   const onLayout = useCallback(
     ({ nativeEvent }: LayoutChangeEvent) => setAvailable(nativeEvent.layout),
     []
@@ -448,9 +454,9 @@ export const SkyOverlay: React.FC<Props> = ({
     selectedName: selection?.selected ?? null
   });
 
-  // The tapped satellite's day ahead, for its card: the next pass it makes, for
-  // the tense of the seeing line, and the next one that can be seen at all.
-  // Against the epoch on screen, like everything else the card says.
+  // The tapped satellite's day ahead, for its card: the next pass that can be
+  // seen at all. Against the epoch on screen, like everything else the card
+  // says.
   const selectedPasses = useSelectedPasses({
     tracker,
     epochRef: drawnEpochRef,
@@ -495,7 +501,7 @@ export const SkyOverlay: React.FC<Props> = ({
 
   /**
    * What a tap on the picture means: the satellites under the finger — marks,
-   * and the names written along the landmarks' paths — or nothing at all.
+   * and the names written along the paths across the sky — or nothing at all.
    *
    * The frame is read from a ref rather than subscribed to, so this view still
    * renders only when something it draws changes rather than sixty times a
@@ -683,20 +689,26 @@ export const SkyOverlay: React.FC<Props> = ({
 
           {/* The other two tabs are sheets over the camera rather than screens
               the app has navigated to: the view underneath keeps running, and
-              coming back is one tap onto a sky that never stopped. */}
-          {tab === "catalog" && (
-            <CatalogScreen
-              catalog={catalog}
-              epochRef={epochRef}
-              onSelect={selectFromCatalog}
-            />
-          )}
-          {tab === "settings" && (
-            <SettingsScreen
-              onOpenGuide={onOpenGuide}
-              onOpenConsole={onOpenConsole}
-              warned={warned}
-            />
+              coming back is one tap onto a sky that never stopped. They stop
+              at the tab bar rather than running on under it: the bar is glass,
+              and a list scrolling behind it put its rows through the tabs. */}
+          {tab !== "sky" && (
+            <View style={[styles.sheet, { bottom: tabBarHeight }]}>
+              {tab === "catalog" && (
+                <CatalogScreen
+                  catalog={catalog}
+                  epochRef={epochRef}
+                  onSelect={selectFromCatalog}
+                />
+              )}
+              {tab === "settings" && (
+                <SettingsScreen
+                  onOpenGuide={onOpenGuide}
+                  onOpenConsole={onOpenConsole}
+                  warned={warned}
+                />
+              )}
+            </View>
           )}
 
           {/* The bottom of the screen, as one column rather than four things each
@@ -731,7 +743,6 @@ export const SkyOverlay: React.FC<Props> = ({
                     onSelect={(name) => setSelection({ names: selection.names, selected: name })}
                     onClose={() => setSelection(null)}
                     describeRef={describeRef}
-                    pass={selectedPasses.next}
                     sighting={selectedPasses.sighting}
                   />
                 )}
@@ -755,7 +766,12 @@ export const SkyOverlay: React.FC<Props> = ({
               </>
             )}
 
-            <TabBar tab={tab} onSelect={onSelectTab} warned={warned} />
+            <TabBar
+              tab={tab}
+              onSelect={onSelectTab}
+              warned={warned}
+              onHeightChange={setTabBarHeight}
+            />
           </View>
         </SafeAreaLayer>
 
@@ -765,6 +781,12 @@ export const SkyOverlay: React.FC<Props> = ({
     </TourTargetsProvider>
   );
 };
+
+/**
+ * What the tab bar is taken to measure before it has been laid out, in points:
+ * its padding, a glyph and a label. Replaced on the first layout.
+ */
+const TAB_BAR_ESTIMATE = 66;
 
 /** One line saying what the sky mask is doing, for the scenes' status panels. */
 function describeMask(anchored: AnchoredSkyMask | null, error: string | null): string {
@@ -805,6 +827,13 @@ const styles = StyleSheet.create({
     width: 0,
     height: 0,
     overflow: "hidden"
+  },
+  /** Where the catalog and settings sheets are laid: the safe area, down to the tab bar. */
+  sheet: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0
   },
   /**
    * The bottom of the screen: a notice, the compass, one card and the tab bar,

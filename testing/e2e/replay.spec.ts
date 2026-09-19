@@ -16,7 +16,7 @@ const BOOTED = '[aria-label$="visible satellites"]';
 const SETTINGS_TAB = '[role="tab"][aria-label="Settings"]';
 const CATALOG_TAB = '[role="tab"][aria-label="Catalog"]';
 const SKY_TAB = '[role="tab"][aria-label="Sky"]';
-const CONSOLE_ROW = '[aria-label="CONSOLE"]';
+const CONSOLE_ROW = '[aria-label="Console"]';
 const PASSES = '[aria-label="Upcoming passes"]';
 const CARD = '[aria-label="Satellite details"]';
 const FILTER = '[aria-label="Category filter"]';
@@ -315,7 +315,7 @@ test.describe("what is coming", () => {
   test("a row opens the card the object's own mark would", async ({ page }) => {
     await page.goto("/");
     await page.locator(BOOTED).first().waitFor({ timeout: 300000 });
-    // The plan is made on the first pass of `useOrbitPaths`, a moment after
+    // The plan is made on the first pass of `useNakedEyePasses`, a moment after
     // the scene opens rather than with it.
     await page.locator(PASSES).waitFor({ timeout: 300000 });
 

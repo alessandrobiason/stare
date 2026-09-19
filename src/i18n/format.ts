@@ -173,50 +173,16 @@ export function seeing(look: {
 }
 
 /**
- * The same question about a pass that has not begun: not whether it can be seen
- * now, but whether it can be seen *when it comes over*.
- *
- * The one the card was getting wrong. Everything `SkyTracker.describe` returns
- * is resolved at the current instant, which is the right tense for an object
- * that is on the frame and the wrong one for an object that is under the floor
- * for another three hours — and the sun moves further in those three hours than
- * anything else in the answer. A card opened from the upcoming-passes list at
- * two in the afternoon was saying "the sun is still up here" about a pass at
- * half past nine in the evening, which is true of the moment it was asked and
- * false of the thing it was asked about.
- *
- * Nothing is recomputed here. `upcomingPasses` already decides each pass at its
- * own high point, which is where the verdict is honest and the moment worth
- * being outside for; this only says it in the card's own words, with the clock
- * time that makes the tense unambiguous. That time is the high point rather
- * than the rise for the same reason — it is the instant the verdict belongs to,
- * and "comes over" is what an object at its highest is doing.
- */
-export function seeingOnPass(pass: {
-  nakedEye: NakedEyeVerdict;
-  apparentMagnitude: number | null;
-  magnitudeMeasured: boolean;
-  peakAtMs: number;
-}): string {
-  return fill(strings().card.seeing.onPass, {
-    time: clockTime(new Date(pass.peakAtMs)),
-    // The list's own short verdict rather than the card's sentence: the card's
-    // are present tense ("Bright enough to see now"), and a present-tense
-    // sentence inside a clause about half past nine is the bug this fixes.
-    verdict: withMagnitude(passSeeing(pass.nakedEye), pass)
-  });
-}
-
-/**
  * When this object can next be seen with the naked eye, in one line: the clock
  * time it is highest, where to stand, and how bright it will be.
  *
  * The card's answer to "is it worth going outside for", which is a different
  * question from the seeing line's "can I see it now" — so it is said beside
- * that line rather than instead of it. The time is the high point, for the
- * reason `seeingOnPass` gives: it is the instant the verdict belongs to. No
- * countdown: the card is about the object rather than about the clock, and the
- * passes panel is where the waiting is counted.
+ * that line rather than instead of it. The time is the high point, because
+ * that is the instant the verdict is decided at (`upcomingPasses`) and the
+ * moment worth being outside for. No countdown: the card is about the object
+ * rather than about the clock, and the passes panel is where the waiting is
+ * counted.
  */
 export function sightingLine(pass: {
   nakedEye: NakedEyeVerdict;

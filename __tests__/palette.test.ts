@@ -174,7 +174,7 @@ describe("the marks themselves", () => {
     expect(closestPair(CATEGORY_COLORS)).toBeGreaterThan(0.135);
   });
 
-  test("keep every category clear of the Starlinks' lavender, which is most of any sky", () => {
+  test("keep every category clear of the Starlinks' colour, which is most of any sky", () => {
     // Half the catalogue is one constellation, so the colour the eye has to
     // pick the rest out of is the internet category's, and each of the others
     // is held further from it than the pairs are from each other.

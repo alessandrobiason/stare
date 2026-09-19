@@ -44,7 +44,7 @@ export const it: Strings = {
       },
       landmark: {
         name: "Con nome",
-        meaning: "Stazioni spaziali e grandi telescopi. La linea tratteggiata indica dove passeranno."
+        meaning: "Stazioni spaziali e grandi telescopi."
       }
     },
     count: {
@@ -61,7 +61,7 @@ export const it: Strings = {
     },
     passes: {
       title: "In arrivo",
-      body: "Cosa potrai vedere a occhio nudo sopra di te. Tocca per vedere il prossimo giorno."
+      body: "Cosa vedrai a occhio nudo: la linea tratteggiata mostra dove passerà. Tocca per la lista."
     },
     catalog: {
       title: "Catalogo",
@@ -157,8 +157,7 @@ export const it: Strings = {
       daylight: "Non visible (è giorno)",
       unknown: "La sua luminosità non è registrata",
       magnitude: "magnitudine {value}",
-      aboutMagnitude: "circa magnitudine {value}",
-      onPass: "Quando passerà, alle {time}: {verdict}"
+      aboutMagnitude: "circa magnitudine {value}"
     },
     sighting: "Visibile a occhio nudo alle {time}",
     facts: {

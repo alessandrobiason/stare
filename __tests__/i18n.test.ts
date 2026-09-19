@@ -11,7 +11,6 @@ import {
   passDirection,
   passSeeing,
   seeing,
-  seeingOnPass,
   speed,
   sunlightSummary,
   timeUntil
@@ -302,27 +301,6 @@ describe("and says it in the space it is given", () => {
     }
   });
 
-  test.each(LOCALES)("%s fits the pass line on the card", (locale) => {
-    setLocaleForTesting(locale);
-    // The same column the card's own seeing line keeps, and the same bound: it
-    // is prose over a photograph, so what is checked is that it wraps to two
-    // lines rather than that it fits on one. This one is the longer of the two
-    // shapes — a clause, a clock time, a verdict and a magnitude.
-    const CARD_COLUMN = 375 - 12 * 2 - 14 * 2;
-    for (const verdict of ["visible", "binoculars", "tooFaint"] as const) {
-      const line = seeingOnPass({
-        nakedEye: verdict,
-        apparentMagnitude: -2.24,
-        magnitudeMeasured: false,
-        peakAtMs: Date.UTC(2026, 7, 29, 19, 31, 0)
-      });
-      // Three lines rather than two: this is the longer of the card's two
-      // shapes — a clause, a clock time, a verdict and a magnitude — and in
-      // Russian it runs past two lines of a card set 12.5 points.
-      expect(width(line, 12.5)).toBeLessThan(3 * CARD_COLUMN);
-    }
-  });
-
   test.each(LOCALES)("%s fits the seeing line on the card", (locale) => {
     // The verdict and, where there is one, the magnitude after it. The card is
     // inset 12 either side by the stack that lays it out, and this line keeps
@@ -407,12 +385,12 @@ describe("the figures follow the reader's conventions", () => {
     // the thing the answer rests on.
     expect(
       seeing({ nakedEye: "visible", apparentMagnitude: -1.83, magnitudeMeasured: true })
-    ).toBe("Bright enough to see now · magnitude -1.8");
+    ).toBe("Visible to the eye · magnitude -1.8");
     // Hedged where the standard magnitude behind it is an estimate rather than
     // an observation. See `standardMagnitude.ts`.
     expect(
       seeing({ nakedEye: "binoculars", apparentMagnitude: 5.24, magnitudeMeasured: false })
-    ).toBe("In sunlight, but you would want binoculars · around magnitude 5.2");
+    ).toBe("Visible with binoculars · around magnitude 5.2");
   });
 
   test("and no figure is offered where the answer does not rest on one", () => {
@@ -426,13 +404,13 @@ describe("the figures follow the reader's conventions", () => {
         apparentMagnitude: Number.POSITIVE_INFINITY,
         magnitudeMeasured: true
       })
-    ).toBe("In the Earth's shadow, with no light to reflect");
+    ).toBe("Not visible (in the Earth's shadow)");
     expect(
       seeing({ nakedEye: "daylight", apparentMagnitude: -1.8, magnitudeMeasured: true })
-    ).toBe("The sun is still up here — nothing in orbit can be seen yet");
+    ).toBe("Not visible (daylight)");
     expect(
       seeing({ nakedEye: "unknown", apparentMagnitude: null, magnitudeMeasured: false })
-    ).toBe("In sunlight, though how brightly it shines is not recorded");
+    ).toBe("Brightness not recorded");
   });
 
   test("how long there is, in the units someone would wait in", () => {
@@ -474,88 +452,11 @@ describe("the figures follow the reader's conventions", () => {
     // under a name and a countdown — and no magnitude, because a figure is
     // worth showing where there is room for what it supports.
     expect(passSeeing("visible")).toBe("visible to the eye");
-    expect(passSeeing("eclipsed")).toBe("in the Earth's shadow");
-    expect(passSeeing("daylight")).toBe("daylight — nothing to see");
+    expect(passSeeing("eclipsed")).toBe("not visible (in the Earth's shadow)");
+    expect(passSeeing("daylight")).toBe("not visible (daylight)");
     for (const verdict of ["visible", "binoculars", "tooFaint"] as const) {
       expect(passSeeing(verdict)).not.toMatch(/magnitude/i);
     }
-  });
-
-  test("a pass that has not begun is answered in the future tense", () => {
-    setLocaleForTesting("en");
-    // The bug this exists for: the card resolved everything at the instant it
-    // was drawn, so a pass at half past nine in the evening was answered with
-    // the sky at two in the afternoon — "the sun is still up here", about an
-    // object that would be crossing a dark sky.
-    const evening = Date.UTC(2026, 7, 29, 19, 31, 0);
-    const line = seeingOnPass({
-      nakedEye: "visible",
-      apparentMagnitude: -2.2,
-      magnitudeMeasured: true,
-      peakAtMs: evening
-    });
-
-    // The clock time is what makes the tense readable rather than merely
-    // correct: it says which sky is being talked about.
-    expect(line).toMatch(/^When it comes over at \d{1,2}:31/);
-    expect(line).toContain("visible to the eye");
-    expect(line).toContain("magnitude -2.2");
-    // And none of the card's own present-tense sentences, which are what was
-    // wrong with the line before.
-    expect(line).not.toContain("now");
-    expect(line).not.toContain("still up here");
-  });
-
-  test("and carries a figure only where the answer rests on one", () => {
-    setLocaleForTesting("en");
-    const atMs = Date.UTC(2026, 7, 29, 19, 31, 0);
-    // In the Earth's shadow it is reflecting nothing, so the magnitude runs off
-    // to infinity and there is no figure to print — as on the card's own line.
-    const eclipsed = seeingOnPass({
-      nakedEye: "eclipsed",
-      apparentMagnitude: Number.POSITIVE_INFINITY,
-      magnitudeMeasured: true,
-      peakAtMs: atMs
-    });
-    expect(eclipsed).toContain("in the Earth's shadow");
-    expect(eclipsed).not.toMatch(/magnitude/i);
-
-    // A pass that is still in daylight when it comes over says so, which is the
-    // other half of the fix: the answer can be "no" for the pass's own sky.
-    const daylight = seeingOnPass({
-      nakedEye: "daylight",
-      apparentMagnitude: -1.8,
-      magnitudeMeasured: true,
-      peakAtMs: atMs
-    });
-    expect(daylight).toContain("daylight — nothing to see");
-    expect(daylight).not.toMatch(/magnitude/i);
-
-    // Hedged where the brightness is an estimate rather than an observation.
-    expect(
-      seeingOnPass({
-        nakedEye: "binoculars",
-        apparentMagnitude: 5.24,
-        magnitudeMeasured: false,
-        peakAtMs: atMs
-      })
-    ).toContain("around magnitude 5.2");
-  });
-
-  test("the pass line follows the reader's clock and conventions", () => {
-    const atMs = Date.UTC(2026, 7, 29, 19, 31, 0);
-    const pass = {
-      nakedEye: "visible",
-      apparentMagnitude: -2.24,
-      magnitudeMeasured: true,
-      peakAtMs: atMs
-    } as const;
-
-    setLocaleForTesting("it");
-    // A 24-hour clock, a comma for the decimal, and the Italian short verdict.
-    expect(seeingOnPass(pass)).toContain("Quando passerà");
-    expect(seeingOnPass(pass)).toContain("visibile a occhio nudo");
-    expect(seeingOnPass(pass)).toContain("magnitudine -2,2");
   });
 
   test("the panel says what the count cannot", () => {

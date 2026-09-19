@@ -6,7 +6,7 @@ import { ObserverLocation } from "../types";
  * exact enough over anything short of a large fraction of the Earth's radius,
  * which is far past what anything comparing against it needs: a walk across a
  * room (`skyMemory.ts`), a few hundred metres of drift before a drawn path is
- * replanned (`useOrbitPaths.ts`), or the tens of kilometres that say somebody
+ * replanned (`planFreshness.ts`), or the tens of kilometres that say somebody
  * has gone somewhere else entirely (`usePassAlerts.ts`).
  *
  * Not a great-circle distance, and deliberately not one: the callers above are

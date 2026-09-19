@@ -7,8 +7,8 @@ import {
   GlyphShape,
   shortName,
   TAIL_DASH,
-  TAIL_FADE,
-  TRAIL_OUTLINE_RATIO
+  EDGE_WEIGHT,
+  TAIL_FADE
 } from "../src/components/markerScene";
 import { DAYLIGHT_PALETTE, MARK_EDGE, NIGHT_PALETTE } from "../src/components/palette";
 import { SatelliteMarkers } from "../src/components/SatelliteMarkers.web";
@@ -303,14 +303,20 @@ describe("a moving mark", () => {
   test("has a fine edge, but never so fine it breaks up", () => {
     // By day the edge is most of what separates a pale mark from a bright sky.
     // Fine, so it reads as the mark's own shading rather than an outline drawn
-    // round it — a tenth of the point — and never under nine tenths of a layout
-    // pixel, which on a phone is still two or three real ones.
+    // round it — a tenth of the point, lightened by `EDGE_WEIGHT` — and never
+    // under that share of nine tenths of a layout pixel, which on a phone is
+    // still a pixel or more.
     for (const rangeKm of [400, 40000]) {
       const small = { width: 360, height: 640 };
       const [glyph] = scene([marker({ rangeKm, trail: null })], 0, small).glyphs;
-      expect(glyph.rim.radius - glyph.core.radius).toBeCloseTo(Math.max(0.9, glyph.core.radius * 2 * 0.1), 9);
+      expect(glyph.rim.radius - glyph.core.radius).toBeCloseTo(
+        Math.max(0.9, glyph.core.radius * 2 * 0.1) * EDGE_WEIGHT,
+        9
+      );
       expect(glyph.rim.radius - glyph.core.radius).toBeLessThan(glyph.core.radius);
     }
+    // Under half the full edge: the point is drawn as light as its tail.
+    expect(EDGE_WEIGHT).toBeLessThan(0.5);
   });
 
   test("edges its tail as well, a little wider on every side", () => {
@@ -318,9 +324,10 @@ describe("a moving mark", () => {
     // part of a mark that says which way the object is going.
     const [glyph] = scene([marker()]).glyphs;
     expect(glyph.tail!.rim).toBeGreaterThan(0);
-    // Under the mark's own rim by TRAIL_OUTLINE_RATIO, or a full-strength
-    // outline reads as a dark stripe down the tail rather than a fine edge.
-    expect(glyph.tail!.rim).toBeCloseTo((glyph.rim.radius - glyph.core.radius) * TRAIL_OUTLINE_RATIO, 6);
+    // The same weight of edge as the point's own: one mark, one edge — both
+    // lightened (`EDGE_WEIGHT`), since a full-strength outline reads as a dark
+    // stripe down a tail and a dark ring round a point.
+    expect(glyph.tail!.rim).toBeCloseTo(glyph.rim.radius - glyph.core.radius, 6);
   });
 
   test("is light rather than a disc at night: no edge, and a bloom around its glow", () => {
@@ -671,7 +678,7 @@ describe("the ring around a tapped satellite", () => {
   });
 });
 
-describe("a landmark's path across the sky", () => {
+describe("a path across the sky", () => {
   /** A name written on the line, and when its object is at that point. */
   const anchorAt = (left: number, top: number, atMs = Date.UTC(2026, 7, 29, 20, 37, 0)) => ({
     at: { left, top },
@@ -883,6 +890,38 @@ describe("a landmark's path across the sky", () => {
     // without this the line is an anonymous streak across the sky.
     const { labels } = scene([], 0, FRAME, [path({ anchor: anchorAt(30, 70) })]);
     expect(labels.map((label) => label.name.split("\n")[0])).toEqual(["ISS"]);
+  });
+
+  test("outranks a mark's name where the two collide", () => {
+    // A line is a pass somebody could go out and see, and its name and time are
+    // what make it one; a mark's name over the same piece of sky gives way.
+    const other = marker({ name: "Hubble", category: "LANDMARK", point: { left: 30, top: 70 } });
+    const { labels } = scene([other], 0, FRAME, [path({ anchor: anchorAt(30, 70) })]);
+
+    expect(labels.map((label) => label.name.split("\n")[0])).toEqual(["ISS"]);
+    expect(labels[0].path).toBe(true);
+  });
+
+  test("is written solid, however faint the line under it", () => {
+    // The line fades with how far off its pass is; the words saying whose it is
+    // and when do not, or a pass tomorrow morning is a name nobody can read.
+    const far = path({ anchor: anchorAt(30, 70), lead: 1 });
+    const [label] = scene([], 0, FRAME, [far]).labels;
+    expect(label.alpha).toBe(1);
+  });
+
+  test("stands on a backing of its own, where a mark's name does not", () => {
+    const landmark = marker({ name: "Hubble", category: "LANDMARK", point: { left: 70, top: 20 } });
+    const built = scene([landmark], 0, FRAME, [path({ anchor: anchorAt(30, 70) })]);
+    const markup = (labels: typeof built.labels) =>
+      renderToStaticMarkup(
+        <MarkerLabels labels={labels} rollDeg={0} palette={NIGHT_PALETTE} />
+      );
+
+    const arcOnly = markup(built.labels.filter((label) => label.path));
+    const markOnly = markup(built.labels.filter((label) => !label.path));
+    expect(arcOnly).toMatch(/background-color/);
+    expect(markOnly).not.toMatch(/background-color/);
   });
 
   test("keys an arc's name apart from a marker's", () => {

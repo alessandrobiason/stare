@@ -1,4 +1,4 @@
-import { FOCUSED_TRAJECTORY, LANDMARK_PATHS, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
+import { FULL_TRAJECTORY, LANDMARK_PATHS, MINIMUM_SATELLITE_ELEVATION_DEG } from "../constants";
 import {
   createObserverFrame,
   eciToEnuInFrame,
@@ -9,17 +9,18 @@ import {
 import { clamp, toDegrees } from "../math/angles";
 import { runSliced, runToEnd, SlicedJob, Slices } from "../timeSlice";
 import { EnuPosition, ObserverLocation } from "../types";
-import { CatalogEntry, SatelliteCatalog } from "./catalog";
-import { SatelliteCategory } from "./categories";
+import { CatalogEntry } from "./catalog";
+import { SatelliteCategory, SatelliteSubcategory } from "./categories";
 import { propagateAt, SatRec } from "./propagator";
 
 /**
- * Where a landmark will cross the sky, between now and a few hours from now.
+ * Where an object will cross the sky: the passes somebody could go outside and
+ * see, and the one object someone has tapped.
  *
  * The overlay's other three answers about an object are all about the instant
  * it is drawn at: a mark for where it is, a size for how far away, a tail for
  * the twelve seconds behind it. That is the right amount to say about sixteen
- * thousand satellites and much too little to say about the dozen worth going
+ * thousand satellites and much too little to say about the few worth going
  * outside for, because the question someone has about the station is not where
  * it is — it is under the floor, and no marker can be drawn for that — but
  * *when* it comes over and *where* to stand when it does.
@@ -67,6 +68,8 @@ export type SkyPass = {
   /** Its catalogue number, which is what identifies it between plans. */
   noradId: number;
   category: SatelliteCategory;
+  /** The part of it, for a split category, so the filter's switches reach its line too. */
+  subcategory: SatelliteSubcategory | null;
   /** The arc, ordered in time. Never fewer than two points. */
   samples: SkySample[];
   /**
@@ -381,16 +384,16 @@ function middleOf(samples: SkySample[]): SkyTick {
  * beside it, a short way back, for the fading wake behind the object
  * (`SkyPass.history`).
  *
- * `pastArcDeg` bounds how far back that wake reaches: a landmark's short one
- * by default, or `FOCUSED_TRAJECTORY.pastArcDeg` for the one object someone
- * has tapped. See `focusedPassFor`.
+ * `pastArcDeg` bounds how far back that wake reaches: a short one by default,
+ * or `FULL_TRAJECTORY.pastArcDeg` for a pass drawn on the sky, which reaches
+ * back to the rise. See `focusedPassFor`.
  *
- * `windowHours` is how far ahead to look, and the reason there is an argument
- * for it is `PASS_ALERTS.windowHours`: the sky draws three hours because that
- * is the sky somebody is standing under, and the notifications plan a day
- * because the app will not be opened again in between. Straight through here
- * — the search for one object over three hours is a few milliseconds — and
- * sliced over a longer window, which is what `passSearch` is for.
+ * `windowHours` is how far ahead to look: three hours for the object someone
+ * has tapped, because that is the sky somebody is standing under, and a day or
+ * a week for the panel and the notifications, because the app will not be
+ * opened again in between. Straight through here — the search for one object
+ * over three hours is a few milliseconds — and sliced over a longer window,
+ * which is what `passSearch` is for.
  */
 export function passesFor(
   entry: CatalogEntry,
@@ -405,12 +408,12 @@ export function passesFor(
 /**
  * The same search, written as a job that can be stopped between steps.
  *
- * `passesFor` is this run straight through, and is what the drawn plan uses:
- * three hours of one object is a couple of hundred propagations, which is
- * under a frame and not worth the machinery. The alert plan is the same search
- * over a day (`PASS_ALERTS.windowHours`), which is not — a landmark's day is
- * tens of milliseconds, and a tier of them run in one go is a second of
- * dropped frames on a view that is drawing sixty times a second.
+ * `passesFor` is this run straight through, and is what the tapped object's
+ * line uses: three hours of one object is a couple of hundred propagations,
+ * which is under a frame and not worth the machinery. The panel's and the
+ * alerts' plans are the same search over a day or a week, which is not — one
+ * object's day is tens of milliseconds, and a few dozen of them run in one go
+ * is a second of dropped frames on a view that is drawing sixty times a second.
  *
  * The checkpoint is the top of the search loop, where the state is one clock
  * reading and the last time the object was below the floor: the arc walk
@@ -461,6 +464,7 @@ export function* passSearch(
       name: entry.name,
       noradId: entry.noradId,
       category: entry.category,
+      subcategory: entry.subcategory,
       samples: walk.samples,
       history: started ? walkBack(entry.satrec, frame, walk.samples[0], pastArcDeg) : [],
       ticks: ticksAlong(walk.samples),
@@ -478,12 +482,10 @@ export function* passSearch(
 /**
  * The satellite someone has tapped, as its own current or very next pass.
  *
- * `passesFor` run for one object rather than a whole tier, with the wake
- * reaching back to the rise instead of the short one every landmark's path
- * gets (`FOCUSED_TRAJECTORY.pastArcDeg`) — affordable here because it is
- * spent on one satellite on demand rather than on the tier every minute.
- * Every category answers, not only the landmarks: what decides whether an
- * object gets a path is whether someone tapped it, not what it is.
+ * `passesFor` run for one object, with the wake reaching back to the rise
+ * (`FULL_TRAJECTORY.pastArcDeg`). Every category answers, not only the ones
+ * the passes panel draws: what decides whether an object gets a path here is
+ * whether someone tapped it, not what it is.
  *
  * `null` when nothing above the floor is on the way for it within the
  * planning window — a peak too low to be worth a line, on top of the low
@@ -494,7 +496,7 @@ export function focusedPassFor(
   fromMs: number,
   observer: ObserverLocation
 ): SkyPass | null {
-  return passesFor(entry, fromMs, observer, FOCUSED_TRAJECTORY.pastArcDeg)[0] ?? null;
+  return passesFor(entry, fromMs, observer, FULL_TRAJECTORY.pastArcDeg)[0] ?? null;
 }
 
 /** Whether two passes are one object drawn twice. See `duplicateSeconds`. */
@@ -527,55 +529,6 @@ function oneArcEach(passes: SkyPass[]): SkyPass[] {
   return kept;
 }
 
-/**
- * Which of the passes found are actually drawn: as many different objects as
- * there are, soonest first.
- *
- * Breadth first — every landmark's next pass before any landmark's second — so
- * the allowance is spent across the tier rather than on the one that comes
- * round most often.
- */
-function drawable(passes: SkyPass[]): SkyPass[] {
-  const seen = new Map<number, number>();
-  return passes
-    .map((pass) => {
-      const round = seen.get(pass.noradId) ?? 0;
-      seen.set(pass.noradId, round + 1);
-      return { pass, round };
-    })
-    .sort((one, other) => one.round - other.round || one.pass.startsAtMs - other.pass.startsAtMs)
-    .slice(0, LANDMARK_PATHS.maximumPaths)
-    .map((entry) => entry.pass);
-}
-
-/**
- * Every pass the landmark tier makes over the observer in a window, deduped.
- *
- * Sliced, because this is the one piece of satellite arithmetic in the app that
- * is neither per frame nor spread across frames: a few thousand propagations in
- * one go is tens of milliseconds, which is several dropped frames of an overlay
- * that is drawing sixty times a second. Handing the thread back inside each
- * object's own search costs the plan a little wall-clock time and costs the sky
- * nothing — and there is no deadline on it, because the plan it replaces goes
- * on being drawn until this one lands. See `src/timeSlice.ts`.
- *
- * `planSkyPaths` takes the next three hours and keeps four of them to draw.
- * The passes panel and the alert planner ask the same question of a different
- * set of objects — the ones that can be seen with the naked eye, landmark or
- * not (`src/satellite/nakedEyePasses.ts`) — through `passesOf`.
- */
-export async function landmarkPasses(
-  catalog: SatelliteCatalog,
-  fromMs: number,
-  observer: ObserverLocation,
-  slices: Slices,
-  windowHours: number = LANDMARK_PATHS.windowHours
-): Promise<SkyPass[]> {
-  const landmarks = catalog.entries.filter((entry) => entry.category === "LANDMARK");
-  const whole = { fromMs, untilMs: fromMs + windowHours * MS_PER_HOUR };
-  return passesOf(landmarks, fromMs, observer, slices, [whole]);
-}
-
 /** A stretch of a plan's window, in epoch milliseconds. */
 export type TimeSpan = { fromMs: number; untilMs: number };
 
@@ -583,30 +536,42 @@ export type TimeSpan = { fromMs: number; untilMs: number };
  * Every pass a set of objects makes over the observer in some stretches of a
  * plan made at `fromMs`, deduped.
  *
- * The search behind `landmarkPasses`, for whichever objects a caller has
- * chosen and over whichever parts of the window it cares about — the whole of
- * it for the drawn arcs, and only the hours dark enough to see anything in for
+ * For whichever objects a caller has chosen and over whichever parts of the
+ * window it cares about — only the hours dark enough to see anything in, for
  * the naked-eye plans (`nakedEyePasses.ts`). None of the callers cares which
  * objects another kept, and all of them want exactly this: those objects' real
  * passes, once each.
  *
+ * Sliced, because this is the one piece of satellite arithmetic in the app that
+ * is neither per frame nor spread across frames: a few thousand propagations in
+ * one go is tens of milliseconds, which is several dropped frames of an overlay
+ * that is drawing sixty times a second. Handing the thread back inside each
+ * object's own search costs the plan a little wall-clock time and costs the sky
+ * nothing — and there is no deadline on it, because the plan it replaces goes
+ * on being used until this one lands. See `src/timeSlice.ts`.
+ *
  * A pass already up when a stretch opens is only kept for a stretch that opens
  * at `fromMs`, where it is the pass under way. Anywhere else it is a pass the
  * stretch has cut in two, and what is left of it has no rise to count down to.
+ *
+ * `pastArcDeg` is how far back the wake of that pass under way is walked: the
+ * short default for a plan that is only asked the times, and
+ * `FULL_TRAJECTORY.pastArcDeg` for one that is drawn (`planSightingPaths`).
  */
 export async function passesOf(
   entries: readonly CatalogEntry[],
   fromMs: number,
   observer: ObserverLocation,
   slices: Slices,
-  spans: readonly TimeSpan[]
+  spans: readonly TimeSpan[],
+  pastArcDeg: number = LANDMARK_PATHS.pastArcDeg
 ): Promise<SkyPass[]> {
   const found: SkyPass[] = [];
   for (const entry of entries) {
     for (const span of spans) {
       const hours = (span.untilMs - span.fromMs) / MS_PER_HOUR;
       const passes = await runSliced(
-        passSearch(entry, span.fromMs, observer, LANDMARK_PATHS.pastArcDeg, hours),
+        passSearch(entry, span.fromMs, observer, pastArcDeg, hours),
         slices
       );
       for (const pass of passes) {
@@ -615,16 +580,6 @@ export async function passesOf(
     }
   }
   return oneArcEach(found);
-}
-
-/** The paths to draw over the next few hours, for the whole landmark tier. */
-export async function planSkyPaths(
-  catalog: SatelliteCatalog,
-  fromMs: number,
-  observer: ObserverLocation,
-  slices: Slices
-): Promise<SkyPass[]> {
-  return drawable(await landmarkPasses(catalog, fromMs, observer, slices));
 }
 
 /**

@@ -120,7 +120,7 @@ export type MarkerPalette = {
    *
    * None at night, where a dark ring round a point of light turns it back into
    * a disc; all of it by day, where the edge is what is read. The same goes for
-   * the landmarks' paths and the selection ring, which sit on the same edge.
+   * the paths across the sky and the selection ring, which sit on the same edge.
    */
   edge: number;
   /** The landmark names, which are drawn as text. */

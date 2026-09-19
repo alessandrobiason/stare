@@ -211,9 +211,9 @@ test("the sky page separates what is drawn from what the mask is hiding", () => 
   // And the observer's own half of it: at 21:00 UTC in late August, this
   // observer is in the dark and whatever is overhead is not.
   expect(rows["Sun here"]).toContain("dark");
-  // The landmarks' arcs are counted apart from the marks: they are drawn
+  // The arcs are counted apart from the marks: they are drawn
   // whether or not the mask has anything to say about the sky they cross.
-  expect(rows["Landmark paths"]).toBe("2");
+  expect(rows["Paths"]).toBe("2");
   expect(rows.Sweep).toBe("2 s · 50%");
   expect(rows.Epoch).toBe("21:00:00.500Z");
 });

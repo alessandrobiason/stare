@@ -108,7 +108,7 @@ export const Icon: React.FC<Props> = ({
      */
     case "catalog":
       return (
-        <View style={[box, styles.rows]}>
+        <View style={[box, styles.rows, { paddingVertical: size * 0.06 }]}>
           {[0, 1, 2].map((row) => (
             <View key={row} style={[styles.row, { gap: stroke * 1.4 }]}>
               <View
@@ -139,9 +139,9 @@ export const Icon: React.FC<Props> = ({
      */
     case "settings":
       return (
-        <View style={[box, styles.sliders]}>
+        <View style={[box, styles.sliders, { paddingVertical: size * 0.1 }]}>
           {[0.36, 0.68].map((knob) => (
-            <View key={knob} style={styles.slider}>
+            <View key={knob} style={[styles.slider, { height: size * 0.26 }]}>
               <View
                 style={{
                   position: "absolute",
@@ -329,9 +329,17 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0
   },
+  /*
+   * The glyphs' insets are points worked out from `size` rather than
+   * percentages, here and in `sliders` below. A percentage padding is a share
+   * of the parent's *width*, not the glyph's own box, and on the phone the
+   * parent is a whole tab: six percent of a third of the screen is more than
+   * the glyph's height, and the rows inside it were squeezed on top of each
+   * other — the sliders into one line. The browser happened to resolve it
+   * against the glyph, which is why it looked right in the harness.
+   */
   rows: {
-    justifyContent: "space-between",
-    paddingVertical: "6%"
+    justifyContent: "space-between"
   },
   row: {
     flexDirection: "row",
@@ -343,11 +351,9 @@ const styles = StyleSheet.create({
     // almost none between the sliders themselves — which is the one gap that
     // reads as "two of them" rather than one smudge. `between` puts all of it
     // there.
-    justifyContent: "space-between",
-    paddingVertical: "10%"
+    justifyContent: "space-between"
   },
   slider: {
-    height: "26%",
     justifyContent: "center"
   },
   button: {

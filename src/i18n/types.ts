@@ -103,14 +103,14 @@ export type Strings = {
       all: string;
     };
     /**
-     * What is coming: the landmarks about to cross the sky, and when.
+     * What is coming: the passes that can be seen with the naked eye, and when.
      *
      * The overlay's other panels are both about the present tense — this many
      * marks are on the frame, these kinds may be drawn — and neither answers
      * the question somebody asks before the phone goes up at all: is anything
-     * worth waiting for. The lines on the sky have always known, and for most
-     * of the three hours they cover they are drawn on sky the camera is not
-     * pointed at. See `src/satellite/upcomingPasses.ts`.
+     * worth waiting for. The lines on the sky say the same thing, and most of
+     * the time they are drawn on sky the camera is not pointed at. See
+     * `src/satellite/upcomingPasses.ts`.
      *
      * The figures are not here. A countdown is `units.minutes` and
      * `units.hoursMinutes`, a bearing is a compass point and a height is
@@ -246,23 +246,6 @@ export type Strings = {
        * `src/satellite/standardMagnitude.ts` for which objects get which.
        */
       aboutMagnitude: string;
-      /**
-       * The same question about a pass that has not begun. `{time}`, `{verdict}`.
-       *
-       * Every other line on the card is resolved at the instant it is drawn,
-       * which is the right tense for an object on the frame and the wrong one
-       * for an object still under the horizon — and between now and a pass
-       * three hours out, the sun is what moves most. So a card opened from the
-       * upcoming-passes list answers about the pass instead, and names the
-       * clock time it is answering about, which is what makes the tense
-       * readable rather than merely correct.
-       *
-       * `{verdict}` is filled from `scene.passes.seeing` — those are fragments
-       * with no tense of their own, which is exactly what a clause about half
-       * past nine needs. The card's own six above are present-tense sentences
-       * and cannot go here. See `seeingOnPass`.
-       */
-      onPass: string;
     };
     /**
      * The next pass that can be seen with the naked eye, within the next day.
@@ -457,7 +440,7 @@ export type TourStrings = {
     moving: TourKeyStrings;
     /** The geostationary belt: rings that never move. */
     parked: TourKeyStrings;
-    /** A landmark: the halo, the name, and the dashed line of its pass. */
+    /** A landmark: the halo and the name. */
     landmark: TourKeyStrings;
   };
   /** The count under the app's name, which opens into what those marks are. */

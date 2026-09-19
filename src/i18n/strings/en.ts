@@ -51,7 +51,7 @@ export const en: Strings = {
       },
       landmark: {
         name: "Named",
-        meaning: "Space stations and big telescopes. The dashed line shows where they'll pass."
+        meaning: "Space stations and big telescopes."
       }
     },
     count: {
@@ -68,7 +68,7 @@ export const en: Strings = {
     },
     passes: {
       title: "Coming up",
-      body: "What you can see overhead with the naked eye. Tap to see the next day."
+      body: "What you can see with the naked eye; the dashed line is its path. Tap for the list."
     },
     catalog: {
       title: "Catalog",
@@ -164,8 +164,7 @@ export const en: Strings = {
       daylight: "Not visible (daylight)",
       unknown: "Brightness not recorded",
       magnitude: "magnitude {value}",
-      aboutMagnitude: "around magnitude {value}",
-      onPass: "When it comes over at {time}: {verdict}"
+      aboutMagnitude: "around magnitude {value}"
     },
     sighting: "Visible to the eye at {time}",
     facts: {

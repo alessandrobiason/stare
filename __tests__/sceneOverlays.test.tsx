@@ -1,5 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Metrics, SafeAreaProvider } from "react-native-safe-area-context";
 import { CatalogScreen } from "../src/components/CatalogScreen";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
@@ -28,6 +29,12 @@ import {
   SatelliteCategory
 } from "../src/satellite/categories";
 import { SatelliteDetail, Tle } from "../src/types";
+
+/** A phone with nothing to inset, for the pieces that read the safe area. */
+const NO_INSETS: Metrics = {
+  frame: { x: 0, y: 0, width: 375, height: 812 },
+  insets: { top: 0, left: 0, right: 0, bottom: 0 }
+};
 
 /** The rendered overlay as plain text, the way someone reads it. */
 function textOf(element: React.ReactElement): string {
@@ -185,8 +192,12 @@ describe("the header", () => {
 describe("the tab bar", () => {
   afterEach(() => setLocaleForTesting(undefined));
 
+  // The bar reaches under the home indicator, so it reads the safe area — and
+  // the provider that supplies it is the app root's (`src/App.tsx`).
   const bar = (warned = false) => (
-    <TabBar tab="sky" onSelect={() => undefined} warned={warned} />
+    <SafeAreaProvider initialMetrics={NO_INSETS}>
+      <TabBar tab="sky" onSelect={() => undefined} warned={warned} />
+    </SafeAreaProvider>
   );
 
   test("is three words, in the reader's own language", () => {
@@ -256,7 +267,7 @@ describe("the settings tab", () => {
       // A fragment of the line rather than the whole of it: the markup escapes
       // the apostrophe in "You'll", and what is under test is which of the
       // three lines the row chose.
-      expect(text).toContain("before a pass you can really see");
+      expect(text).toContain("before a pass you can see");
     });
 
     test("offers them where nobody has been asked yet", () => {
@@ -627,7 +638,6 @@ describe("the tapped satellite's card", () => {
     details: Record<string, SatelliteDetail | null>,
     names = Object.keys(details),
     selected = names[0],
-    pass: UpcomingPass | null = null,
     sighting: UpcomingPass | null = null
   ) {
     const describeRef = { current: (name: string) => details[name] ?? null };
@@ -638,62 +648,13 @@ describe("the tapped satellite's card", () => {
         onSelect={() => undefined}
         onClose={() => undefined}
         describeRef={describeRef}
-        pass={pass}
         sighting={sighting}
         />
     );
   }
 
-  describe("a pass that has not begun", () => {
-    /** The station, under the horizon now and crossing a dark sky this evening. */
-    const tonight: UpcomingPass = {
-      name: "ISS",
-      noradId: 25544,
-      category: "LANDMARK",
-      startsAtMs: Date.UTC(2026, 7, 29, 19, 24, 0),
-      endsAtMs: Date.UTC(2026, 7, 29, 19, 34, 0),
-      peakAtMs: Date.UTC(2026, 7, 29, 19, 31, 0),
-      peakElevationDeg: 68,
-      riseAzimuthDeg: 247,
-      setAzimuthDeg: 51,
-      started: false,
-      nakedEye: "visible",
-      apparentMagnitude: -2.2,
-      magnitudeMeasured: true
-    };
-
-    /** The same object as the tracker sees it now: down, and in daylight. */
-    const rightNow = detail({
-      name: "ISS",
-      noradId: 25544,
-      category: "LANDMARK",
-      elevationDeg: -32.5,
-      nakedEye: "daylight",
-      sunAltitudeDeg: 24
-    });
-
-    test("is answered for the sky it will cross, not the sky overhead now", () => {
-      // The bug: a card opened from the list in the afternoon reported the sun
-      // that was up while it was being read, about a pass hours later. The
-      // figures below the line are still about now — this line alone is not.
-      const text = textOf(card({ ISS: rightNow }, ["ISS"], "ISS", tonight));
-
-      expect(text).toContain("visible to the eye");
-      expect(text).toContain("magnitude -2.2");
-      expect(text).not.toContain("The sun is still up here");
-    });
-
-    test("names the time, so which sky it means is not left to be inferred", () => {
-      const text = textOf(card({ ISS: rightNow }, ["ISS"], "ISS", tonight));
-
-      expect(text).toMatch(/When it comes over at \d{1,2}:31/);
-    });
-
-    test("but not for an object that is on the frame right now", () => {
-      // The plan carries a landmark's next pass even while it is crossing the
-      // sky, so the station overhead has one ninety minutes out. Its mark is on
-      // the picture and its figures are live: the question a tap is asking
-      // there is about now, and the evening's pass is not the answer.
+  describe("whether it can be seen", () => {
+    test("is about the sky right now, whatever the object has ahead of it", () => {
       const overhead = detail({
         name: "ISS",
         noradId: 25544,
@@ -704,21 +665,28 @@ describe("the tapped satellite's card", () => {
         magnitudeMeasured: true,
         sunAltitudeDeg: -14
       });
-      const later = { ...tonight, startsAtMs: tonight.startsAtMs + 90 * 60_000 };
-      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", later));
+      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS"));
 
-      expect(text).toContain("Bright enough to see now");
+      expect(text).toContain("Visible to the eye · magnitude -2.4");
+      // No line in the future tense: the card is about now, like every figure
+      // under it, and the next sighting has a line of its own.
       expect(text).not.toContain("When it comes over");
     });
 
-    test("without one, the card is about the sky right now as it always was", () => {
-      // A tap on a mark that is on the frame, or on anything the landmark tier
-      // does not plan a path for: nothing to name a time from, and the object
-      // is up, so the present tense is the correct one.
-      const text = textOf(card({ ISS: rightNow }, ["ISS"], "ISS", null));
+    test("says nothing by day, when the sun has already given the answer", () => {
+      // True of every object overhead at once, so a line saying it on every
+      // card tells nobody anything. The figures are still there.
+      const daylit = detail({ nakedEye: "daylight", sunAltitudeDeg: 24 });
+      const text = textOf(card({ "STARLINK-1234": daylit }));
 
-      expect(text).toContain("The sun is still up here");
-      expect(text).not.toContain("When it comes over");
+      expect(text).not.toContain(strings().card.seeing.daylight);
+      expect(text).toContain("1,240 km");
+    });
+
+    test("still says it at night, in shadow or not", () => {
+      const eclipsed = detail({ nakedEye: "eclipsed", apparentMagnitude: null });
+      // A fragment, because the markup escapes the apostrophe in "Earth's".
+      expect(textOf(card({ "STARLINK-1234": eclipsed }))).toContain("Not visible (in the Earth");
     });
   });
 
@@ -748,26 +716,18 @@ describe("the tapped satellite's card", () => {
     });
 
     test("is said on a line of its own, beside what is true now", () => {
-      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", null, sighting));
+      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", sighting));
 
       expect(text).toMatch(/Visible to the eye at \d{1,2}:31/);
       // Where to stand and how bright, as the passes panel says it.
       expect(text).toContain("68° up");
       expect(text).toContain("magnitude -2.2");
-      // And the seeing line is still about the sky overhead now.
-      expect(text).toContain("Not visible (daylight)");
-    });
-
-    test("is not said twice when the seeing line is already about that pass", () => {
-      const below = { ...overhead, elevationDeg: -32.5 };
-      const text = textOf(card({ ISS: below }, ["ISS"], "ISS", sighting, sighting));
-
-      expect(text).toMatch(/When it comes over at \d{1,2}:31/);
-      expect(text).not.toMatch(/Visible to the eye at/);
+      // And nothing about the sky overhead now, which is a daylit one.
+      expect(text).not.toContain("Not visible (daylight)");
     });
 
     test("and nothing is said without one", () => {
-      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", null, null));
+      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", null));
 
       expect(text).not.toMatch(/Visible to the eye at/);
     });

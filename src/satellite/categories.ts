@@ -93,34 +93,37 @@ export const SUBCATEGORIES_OF: Record<SatelliteCategory, readonly SatelliteSubca
  *
  * Set in OKLCH and converted, so the hues are spaced by eye rather than by RGB:
  *
- * - `LANDMARK` a pale gold, the lightest and warmest, for the couple of dozen
- *   objects worth looking up for.
- * - `NAVIGATION` a peach, `EARTH` a soft green.
- * - `INTERNET` a lavender, and `TELECOM` a clear sky cyan: the two halves of
- *   what was one category, on either side of the wheel from the warm hues.
+ * - `LANDMARK` a rose pink, for the couple of dozen objects worth looking up
+ *   for: the one warm hue on the frame that nothing else comes near.
+ * - `NAVIGATION` an apricot, `EARTH` a soft green.
+ * - `INTERNET` a pale ice aqua, and `TELECOM` a clear sky cyan: the two halves
+ *   of what was one category, kept apart by lightness more than by hue.
  * - `OTHER` a warm stone grey, with next to no chroma and the least light, so
  *   the residual is the quietest thing on the frame.
  *
  * Tuned for the sky as it actually is, which is mostly one colour: Starlink is
- * half the catalogue, so on any frame the lavender is the ground every other
- * mark has to be picked out of. The set before this one was spaced evenly and
- * softly, and its closest pairs were the ones that mattered most — a coral
- * navigation mark leaning towards the lavender, a pale sky-blue telecom one
- * leaning towards it from the other side, a grey barely apart from it, and a
- * mint that was nearly the landmarks' champagne. So each hue is pushed to the
- * far side of its own range and given the chroma a pastel can take there (up
- * to 0.12, against 0.085 to 0.12 before).
+ * half the catalogue, so on any frame the internet colour is the ground every
+ * other mark has to be picked out of — which is why it is the palest and the
+ * least chromatic of the five, near enough to white that a sky of them reads
+ * as a sky of lights, and everything with a stronger hue stands out of it.
  *
- * No two are closer than 0.135 in OKLab (it was 0.11), none is closer than 0.145
- * to the lavender (0.13), and every one is still over seven to one against a
- * night sky.
+ * No yellow and no violet: the set before this one had a pale gold for the
+ * landmarks and a lavender for the internet, and neither was liked on the sky.
+ * Taking both out narrows the wheel to the warm reds and oranges, the greens
+ * and the cyans, so the peach the navigation marks had moved round to an
+ * apricot to leave the rose room, and the green and the cyan took a little
+ * more chroma.
+ *
+ * No two are closer than 0.135 in OKLab, none is closer than 0.145 to the
+ * internet colour, and every one is still over seven to one against a night
+ * sky.
  */
 export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
-  LANDMARK: "#f7eb97",
-  NAVIGATION: "#ffa383",
-  EARTH: "#8cd897",
-  INTERNET: "#cfa8f9",
-  TELECOM: "#5fcef1",
+  LANDMARK: "#ffbcdf",
+  NAVIGATION: "#f7ae65",
+  EARTH: "#89d995",
+  INTERNET: "#aefeff",
+  TELECOM: "#50cff6",
   OTHER: "#a5a39f"
 };
 
@@ -133,10 +136,10 @@ export const CATEGORY_COLORS: Record<SatelliteCategory, string> = {
  * in the air around it.
  */
 export const CATEGORY_BLOOMS: Record<SatelliteCategory, string> = {
-  LANDMARK: "#dbca58",
-  NAVIGATION: "#ea7b53",
+  LANDMARK: "#ea94c2",
+  NAVIGATION: "#e18816",
   EARTH: "#59bc6c",
-  INTERNET: "#b482e6",
+  INTERNET: "#6ae2e4",
   TELECOM: "#0bafd7",
   OTHER: "#8b8479"
 };
@@ -153,10 +156,10 @@ export const CATEGORY_BLOOMS: Record<SatelliteCategory, string> = {
  * OKLCH lightness 0.35 to 0.38, which is dark enough to hold against cloud.
  */
 export const CATEGORY_EDGES: Record<SatelliteCategory, string> = {
-  LANDMARK: "#4b4306",
-  NAVIGATION: "#67301d",
+  LANDMARK: "#622e4b",
+  NAVIGATION: "#613701",
   EARTH: "#1c4e27",
-  INTERNET: "#4e3566",
+  INTERNET: "#064c4e",
   TELECOM: "#044a5c",
   OTHER: "#3c3a38"
 };

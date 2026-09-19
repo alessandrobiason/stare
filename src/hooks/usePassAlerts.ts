@@ -26,16 +26,15 @@ type Options = {
  * notifications that were queued before it was shut and runs none of our code
  * in between, so every alert somebody gets at nine in the evening was worked
  * out the last time they had the app open. That is why the plan reaches a week
- * ahead (`PASS_ALERTS.horizonDays`) where the drawn arcs reach three hours, and
+ * ahead (`PASS_ALERTS.horizonDays`) where the panel and its arcs reach a day, and
  * why a foreground return rebuilds the queue as well as the timer: a return is
  * the one moment the app knows it is allowed to think.
  *
  * Not on *every* return, though, and not only from a return. A week of plan is
  * a couple of seconds of arithmetic, so it is not redone on every render — a
  * plan is good until `refreshMinutes` have passed *or* the observer has moved
- * `PASS_ALERTS.observerDriftMetres`, whichever comes first, exactly as the
- * drawn landmark paths decide the same thing for a shorter plan
- * (`useOrbitPaths.stale`). Time is checked on a timer and on every foreground
+ * `PASS_ALERTS.observerDriftMetres`, whichever comes first, exactly as a
+ * drawn path decides the same thing for a shorter plan (`pathPlanStale`). Time is checked on a timer and on every foreground
  * return; the observer's position is checked on its own, cheaper timer
  * (`observerCheckMinutes`), because a phone that never leaves the foreground —
  * held up on a train, propped on a car dashboard — should still notice it has

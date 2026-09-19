@@ -5,8 +5,8 @@ import { ObserverLocation } from "../src/types";
 /**
  * The two comparisons every background plan in this app is checked against:
  * how far apart two fixes are, and whether that (or time) has moved a plan out
- * from under itself. Shared by `useOrbitPaths`, `useFocusedPath`, `SkyMemory`
- * and `usePassAlerts`, each with its own thresholds.
+ * from under itself. Shared by `useFocusedPath`, `useNakedEyePasses`,
+ * `SkyMemory` and `usePassAlerts`, each with its own thresholds.
  */
 
 const HELSINKI: ObserverLocation = { latitudeDeg: 60.1699, longitudeDeg: 24.9384, heightM: 20 };

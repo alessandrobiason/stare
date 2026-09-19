@@ -30,13 +30,14 @@ import { standardMagnitudeFor } from "./standardMagnitude";
  * itself. What they cannot answer is the question asked before the phone goes
  * up at all — *is anything coming, and how long have I got* — because a line
  * that has not entered the frame yet is a line nobody has seen. Most of the
- * time that is every line there is: the arcs are three hours of sky and the
- * camera holds sixty degrees of it.
+ * time that is every line there is: the arcs are a day of sky and the camera
+ * holds sixty degrees of it.
  *
  * So this reads a plan the other way round. Nothing here is planned, searched
  * or propagated over: a plan has already decided which passes there are — the
- * drawn arcs' (`planSkyPaths`), or the day and the week of naked-eye passes the
- * panel and the alerts are made from (`nakedEyePasses.ts`) — and this works out
+ * day and the week of naked-eye passes the panel, the drawn arcs and the
+ * alerts are made from (`nakedEyePasses.ts`), or the one object somebody
+ * tapped — and this works out
  * what to *say* about each: when it comes up, where to stand, how high it gets,
  * and whether it can be seen when it does.
  *
@@ -81,9 +82,8 @@ export type UpcomingPass = {
  * What to say about the passes that have been planned, soonest first.
  *
  * Ordered by when it comes up rather than in the order the plan produced,
- * which for the drawn arcs is breadth first across the landmarks (`drawable`)
- * — the right order for spending four lines on four different objects, and
- * the wrong one for a list whose whole subject is what happens next.
+ * which is object by object (`passesOf`) — the wrong order for a list whose
+ * whole subject is what happens next.
  *
  * Any object answers, not only the landmarks: the passes panel and the alerts
  * describe the naked-eye passes of whatever can be seen (`nakedEyePasses.ts`),

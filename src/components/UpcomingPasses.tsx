@@ -52,12 +52,11 @@ type Props = {
  * before the phone goes up at all: is anything worth waiting for.
  *
  * The app has always known. Every pass that can be seen with the naked eye
- * over the next day is planned (`nakedEyePasses.ts`), whatever object makes it
- * — further out than the three hours the landmarks' arcs are drawn over
- * (`orbitPath.ts`), because an arc is only an answer to somebody already
- * pointing the phone at the piece of sky it crosses, and for most of even
- * those three hours that is nobody. So the plan is read out here, where it can
- * be seen without hunting for it.
+ * over the next day is planned (`nakedEyePasses.ts`), whatever object makes it,
+ * and drawn on the sky as the arc it will cross (`drawnSightings`) — but an
+ * arc is only an answer to somebody already pointing the phone at the piece of
+ * sky it crosses, and most of the time that is nobody. So the same plan is
+ * read out here, where it can be seen without hunting for it.
  *
  * **Shut, it is the next pass** — the object, how long there is, where to stand
  * and whether it can be seen — which is the whole answer for most of the times

@@ -412,18 +412,18 @@ export const NOTABLE_SATELLITES = {
 } as const;
 
 /**
- * The landmarks' own orbits, drawn across the sky ahead of them
- * (`src/satellite/orbitPath.ts`).
+ * The passes drawn across the sky ahead of their objects
+ * (`src/satellite/orbitPath.ts`): every sighting the passes panel lists, and
+ * the one object someone has tapped.
  *
  * A marker says where an object is and a trail says which way it is going, and
- * for most of the catalogue that is the whole of what is worth saying. The
- * landmarks are the exception, and they are the exception twice over. They are
- * the couple of dozen objects someone would actually wait outside for, and they
- * are the ones whose trail says least: a trail is twelve seconds long, and
- * twelve seconds of the station is a few degrees — a stub that answers "which
- * way" and nothing at all about "when" or "from where". So a landmark carries
- * its path instead: the arc it will trace between rising and setting, drawn
- * whole, with the clock time it starts at.
+ * for most of the catalogue that is the whole of what is worth saying. A pass
+ * somebody could go outside and see is the exception: a trail is twelve
+ * seconds long, and twelve seconds of the station is a few degrees — a stub
+ * that answers "which way" and nothing at all about "when" or "from where". So
+ * each of the panel's sightings carries its path instead: the arc it will
+ * trace between rising and setting, drawn whole, with the clock time it is at
+ * the point its name is written.
  *
  * That is also what makes the path worth drawing when its object is nowhere on
  * screen. A marker off the frame is invisible and there is nothing to be done
@@ -433,13 +433,15 @@ export const NOTABLE_SATELLITES = {
  */
 export const LANDMARK_PATHS = {
   /**
-   * How far ahead a path is drawn, in hours.
+   * How far ahead a tapped satellite's next pass is looked for, in hours, and
+   * the span a drawn path's weight fades across (`nearOpacity`).
    *
    * Long enough to be a plan for the evening rather than a description of the
    * next few minutes, short enough that what is drawn is still the sky someone
    * is standing under: three hours is two passes of the station over one place,
    * and the second of them is already an hour and a half of the Earth turning
-   * away from where the first one was.
+   * away from where the first one was. A sighting further off than this is
+   * still drawn — the panel lists a day — at the faintest weight a path has.
    */
   windowHours: 3,
   /**
@@ -520,16 +522,16 @@ export const LANDMARK_PATHS = {
    */
   minimumPeakElevationDeg: 10,
   /**
-   * How many paths are drawn at once.
+   * How many of the passes panel's sightings are drawn at once, at most.
    *
-   * The limit is legibility rather than cost. Each path is up to a hundred and
-   * eighty degrees of sky, so on a sixty-degree frame two or three of them
-   * cross the view at any moment; past four the lines start to read as a mesh
-   * over the picture rather than as a route each. Which four is decided by
-   * breadth first — every landmark's next pass before any landmark's second —
-   * so a station that comes round twice cannot take the whole allowance.
+   * One per object — its soonest — so a station that comes round twice tonight
+   * draws the pass it is about to make and not the one after it. The cap is
+   * for the evening a fresh launch is a string of dozens of lights, each a
+   * sighting of its own on nearly the same line: past a dozen the lines are a
+   * mesh over the picture rather than a route each, and each is a projection a
+   * frame. Soonest first, so what is dropped is what is furthest off.
    */
-  maximumPaths: 4,
+  maximumSightingPaths: 12,
   /**
    * When two passes are the same object twice, in seconds and degrees.
    *
@@ -646,34 +648,32 @@ export const LANDMARK_PATHS = {
 } as const;
 
 /**
- * How the passes panel reads out further than the sky draws.
+ * How far ahead the passes panel reads out.
  *
- * A line only earns its place on the frame for the three hours someone is
- * actually standing under (`LANDMARK_PATHS.windowHours`) — past four crossings
- * the arcs read as a mesh rather than a route each. A list has no such limit:
- * read sitting down rather than glanced at over the phone, it can answer "is
- * anything worth waiting up for tonight" instead of only "what's up right
+ * Read sitting down rather than glanced at over the phone, a list can answer
+ * "is anything worth waiting up for tonight" instead of only "what's up right
  * now." A day ahead is long enough for that and short enough to still be
  * tonight's plan.
  *
  * What it lists is not the landmark tier but every pass that can be seen with
- * the naked eye (`src/satellite/nakedEyePasses.ts`), whatever the object is.
- * Rows past the three drawn hours open the same card any other row does; there
- * is simply no line on the sky yet for that one to point at, which is no
- * different from tapping an object from the catalog before it has risen.
+ * the naked eye (`src/satellite/nakedEyePasses.ts`), whatever the object is —
+ * and the same passes are drawn on the sky, each object's soonest, so a row in
+ * the list is also a line showing where to look for it
+ * (`LANDMARK_PATHS.maximumSightingPaths`).
  */
 export const PASSES_PANEL = {
   windowHours: 24,
   /**
    * How often the day's plan is worked out again, in minutes.
    *
-   * Slower than the drawn arcs' minute (`LANDMARK_PATHS.refreshSeconds`),
-   * because nothing here is a line whose head has to sit on its marker: a row
-   * is a clock time and a bearing, and both are as true ten minutes later. The
-   * countdowns tick on the panel's own clock, and a pass that has ended is
-   * dropped there as well (`UpcomingPasses`), so a plan this old is the same
-   * list with less of it left. What it saves is a day of every naked-eye
-   * candidate being searched sixty times an hour.
+   * Slower than a tapped satellite's line (`LANDMARK_PATHS.refreshSeconds`),
+   * because a day of every naked-eye candidate is a much bigger search than
+   * one object's next pass. Nothing is lost by it: every sample of a pass is
+   * resolved at its own instant, so a plan ten minutes old draws the same
+   * lines — trimmed to the present on every frame (`pathFrom`) — and the
+   * countdowns tick on the panel's own clock, with a pass that has ended
+   * dropped there as well (`UpcomingPasses`). What it saves is a day of every
+   * naked-eye candidate being searched sixty times an hour.
    */
   refreshMinutes: 10,
   /**
@@ -913,17 +913,18 @@ export const PASS_ALERTS = {
 } as const;
 
 /**
- * How far back the wake reaches for the one satellite someone has tapped, in
- * degrees of sky (`src/satellite/orbitPath.ts`'s `focusedPassFor`).
+ * How far back the wake reaches behind a pass drawn on the sky, in degrees
+ * (`projectPaths`): the tapped satellite's (`focusedPassFor`) and each of the
+ * passes panel's sightings (`planSightingPaths`).
  *
- * A landmark's wake (`LANDMARK_PATHS.pastArcDeg`) is deliberately short — a
- * hint of which way the object is curving, drawn for up to four passes at
- * once. This is drawn for one object, on demand, and what someone tapping it
- * wants is the whole story: where it rose, not just where it has lately been.
- * 200 degrees is past the most any pass over one place can be, so the wake
- * always reaches the rise itself rather than being cut short of it.
+ * The plain wake (`LANDMARK_PATHS.pastArcDeg`) is deliberately short — a hint
+ * of which way the object is curving, and what a plan walks back for a pass it
+ * is only asked the times of. A drawn pass is the whole trajectory: where it
+ * rose, not just where it has lately been. 200 degrees is past the most any
+ * pass over one place can be, so the wake always reaches the rise itself
+ * rather than being cut short of it.
  */
-export const FOCUSED_TRAJECTORY = {
+export const FULL_TRAJECTORY = {
   pastArcDeg: 200,
   /** More steps than the wake's, since the arc it fades across is longer. */
   pastSteps: 20

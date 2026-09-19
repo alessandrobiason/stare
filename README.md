@@ -40,7 +40,7 @@ sizes. **The sky behind them is drawn rather than photographed** — see
 </td>
 </tr>
 <tr>
-<td>Each landmark carries the arc it will cross, and the minute it comes up.</td>
+<td>Every pass you could see carries the arc it will cross, and the minute it comes up.</td>
 <td>The same six categories, and the same soft colours, in daylight.</td>
 <td></td>
 </tr>
@@ -53,7 +53,7 @@ sizes. **The sky behind them is drawn rather than photographed** — see
 | **Where they are** | Markers on the camera picture, from a GPS fix and a fused compass — not a star chart you aim by hand. |
 | **What is in the way** | A segmentation model reads the sky out of the frame; anything over a roof or a tree is dropped. |
 | **Whether you would see it** | Sunlight on the object, darkness here, and its magnitude. For most of the day the honest answer is no, and it says so. |
-| **When to look up** | Every landmark pass for the next three hours, drawn as an arc across the sky and listed as a countdown. |
+| **When to look up** | Every pass you could see with the naked eye in the next day, listed as a countdown and drawn as an arc across the sky. |
 | **When to go outside** | A notification ten minutes before a pass you could actually see — naked eye or binoculars — with the app shut and the phone in a pocket. Nothing at all for a sky with nothing in it. |
 | **What it is** | Tap any mark — or any name written along an arc — for a briefing, the range, the speed and the orbit. |
 | **Where to find one** | The catalogue tab is the same 16,000 objects read the other way round: by fleet, by name, by what is up right now. |
@@ -219,8 +219,8 @@ what the harness substitutes and what it does not.
   but not by much.
 - **They are planned for where the phone was — while the app was open.** A
   session left running notices it has moved: `usePassAlerts` replans against
-  the observer as well as the clock, the same way the drawn landmark paths do
-  (`useOrbitPaths.stale`), just at a much coarser distance — twenty kilometres
+  the observer as well as the clock, the same way a drawn path does
+  (`pathPlanStale`), just at a much coarser distance — twenty kilometres
   rather than a couple of hundred metres, since a plan that only ever speaks in
   compass points and whole degrees is asking whether the reader is still
   roughly in the same place, not whether a bearing still holds to a fraction of

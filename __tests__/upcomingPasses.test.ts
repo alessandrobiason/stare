@@ -5,7 +5,7 @@ import { azimuthDeg } from "../src/coordinates/transform";
 import { parseTleCatalog } from "../src/data/tleCatalog";
 import { wrapDegrees360 } from "../src/math/angles";
 import { SatelliteCatalog } from "../src/satellite/catalog";
-import { planSkyPaths, SkyPass } from "../src/satellite/orbitPath";
+import { passesOf, SkyPass } from "../src/satellite/orbitPath";
 import { upcomingPasses } from "../src/satellite/upcomingPasses";
 import { startSlicing } from "../src/timeSlice";
 import { ObserverLocation } from "../src/types";
@@ -25,20 +25,26 @@ const catalog = new SatelliteCatalog(
   )
 );
 
-/** The plan the sky is drawing, which is the only thing the list reads. */
+/**
+ * A plan of real passes to describe: the landmark tier's next three hours.
+ * What the list reads is a plan, whichever objects it was made for.
+ */
 async function plan(fromMs = MIDNIGHT): Promise<SkyPass[]> {
-  return planSkyPaths(catalog, fromMs, observer, startSlicing());
+  const landmarks = catalog.entries.filter((entry) => entry.category === "LANDMARK");
+  return passesOf(landmarks, fromMs, observer, startSlicing(), [
+    { fromMs, untilMs: fromMs + LANDMARK_PATHS.windowHours * 3_600_000 }
+  ]);
 }
 
-test("says something about every pass the sky is drawing", async () => {
+test("says something about every pass it is handed", async () => {
   const passes = await plan();
   const listed = upcomingPasses(passes, catalog, observer);
 
-  // Not a selection of them: every line on the frame is a row, or the list is
-  // offering a subset of the sky with nothing to say which subset.
+  // Not a selection of them: choosing which to show is the caller's business
+  // (`planSightings` keeps the ones that can be seen), and a list that quietly
+  // dropped some would be offering a subset with nothing to say which.
   expect(listed).toHaveLength(passes.length);
   expect(listed.length).toBeGreaterThan(0);
-  expect(listed.length).toBeLessThanOrEqual(LANDMARK_PATHS.maximumPaths);
   expect(new Set(listed.map((one) => one.name)).size).toBeGreaterThan(0);
 });
 
@@ -46,10 +52,9 @@ test("soonest first, whatever order the plan came in", async () => {
   const passes = await plan();
   expect(passes.length).toBeGreaterThan(1);
 
-  // The plan is ordered breadth first across the landmarks — every object's
-  // first pass before any object's second — which is the right order for
-  // spending four lines and says nothing about what happens next. Handed the
-  // same passes backwards, the list has to come out the same way round.
+  // The plan is ordered object by object, which says nothing about what
+  // happens next. Handed the same passes backwards, the list has to come out
+  // the same way round.
   const forwards = upcomingPasses(passes, catalog, observer);
   const backwards = upcomingPasses([...passes].reverse(), catalog, observer);
 

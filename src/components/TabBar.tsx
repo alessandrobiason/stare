@@ -1,5 +1,6 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
 import { SceneTab } from "../hooks/useSceneControls";
@@ -15,6 +16,11 @@ type Props = {
    * is where the console that explains it lives — see `SettingsScreen`.
    */
   warned?: boolean;
+  /**
+   * Told how much of the safe area the bar takes, in points from its bottom
+   * edge: what a sheet over the camera has to stop above (`SkyOverlay`).
+   */
+  onHeightChange?: (height: number) => void;
 };
 
 /** The three tabs, in the order they are shown. */
@@ -37,10 +43,13 @@ const TABS: readonly { id: SceneTab; icon: IconName }[] = [
  * the way out of it. Glass like everything else, a hairline along the top, and
  * the active tab lit in the app's accent — the only colour in the bar.
  *
- * The bar sits inside the safe area (`SafeAreaLayer`), so on a phone with a
- * home indicator it stops above it rather than under it.
+ * The bar is laid out inside the safe area (`SafeAreaLayer`), so its tabs sit
+ * above the home indicator rather than under it — but its glass runs on down
+ * to the bottom of the screen, as a tab bar on this platform does. Stopped at
+ * the safe area it left a strip of camera picture under the bar, which made a
+ * bar of the right height look like one squeezed into too little.
  */
-export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = false }) => {
+export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = false, onHeightChange }) => {
   // The three labels are words, and nothing else here changes when the
   // console's picker changes the language. See `useLocale`.
   useLocale();
@@ -53,9 +62,19 @@ export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = fal
     catalog: catalogRef,
     settings: settingsRef
   };
+  // Past the safe area's foot by the home indicator's height, and padded back
+  // up by the same, so the glass reaches the screen's edge and the tabs do not.
+  const { bottom } = useSafeAreaInsets();
+  const onLayout = onHeightChange
+    ? ({ nativeEvent }: LayoutChangeEvent) => onHeightChange(nativeEvent.layout.height - bottom)
+    : undefined;
 
   return (
-    <View style={styles.bar} accessibilityRole="tablist">
+    <View
+      style={[styles.bar, { marginBottom: -bottom, paddingBottom: BAR_PADDING_BOTTOM + bottom }]}
+      accessibilityRole="tablist"
+      onLayout={onLayout}
+    >
       {TABS.map(({ id, icon }) => {
         const on = id === tab;
         return (
@@ -94,12 +113,14 @@ export const TabBar: React.FC<Props> = React.memo(({ tab, onSelect, warned = fal
 
 TabBar.displayName = "TabBar";
 
+/** Under the labels, above the home indicator (or the screen's edge, without one). */
+const BAR_PADDING_BOTTOM = 6;
+
 const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "stretch",
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingTop: 10,
     ...glass(theme.color.panel, 28),
     // The bar is edge to edge: the only hairline it wears is the one along the
     // top, and the border the glass carries would draw three more.
@@ -111,13 +132,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 5,
     // A thumb-sized target, which is the whole point of a tab bar.
-    minHeight: 44
+    minHeight: 48
   },
   label: {
     color: theme.color.textDim,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
     letterSpacing: 0.2
   },

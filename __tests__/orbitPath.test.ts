@@ -15,12 +15,13 @@ import { projectPaths } from "../src/hooks/useAnimatedMarkers";
 import { wrapDegrees360 } from "../src/math/angles";
 import { parseTleCatalog } from "../src/data/tleCatalog";
 import { CatalogEntry, SatelliteCatalog } from "../src/satellite/catalog";
+import { drawnSightings } from "../src/satellite/nakedEyePasses";
 import {
   cutAlong,
   passesFor,
+  passesOf,
   pathBehind,
   pathFrom,
-  planSkyPaths,
   separationDeg,
   SkyPass
 } from "../src/satellite/orbitPath";
@@ -282,26 +283,51 @@ describe("choosing which paths to draw", () => {
       expect(minutesFrom(pass, MIDNIGHT)).toBeCloseTo(37.6, 1);
     }
 
-    const drawn = await planSkyPaths(catalog, MIDNIGHT, observer, startSlicing());
-    const station = drawn.filter((pass) => Math.abs(minutesFrom(pass, MIDNIGHT) - 37.6) < 0.1);
+    const landmarks = catalog.entries.filter((entry) => entry.category === "LANDMARK");
+    const found = await passesOf(landmarks, MIDNIGHT, observer, startSlicing(), [
+      { fromMs: MIDNIGHT, untilMs: MIDNIGHT + LANDMARK_PATHS.windowHours * 3_600_000 }
+    ]);
+    const station = found.filter((pass) => Math.abs(minutesFrom(pass, MIDNIGHT) - 37.6) < 0.1);
     expect(station).toHaveLength(1);
     expect(station[0].name).toBe("ISS");
     expect(station[0].noradId).toBe(25544);
   });
 
-  test("spends the allowance on different objects before second passes", async () => {
-    const drawn = await planSkyPaths(catalog, MIDNIGHT, observer, startSlicing());
-    expect(drawn.length).toBeLessThanOrEqual(LANDMARK_PATHS.maximumPaths);
-    // Both the station and CHEOPS come round twice inside the window, and
-    // neither gets a second line while another landmark is still without one.
-    expect(new Set(drawn.map((pass) => pass.noradId)).size).toBe(drawn.length);
-    expect(drawn.map((pass) => pass.name)).toContain("ISS");
-    expect(drawn.map((pass) => pass.name)).toContain("XMM-Newton");
+  /** The station's and CHEOPS's passes over three hours, soonest first, as a plan hands them over. */
+  const planned = () =>
+    [...passesFor(landmark(25544), MIDNIGHT, observer), ...passesFor(landmark(44874), MIDNIGHT, observer)]
+      .sort((one, other) => one.startsAtMs - other.startsAtMs);
+
+  test("draws one line per object, its soonest", () => {
+    const passes = planned();
+    // Both come round twice inside the window, so the plan has two of each.
+    expect(passes.filter((pass) => pass.noradId === 25544).length).toBeGreaterThan(1);
+
+    const drawn = drawnSightings(passes, MIDNIGHT);
+    expect(drawn.map((pass) => pass.noradId).sort()).toEqual([25544, 44874]);
+    const station = passes.filter((pass) => pass.noradId === 25544);
+    expect(drawn.find((pass) => pass.noradId === 25544)).toBe(station[0]);
   });
 
-  test("plans nothing for the sixteen thousand objects that are not landmarks", async () => {
-    const drawn = await planSkyPaths(catalog, MIDNIGHT, observer, startSlicing());
-    for (const pass of drawn) expect(pass.category).toBe("LANDMARK");
+  test("and the next one the moment the first is over, not at the next plan", () => {
+    const passes = planned();
+    const station = passes.filter((pass) => pass.noradId === 25544);
+    const drawn = drawnSightings(passes, station[0].endsAtMs + 1000);
+    expect(drawn.find((pass) => pass.noradId === 25544)).toBe(station[1]);
+  });
+
+  test("keeps a string of fresh launches to a handful of lines", () => {
+    // A train of new satellites is dozens of sightings on nearly one line.
+    const [one] = planned();
+    const train = Array.from({ length: 40 }, (_, index) => ({
+      ...one,
+      noradId: 90000 + index,
+      startsAtMs: one.startsAtMs + index * 20_000
+    }));
+    const drawn = drawnSightings(train, MIDNIGHT);
+    expect(drawn).toHaveLength(LANDMARK_PATHS.maximumSightingPaths);
+    // The soonest of them, which are the ones about to happen.
+    expect(drawn[0]).toBe(train[0]);
   });
 });
 

@@ -444,7 +444,7 @@ export function skySection({ tracker, markers, memory, epoch }: SkyDebugInput): 
       // The landmarks' own arcs, which are drawn whether or not the mask has
       // anything to say about them: they are where to point the phone rather
       // than a claim that something can be seen. See `LANDMARK_PATHS`.
-      { label: "Landmark paths", value: `${markers.paths}` },
+      { label: "Paths", value: `${markers.paths}` },
       {
         label: "Sky mapped",
         value: `${Math.round(memory.coverage * 100)}% · ${memory.cells} cells`

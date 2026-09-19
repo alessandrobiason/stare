@@ -78,7 +78,7 @@ export type SightableVerdict = "visible";
 /**
  * The week's alerts, planned from the catalogue's naked-eye candidates.
  *
- * A week rather than the three hours the sky draws, because the two are read
+ * A week rather than the day the sky draws, because the two are read
  * by different people: an arc is for somebody holding the phone up now, and
  * this is for somebody who has put it away and will not open it again before
  * the pass. Nothing of ours runs while the app is closed — iOS delivers what was

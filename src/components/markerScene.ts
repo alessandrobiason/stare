@@ -76,7 +76,8 @@ import { Ink, MARK_COLOR, MarkerPalette } from "./palette";
  * - **Size** is distance, on a log scale.
  * - **A label** is spent on the landmarks and on one satellite per category
  *   currently on the frame (`NotableSatellites`), and only where two of them
- *   do not collide.
+ *   do not collide — after the names of the lines drawn across the sky, which
+ *   go first.
  *
  * By day the pale fill alone would vanish into the sky, so every mark, tail
  * included, gains a fine edge in a deep shade of its own hue and loses its light: by
@@ -88,7 +89,8 @@ import { Ink, MARK_COLOR, MarkerPalette } from "./palette";
  */
 export type MarkerScene = {
   /**
-   * The landmarks' upcoming passes, drawn under everything else.
+   * The passes drawn across the sky — the passes panel's sightings and the
+   * tapped satellite's — under everything else.
    *
    * Under, because a path is the ground a mark is read against rather than
    * something to read in its own right: it is the longest shape on the frame by
@@ -262,7 +264,7 @@ export type SelectionRing = {
 };
 
 /**
- * One landmark's path across the sky, as the lines that draw it.
+ * One pass across the sky, as the lines that draw it.
  *
  * Stroked lines rather than the tapered polygon a trail is drawn as, and for
  * the opposite reason. A trail is a dozen pixels of the object's own body and
@@ -305,7 +307,7 @@ export type PathShape = {
    * line, so a mark is the same line turning a corner rather than a new shape.
    */
   arrows: number[][];
-  /** The category colour, which for a landmark path is the landmark colour. */
+  /** The category colour of the object making the pass. */
   color: string;
   /** How solid the line is, which says how far ahead the pass is. */
   alpha: number;
@@ -350,6 +352,12 @@ export type LabelPlacement = {
   /** How far from that centre the name's nearer edge is, in layout pixels. */
   offsetY: number;
   alpha: number;
+  /**
+   * Whether this names a line rather than a mark. Set on a backing of its own
+   * (`MarkerLabels`): it is written over open sky, often far from anything
+   * else drawn, and it is the one label that carries a time to be read.
+   */
+  path: boolean;
 };
 
 /**
@@ -389,25 +397,36 @@ export function buildMarkerScene(
   const candidates = frame.markers
     .filter((marker) => labelRank(marker) !== null && pointOnFrame(marker.point))
     .sort((first, second) => (labelRank(first) ?? 0) - (labelRank(second) ?? 0));
-  const marks = candidates.map((marker) => marker.point);
-  const clear = labellablePoints(marks, box);
-  const named = new Set(candidates.filter((_, index) => clear[index]).map((one) => one.name));
   // Every arc says which object it belongs to as well, at a point on the line
-  // itself (`MarkerPath.anchor`). Without it a landmark hidden behind a roof —
-  // which is a landmark with no marker at all — leaves an anonymous line across
+  // itself (`MarkerPath.anchor`). Without it an object hidden behind a roof —
+  // which is an object with no marker at all — leaves an anonymous line across
   // the sky, and the one question anyone has about a line is whose it is.
   //
-  // Not while its own marker is carrying the name a few pixels away, though:
-  // that is the same word twice on one frame, and the marker's is the better
-  // placed of the two.
+  // Not while its own marker is on the frame to carry the name a few pixels
+  // away, though: that is the same word twice on one frame, and the marker's
+  // is the better placed of the two.
+  const marked = new Set(candidates.map((marker) => marker.name));
   const arcs = frame.paths.flatMap((path) =>
-    path.anchor && !named.has(path.name) ? [{ path, anchor: path.anchor }] : []
+    path.anchor && !marked.has(path.name) ? [{ path, anchor: path.anchor }] : []
   );
-  // Both kinds compete for the same clear space, and the marks win: a name over
-  // something someone can look at now outranks one over a line. Run again over
-  // the two together rather than kept from above, so an arc's name is placed
-  // against the marks' names as well as against the other arcs'.
-  const allowed = labellablePoints([...marks, ...arcs.map((arc) => arc.anchor.at)], box);
+  // Both kinds compete for the same clear space, and the arcs win: a line is a
+  // pass somebody could go out and see, or the object they tapped, and its name
+  // and time are the whole of what makes it one — where a mark's name is one
+  // of a dozen over the traffic. So the arcs' names are placed first, then the
+  // names standing in for an arc's (its object's own marker), and the rest of
+  // the marks in their usual order only where there is room left.
+  const withPath = new Set(frame.paths.map((path) => path.name));
+  const ordered = [
+    ...candidates.filter((marker) => withPath.has(marker.name)),
+    ...candidates.filter((marker) => !withPath.has(marker.name))
+  ];
+  const allowed = labellablePoints(
+    [...arcs.map((arc) => arc.anchor.at), ...ordered.map((marker) => marker.point)],
+    box
+  );
+  const named = new Set(
+    ordered.filter((_, index) => allowed[arcs.length + index]).map((one) => one.name)
+  );
   const labels: LabelPlacement[] = [];
   let selection: SelectionRing | null = null;
 
@@ -437,7 +456,7 @@ export function buildMarkerScene(
     // reaching `outline` past the mark and stopping flush with it on the inside,
     // so the colour keeps the full width it was sized at.
     const diameter = size * (marker.parked ? RING_DIAMETER_RATIO : CORE_DIAMETER_RATIO);
-    const outline = Math.max(MIN_EDGE_PX, diameter * OUTLINE_RATIO);
+    const outline = Math.max(MIN_EDGE_PX, diameter * OUTLINE_RATIO) * EDGE_WEIGHT;
     const ring = marker.parked ? Math.max(MIN_RING_PX, diameter * RING_RATIO) : null;
     glyphs.push({
       x,
@@ -448,7 +467,7 @@ export function buildMarkerScene(
           path,
           Math.max(MIN_TRAIL_WIDTH_PX * scale, diameter * TRAIL_WIDTH_RATIO),
           TAIL_ALPHA * strength,
-          outline * TRAIL_OUTLINE_RATIO,
+          outline,
           scale
         ),
       rim:
@@ -497,13 +516,14 @@ export function buildMarkerScene(
         // Off the footprint rather than the drawn size, so a name does not jump
         // when its mark is tapped.
         offsetY: footprint / 2 + LABEL_GAP_PX,
-        alpha: marker.opacity
+        alpha: marker.opacity,
+        path: false
       });
     }
   }
 
   arcs.forEach((arc, index) => {
-    if (!allowed[marks.length + index]) return;
+    if (!allowed[index]) return;
     labels.push({
       key: arc.path.key,
       // The name carries the clock time its object is *at this point on the
@@ -528,7 +548,12 @@ export function buildMarkerScene(
       y: (arc.anchor.at.top / 100) * box.height,
       above: false,
       offsetY: ARC_LABEL_GAP_PX * scale,
-      alpha: pathOpacity(arc.path.lead)
+      // Solid whatever the line's own weight. The line fades with how far off
+      // its pass is, which is the right thing for a two-thousand-pixel stroke
+      // over a photograph and the wrong one for the few words saying whose it
+      // is and when: a name at a quarter strength is a name nobody reads.
+      alpha: 1,
+      path: true
     });
   });
 
@@ -926,23 +951,25 @@ const MIN_TRAIL_WIDTH_PX = 1.4;
  */
 const OUTLINE_RATIO = 0.1;
 /**
- * How much of the point's own edge a trail's rim is drawn at, by day (its
- * alpha is already near zero at night, same as the point's).
+ * How much of that edge a mark is actually drawn with, point and trail alike,
+ * by day (its alpha is already near zero at night).
  *
  * Under half: at the full `OUTLINE_RATIO` a trail read as a dark stripe down
- * its middle rather than as a line with a fine, parting edge — right for a
- * mark's own rim, too heavy stretched the length of a tail.
+ * its middle rather than as a line with a fine, parting edge, and the point
+ * inside it as a dot in a dark ring. The trail was lightened first and the
+ * point after it, to match — one mark, one weight of edge.
  */
-export const TRAIL_OUTLINE_RATIO = 0.45;
+export const EDGE_WEIGHT = 0.45;
 /** The thinnest a line's rim is drawn, in layout pixels. */
 const MIN_OUTLINE_PX = 1;
 /**
- * The thinnest a mark's edge is drawn, in layout pixels.
+ * The thinnest a mark's full edge is taken to be, in layout pixels, before
+ * `EDGE_WEIGHT` lightens it.
  *
  * Under a pixel, because on the phone a layout pixel is two or three real
- * ones: nine tenths of one is still a continuous ring at the far end of the
- * range scale, and it is in the mark's own hue (`CATEGORY_EDGES`), so it reads
- * as the rim of a coloured light rather than as a grey smudge round it.
+ * ones: even lightened, what is left is still a continuous ring at the far end
+ * of the range scale, and it is in the mark's own hue (`CATEGORY_EDGES`), so it
+ * reads as the rim of a coloured light rather than as a grey smudge round it.
  */
 const MIN_EDGE_PX = 0.9;
 /** Thickness of the parked ring, as a fraction of its diameter. */
