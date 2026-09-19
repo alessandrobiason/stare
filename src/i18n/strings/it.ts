@@ -34,17 +34,17 @@ export const it: Strings = {
     marks: {
       title: "Nel cielo",
       body: "Ogni segno è un satellite. Toccane uno per sapere cos'è.",
-      moving: {
-        name: "In movimento",
-        meaning: "La scia indica da dove arriva. Più è grande, più è vicino."
+      longTail: {
+        name: "Coda lunga",
+        meaning: "Si muove veloce: di solito orbita bassa, circa 400–2.000 km di quota."
+      },
+      shortTail: {
+        name: "Coda corta",
+        meaning: "Si muove piano: di solito orbita media, circa 2.000–20.000 km di quota."
       },
       parked: {
-        name: "Anello",
-        meaning: "Geostazionario: resta sempre nello stesso punto."
-      },
-      landmark: {
-        name: "Con nome",
-        meaning: "Stazioni spaziali e grandi telescopi."
+        name: "Senza coda",
+        meaning: "Resta fermo su un punto: molto lontano, circa 36.000 km di quota."
       }
     },
     count: {

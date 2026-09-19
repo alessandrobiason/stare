@@ -26,7 +26,7 @@ import { SatelliteCategory } from "../satellite/categories";
 export const FIGURE_MARK_SCALE = 1;
 
 /** The kinds of mark the tour draws a tile of, in the order it lists them. */
-export type MarkSample = "moving" | "parked" | "landmark";
+export type MarkSample = "longTail" | "shortTail" | "parked";
 
 /** One tile, in layout points. */
 export const MARK_TILE: FrameSize = { width: 74, height: 56 };
@@ -46,23 +46,18 @@ type Placed = {
 };
 
 const MARK_SAMPLES: Record<MarkSample, readonly Placed[]> = {
-  // Near and far, in one colour and on one heading, so that size and the length
-  // of the tail are the only two things that differ.
-  moving: [
-    { category: "EARTH", x: 34, y: 23, rangeKm: 450, headingDeg: 20, travel: 30 },
-    { category: "EARTH", x: 62, y: 37, rangeKm: 20000, headingDeg: 20, travel: 8 }
-  ],
+  // Low orbit: it crosses the sky in minutes, so over the trail window it
+  // leaves a long tail behind it.
+  longTail: [{ category: "EARTH", x: 37, y: 28, rangeKm: 450, headingDeg: 20, travel: 30 }],
+  // Medium orbit: far slower across the sky, so the same window leaves only a
+  // short one.
+  shortTail: [{ category: "EARTH", x: 37, y: 28, rangeKm: 20000, headingDeg: 20, travel: 8 }],
   // A stretch of the geostationary belt, which is how rings are met on the sky:
   // several in a row, small, and none of them moving.
   parked: [
     { category: "TELECOM", x: 15, y: 31, rangeKm: 37000, headingDeg: null },
     { category: "TELECOM", x: 37, y: 26, rangeKm: 38200, headingDeg: null },
     { category: "TELECOM", x: 59, y: 31, rangeKm: 36800, headingDeg: null }
-  ],
-  // In the middle of the tile, which is as tall as it is so that the halo of a
-  // landmark — the largest mark on the sky — fits inside it.
-  landmark: [
-    { name: "ISS", category: "LANDMARK", x: 37, y: 28, rangeKm: 420, headingDeg: 20, travel: 18 }
   ]
 };
 

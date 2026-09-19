@@ -48,9 +48,9 @@ export function tourSteps(): readonly TourStep[] {
       title: t.marks.title,
       body: t.marks.body,
       marks: [
-        { sample: "moving", ...t.marks.moving },
-        { sample: "parked", ...t.marks.parked },
-        { sample: "landmark", ...t.marks.landmark }
+        { sample: "longTail", ...t.marks.longTail },
+        { sample: "shortTail", ...t.marks.shortTail },
+        { sample: "parked", ...t.marks.parked }
       ]
     },
     { id: "count", target: "count", ...t.count },

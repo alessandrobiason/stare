@@ -41,17 +41,17 @@ export const en: Strings = {
     marks: {
       title: "On the sky",
       body: "Every mark is a satellite. Tap one to see what it is.",
-      moving: {
-        name: "Moving",
-        meaning: "The tail shows where it came from. Bigger means closer."
+      longTail: {
+        name: "Long tail",
+        meaning: "Moving fast: usually a low orbit, roughly 400–2,000 km up."
+      },
+      shortTail: {
+        name: "Short tail",
+        meaning: "Moving slowly: usually a medium orbit, roughly 2,000–20,000 km up."
       },
       parked: {
-        name: "Ring",
-        meaning: "Geostationary: it stays in the same spot."
-      },
-      landmark: {
-        name: "Named",
-        meaning: "Space stations and big telescopes."
+        name: "No tail",
+        meaning: "Holds still over one spot: very far out, around 36,000 km up."
       }
     },
     count: {

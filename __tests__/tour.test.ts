@@ -158,11 +158,23 @@ test("a control's view is found while mounted and forgotten after", () => {
 });
 
 describe("the key to the marks is drawn rather than described", () => {
-  const SAMPLES: readonly MarkSample[] = ["moving", "parked", "landmark"];
+  const SAMPLES: readonly MarkSample[] = ["longTail", "shortTail", "parked"];
 
   /** A tile as the sky's renderer draws it. */
   function drawn(sample: MarkSample) {
     return buildMarkerScene(markSampleFrame(sample), MARK_TILE, NIGHT_PALETTE, null, FIGURE_MARK_SCALE);
+  }
+
+  /** How far a glyph's tail reaches from its core, at the farthest point drawn. */
+  function tailReach(glyph: ReturnType<typeof drawn>["glyphs"][number]): number {
+    const points = glyph.tail?.runs.flat() ?? [];
+    let reach = 0;
+    for (let index = 0; index < points.length; index += 2) {
+      const dx = points[index] - glyph.x;
+      const dy = points[index + 1] - glyph.y;
+      reach = Math.max(reach, Math.hypot(dx, dy));
+    }
+    return reach;
   }
 
   test("every kind of mark has a picture and a meaning, in every language", () => {
@@ -179,23 +191,24 @@ describe("the key to the marks is drawn rather than described", () => {
   });
 
   test("each picture is the mark its row names", () => {
-    const moving = drawn("moving").glyphs;
-    expect(moving).toHaveLength(2);
-    for (const glyph of moving) {
-      expect(glyph.tail).not.toBeNull();
-      expect(glyph.core.width).toBeNull();
-    }
-    // Near first: larger, which is the other half of what the row says.
-    expect(moving[0].core.radius).toBeGreaterThan(moving[1].core.radius);
+    const longTail = drawn("longTail").glyphs;
+    expect(longTail).toHaveLength(1);
+    expect(longTail[0].tail).not.toBeNull();
+    expect(longTail[0].core.width).toBeNull();
+
+    const shortTail = drawn("shortTail").glyphs;
+    expect(shortTail).toHaveLength(1);
+    expect(shortTail[0].tail).not.toBeNull();
+    expect(shortTail[0].core.width).toBeNull();
+
+    // Low orbit crosses the sky fastest, so its tail reaches farther from the
+    // core over the same trail window than medium orbit's does.
+    expect(tailReach(longTail[0])).toBeGreaterThan(tailReach(shortTail[0]));
 
     for (const glyph of drawn("parked").glyphs) {
       expect(glyph.tail).toBeNull();
       expect(glyph.core.width).toBeGreaterThan(0);
     }
-
-    const landmark = drawn("landmark");
-    expect(landmark.glyphs[0].halo).not.toBeNull();
-    expect(landmark.labels.map((label) => label.name)).toEqual(["ISS"]);
   });
 
   test("and fits its tile, halo and tail included", () => {

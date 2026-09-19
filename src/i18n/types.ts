@@ -436,12 +436,12 @@ export type TourStrings = {
   marks: {
     title: string;
     body: string;
-    /** A body and its tail, near and far. */
-    moving: TourKeyStrings;
-    /** The geostationary belt: rings that never move. */
+    /** Low orbit: fast enough across the sky to leave a long tail. */
+    longTail: TourKeyStrings;
+    /** Medium orbit: slower across the sky, so the same window leaves a short one. */
+    shortTail: TourKeyStrings;
+    /** The geostationary belt: rings that never move, and so have no tail at all. */
     parked: TourKeyStrings;
-    /** A landmark: the halo and the name. */
-    landmark: TourKeyStrings;
   };
   /** The count under the app's name, which opens into what those marks are. */
   count: TourStepStrings;
