@@ -6,6 +6,7 @@ import { Metrics, SafeAreaProvider } from "react-native-safe-area-context";
 import { CatalogScreen } from "../src/components/CatalogScreen";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
+import { FindInSky } from "../src/components/FindInSky";
 import { compassMarks, nearestPoint } from "../src/components/HorizonCompass";
 import { SatelliteCard } from "../src/components/SatelliteCard";
 import { SkyHeader } from "../src/components/SkyHeader";
@@ -1056,6 +1057,32 @@ describe("the tapped satellite's card", () => {
     });
   });
 
+  describe("the arrow at the foot of a card that goes on below it", () => {
+    test("is a control, and says what it does to anyone not seeing it", () => {
+      // The fade is the sign and the arrow is the instruction, but it is also
+      // pressable — it takes the body down to the map — so it has to say so.
+      const markup = renderToStaticMarkup(
+        card({ "STARLINK-1234": detail() }, undefined, undefined, null, plan())
+      );
+
+      expect(markup).toContain(`aria-label="${strings().card.more}"`);
+    });
+
+    test("leaves everything the card says still on the card", () => {
+      // A cue that covered the reading would be worse than no cue: it is a
+      // strip at the foot of the sheet rather than a layer over it, and the
+      // only part of it that takes a touch is the arrow.
+      const text = textOf(card({ "STARLINK-1234": detail() }, undefined, undefined, null, plan()));
+
+      // Everything the card says is still said.
+      expect(text).toContain("1,240 km");
+      expect(text).toContain(strings().card.map.title);
+      // And the cue itself says nothing: it is an arrow, not a sentence over a
+      // camera picture.
+      expect(text).not.toContain(strings().card.more);
+    });
+  });
+
   test("says so when the catalog no longer carries what was tapped", () => {
     // Objects leave the active catalog, and it is reloaded every couple of
     // hours underneath a card that is still open.
@@ -1063,6 +1090,51 @@ describe("the tapped satellite's card", () => {
 
     expect(text).toContain("left the catalog");
     expect(text).not.toContain("km");
+  });
+});
+
+/**
+ * The sign over the middle of the picture, raised when a pass is picked out of
+ * the list rather than tapped on the sky.
+ *
+ * What it is for is the one thing a card at the foot of the screen cannot do:
+ * get somebody to look up. See `FindInSky`.
+ */
+describe("the sign saying to look for it", () => {
+  test("says which way to point the phone for an object that is up", () => {
+    const text = textOf(
+      <FindInSky
+        aim={{ id: 1, direction: "SE 143\u00b0 \u00b7 27\u00b0 up", risen: true }}
+        onDone={() => undefined}
+      />
+    );
+
+    expect(text).toContain(strings().scene.findIt.look);
+    // The bearing the card gives, in the same words: one answer, said twice
+    // rather than two answers to compare.
+    expect(text).toContain("SE 143\u00b0 \u00b7 27\u00b0 up");
+  });
+
+  test("and gives no bearing at all for one that has not risen", () => {
+    // Where a satellite sits under the horizon is not where it comes up, and a
+    // list of upcoming passes is mostly objects that have not risen: a bearing
+    // here would be the one figure on this screen that sends somebody out to
+    // face the wrong way.
+    const text = textOf(
+      <FindInSky
+        aim={{ id: 2, direction: "NW 312\u00b0 \u00b7 24\u00b0 below", risen: false }}
+        onDone={() => undefined}
+      />
+    );
+
+    expect(text).toContain(strings().scene.findIt.notUp);
+    expect(text).toContain(strings().scene.findIt.wait);
+    expect(text).not.toContain("312");
+  });
+
+  test("is nothing at all with nothing to say", () => {
+    // Which is the state the view spends all but a few seconds of its life in.
+    expect(renderToStaticMarkup(<FindInSky aim={null} onDone={() => undefined} />)).toBe("");
   });
 });
 

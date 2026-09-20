@@ -148,6 +148,41 @@ export type Strings = {
       seeing: Record<PassSeeing, string>;
     };
     /**
+     * What is said over the middle of the picture when a pass is picked out of
+     * the list rather than tapped on the sky.
+     *
+     * A row in the passes panel is a name and a countdown, and pressing one
+     * opens that object's card at the bottom of the screen — which reads as
+     * having opened a page about it. What actually happened is that the app
+     * has just put a line across the sky and lit a mark somewhere on it, both
+     * of them behind the phone somebody is holding at chest height. Nobody
+     * looks up for something they do not know is there, so this says it: for a
+     * few seconds, over the middle of the frame, in the one place on this
+     * screen nothing else is ever drawn.
+     */
+    findIt: {
+      /** The heading while the object is up. Upper-cased, like every heading here. */
+      look: string;
+      /**
+       * And while it has not risen yet, which is most of what a list of
+       * *upcoming* passes holds. A promise that it will be there is the wrong
+       * thing to open with when the object is still under the horizon.
+       */
+      notUp: string;
+      /** Where to point the phone. `{direction}`, from `lookDirection`. */
+      aim: string;
+      /**
+       * And what there is to do about an object that has not risen.
+       *
+       * No bearing, deliberately. Where a satellite sits while it is under the
+       * horizon is not where it will come up, and it is the one figure on this
+       * screen that would send somebody out to face the wrong way — so what is
+       * said instead is the thing that is true: the crossing is already drawn,
+       * and the phone is how it is looked at.
+       */
+      wait: string;
+    };
+    /**
      * The strip of cardinal points along the bottom of the picture.
      *
      * The letters on it are `compass` below — the same eight the card gives
@@ -210,6 +245,14 @@ export type Strings = {
     photo: string;
     /** The catalog is reloaded underneath an open card, and objects leave it. */
     missing: string;
+    /**
+     * The cue at the foot of a card with more in it than fits: what the arrow
+     * over the fade means, and what pressing it does.
+     *
+     * Never seen — the arrow is the message — but it is a control as well as a
+     * sign, so it has to say what it is. See `SatelliteCard`'s scroll cue.
+     */
+    more: string;
     /**
      * Whether this object can be seen from here, right now.
      *

@@ -5,7 +5,10 @@ import {
   Image,
   LayoutChangeEvent,
   Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleProp,
@@ -116,6 +119,33 @@ const DRAG_SLOP = 6;
 const SLIDE_MS = 220;
 
 /**
+ * How much content has to hang below the fold, in points, before the card says
+ * so.
+ *
+ * A few points of overflow is a line of text clipped by a rounding error, and
+ * an arrow inviting somebody to scroll to it is a lie. This is about half a
+ * row of figures: past it there is really something down there — which, on the
+ * cards that overflow at all, is the ground track map.
+ */
+const CUE_MIN_OVERFLOW = 24;
+/**
+ * How far the body has to be scrolled, in points, before the cue is taken as
+ * answered and goes for good.
+ *
+ * Small on purpose: the cue is a piece of news — there is more of this card —
+ * and the first flick is what delivers it. Anything more would leave an arrow
+ * bobbing over a map somebody is already reading.
+ */
+const CUE_ANSWERED_AT = 8;
+/** How long the cue takes to fade in, and to fade out once it is answered. */
+const CUE_FADE_IN_MS = 260;
+const CUE_FADE_OUT_MS = 160;
+/** One half of the cue's bob: down, then back, on a loop while it is up. */
+const CUE_BOB_MS = 780;
+/** How far it bobs, in points. A nudge — this is a hint, not a bouncing ball. */
+const CUE_BOB = 3;
+
+/**
  * What a tapped satellite is, at the bottom of the screen.
  *
  * The overlay's four channels answer "what is it for" and "how far away", and
@@ -140,6 +170,18 @@ const SLIDE_MS = 220;
  * the card does and is absent entirely for a phone with no signal — which is why
  * it is drawn as a strip that appears rather than a gap that fills, and why
  * every failure in `landmarkPhotos.ts` ends as a card with no picture on it.
+ *
+ * **And it says when it goes on below the fold.** The card is capped at a
+ * little under half the screen and the ground track map lives at the foot of
+ * it, so on most cards the best thing on it is under the edge — and a sheet
+ * with no scrollbar over a camera picture reads as a sheet that ends where it
+ * ends. Nobody scrolls something they have no reason to think is scrollable. So
+ * a card with more in it than fits fades its bottom edge into its own glass and
+ * puts an arrow on it (`ScrollCue`): the fade says the content is continuing
+ * rather than finishing, the arrow says which way, and pressing it takes the
+ * body down to the map. It is drawn only while there is really something below
+ * (`CUE_MIN_OVERFLOW`) and goes the moment anybody scrolls, because by then it
+ * is an arrow over the thing it was pointing at.
  *
  * **A tap over a cluster.** The sky puts markers on top of each other, so a tap
  * frequently means several satellites at once. The alternatives were a pair of
@@ -201,6 +243,7 @@ export const SatelliteCard: React.FC<Props> = ({
   }, [describeRef, selected]);
 
   const drag = useSwipeToDismiss(onClose);
+  const cue = useScrollCue(selected);
 
   return (
     <Animated.View
@@ -308,7 +351,19 @@ export const SatelliteCard: React.FC<Props> = ({
       {/* Under the name, and scrolling: the picture and the paragraph are the
           tall half of this card, and a card that grows past its share of the
           screen is a card over the sky it is describing. */}
-      <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={cue.bodyRef}
+        style={styles.body}
+        showsVerticalScrollIndicator={false}
+        // What the cue is worked out from: how tall the card's window is, how
+        // tall what is in it is, and whether anybody has moved it yet.
+        onLayout={cue.onLayout}
+        onContentSizeChange={cue.onContentSizeChange}
+        onScroll={cue.onScroll}
+        // Four or five events a second rather than every frame: the only thing
+        // read off them is whether the body has moved at all.
+        scrollEventThrottle={200}
+      >
         {/* Keyed by the file, so switching between two satellites under one
             finger starts the picture over rather than showing the Soyuz's for
             the frame before the ISS's effect has run. */}
@@ -392,9 +447,178 @@ export const SatelliteCard: React.FC<Props> = ({
           </>
         )}
       </ScrollView>
+
+      {/* Over the foot of the body rather than under it, because what it is
+          saying is that the body carries on past there. Outside the scroll, so
+          it stays at the edge of the card while the content moves behind it. */}
+      <ScrollCue shown={cue.shown} onPress={cue.toBottom} />
     </Animated.View>
   );
 };
+
+/**
+ * Whether the card has more in it than fits, and whether anyone has found out.
+ *
+ * Measured rather than guessed: what makes a card overflow is a photograph, a
+ * paragraph of a length nobody controls and a map that is only drawn for the
+ * objects whose elements yield an orbit, against a window that is a fraction of
+ * whatever phone this is. So the two heights are taken as the `ScrollView`
+ * reports them and compared, which is the only answer that is right on every
+ * card and every screen.
+ *
+ * The heights live in refs and only the verdict is state: both arrive several
+ * times while a photograph lands and a paragraph lays out, and none of those is
+ * a render of a card that is already re-rendering twice a second.
+ *
+ * Reset when the selection changes, along with the scroll itself: a tap through
+ * a cluster is a different object read from the top, and a body left where the
+ * last one was scrolled to would open the next card halfway down its map.
+ */
+function useScrollCue(selected: string) {
+  const bodyRef = useRef<ScrollView>(null);
+  const windowRef = useRef(0);
+  const contentRef = useRef(0);
+  const answeredRef = useRef(false);
+  const [shown, setShown] = useState(false);
+
+  const settle = () => {
+    const over = contentRef.current - windowRef.current > CUE_MIN_OVERFLOW;
+    setShown(over && !answeredRef.current);
+  };
+
+  useEffect(() => {
+    answeredRef.current = false;
+    bodyRef.current?.scrollTo({ y: 0, animated: false });
+    settle();
+    // On the selection alone: `settle` is rebuilt every render and reads only
+    // refs, so it is not a dependency in any sense that matters here.
+  }, [selected]);
+
+  return {
+    bodyRef,
+    shown,
+    onLayout: ({ nativeEvent }: LayoutChangeEvent) => {
+      windowRef.current = nativeEvent.layout.height;
+      settle();
+    },
+    onContentSizeChange: (_width: number, height: number) => {
+      contentRef.current = height;
+      settle();
+    },
+    onScroll: ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (nativeEvent.contentOffset.y <= CUE_ANSWERED_AT) return;
+      answeredRef.current = true;
+      setShown(false);
+    },
+    toBottom: () => bodyRef.current?.scrollToEnd({ animated: true })
+  };
+}
+
+/**
+ * The sign that the card goes on below its edge: its own glass closing over the
+ * content, and an arrow on it.
+ *
+ * Two halves doing two jobs. The fade is the honest half — content that dims
+ * into the surface it is on is content that continues, and it is the thing a
+ * reader takes in without being told anything. The arrow is the instruction,
+ * and it bobs, because a still arrow at the bottom of a sheet is read as
+ * decoration and a moving one is read as an invitation. It is also a control:
+ * pressing it takes the card to its foot, for the reader who understood the
+ * sign and would rather not drag a sheet that can also be dismissed by
+ * dragging it.
+ *
+ * The fade is drawn as a stack of bands rather than as a gradient. There is no
+ * gradient primitive in this app that is not Skia (`lightShaders.ts`), and a
+ * canvas for fifty points of dusk at the bottom of a card is a surface, a
+ * backend and a web fork for something eight views do indistinguishably at this
+ * height. They are the card's own colour — `panelDeep` — so what the content
+ * fades into is the glass it is already lying on rather than a grey laid over
+ * it.
+ */
+const ScrollCue: React.FC<{ shown: boolean; onPress: () => void }> = ({ shown, onPress }) => {
+  const fade = useRef(new Animated.Value(0)).current;
+  const bob = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fade, {
+      toValue: shown ? 1 : 0,
+      duration: shown ? CUE_FADE_IN_MS : CUE_FADE_OUT_MS,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: CUE_NATIVE_DRIVER
+    }).start();
+
+    if (!shown) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bob, {
+          toValue: 1,
+          duration: CUE_BOB_MS,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: CUE_NATIVE_DRIVER
+        }),
+        Animated.timing(bob, {
+          toValue: 0,
+          duration: CUE_BOB_MS,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: CUE_NATIVE_DRIVER
+        })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [bob, fade, shown]);
+
+  return (
+    <Animated.View
+      // Nothing under it is ever unreachable: the fade takes no touches at all
+      // and the arrow stops taking them the moment it is answered. In the style
+      // rather than as the prop, which both React Native and the web have
+      // moved on from.
+      style={[styles.cue, { opacity: fade, pointerEvents: shown ? "box-none" : "none" }]}
+    >
+      <View style={styles.cueFade}>
+        {CUE_FADE_BANDS.map((band, index) => (
+          <View key={index} style={band} />
+        ))}
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={strings().card.more}
+        style={styles.cueButton}
+        onPress={onPress}
+      >
+        <Animated.View
+          style={{
+            transform: [
+              { translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, CUE_BOB] }) }
+            ]
+          }}
+        >
+          <Icon name="chevron" direction="down" size={13} color={theme.color.textBright} />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+};
+
+/** The phone drives the cue off the UI thread; the browser has no such driver. */
+const CUE_NATIVE_DRIVER = Platform.OS !== "web";
+
+/** How tall the fade at the foot of the card is, in points, and in how many bands. */
+const CUE_FADE = 52;
+const CUE_BANDS = 8;
+
+/**
+ * The fade, as bands: the card's own `panelDeep` from nothing to the full
+ * strength of the glass, squared so the top of it is barely there and the
+ * weight gathers at the bottom — which is how a real gradient reads and how a
+ * ramp of eight equal steps does not.
+ */
+const CUE_FADE_BANDS = Array.from({ length: CUE_BANDS }, (_unused, index) => ({
+  height: CUE_FADE / CUE_BANDS,
+  backgroundColor: `rgba(6, 13, 26, ${(((index + 1) / CUE_BANDS) ** 2 * 0.88).toFixed(3)})`
+}));
 
 /**
  * The card's own slide: dragged down by its header, and either put away or
@@ -844,6 +1068,45 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     color: theme.color.textDim,
     fontSize: 12
+  },
+  /**
+   * The cue's strip along the foot of the card: the fade behind, the arrow
+   * resting on the bottom of it.
+   */
+  cue: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: CUE_FADE,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 6
+  },
+  cueFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    // Bottom-up, so the strongest band is the one against the card's edge.
+    justifyContent: "flex-end",
+    // The fade is a picture, not a lid: the arrow is the only part of the cue
+    // that takes a touch, and everything under the rest of it — the map, the
+    // link, the body's own scroll — goes on taking them as it did.
+    pointerEvents: "none"
+  },
+  cueButton: {
+    // The one control in the app smaller than a thumb: it is a hint that can
+    // also be pressed, and every point of it is a point of sky the card is
+    // already covering. The gesture it stands for — a flick anywhere on the
+    // body — is the size of the card.
+    width: 30,
+    height: 30,
+    borderRadius: theme.radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    ...glass(theme.color.panelLight, 10)
   }
 });
 

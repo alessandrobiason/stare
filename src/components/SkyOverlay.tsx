@@ -7,7 +7,7 @@ import {
   View
 } from "react-native";
 import { FrameLens } from "../camera/projection";
-import { SKY_MASK_CHASE_FRACTION } from "../constants";
+import { MINIMUM_SATELLITE_ELEVATION_DEG, SKY_MASK_CHASE_FRACTION } from "../constants";
 import { cachedCatalog } from "../data/tleCache";
 import {
   catalogSection,
@@ -38,9 +38,11 @@ import { skyCoverage } from "../vision/skyMask";
 import { CategoryLegend } from "./CategoryLegend";
 import { CatalogScreen } from "./CatalogScreen";
 import { strings } from "../i18n";
+import { lookDirection } from "../i18n/format";
 import { toDegrees } from "../math/angles";
 import { startSlicing } from "../timeSlice";
 import { DebugPanel } from "./DebugPanel";
+import { FindInSky, SkyAim } from "./FindInSky";
 import { GuideTour } from "./GuideTour";
 import { HorizonCompass } from "./HorizonCompass";
 import {
@@ -326,6 +328,13 @@ export const SkyOverlay: React.FC<Props> = ({
   const [available, setAvailable] = useState<FrameSize | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   /**
+   * Where to point the phone for a satellite picked out of the passes panel,
+   * while the sign saying so is up. See `FindInSky`.
+   */
+  const [aim, setAim] = useState<SkyAim | null>(null);
+  /** One up per press, so picking the same object twice shows the sign twice. */
+  const aimCount = useRef(0);
+  /**
    * How much of the safe area the tab bar takes, which is where the catalog
    * and settings sheets stop. Measured rather than assumed: the bar's height
    * is its labels', and those follow the reader's text size.
@@ -474,16 +483,6 @@ export const SkyOverlay: React.FC<Props> = ({
     name: selection?.selected ?? null
   });
 
-  // A row of the passes panel, picked: the same selection a tap on the object's
-  // own mark makes, so the card that opens is the card the sky would have
-  // opened. One name rather than a cluster: a row is one object by
-  // construction. Stable, so the panel does not render every time a sky mask
-  // lands on this view.
-  const selectPass = useCallback(
-    (name: string) => setSelection({ names: [name], selected: name }),
-    []
-  );
-
   /**
    * A row of the catalog, picked: the same selection again, and the sky back.
    *
@@ -511,6 +510,40 @@ export const SkyOverlay: React.FC<Props> = ({
   });
 
   /**
+   * A row of the passes panel, picked: the same selection a tap on the object's
+   * own mark makes, so the card that opens is the card the sky would have
+   * opened. One name rather than a cluster: a row is one object by
+   * construction.
+   *
+   * And the sign over the middle of the picture, which is the half a tap on a
+   * mark does not need: somebody who tapped the sky is already looking at it,
+   * and somebody who pressed a row in a list is looking at a list. See
+   * `FindInSky`. The bearing is read here, at the moment of the press, because
+   * that is when it is true.
+   *
+   * Stable, so the panel does not render every time a sky mask lands on this
+   * view; `describeRef` is a ref and never changes identity.
+   */
+  const selectPass = useCallback(
+    (name: string) => {
+      setSelection({ names: [name], selected: name });
+      const detail = describeRef.current(name);
+      // Nothing to point at for a name the catalog has dropped since the plan
+      // was made — the card about to open says so, which is the whole answer.
+      setAim(
+        detail
+          ? {
+              id: aimCount.current++,
+              direction: lookDirection(detail),
+              risen: detail.elevationDeg >= MINIMUM_SATELLITE_ELEVATION_DEG
+            }
+          : null
+      );
+    },
+    [describeRef]
+  );
+
+  /**
    * What a tap on the picture means: the satellites under the finger — marks,
    * and the names written along the paths across the sky — or nothing at all.
    *
@@ -535,6 +568,9 @@ export const SkyOverlay: React.FC<Props> = ({
 
     const names = namesUnder(latestFrameRef.current, frameStyle, point);
     setSelection(names.length === 0 ? null : { names, selected: names[0] });
+    // Whoever tapped the picture is looking at the picture, and the sign is
+    // advice about an object they may just have stopped asking about.
+    setAim(null);
   };
 
   // Rebuilt on every render and read only through the ref, because the panel
@@ -602,6 +638,14 @@ export const SkyOverlay: React.FC<Props> = ({
   useEffect(() => {
     onMaskStatusChangeRef.current?.(maskStatus);
   }, [maskStatus, onMaskStatusChangeRef]);
+
+  // A sign about where to point the phone is worthless once the phone is
+  // pointed at something else: a tab over the sky, or the debug overlays taking
+  // the picture. Dropped rather than merely hidden, so coming back does not
+  // replay a bearing that is minutes old.
+  useEffect(() => {
+    if (tab !== "sky" || debug) setAim(null);
+  }, [debug, tab]);
 
   const onSkyFixChangeRef = useLatestRef(onSkyFixChange);
   useEffect(() => {
@@ -751,8 +795,14 @@ export const SkyOverlay: React.FC<Props> = ({
                     style={styles.inset}
                     names={selection.names}
                     selected={selection.selected}
-                    onSelect={(name) => setSelection({ names: selection.names, selected: name })}
-                    onClose={() => setSelection(null)}
+                    onSelect={(name) => {
+                      setSelection({ names: selection.names, selected: name });
+                      setAim(null);
+                    }}
+                    onClose={() => {
+                      setSelection(null);
+                      setAim(null);
+                    }}
                     describeRef={describeRef}
                     sighting={selectedPasses.sighting}
                     groundTrack={groundTrack}
@@ -786,6 +836,15 @@ export const SkyOverlay: React.FC<Props> = ({
             />
           </View>
         </SafeAreaLayer>
+
+        {/* Over the picture and over the panels, in the middle of the screen,
+            for a few seconds after a pass is picked out of the list: which way
+            to point the phone. Not under the debug overlays, where the picture
+            belongs to the mask, and not while another tab is over the sky —
+            there is nothing to aim at behind a sheet. */}
+        {tab === "sky" && !debug && (
+          <FindInSky aim={aim} onDone={() => setAim(null)} />
+        )}
 
         {/* Last, so it is over every panel: it lights up the real ones. */}
         {guide && <GuideTour onDone={onCloseGuide} />}

@@ -119,6 +119,12 @@ export const en: Strings = {
         unknown: "brightness not recorded"
       }
     },
+    findIt: {
+      look: "LOOK FOR IT IN THE SKY",
+      notUp: "NOT UP YET",
+      aim: "Point the phone {direction}",
+      wait: "Its crossing is already drawn on the sky — raise the phone to find it"
+    },
     compass: {
       facing: "Facing {point}"
     },
@@ -157,6 +163,7 @@ export const en: Strings = {
     openSite: "Open {site}",
     photo: "Photograph of {name}",
     missing: "This satellite has left the catalog.",
+    more: "Scroll for more",
     seeing: {
       tooFar: "Not visible — too far away to see",
       visible: "Visible to the eye",

@@ -112,6 +112,12 @@ export const it: Strings = {
         unknown: "luminosità non registrata"
       }
     },
+    findIt: {
+      look: "CERCALO IN CIELO",
+      notUp: "NON È ANCORA SORTO",
+      aim: "Punta il telefono verso {direction}",
+      wait: "Il suo passaggio è già tracciato sul cielo: alza il telefono per trovarlo"
+    },
     compass: {
       facing: "Direzione {point}"
     },
@@ -150,6 +156,7 @@ export const it: Strings = {
     openSite: "Apri {site}",
     photo: "Fotografia di {name}",
     missing: "Questo satellite non è più nel catalogo.",
+    more: "Scorri per vedere altro",
     seeing: {
       tooFar: "Non visibile — troppo lontano per vederlo",
       visible: "Visibile a occhio nudo",
