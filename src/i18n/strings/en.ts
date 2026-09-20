@@ -169,6 +169,12 @@ export const en: Strings = {
       aboutMagnitude: "around magnitude {value}"
     },
     sighting: "Visible to the eye at {time}",
+    map: {
+      label: "Ground track of {name}",
+      title: "GROUND TRACK",
+      footprint: "Inside the circle it is above the horizon",
+      at: "at {time}"
+    },
     facts: {
       distance: "Distance",
       altitude: "Altitude",

@@ -162,6 +162,12 @@ export const it: Strings = {
       aboutMagnitude: "circa magnitudine {value}"
     },
     sighting: "Visibile a occhio nudo alle {time}",
+    map: {
+      label: "Traccia a terra di {name}",
+      title: "TRACCIA A TERRA",
+      footprint: "Dentro il cerchio è sopra l'orizzonte",
+      at: "alle {time}"
+    },
     facts: {
       distance: "Distanza",
       altitude: "Quota",

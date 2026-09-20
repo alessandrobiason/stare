@@ -27,8 +27,10 @@ import "@shopify/react-native-skia/src/skia/NativeSetup";
 
 export {
   AlphaType,
+  ClipOp,
   ColorType,
   createPicture,
+  FillType,
   PaintStyle,
   Skia,
   StrokeCap,

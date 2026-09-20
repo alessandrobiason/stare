@@ -954,6 +954,91 @@ export const FULL_TRAJECTORY = {
 } as const;
 
 /**
+ * The world map on a tapped satellite's card, and the orbit drawn over it
+ * (`src/satellite/groundTrack.ts`, `src/components/groundTrackScene.ts`).
+ *
+ * Everything else on the card is about here and now: how far away the thing is
+ * from where you are standing, which way to look, whether you could see it.
+ * The map is the other half of the answer — what the object *does*, which is a
+ * shape rather than a figure, and the only one of the two that tells a person
+ * why a satellite is in the orbit it is in.
+ *
+ * Read `groundTrack.ts` for what the shape means and `loopSecondsFor` for why
+ * the animation runs at the rate it does.
+ */
+export const GROUND_TRACK = {
+  /**
+   * How many points one orbit is sampled at.
+   *
+   * A degree of longitude is about a pixel on a map this size, and a low orbit
+   * covers some 360 degrees in a period — so this is roughly a point per pixel
+   * of track, which is what keeps a near-polar orbit's turn over the pole a
+   * curve rather than a corner. It is a few hundred propagations of a single
+   * object, spent once on a tap.
+   */
+  samples: 360,
+  /** Too few to draw a curve with: a track this broken is not drawn at all. */
+  minimumSamples: 8,
+  /**
+   * Past this, one orbit is not a picture of anything, in minutes.
+   *
+   * Two days. A real catalogue orbit tops out at a sidereal day — that is what
+   * geostationary *means* — so anything beyond this is decaying elements, an
+   * escape trajectory, or a set of numbers SGP4 should not have been given.
+   * Those objects keep their card and lose their map.
+   */
+  maximumPeriodMinutes: 2880,
+  /**
+   * The map itself: an equirectangular world, twice as wide as it is tall.
+   *
+   * The plainest projection there is — longitude straight across, latitude
+   * straight down — and the right one here for two reasons that have nothing
+   * to do with cartography. A ground track in it is the curve everybody has
+   * seen on a mission-control screen, so the shape is recognised before it is
+   * explained; and the poles being stretched to the full width is what makes a
+   * polar orbit's sweep across the top of the map read as the sweep it is.
+   */
+  aspect: 2,
+  /** Meridians and parallels, every this many degrees. */
+  graticuleStepDeg: 30,
+  /**
+   * How much of the orbit, as a fraction, is drawn as the bright wake behind
+   * the moving dot.
+   *
+   * The rest of the track is drawn faint, so there is always a whole orbit on
+   * the map to read the shape off, and a lit piece saying where in it the
+   * object is now. A tenth is a few seconds of animation: long enough to see
+   * which way the dot is going, short enough that the wake is a comet's tail
+   * rather than a second copy of the track.
+   */
+  wakeFraction: 0.1,
+  /** How many points the footprint's circle is drawn with. */
+  footprintPoints: 96,
+  animation: {
+    /**
+     * The orbit the loop's length is quoted against, in minutes, and how many
+     * seconds that one takes. A low orbit — the station's — in twelve seconds.
+     */
+    referenceMinutes: 96,
+    referenceSeconds: 12,
+    /**
+     * The power the period ratio is raised to before it stretches the loop.
+     *
+     * Well under one on purpose. At 1 every orbit would run at the same
+     * compression and a geostationary day would take three minutes; at 0 every
+     * orbit would take the same twelve seconds and the card would be showing
+     * two objects sixteen times apart in period moving at the same rate. A
+     * third of the way between the two is a loop that is visibly longer for a
+     * slower orbit and still ends while somebody is watching. See
+     * `loopSecondsFor`.
+     */
+    stretch: 0.3,
+    minimumSeconds: 9,
+    maximumSeconds: 24
+  }
+} as const;
+
+/**
  * Tapping a marker to read what it is (`src/components/markerHitTest.ts`).
  *
  * The overlay says what a satellite is *for* with colour and how far away it is

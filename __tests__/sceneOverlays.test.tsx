@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Metrics, SafeAreaProvider } from "react-native-safe-area-context";
@@ -20,6 +22,9 @@ import {
   loadLandmarkPhoto
 } from "../src/satellite/landmarkPhotos";
 import { SkySummary } from "../src/hooks/useAnimatedMarkers";
+import { GroundTrackPlan } from "../src/hooks/useGroundTrack";
+import { groundTrackFor } from "../src/satellite/groundTrack";
+import { parseTleCatalog } from "../src/data/tleCatalog";
 import { BREAKDOWN_ROWS, FleetBreakdown, tallyFleets } from "../src/satellite/fleets";
 import { SAMPLE_TLE } from "../src/data/sampleTle";
 import { SatelliteCatalog } from "../src/satellite/catalog";
@@ -639,7 +644,8 @@ describe("the tapped satellite's card", () => {
     details: Record<string, SatelliteDetail | null>,
     names = Object.keys(details),
     selected = names[0],
-    sighting: UpcomingPass | null = null
+    sighting: UpcomingPass | null = null,
+    groundTrack: GroundTrackPlan | null = null
   ) {
     const describeRef = { current: (name: string) => details[name] ?? null };
     return (
@@ -650,8 +656,21 @@ describe("the tapped satellite's card", () => {
         onClose={() => undefined}
         describeRef={describeRef}
         sighting={sighting}
+        groundTrack={groundTrack}
         />
     );
+  }
+
+  /** One orbit planned for the card's map, from the fixture's own elements. */
+  function plan(name = "ISS"): GroundTrackPlan {
+    const tles = parseTleCatalog(
+      fs.readFileSync(path.join(__dirname, "../testing/fixtures/active.tle"), "utf8")
+    ).filter((tle) => tle.name === name);
+    const entry = new SatelliteCatalog(tles).entries[0];
+    return {
+      track: groundTrackFor(entry, Date.UTC(2026, 7, 23, 12, 0, 0)),
+      observer: { latitudeDeg: 45.46, longitudeDeg: 9.19, heightM: 120 }
+    };
   }
 
   describe("whether it can be seen", () => {
@@ -989,6 +1008,51 @@ describe("the tapped satellite's card", () => {
 
       expect(text).toContain("International Space Station");
       expect(text).not.toContain("Public domain");
+    });
+  });
+
+  describe("the map of where it goes", () => {
+    test("is drawn under the figures, with the circle explained", () => {
+      const text = textOf(card({ "STARLINK-1234": detail() }, undefined, undefined, null, plan()));
+
+      expect(text).toContain(strings().card.map.title);
+      expect(text).toContain(strings().card.map.footprint);
+      // Under the figures rather than over them: the card still opens on what
+      // the object is, and the map is what a scroll gets you.
+      expect(text.indexOf(strings().card.facts.orbit)).toBeLessThan(
+        text.indexOf(strings().card.map.title)
+      );
+    });
+
+    test("names the object it is a map of, for a screen reader", () => {
+      const markup = renderToStaticMarkup(
+        card({ "STARLINK-1234": detail() }, undefined, undefined, null, plan())
+      );
+
+      expect(markup).toContain(fill(strings().card.map.label, { name: "STARLINK-1234" }));
+    });
+
+    test("is absent until the orbit has been worked out", () => {
+      // The plan lands a moment after the tap, and an object whose elements
+      // will not make an orbit never gets one at all. Either way the card is
+      // the card it was, rather than a card with an empty world on it.
+      expect(textOf(card({ "STARLINK-1234": detail() }))).not.toContain(
+        strings().card.map.title
+      );
+
+      const noOrbit: GroundTrackPlan = { ...plan(), track: null };
+      expect(
+        textOf(card({ "STARLINK-1234": detail() }, undefined, undefined, null, noOrbit))
+      ).not.toContain(strings().card.map.title);
+    });
+
+    test("is not drawn for an object the catalog has dropped", () => {
+      // No category to colour it with and no figures to sit under: what is
+      // left is the line saying the object has gone.
+      const text = textOf(card({ "STARLINK-1234": null }, undefined, undefined, null, plan()));
+
+      expect(text).toContain("left the catalog");
+      expect(text).not.toContain(strings().card.map.title);
     });
   });
 

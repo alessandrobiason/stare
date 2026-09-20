@@ -21,6 +21,7 @@ import {
 } from "../debug/sections";
 import { SkySummary, useAnimatedMarkers } from "../hooks/useAnimatedMarkers";
 import { useCelestialAlignment } from "../hooks/useCelestialAlignment";
+import { useGroundTrack } from "../hooks/useGroundTrack";
 import { useLatestRef } from "../hooks/useLatestRef";
 import { useSelectedPasses } from "../hooks/useSelectedPasses";
 import { useSkyPalette } from "../hooks/useSkyPalette";
@@ -463,6 +464,16 @@ export const SkyOverlay: React.FC<Props> = ({
     name: selection?.selected ?? null
   });
 
+  // And the orbit it draws on the ground, for the map at the foot of the same
+  // card. Not about this place the way the passes above are — an orbit is the
+  // same orbit wherever it is watched from — but planned against the same
+  // epoch, because the fix it carries is what puts the observer on the map.
+  const groundTrack = useGroundTrack({
+    tracker,
+    epochRef: drawnEpochRef,
+    name: selection?.selected ?? null
+  });
+
   // A row of the passes panel, picked: the same selection a tap on the object's
   // own mark makes, so the card that opens is the card the sky would have
   // opened. One name rather than a cluster: a row is one object by
@@ -744,6 +755,7 @@ export const SkyOverlay: React.FC<Props> = ({
                     onClose={() => setSelection(null)}
                     describeRef={describeRef}
                     sighting={selectedPasses.sighting}
+                    groundTrack={groundTrack}
                   />
                 )}
 

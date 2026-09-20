@@ -264,6 +264,44 @@ export type Strings = {
      * passes panel uses for the same pass. See `sightingLine`.
      */
     sighting: string;
+    /**
+     * The map of the world at the foot of the card, and the orbit drawn
+     * moving across it.
+     *
+     * Four strings for a picture, which is the ratio this block is meant to
+     * have: the shape of a ground track is the answer, and the words are only
+     * there to say what the shaded patch is and what the clock beside it is
+     * counting. See `src/components/GroundTrackMap.tsx`.
+     */
+    map: {
+      /**
+       * What the picture is, for a screen reader. `{name}`.
+       *
+       * Names the object rather than describing the drawing, for the reason
+       * `photo` above does: a moving map of an orbit is not a thing a fixed
+       * sentence describes, and the orbit's figures are all in the rows above
+       * it in words a screen reader has already read out.
+       */
+      label: string;
+      /** The heading over it. Upper-cased, like the purpose line. */
+      title: string;
+      /**
+       * What the circle under the satellite is: the ground it is above the
+       * horizon from, which is the ground it can serve.
+       */
+      footprint: string;
+      /**
+       * The moment the animation is at, as a clock time. `{time}`.
+       *
+       * The one thing on the card that says the map is running at its own
+       * speed rather than in real time — and the only honest way to show that
+       * two objects sixteen times apart in period are being flown round in
+       * about the same number of seconds. A day goes by under a geostationary
+       * satellite's motionless dot; an hour and a half under the station's lap
+       * of the world.
+       */
+      at: string;
+    };
     facts: {
       distance: string;
       altitude: string;

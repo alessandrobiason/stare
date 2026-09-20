@@ -56,6 +56,7 @@ sizes. **The sky behind them is drawn rather than photographed** — see
 | **When to look up** | Every pass you could see with the naked eye in the next day, listed as a countdown and drawn as an arc across the sky. |
 | **When to go outside** | A notification ten minutes before a pass you could actually see — naked eye or binoculars — with the app shut and the phone in a pocket. Nothing at all for a sky with nothing in it. |
 | **What it is** | Tap any mark — or any name written along an arc — for a briefing, the range, the speed and the orbit. |
+| **What it does** | And at the foot of that card, a world map with the object's orbit flown across it: the ground track, and the patch of the world it can see from wherever it has got to. |
 | **Where to find one** | The catalogue tab is the same 16,000 objects read the other way round: by fleet, by name, by what is up right now. |
 
 Two languages, English and Italian. iPhone only, portrait only; it needs a
@@ -95,6 +96,7 @@ flowchart LR
 | ECI → ECEF → ENU → the camera's own axes | [`src/camera/projection.ts`](src/camera/projection.ts) |
 | Sky mask, and the six filters between it and a hidden marker | [`src/vision/`](src/vision/) |
 | What a satellite looks like, in one place | [`src/components/markerScene.ts`](src/components/markerScene.ts) |
+| The card's world map: one orbit as a ground track, flown | [`src/satellite/groundTrack.ts`](src/satellite/groundTrack.ts), [`src/components/groundTrackScene.ts`](src/components/groundTrackScene.ts) |
 | Passes: the arcs, and the same plan as a list | [`src/satellite/orbitPath.ts`](src/satellite/orbitPath.ts), [`src/satellite/upcomingPasses.ts`](src/satellite/upcomingPasses.ts) |
 | Which passes are worth waking somebody for, and queueing them | [`src/satellite/passAlerts.ts`](src/satellite/passAlerts.ts), [`src/notifications/`](src/notifications/) |
 

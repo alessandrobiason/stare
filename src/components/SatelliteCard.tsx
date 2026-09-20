@@ -15,6 +15,7 @@ import {
   View,
   ViewStyle
 } from "react-native";
+import { GroundTrackPlan } from "../hooks/useGroundTrack";
 import { fill, strings } from "../i18n";
 import {
   kilometres,
@@ -35,6 +36,7 @@ import {
 } from "../satellite/landmarkPhotos";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { SatelliteDetail } from "../types";
+import { GroundTrackMap } from "./GroundTrackMap";
 import { Icon } from "./Icon";
 import { cssColor } from "./palette";
 import { glass, lift, theme } from "./theme";
@@ -66,6 +68,17 @@ type Props = {
    * different answer most of the time. See `sightingLine`.
    */
   sighting?: UpcomingPass | null;
+  /**
+   * The orbit this object draws on the ground, for the map at the foot of the
+   * card, or `null` while there is none to draw.
+   *
+   * Planned outside the card (`useGroundTrack`) rather than read off
+   * `describeRef` like the figures are, for the reason the sighting above is:
+   * it is a few hundred propagations that land some time after the tap, and a
+   * card that re-read it on its own sampling timer would be running them twice
+   * a second for a picture that changes twice an hour.
+   */
+  groundTrack?: GroundTrackPlan | null;
   /** Where it sits: laid over the card's own, by the stack that arranges it. */
   style?: StyleProp<ViewStyle>;
 };
@@ -151,6 +164,7 @@ export const SatelliteCard: React.FC<Props> = ({
   onClose,
   describeRef,
   sighting = null,
+  groundTrack = null,
   style
 }) => {
   const t = strings();
@@ -354,6 +368,28 @@ export const SatelliteCard: React.FC<Props> = ({
           // — an honest gap, rather than a card of dashes that looks like a
           // fault.
           <Text style={styles.missing}>{t.card.missing}</Text>
+        )}
+
+        {/* Last, and the only thing on the card that is not about this instant
+            or about this place: what the object *does*. It is the tallest block
+            here, which is why it is at the bottom — the card opens on the
+            picture of the thing and the paragraph about it, as it always has,
+            and the map is what a scroll gets you.
+
+            Directly under the figures rather than under the paragraph, because
+            it belongs with them: the row above it says an orbit takes an hour
+            and a half, and this is that hour and a half drawn. Absent entirely
+            where the elements will not yield an orbit, rather than drawn as an
+            empty world — see `useGroundTrack`. */}
+        {detail && groundTrack?.track && (
+          <>
+            <View style={styles.rule} />
+            <GroundTrackMap
+              plan={groundTrack}
+              name={selected}
+              color={CATEGORY_COLORS[detail.category]}
+            />
+          </>
         )}
       </ScrollView>
     </Animated.View>
