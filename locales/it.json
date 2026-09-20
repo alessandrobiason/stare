@@ -1,4 +1,5 @@
 {
   "NSCameraUsageDescription": "Stare disegna i satelliti sul cielo che hai davanti.",
-  "NSLocationWhenInUseUsageDescription": "A Stare serve la tua posizione per sapere quali satelliti hai sopra la testa."
+  "NSLocationWhenInUseUsageDescription": "A Stare serve la tua posizione per sapere quali satelliti hai sopra la testa.",
+  "NSMotionUsageDescription": "A Stare servono i sensori di movimento per sapere dove stai puntando il telefono."
 }

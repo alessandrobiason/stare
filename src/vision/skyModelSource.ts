@@ -19,3 +19,18 @@ const DEFAULT_MODEL_URL =
  * both the web and the phone.
  */
 export const SKY_MODEL_URL = process.env.EXPO_PUBLIC_SKYWATER_MODEL_URL ?? DEFAULT_MODEL_URL;
+
+/**
+ * Who the model belongs to, for the About page.
+ *
+ * SkyWater-Seg is somebody else's work under the MIT licence, and the licence
+ * asks for the notice to travel with it. The weights are downloaded at runtime
+ * rather than compiled into the binary, so strictly the app distributes
+ * nothing — but the app is unusable without them, and a credit costs one line.
+ * It lives here beside the URL it credits so the two cannot drift apart.
+ */
+export const SKY_MODEL_CREDIT = {
+  name: "SkyWater-Seg",
+  /** The model card, which is where the licence and the weights both are. */
+  page: "https://huggingface.co/Realcat/skywater_seg"
+} as const;

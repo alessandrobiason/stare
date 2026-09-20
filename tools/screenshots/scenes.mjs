@@ -221,8 +221,14 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 41,
     caption: {
-      title: "Point it at the sky",
-      body: "The satellites passing over you, drawn on the picture where they actually are."
+      en: {
+        title: "Point it at the sky",
+        body: "The satellites passing over you, drawn on the picture where they actually are."
+      },
+      it: {
+        title: "Puntalo verso il cielo",
+        body: "I satelliti che ti passano sopra, disegnati sull’immagine dove si trovano davvero."
+      }
     },
     sky: NIGHT_CITY,
     palette: "night",
@@ -231,9 +237,12 @@ const scenes = [
     // what the plan says when a pass has already begun (`scene.passes.now`).
     pass: {
       name: "ISS",
-      inMinutes: "now",
-      where: "NE · 38° up",
-      seeing: "visible to the eye"
+      // `null` is the pass that has already begun, which the app writes as
+      // `scene.passes.now` rather than as a count of minutes.
+      inMinutes: null,
+      azimuthDeg: 45,
+      elevationDeg: 38,
+      seeing: "visible"
     },
     // The station's own arc, running on ahead of it: the same line the marker
     // is travelling along, with the next minute marked on it.
@@ -271,8 +280,14 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 38,
     caption: {
-      title: "Tap a light, learn what it is",
-      body: "What it is, who flies it, how far away — and the figures keep moving while you read."
+      en: {
+        title: "Tap a light, learn what it is",
+        body: "What it is, who flies it, how far away — and the figures keep moving while you read."
+      },
+      it: {
+        title: "Tocca una luce, scopri cos’è",
+        body: "Che cos’è, chi lo fa volare, quanto è lontano — e i numeri continuano a muoversi mentre leggi."
+      }
     },
     sky: { ...NIGHT_CITY, seed: 23 },
     palette: "night",
@@ -281,20 +296,39 @@ const scenes = [
     card: {
       names: ["ISS", "CREW DRAGON 9", "PROGRESS-MS 28"],
       selected: "ISS",
+      // The row of small type under the name is the object's category, so it
+      // is looked up rather than written out: `filter.categories.LANDMARK`.
       category: "LANDMARK",
-      purpose: "HIGHLIGHTS",
-      briefing:
-        "The International Space Station: a laboratory the size of a football pitch, 400 km up, " +
-        "crewed without a break since November 2000 by NASA, Roscosmos, ESA, JAXA and CSA. It is " +
-        "also the brightest thing in this sky — bright enough to follow with the naked eye.",
+      /*
+       * A shortened `briefing.ts` — the card on a phone scrolls and a frame
+       * does not, so this is the opening of the real paragraph rather than all
+       * of it. Trimmed by hand per language from `src/satellite/briefing.ts`
+       * and `src/i18n/briefings/it.ts`, which is why it is here and not read
+       * from them: what this needs is the same text cut to the same height,
+       * and where to cut is a judgement in each language.
+       */
+      briefing: {
+        en:
+          "The International Space Station: a laboratory the size of a football pitch, 400 km up, " +
+          "crewed without a break since November 2000 by NASA, Roscosmos, ESA, JAXA and CSA. It is " +
+          "also the brightest thing in this sky — bright enough to follow with the naked eye.",
+        it:
+          "La Stazione Spaziale Internazionale: un laboratorio grande come un campo da calcio, a " +
+          "400 km di quota, abitato senza interruzioni dal novembre 2000 da NASA, Roscosmos, ESA, " +
+          "JAXA e CSA. È anche l’oggetto più luminoso di questo cielo: si segue a occhio nudo."
+      },
       site: "nasa.gov",
-      facts: [
-        ["Distance", "612 km"],
-        ["Altitude", "421 km"],
-        ["Speed", "7.7 km/s"],
-        ["Look", "NE 41° · 38° up"],
-        ["Orbit", "93 min"]
-      ]
+      // The five figures, as the numbers behind them: the labels are the app's
+      // (`card.facts`) and the units are the app's (`units`), so the row reads
+      // "38° up" in English and "38° sopra" in Italian from one entry here.
+      figures: {
+        distanceKm: 612,
+        altitudeKm: 421,
+        speedKmPerSecond: 7.7,
+        azimuthDeg: 41,
+        elevationDeg: 38,
+        orbitMinutes: 93
+      }
     },
     // The same arc as the card is describing: the tapped object is on it, and
     // the figures on the card are figures about a point along it.
@@ -325,8 +359,14 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 128,
     caption: {
-      title: "It knows what is in the way",
-      body: "Anything behind a building or a tree is left out, rather than drawn over it."
+      en: {
+        title: "It knows what is in the way",
+        body: "Anything behind a building or a tree is left out, rather than drawn over it."
+      },
+      it: {
+        title: "Sa cosa c’è di mezzo",
+        body: "Quello che sta dietro a un palazzo o a un albero viene escluso, invece di essere disegnato sopra."
+      }
     },
     sky: {
       mode: "night",
@@ -376,8 +416,14 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 196,
     caption: {
-      title: "Colour is what it is for",
-      body: "The same soft colours by day and by night. Size is how far away; a ring holds station over the equator."
+      en: {
+        title: "Colour is what it is for",
+        body: "The same soft colours by day and by night. Size is how far away; a ring holds station over the equator."
+      },
+      it: {
+        title: "Il colore dice a cosa serve",
+        body: "Gli stessi colori tenui di giorno e di notte. La dimensione è la distanza; un anello sta fermo sopra l’equatore."
+      }
     },
     sky: {
       mode: "day",
@@ -416,8 +462,14 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 22,
     caption: {
-      title: "What is overhead, right now",
-      body: "The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds."
+      en: {
+        title: "What is overhead, right now",
+        body: "The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds."
+      },
+      it: {
+        title: "Cosa hai sopra, proprio adesso",
+        body: "Il catalogo pubblico in tempo reale — circa 16.000 oggetti tracciati — diviso per quello che il cielo davanti a te contiene davvero."
+      }
     },
     sky: { ...NIGHT_CITY, seed: 77 },
     palette: "night",
@@ -427,7 +479,7 @@ const scenes = [
     // them always add up — see `statusPanel`.
     // The line the breakdown opens with: a count of marks says nothing about
     // whether any of them can be seen. See `scene.sunlight`.
-    sunlight: "14 of these are in sunlight",
+    sunlight: { of: "some", count: 14 },
     breakdown: {
       rows: [
         ["Starlink", 6],
@@ -465,8 +517,14 @@ const scenes = [
     // frame (`HorizonCompass`). The card's own bearings are read against it.
     headingDeg: 305,
     caption: {
-      title: "Know when to look up",
-      body: "Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up."
+      en: {
+        title: "Know when to look up",
+        body: "Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up."
+      },
+      it: {
+        title: "Sai quando guardare in su",
+        body: "Ogni passaggio porta con sé l’arco che percorrerà, una punta di freccia per ogni minuto, e l’ora in cui sorge."
+      }
     },
     sky: { ...NIGHT_CITY, seed: 53 },
     palette: "night",
@@ -476,9 +534,10 @@ const scenes = [
     // it is opened: the next pass, where to stand and whether it can be seen.
     pass: {
       name: "ISS",
-      inMinutes: "14 min",
-      where: "NW · 63° up",
-      seeing: "visible to the eye"
+      inMinutes: 14,
+      azimuthDeg: 315,
+      elevationDeg: 63,
+      seeing: "visible"
     },
     // Two passes, which is what the frame is about. One is under way and is
     // drawn at full strength from the object itself; the other has not begun,

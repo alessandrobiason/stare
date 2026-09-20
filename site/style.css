@@ -1,0 +1,114 @@
+/*
+ * The two pages App Store Connect insists on, in the app's own colours.
+ *
+ * No build step, no fonts to fetch, no analytics: the whole site is three
+ * files, which is the right size for something whose job is to exist at a
+ * stable URL and say what is true.
+ */
+
+:root {
+  --background: #07101f;
+  --panel: #0d1c33;
+  --text: #eef4fb;
+  --text-dim: #93a7c0;
+  --accent: #4da6ff;
+  --rule: rgba(147, 167, 192, 0.22);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0 16px 96px;
+  background: var(--background);
+  color: var(--text);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial,
+    sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+main {
+  max-width: 43rem;
+  margin: 0 auto;
+}
+
+header {
+  padding: 56px 0 8px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 32px;
+}
+
+h1 {
+  font-size: clamp(1.9rem, 6vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+h2 {
+  font-size: 1.22rem;
+  letter-spacing: -0.01em;
+  margin: 40px 0 10px;
+}
+
+p,
+li {
+  color: var(--text-dim);
+}
+
+strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+a {
+  color: var(--accent);
+}
+
+ul {
+  padding-left: 1.15rem;
+}
+
+li {
+  margin-bottom: 10px;
+}
+
+.lede {
+  font-size: 1.08rem;
+  color: var(--text);
+}
+
+.stamp {
+  font-size: 0.92rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* The one boxed paragraph a page gets: the answer, before the detail. */
+.summary {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin: 28px 0 8px;
+}
+
+.summary p {
+  margin: 0;
+  color: var(--text);
+}
+
+nav.langs {
+  margin-top: 14px;
+  font-size: 0.92rem;
+}
+
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  font-size: 0.92rem;
+  color: var(--text-dim);
+}

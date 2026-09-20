@@ -1,7 +1,11 @@
 /*
  * Builds the App Store screenshots.
  *
- *     node tools/screenshots/render.mjs
+ *     node tools/screenshots/render.mjs [--locale it]
+ *
+ * One set per storefront language. English writes `docs/app-store/`, every
+ * other locale writes `docs/app-store/<locale>/`, and the language comes from
+ * `LOCALES` in `src/i18n/locale.ts` — the same list the app itself speaks.
  *
  * Two passes, and the split is the point. The phone screen is rendered on its
  * own at the device scale factor a 6.9-inch iPhone actually has, so every panel
@@ -16,11 +20,21 @@
  * `tools/screenshots/backgrounds/<scene id>.jpg` and it is used instead, at the
  * camera's own 3:4 shape, with the overlay unchanged on top of it.
  *
+ * **The words on the phone are the app's own.** The chrome in these frames —
+ * the filter's categories, the count, the card's labels — is read out of
+ * `src/i18n/strings/<locale>.ts` at render time rather than copied into this
+ * file, because a copy is a thing that drifts: the store would go on showing
+ * last year's wording of a panel the app has since rewritten, and nothing
+ * would fail. What each scene *says* rather than what the app calls it — a
+ * briefing, a tally, the figures on a card — is scene data, and carries one
+ * entry per locale in `scenes.mjs`.
+ *
  * Chromium comes from the Playwright browser directory this container already
  * has; `CHROME` overrides it. Inter is fetched once into `.cache/fonts` and the
  * system sans is used if that fetch fails.
  */
 
+import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
@@ -30,8 +44,9 @@ import {
   rmSync,
   writeFileSync
 } from "node:fs";
-import { dirname, extname, join } from "node:path";
+import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import scenes from "./scenes.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -39,7 +54,124 @@ const root = join(here, "..", "..");
 const build = join(here, ".build");
 const cache = join(here, ".cache");
 const backgrounds = join(here, "backgrounds");
-const outDir = join(root, "docs", "app-store");
+
+/* ---- The language this run is drawing. ----------------------------------- */
+
+/**
+ * Reads a TypeScript module out of `src/` and hands back what it exports.
+ *
+ * The app's strings are `.ts`, this tool is `.mjs`, and the two have to meet
+ * somewhere. They meet here rather than in a copy of the strings, because the
+ * whole reason to reach into `src/` is that a second copy would be free to be
+ * wrong. Every file this loads is a plain object literal behind an
+ * `import type`, so stripping the types leaves runnable JavaScript and no
+ * bundler is needed — `transpileModule` does not typecheck, which is what
+ * `npm run typecheck` is for.
+ */
+async function loadFromSource(relative) {
+  const file = join(root, relative);
+  const js = ts.transpileModule(readFileSync(file, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: file
+  }).outputText;
+  // Imports inside the transpiled text resolve against this data URL, which has
+  // no directory, so anything the strings reach for has to be a type. They are.
+  return import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
+}
+
+/**
+ * The languages the app has interface text for, which is the directory listing
+ * rather than `LOCALES` in `src/i18n/locale.ts`: that module reaches for the
+ * device's own storage on the way in and does not load outside React Native.
+ * The two lists are held together by `__tests__/i18n.test.ts`, which is a
+ * better place for that check than here.
+ */
+const LOCALES = readdirSync(join(root, "src", "i18n", "strings"))
+  .filter((file) => extname(file) === ".ts")
+  .map((file) => file.replace(/\.ts$/, ""));
+const FALLBACK_LOCALE = "en";
+
+const locale = (() => {
+  const flag = process.argv.indexOf("--locale");
+  if (flag === -1) return FALLBACK_LOCALE;
+  const asked = process.argv[flag + 1];
+  if (!LOCALES.includes(asked)) {
+    throw new Error(`no such locale: ${asked} (the app speaks ${LOCALES.join(", ")})`);
+  }
+  return asked;
+})();
+
+/** What the app says, in that language. */
+const { [locale]: t } = await loadFromSource(`src/i18n/strings/${locale}.ts`);
+
+/**
+ * English keeps the directory it has always had, so the six paths the listing
+ * already points at do not move; every other language gets one beside it.
+ */
+const outDir =
+  locale === FALLBACK_LOCALE
+    ? join(root, "docs", "app-store")
+    : join(root, "docs", "app-store", locale);
+
+/**
+ * `fill` and `compassPoint` from `src/i18n/format.ts`, which cannot be loaded
+ * the way the strings are: it reaches through `strings()` into the module that
+ * holds the device's chosen language. They are four lines each and they are
+ * the only two this tool needs, so they are mirrored rather than imported.
+ */
+function fill(template, values) {
+  return template.replace(/\{(\w+)\}/g, (whole, name) =>
+    name in values ? String(values[name]) : whole
+  );
+}
+
+function compassPoint(azimuthDeg) {
+  const points = t.compass;
+  const sector = Math.round(azimuthDeg / 45) % points.length;
+  return points[(sector + points.length) % points.length];
+}
+
+/**
+ * The line the breakdown opens with: how many of the marks under it are lit.
+ *
+ * A scene says which of the four the sky it draws is in, and `all` is the one
+ * a scene does not have to say (`scene.sunlight`).
+ */
+function sunlightLine(scene) {
+  const lit = scene.sunlight ?? { of: "all" };
+  return fill(t.scene.sunlight[lit.of], { count: lit.count });
+}
+
+/**
+ * The five figures down the card, as the app builds them: the labels from
+ * `card.facts`, the units from `units`, and the bearing through the same
+ * compass table the strip along the foot of the frame is lettered from. See
+ * `lookDirection` in `src/i18n/format.ts`, which this follows exactly.
+ */
+/**
+ * The two lines of store copy around the frame, in the language being drawn.
+ *
+ * Falls back rather than throwing: a caption a new language has not been given
+ * yet should hold up the listing for that storefront, not the whole run.
+ */
+function caption(scene) {
+  return scene.caption[locale] ?? scene.caption[FALLBACK_LOCALE];
+}
+
+function figureRows(figures) {
+  return [
+    [t.card.facts.distance, fill(t.units.km, { value: figures.distanceKm })],
+    [t.card.facts.altitude, fill(t.units.km, { value: figures.altitudeKm })],
+    [t.card.facts.speed, fill(t.units.kmPerSecond, { value: figures.speedKmPerSecond })],
+    [
+      t.card.facts.look,
+      `${compassPoint(figures.azimuthDeg)} ${figures.azimuthDeg}° · ${fill(t.units.up, {
+        degrees: figures.elevationDeg
+      })}`
+    ],
+    [t.card.facts.orbit, fill(t.units.minutes, { value: figures.orbitMinutes })]
+  ];
+}
 
 /** The store's frame, and the phone inside it. */
 const FRAME = { width: 1290, height: 2796 };
@@ -174,20 +306,12 @@ function backgroundFor(scene) {
 
 /* ---- The phone screen. --------------------------------------------------- */
 
-const CATEGORY_LABELS = {
-  LANDMARK: "HIGHLIGHTS",
-  NAVIGATION: "NAVIGATION",
-  EARTH: "EARTH WATCH",
-  INTERNET: "INTERNET",
-  TELECOM: "TV &amp; PHONES",
-  OTHER: "OTHER"
-};
 const CATEGORY_ORDER = ["LANDMARK", "NAVIGATION", "EARTH", "INTERNET", "TELECOM", "OTHER"];
-/** `SUBCATEGORIES_OF`, with the English names the rows carry. */
-const SUBCATEGORY_LABELS = {
-  EARTH: ["WEATHER", "IMAGING &amp; RADAR"],
-  INTERNET: ["STARLINK", "OTHER NETWORKS"],
-  TELECOM: ["TV &amp; DATA", "PHONES &amp; IOT"]
+/** `SUBCATEGORIES_OF`: which rows hang under which category, in the app's order. */
+const SUBCATEGORY_OF = {
+  EARTH: ["WEATHER", "IMAGING"],
+  INTERNET: ["STARLINK", "CONSTELLATIONS"],
+  TELECOM: ["BROADCAST", "MOBILE"]
 };
 /** `CATEGORY_COLORS`: one pastel per category, day and night. */
 const CATEGORY_COLORS = {
@@ -247,7 +371,8 @@ const ICONS = {
 };
 
 /** The eight points the compass strip carries, from north, clockwise. */
-const COMPASS_POINTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+/** The app's own letters, which are not the same eight in every language. */
+const COMPASS_POINTS = t.compass;
 
 /**
  * How far either side of the middle the strip reaches, in degrees.
@@ -295,14 +420,14 @@ function headerPanel(scene) {
   }
   const rows = open
     ? `<div class="breakdown">
-        <div class="sunlight">${escape(scene.sunlight ?? "All of these are in sunlight")}</div>
+        <div class="sunlight">${escape(sunlightLine(scene))}</div>
         ${breakdown.rows
           .map(
             ([name, tally]) =>
               `<div class="row"><span class="name">${escape(name)}</span><span class="tally">${tally}</span></div>`
           )
           .join("\n        ")}
-        <div class="row other"><span class="name">Others</span><span class="tally">${other}</span></div>
+        <div class="row other"><span class="name">${escape(t.scene.breakdown.other)}</span><span class="tally">${other}</span></div>
       </div>`
     : "";
   const filterOpen = scene.panels.filter === "open";
@@ -311,7 +436,7 @@ function headerPanel(scene) {
       <div class="titles">
         <div class="wordmark">Stare</div>
         <div class="count-row">
-          <span class="count">${count} visible satellites</span>
+          <span class="count">${escape(fill(t.scene.visibleSatellites, { count }))}</span>
           ${ICONS.chevron("rgba(147, 167, 192, 0.5)", open ? "up" : "down", 12)}
         </div>
         ${rows}
@@ -326,27 +451,27 @@ function headerPanel(scene) {
 function filterPanel(scene) {
   if (scene.panels.filter !== "open") return "";
   return `<div class="filter">
-      <div class="filter-head"><span class="panel-title">FILTER</span></div>
+      <div class="filter-head"><span class="panel-title">${escape(t.filter.title)}</span></div>
       ${CATEGORY_ORDER.map((category) => {
         const swatch = `background:${CATEGORY_COLORS[category]};border-color:${thinned(CATEGORY_COLORS[category], 0.3)}`;
-        const subs = (SUBCATEGORY_LABELS[category] ?? []).map(
-          (name) => `<div class="row sub">
+        const subs = (SUBCATEGORY_OF[category] ?? []).map(
+          (key) => `<div class="row sub">
         <span class="swatch" style="${swatch}"></span>
-        <span class="name">${name}</span>
+        <span class="name">${escape(t.filter.subcategories[key])}</span>
         <span class="toggle on"><span class="knob"></span></span>
       </div>`
         );
         return [
           `<div class="row">
         <span class="swatch" style="${swatch}"></span>
-        <span class="name">${CATEGORY_LABELS[category]}</span>
+        <span class="name">${escape(t.filter.categories[category])}</span>
         <span class="toggle on"><span class="knob"></span></span>
       </div>`,
           ...subs
         ].join("\n      ");
       }).join("\n      ")}
-      <div class="key"><span class="ring"></span><span>RING = PARKED OVER THE EQUATOR</span></div>
-      <div class="show-all">SHOW ALL</div>
+      <div class="key"><span class="ring"></span><span>${escape(t.filter.ringKey)}</span></div>
+      <div class="show-all">${escape(t.filter.showAll)}</div>
     </div>`;
 }
 
@@ -411,16 +536,16 @@ function satelliteCard(scene) {
         <span class="badge" style="border-color:${thinned(CATEGORY_COLORS[card.category], 0.35)}"><span class="mark${card.parked ? " ring" : ""}" style="${card.parked ? `border-color:${CATEGORY_COLORS[card.category]}` : `background:${CATEGORY_COLORS[card.category]};border-color:${thinned(CATEGORY_COLORS[card.category], 0.3)}`}"></span></span>
         <div class="heading">
           <div class="name">${escape(card.selected)}</div>
-          <div class="purpose-label">${escape(card.purpose)}</div>
+          <div class="purpose-label">${escape(t.filter.categories[card.category])}</div>
         </div>
         <div class="close">✕</div>
       </div>
       <div class="briefing">
-        <p>${escape(card.briefing)}</p>
+        <p>${escape(card.briefing[locale] ?? card.briefing[FALLBACK_LOCALE])}</p>
         <div class="site">${escape(card.site)} ↗</div>
       </div>
       <div class="facts">
-        ${card.facts
+        ${figureRows(card.figures)
           .map(
             ([label, value]) =>
               `<div class="fact"><span class="label">${escape(label)}</span><span class="value">${escape(value)}</span></div>`
@@ -439,17 +564,25 @@ function satelliteCard(scene) {
 function passesCard(scene) {
   const pass = scene.pass;
   if (!pass) return "";
-  const seen = pass.seeing === "visible to the eye";
+  // The app lights this line only for what an unaided eye can actually catch.
+  const seen = pass.seeing === "visible";
+  const when =
+    pass.inMinutes === null
+      ? t.scene.passes.now
+      : fill(t.units.minutes, { value: pass.inMinutes });
+  const where = `${compassPoint(pass.azimuthDeg)} · ${fill(t.units.up, {
+    degrees: pass.elevationDeg
+  })}`;
 
   return `<div class="card passes">
       <div class="grip"><span></span></div>
       <div class="head">
         <span class="badge accent">${ICONS.sky("var(--accent)", 20)}</span>
         <div class="heading">
-          <div class="pass-name"><span>${escape(pass.name)}</span><span class="when">${escape(pass.inMinutes)}</span></div>
-          <div class="pass-meta">${escape(pass.where)} · <span${
+          <div class="pass-name"><span>${escape(pass.name)}</span><span class="when">${escape(when)}</span></div>
+          <div class="pass-meta">${escape(where)} · <span${
             seen ? ' class="visible"' : ""
-          }>${escape(pass.seeing)}</span></div>
+          }>${escape(t.scene.passes.seeing[pass.seeing])}</span></div>
         </div>
         ${ICONS.chevron("rgba(147, 167, 192, 0.5)", "up")}
       </div>
@@ -465,9 +598,9 @@ function passesCard(scene) {
  */
 function tabBar() {
   const tabs = [
-    ["sky", "Sky", true],
-    ["catalog", "Catalog", false],
-    ["settings", "Settings", false]
+    ["sky", t.tabs.sky, true],
+    ["catalog", t.tabs.catalog, false],
+    ["settings", t.tabs.settings, false]
   ];
   return `<div class="tabbar">
       ${tabs
@@ -697,8 +830,8 @@ body {
 <body>
 <canvas id="stars" width="${FRAME.width}" height="${FRAME.height}"></canvas>
 <div class="caption">
-  <h1>${escape(scene.caption.title)}</h1>
-  <p>${escape(scene.caption.body)}</p>
+  <h1>${escape(caption(scene).title)}</h1>
+  <p>${escape(caption(scene).body)}</p>
 </div>
 <div class="device"><img src="data:image/png;base64,${screenPng}" alt=""></div>
 <script>
@@ -765,6 +898,7 @@ function shoot({ page, out, width, height, scale }) {
 
 function main() {
   if (!CHROME) throw new Error("no chromium found; set CHROME to one");
+  console.log(`  drawing the ${locale} set`);
   rmSync(build, { recursive: true, force: true });
   mkdirSync(build, { recursive: true });
   mkdirSync(outDir, { recursive: true });
@@ -792,7 +926,7 @@ function main() {
     );
     const out = join(outDir, `${scene.id}.png`);
     shoot({ page: framePage, out, width: FRAME.width, height: FRAME.height, scale: 1 });
-    console.log(`  ${scene.id} → docs/app-store/${scene.id}.png`);
+    console.log(`  ${scene.id} → ${relative(root, out)}`);
   });
 }
 

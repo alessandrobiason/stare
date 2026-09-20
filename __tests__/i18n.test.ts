@@ -613,7 +613,7 @@ describe("the tour fits the smallest screen", () => {
 /**
  * What iOS itself asks, in `locales/`.
  *
- * These two sentences are read by the operating system out of the app bundle
+ * These three sentences are read by the operating system out of the app bundle
  * before a line of JavaScript runs — see `locales/README.md` — so they live
  * outside `src/i18n` and nothing in the app can fall back for them. A language
  * the app speaks with no file here gets an English system prompt over a
@@ -622,8 +622,16 @@ describe("the tour fits the smallest screen", () => {
 describe("the prompts the operating system shows", () => {
   const DIRECTORY = path.join(__dirname, "..", "locales");
 
-  /** The keys iOS reads, matching the English pair in `app.json`. */
-  const KEYS = ["NSCameraUsageDescription", "NSLocationWhenInUseUsageDescription"];
+  /**
+   * The keys iOS reads, matching the English originals in `app.json` — the
+   * camera and location plugins' permission strings, and the motion one that
+   * `expo-location` and `expo-sensors` both write.
+   */
+  const KEYS = [
+    "NSCameraUsageDescription",
+    "NSLocationWhenInUseUsageDescription",
+    "NSMotionUsageDescription"
+  ];
 
   function read(locale: Locale): Record<string, string> {
     return JSON.parse(fs.readFileSync(path.join(DIRECTORY, `${locale}.json`), "utf8")) as Record<
@@ -641,7 +649,7 @@ describe("the prompts the operating system shows", () => {
     }
   });
 
-  test.each(LOCALES)("%s says both of them", (locale) => {
+  test.each(LOCALES)("%s says all of them", (locale) => {
     const strings = read(locale);
 
     expect(Object.keys(strings).sort()).toEqual([...KEYS].sort());

@@ -1,14 +1,28 @@
 # App Store screenshots
 
-Six frames for the iPhone listing, and the generator that draws them:
-`docs/app-store/*.png`, from `tools/screenshots/`.
+Six frames for the iPhone listing, one set per storefront language, and the
+generator that draws them: `docs/app-store/`, from `tools/screenshots/`.
 
-    node tools/screenshots/render.mjs
+    node tools/screenshots/render.mjs              # docs/app-store/
+    node tools/screenshots/render.mjs --locale it  # docs/app-store/it/
 
 Output is **1290 × 2796**, which App Store Connect takes for the 6.9 and
 6.7-inch classes and scales down for every size below them. Nothing else has to
 be uploaded unless the listing is later given iPad screenshots, which this app
 cannot have — `supportsTablet` is false.
+
+**The words inside the phone are the app's own.** The filter's categories, the
+count in the header, the card's five labels, the letters on the compass and the
+tab bar are read out of `src/i18n/strings/<locale>.ts` while the frame is
+drawn, not copied into the generator — so a panel the app rewrites cannot go on
+being advertised in its old wording, and a new language gets a full set of
+frames the day its strings land. The captions around the frame and the prose
+inside a scene are in `scenes.mjs`, one entry per language. See
+[Editing them](#editing-them).
+
+The rest of the listing — the names, the keywords, the description, the age
+rating, the trader status, the privacy answers and the note to App Review — is
+[docs/app-store-listing.md](app-store-listing.md).
 
 **The camera picture in these frames is drawn, not photographed.** Everything
 laid over it is the app: the panels are the app's own styles at the app's own
@@ -116,8 +130,13 @@ Where the numbers come from, if a frame has to be argued about:
 ## Editing them
 
 - **The story**: `tools/screenshots/scenes.mjs` — one entry per frame, holding
-  the caption, the sky, the markers on it, the landmark paths across it, which
-  way the camera is pointing and which panels are open. Marker positions are percentages of the camera frame,
+  the caption in each language, the sky, the markers on it, the landmark paths
+  across it, which way the camera is pointing and which panels are open. The
+  text a scene carries is split by what it is: a caption and a briefing are
+  written per language here, while a tally, a bearing or a distance is a
+  number here and is worded by the app's own strings when the frame is drawn
+  (`figureRows`, `sunlightLine`), so "38° up" becomes "38° sopra" without a
+  second copy of the sentence. Marker positions are percentages of the camera frame,
   as the projection hands them to the overlay; a path is taken from its own
   object rather than typed beside it (`pathAhead`), so it cannot end up pointing
   somewhere its marker is not going.
@@ -126,7 +145,9 @@ Where the numbers come from, if a frame has to be argued about:
   `markerScene.ts` and the canvas backend beside it; if a mark or a path changes
   in the app it has to change here, or the store is showing a different app.
 - **The panels**: `tools/screenshots/page/screen.css`, which mirrors the React
-  Native styles a value at a time.
+  Native styles a value at a time. Their *words* are not mirrored — those are
+  loaded from `src/i18n/strings/` — so a renamed category is picked up here on
+  its own and a restyled one is not.
 
 ## What is still needed
 
@@ -149,21 +170,16 @@ Ranked by what each is worth.
    the caption around them. That needs a build on a device and a clear evening;
    it is the honest version of frames 1, 2 and 5, and the only version of frame
    3 that proves anything.
-3. **A decision on the marketing name.** The listing name can be up to 30
-   characters and the app is called `Stare` in `app.json`. "Stare" alone is a
-   hard search term; "Stare — Satellites Overhead" or similar is findable. The
-   frames carry no wordmark, so this changes nothing here — but it changes the
-   subtitle and the keywords, which are the other half of the same page.
-4. **Localised captions.** The app ships in twelve languages and the App Store
-   takes a screenshot set per storefront. The captions here are English; the
-   six titles and six bodies are the whole of what needs translating, and
-   they should be translated by whoever wrote `src/i18n/strings/*.ts` rather
-   than machine-translated, since they are written in that voice.
-5. **The rest of the listing**, which these frames do not cover: the 30-second
-   preview video (optional, and hard to shoot honestly for this app), the
-   description, the subtitle, the keywords, the support and privacy URLs, and
-   the privacy nutrition labels — for which the true answer is that nothing
-   leaves the device except a request to CelesTrak for the public catalogue.
+3. **A 30-second preview video.** Optional, and hard to shoot honestly for
+   this app for the same reason the frames are: it wants a real sky. Worth
+   doing only once there is one.
+
+Two things that used to be on this list are done. The captions exist in both
+languages the app speaks, and so does everything else on the frame — a
+storefront gets its own set from `--locale`. And the marketing name is
+settled: the record is "Stare - Watch the Satellites", with the subtitle and
+keywords written out in
+[docs/app-store-listing.md](app-store-listing.md).
 
 ## What a reviewer will ask
 

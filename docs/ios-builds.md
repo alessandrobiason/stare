@@ -19,13 +19,16 @@ to this project are that half. See
 `ios/` is generated from `app.json` and never committed — edit `app.json`, not
 the Xcode project, which the next `--clean` prebuild discards. That config pins
 portrait-only orientation (the projection assumes an upright phone), the camera
-and when-in-use location strings, and `UIRequiredDeviceCapabilities` for
-gyroscope, magnetometer and location services.
+and when-in-use location strings, `UIRequiredDeviceCapabilities` for gyroscope,
+magnetometer and location services, the launch screen's colour (see below) and
+the privacy manifest.
 
 Both of the build workflows are `workflow_dispatch` only — no push or schedule
 trigger — because a macOS runner is 20-30 minutes of wall clock and bills at
-10x on a private fork. (`check.yml`, which is Linux and runs typecheck, lint
-and jest, is the one workflow here that does run on push.)
+10x on a private fork. (The two that run on a push are Linux and cost nothing
+worth counting: `check.yml`, which runs typecheck, lint and jest on every push,
+and `pages.yml`, which republishes the privacy policy and support pages in
+`site/` and only when something in `site/` changed.)
 
 - **`.github/workflows/ios-build.yml`** — a Linux job regenerates the native
   project first (so a broken `app.json` fails fast at the 1x rate), then a
@@ -154,6 +157,20 @@ detected, so give it a minute on Wi-Fi before pointing it at the sky.
 Once a build made after the updates setup below is installed, most later fixes
 do not come this way at all — see
 [Shipping a fix without a rebuild](#shipping-a-fix-without-a-rebuild).
+
+### 8. The App Store, when the time comes
+
+Nothing about the pipeline changes. `ios-testflight.yml` exports with
+`method: app-store-connect` and uploads with `altool`, which is the same
+delivery a public release is made from: a build that reached TestFlight is a
+build that can be attached to a version and submitted. There is no second
+workflow to write and no second set of credentials.
+
+What is left is entirely inside App Store Connect — the listing, the age
+rating, the privacy answers, the trader status the EU requires, and the note
+that tells a reviewer indoors why the screen is empty. All of it, written out
+to be pasted, is in
+[docs/app-store-listing.md](app-store-listing.md).
 
 ## Native patches to dependencies
 
@@ -497,6 +514,21 @@ So the release signs manually, with the profile from step 4, and:
 - **Export compliance.** `ITSAppUsesNonExemptEncryption` is `false` in
   `app.json`, since the app only makes ordinary HTTPS requests. Without it, App
   Store Connect asks the question again on every single upload.
+- **The launch screen's colour.** `expo-splash-screen` is configured with
+  `#07101f`, which is `BOOT_SKY_BACKGROUND` — the middle stop of the boot sky's
+  own gradient. Without the plugin, prebuild writes the template's white
+  storyboard, and the app opens on a white flash before the night sky it is
+  supposed to open on. `App.tsx` already goes to some trouble to avoid exactly
+  that flash one layer further in; this is the same decision at the layer below
+  it, and the two colours have to stay equal by hand, because one is in
+  `app.json` and the other is in TypeScript.
+- **The privacy manifest.** `ios.privacyManifests` declares no tracking, no
+  tracking domains, no collected data and no required-reason API use by the
+  app's own target — which is what is true, and is what the App Privacy answers
+  in `docs/app-store-listing.md` say in the other form. Every pod that does
+  touch a required-reason API ships its own manifest, which is why this one is
+  empty rather than long. If an upload ever comes back with an `ITMS-91053` or
+  `ITMS-91061` email, that is the list to add to.
 
 ## When a release fails
 

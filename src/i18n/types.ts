@@ -537,6 +537,9 @@ export type Strings = {
     detail: string;
     author: string;
     project: string;
+    /** The row crediting the segmentation model, and the licence under it. */
+    model: string;
+    modelLicence: string;
     version: string;
   };
 };

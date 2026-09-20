@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stare — Privacy Policy</title>
+    <meta
+      name="description"
+      content="Stare collects nothing. What the app reads, where it stays, and the four services it talks to."
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Privacy Policy</h1>
+        <p class="stamp">Stare · last updated 20 September 2026</p>
+        <nav class="langs"><a href="privacy.it.html">In italiano</a></nav>
+      </header>
+
+      <div class="summary">
+        <p>
+          Stare has no accounts, no analytics, no advertising and no tracking. Nothing you do in
+          the app is sent to its developer, and no data about you is collected.
+        </p>
+      </div>
+
+      <h2>What the app reads from your phone</h2>
+      <ul>
+        <li>
+          <strong>Your location.</strong> Read while the app is open, to work out which satellites
+          are above you and where on the sky to draw them. It is used on the device and never
+          transmitted. It is not written to storage: close the app and it is gone.
+        </li>
+        <li>
+          <strong>The camera.</strong> The live preview is the picture the markers are drawn over.
+          Single frames are analysed on the device, by a model that runs on the device, to tell sky
+          from buildings and trees so that anything behind them can be left out. A frame is written
+          to the app's private cache for as long as that analysis takes and deleted immediately
+          afterwards. Frames are never uploaded and never added to your photo library.
+        </li>
+        <li>
+          <strong>Motion and compass sensors.</strong> Read to know which way the phone is pointing.
+          They stay on the device.
+        </li>
+        <li>
+          <strong>Notifications.</strong> Pass alerts are local notifications — a time and a message
+          handed to iOS by the app itself. No push server is involved and no device token is ever
+          registered or sent anywhere.
+        </li>
+      </ul>
+
+      <h2>What the app downloads</h2>
+      <p>
+        Stare makes requests to the four services below. None of them is sent your location, your
+        camera frames, or any identifier the app has made up. As with any request over the
+        internet, each of them does receive your device's IP address and can see that a request was
+        made.
+      </p>
+      <ul>
+        <li>
+          <strong>celestrak.org</strong> — the public catalogue of tracked objects and their orbits,
+          refreshed from time to time. The request asks for the catalogue and says nothing about
+          you.
+        </li>
+        <li>
+          <strong>huggingface.co</strong> — the sky-detection model, downloaded once on first launch
+          and then kept on the device.
+        </li>
+        <li>
+          <strong>commons.wikimedia.org</strong> and <strong>upload.wikimedia.org</strong> —
+          photographs of a few well-known spacecraft, fetched when you tap one that has one.
+        </li>
+        <li>
+          <strong>u.expo.dev</strong> — asks whether a newer version of the app's own code has been
+          published, so that fixes can arrive without a new download from the App Store. The request
+          carries the app's version and the platform it is running on.
+        </li>
+      </ul>
+
+      <h2>What is kept on your phone</h2>
+      <p>
+        The downloaded catalogue and the time it was fetched, the sky-detection model, the language
+        you picked if you picked one, and whether you have been shown the tour. All of it lives in
+        the app's own storage and all of it goes when the app is deleted.
+      </p>
+
+      <h2>Children</h2>
+      <p>
+        Stare is not directed at children and collects no data from anyone, of any age.
+      </p>
+
+      <h2>Changes</h2>
+      <p>
+        If what the app does with any of this changes, this page changes with it and the date at the
+        top moves.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Stare is built in the open. Questions and corrections are welcome at
+        <a href="https://github.com/alessandrobiason/stare/issues">the project's issue tracker</a>,
+        and the source for everything described here is in the same repository.
+      </p>
+
+      <footer>
+        <a href="index.html">Support</a> ·
+        <a href="https://github.com/alessandrobiason/stare">Source on GitHub</a>
+      </footer>
+    </main>
+  </body>
+</html>

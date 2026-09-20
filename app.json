@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stare",
     "slug": "stare",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -32,6 +32,12 @@
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait"
         ]
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyAccessedAPITypes": []
       }
     },
     "plugins": [
@@ -60,6 +66,13 @@
           "motionPermission": "Stare uses motion data to track where you're pointing your device in the sky."
         }
       ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#07101f",
+          "resizeMode": "contain"
+        }
+      ],
       "onnxruntime-react-native",
       "./plugins/withoutPushEntitlement"
     ],
@@ -72,13 +85,6 @@
         "projectId": "6a2d1b3b-c6d7-4981-8cf9-ad1402b4ef87"
       }
     },
-    "owner": "alesbiasons-team",
-    "android": {
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ]
-    }
+    "owner": "alesbiasons-team"
   }
 }

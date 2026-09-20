@@ -278,9 +278,11 @@ export const en: Strings = {
   },
   about: {
     title: "About",
-    detail: "Author, project and version.",
+    detail: "Author, project, credits and version.",
     author: "Author",
     project: "Project",
+    model: "Sky detection",
+    modelLicence: "SegFormer model by Realcat, used under the MIT licence.",
     version: "Version"
   }
 };

@@ -8,6 +8,7 @@ import { strings } from "../i18n";
 import { LANGUAGE_NAMES, LOCALES, Locale, setLocale } from "../i18n/locale";
 import { askForPassAlerts, openPassAlertSettings } from "../notifications/alertAccess";
 import { PassAlertAccess } from "../notifications/alertTypes";
+import { SKY_MODEL_CREDIT } from "../vision/skyModelSource";
 import { CONSOLE_LABEL } from "./consoleLabel";
 import { Icon } from "./Icon";
 import { theme } from "./theme";
@@ -153,13 +154,22 @@ export const SettingsScreen: React.FC<Props> = ({ onOpenGuide, onOpenConsole, wa
           {about && (
             <View style={[styles.sublist, styles.sublistLast]}>
               <Fact label={t.about.author} value={AUTHOR_NAME} />
-              {/* The one fact here that goes somewhere: written as the address
-                  it opens rather than as "GitHub", so where a tap leads is on
-                  the screen before the tap. */}
+              {/* Written as the address it opens rather than as "GitHub", so
+                  where a tap leads is on the screen before the tap. */}
               <Fact
                 label={t.about.project}
                 value={GITHUB_URL.replace(/^https:\/\//, "")}
                 onPress={() => void Linking.openURL(GITHUB_URL).catch(() => undefined)}
+              />
+              {/* The one piece of the app somebody else wrote and the licence
+                  asks us to name. See `SKY_MODEL_CREDIT`. */}
+              <Fact
+                label={t.about.model}
+                value={SKY_MODEL_CREDIT.name}
+                detail={t.about.modelLicence}
+                onPress={() =>
+                  void Linking.openURL(SKY_MODEL_CREDIT.page).catch(() => undefined)
+                }
               />
               {/* Which binary this is, under the number. See `describeBuild`: a
                   fix that never reached the phone reads exactly like a fix that
@@ -212,7 +222,7 @@ type FactProps = {
   value: string;
   /** A second, quieter line under the fact, for what the value alone does not say. */
   detail?: string | null;
-  /** Where the fact leads, for the one that is a link. */
+  /** Where the fact leads, for the ones that are links. */
   onPress?: () => void;
 };
 

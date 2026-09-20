@@ -1,3 +1,4 @@
+import appConfig from "../../app.json";
 import { BriefingId, briefingEntryFor, BriefingSubject } from "./briefing";
 
 /**
@@ -100,9 +101,15 @@ const PHOTO_FILES = {
   tianzhou: "Tianzhou Rendering no background.png"
 } as const satisfies Partial<Record<BriefingId, string>>;
 
-/** The endpoint, and how Wikimedia asks a client to identify itself. */
+/**
+ * The endpoint, and how Wikimedia asks a client to identify itself.
+ *
+ * Their policy wants a name, a version and a way to be reached, so the version
+ * is read from `app.json` rather than typed here: a string that has to be
+ * remembered on every release is a string that says 0.1 for years.
+ */
 const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
-const API_USER_AGENT = "Stare/0.1 (https://github.com/alessandrobiason/stare)";
+const API_USER_AGENT = `Stare/${appConfig.expo.version} (https://github.com/alessandrobiason/stare)`;
 
 /**
  * How wide a picture to ask for, in pixels.

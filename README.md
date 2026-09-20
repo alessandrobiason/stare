@@ -30,12 +30,15 @@ sensors, and left out when a building is in the way.
 <td><img src="docs/readme/legend.jpg" alt="The category filter over a daylit sky"></td>
 <td valign="top">
 
-The six App Store frames live in [docs/app-store/](docs/app-store/), and
-[`tools/screenshots/`](tools/screenshots/) draws them.
+The six App Store frames live in [docs/app-store/](docs/app-store/) — one set
+per storefront language — and [`tools/screenshots/`](tools/screenshots/) draws
+them.
 
-The panels and the marks in these pictures are the app's own, at the app's own
-sizes. **The sky behind them is drawn rather than photographed** — see
-[docs/app-store-screenshots.md](docs/app-store-screenshots.md).
+The panels, the marks and every word in these pictures are the app's own, at
+the app's own sizes. **The sky behind them is drawn rather than photographed**
+— see [docs/app-store-screenshots.md](docs/app-store-screenshots.md). The
+listing around them is
+[docs/app-store-listing.md](docs/app-store-listing.md).
 
 </td>
 </tr>

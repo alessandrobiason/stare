@@ -1,9 +1,10 @@
 # What the operating system asks, in the reader's language
 
-The two sentences iOS shows inside its own camera and location prompts. They
-are not part of `src/i18n`, and cannot be: they are read by the operating
-system out of the app bundle before a line of JavaScript runs, so they have to
-exist as native resources rather than as strings the app looks up.
+The three sentences iOS shows inside its own camera, location and motion
+prompts. They are not part of `src/i18n`, and cannot be: they are read by the
+operating system out of the app bundle before a line of JavaScript runs, so
+they have to exist as native resources rather than as strings the app looks
+up.
 
 `app.json`'s `expo.locales` points at these files. On `expo prebuild`, Expo
 turns each one into `ios/Stare/Supporting/<lang>.lproj/InfoPlist.strings` and
@@ -14,9 +15,15 @@ system falls back to for a language not listed here.
 
 **Keep these short and keep them true.** They are read in a modal, by someone
 deciding whether to say no, seconds after the intro's last page has explained
-why the app is about to ask (`src/i18n` → `intro.access`). The two texts are
-deliberately different: the intro page has room to explain, the prompt has one
-line to justify.
+why the app is about to ask (`src/i18n` → `intro.access`). The two wordings of
+the same permission are deliberately different: the intro page has room to
+explain, the prompt has one line to justify.
+
+`NSMotionUsageDescription` is written by two plugins — `expo-location`'s
+`motionUsagePermission` and `expo-sensors`'s `motionPermission` — and iOS shows
+it when the attitude stream starts rather than at the same moment as the other
+two. It is easy to leave untranslated for exactly that reason: it is the one
+prompt that does not appear during the intro's run of three.
 
 ## Two constraints
 

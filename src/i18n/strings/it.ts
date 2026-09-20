@@ -273,9 +273,11 @@ export const it: Strings = {
   },
   about: {
     title: "Informazioni",
-    detail: "Autore, progetto e versione.",
+    detail: "Autore, progetto, crediti e versione.",
     author: "Autore",
     project: "Progetto",
+    model: "Riconoscimento del cielo",
+    modelLicence: "Modello SegFormer di Realcat, usato con licenza MIT.",
     version: "Versione"
   }
 };

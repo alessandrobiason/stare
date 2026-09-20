@@ -1,0 +1,81 @@
+# Publishes site/ to GitHub Pages.
+#
+# The App Store will not take a submission without a privacy policy URL, and it
+# wants a support URL beside it. Both of those have to be pages that load, for
+# anyone, forever — which is a different thing from a Markdown file in this
+# repository, and the reason this workflow exists rather than pointing Apple at
+# a file in docs/.
+#
+# It is Linux, it takes about a minute, and it bills at 1x. It runs on a push
+# that touches site/ and nothing else, so the ordinary day of this project —
+# which is all JavaScript under src/ — never starts it. The other three
+# workflows and what they cost are in docs/ios-builds.md.
+#
+# ONE MANUAL STEP, ONCE: Settings -> Pages -> Build and deployment -> Source:
+# "GitHub Actions". Until that is set, this workflow runs and its deploy step
+# fails with "Pages site not found" — nothing else in the repository is
+# affected, and re-running it after flipping the setting is enough. The pages
+# then live at https://alessandrobiason.github.io/stare/ and the two URLs App
+# Store Connect wants are:
+#
+#   Privacy policy   https://alessandrobiason.github.io/stare/privacy.html
+#   Support          https://alessandrobiason.github.io/stare/
+#
+# (and privacy.it.html / index.it.html for the Italian storefront, which App
+# Store Connect takes per language.)
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A half-finished deploy is a privacy policy that does not load, so let a run
+# finish rather than cancelling it for a newer one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy site/
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # Every link on these pages is relative or absolute-to-github.com, and
+      # every one of them is checked here rather than after the fact: a support
+      # page whose privacy link 404s is worse than no support page, and it is
+      # the kind of thing nobody looks at twice after the first deploy.
+      - name: Check the pages link to each other
+        run: |
+          cd site
+          status=0
+          for page in *.html; do
+            while read -r target; do
+              [ -f "$target" ] || { echo "$page -> $target is missing"; status=1; }
+            done < <(grep -o 'href="[^"#:]*\.\(html\|css\)"' "$page" | sed 's/href="//;s/"$//')
+          done
+          exit $status
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
