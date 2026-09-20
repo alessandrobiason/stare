@@ -1,5 +1,14 @@
 import React, { useCallback, useState } from "react";
-import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  LayoutChangeEvent,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
+import { bootFailureText, opensSettings } from "../boot/bootFailure";
 import { describeBuild } from "../debug/buildIdentity";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
@@ -9,10 +18,32 @@ import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
 import { theme } from "./theme";
 
+/**
+ * Whether this platform can be sent to the app's own page in the system
+ * settings.
+ *
+ * The phone can; a browser cannot, and `react-native-web`'s `Linking` simply
+ * has no `openSettings` on it — so the replay harness, which renders this very
+ * screen (`testing/replay/App.tsx`), would throw on the press rather than
+ * degrade. Asked at all because the honest thing to do with a button that
+ * cannot work is not to draw it, and asked at render rather than at import so
+ * that what is checked is the platform the screen is actually drawn on.
+ */
+function canOpenSettings(): boolean {
+  return typeof Linking.openSettings === "function";
+}
+
 type Props = {
   failed: boolean;
-  /** The failure to show, when `failed`. */
-  error: string | null;
+  /**
+   * What was thrown, when `failed` — not a sentence about it.
+   *
+   * Turned into words here rather than by whoever caught it, so the reason is
+   * written in the language the app is in at the moment it is drawn, and so
+   * this screen can tell a refused permission from a dropped connection and
+   * offer the right way out of each. See `src/boot/bootFailure.ts`.
+   */
+  error: unknown;
   /** Whether trying again could help; a missing sensor is not going to appear. */
   retryable?: boolean;
   onRetry: () => void;
@@ -47,6 +78,16 @@ export const BootScreen: React.FC<Props> = ({
   const [frame, setFrame] = useState<FrameSize | null>(null);
   // Read once: it cannot change while the app is running.
   const [build] = useState(describeBuild);
+  // Written out on every render rather than remembered, because the language
+  // can change under it: the settings tab is behind this screen only when boot
+  // succeeded, but a failure that arrives after a language change has to be in
+  // the new one.
+  const reason = failed && error !== null ? bootFailureText(error) : null;
+  // A refused camera, a refused fix, location services off for the whole
+  // phone: all three are a switch two levels down the system settings, and
+  // "try again" on its own is a button that fails the same way. See
+  // `opensSettings`.
+  const settings = failed && opensSettings(error) && canOpenSettings();
 
   const measure = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -68,7 +109,7 @@ export const BootScreen: React.FC<Props> = ({
       {failed && (
         <View style={styles.card}>
           <Text style={styles.title}>{t.failed}</Text>
-          {error ? (
+          {reason ? (
             // Scrolled and selectable, because a reason can be long. The
             // camera's capture failures now carry the AVFoundation error and
             // the session's state with them, which is a paragraph rather than a
@@ -78,14 +119,43 @@ export const BootScreen: React.FC<Props> = ({
             // it can be copied out rather than photographed.
             <ScrollView style={styles.reasonScroll} contentContainerStyle={styles.reasonContent}>
               <Text style={styles.reason} selectable>
-                {error}
+                {reason}
               </Text>
             </ScrollView>
           ) : null}
 
+          {/* The way out of the failure, where the phone's own settings are
+              it: first, and filled in, because on a refused permission it is
+              the button that works and the retry beside it is the one that
+              cannot. `openSettings` lands on this app's own page rather than
+              the top of the list, so nothing has to be described in words. */}
+          {settings ? (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.retry}
+              onPress={() => {
+                // Swallowed: a phone that will not open its own settings is
+                // not a reason to crash the screen reporting the failure.
+                try {
+                  void Linking.openSettings().catch(() => undefined);
+                } catch {
+                  // Nothing to do, and nothing worth saying about it here.
+                }
+              }}
+            >
+              <Text style={styles.retryLabel}>{t.openSettings}</Text>
+            </Pressable>
+          ) : null}
+
           {retryable ? (
-            <Pressable style={styles.retry} onPress={onRetry}>
-              <Text style={styles.retryLabel}>{t.tryAgain}</Text>
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.retry, settings && styles.retrySecondary]}
+              onPress={onRetry}
+            >
+              <Text style={[styles.retryLabel, settings && styles.retryLabelSecondary]}>
+                {t.tryAgain}
+              </Text>
             </Pressable>
           ) : (
             <Text style={styles.footnote}>{t.unsupported}</Text>
@@ -179,6 +249,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5
+  },
+  /**
+   * The retry when it is the second button rather than the only one.
+   *
+   * Outlined instead of filled: with the settings button above it the two are
+   * not equal offers — one goes to the switch that is actually in the way, and
+   * this one is for somebody who has already flipped it and come back.
+   */
+  retrySecondary: {
+    marginTop: 8,
+    backgroundColor: "transparent",
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: theme.color.divider
+  },
+  retryLabelSecondary: {
+    color: theme.color.textDim
   },
   build: {
     marginTop: 14,

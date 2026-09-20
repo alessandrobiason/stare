@@ -4,6 +4,7 @@ import {
   classifySatellite,
   isDuplicateEntry,
   isParked,
+  launchYear,
   noradId,
   parentOf,
   SATELLITE_CATEGORIES,
@@ -161,4 +162,30 @@ test("detects a geostationary orbit from its mean motion", () => {
   expect(isParked(parkedLine2)).toBe(true);
   expect(isParked(SAMPLE_TLE.line2)).toBe(false);
   expect(isParked(undefined)).toBe(false);
+});
+
+describe("the year an object went up", () => {
+  test("is read off the international designator in the elements", () => {
+    // Columns 10-17 of line 1: two digits of launch year, three of launch
+    // number within it, and the piece. The station went up as 1998-067A.
+    expect(launchYear("1 25544U 98067A   26235.00000000  .00001264  00000-0  29621-4 0  9995"))
+      .toBe(1998);
+    expect(launchYear("1 49044U 21066A   26235.00000000  .00001264  00000-0  29621-4 0  9995"))
+      .toBe(2021);
+  });
+
+  test("and the two-digit year is resolved against the space age, not the millennium", () => {
+    // Nothing in orbit predates Sputnik in 1957, so `57` and up is the
+    // twentieth century. Vanguard 1, 1958-002B, is still up there.
+    expect(launchYear("1 00005U 58002B   26235.00000000  .00000234  00000-0  32891-3 0  9999"))
+      .toBe(1958);
+    expect(launchYear("1 00016U 58007A   26235.00000000  .00000100  00000-0  10000-3 0  9999"))
+      .toBe(1958);
+  });
+
+  test("and elements with no designator at all say so rather than guessing", () => {
+    expect(launchYear("1 25544U          26235.00000000  .00001264  00000-0  29621-4 0  9995"))
+      .toBeNull();
+    expect(launchYear("1 25544U")).toBeNull();
+  });
 });

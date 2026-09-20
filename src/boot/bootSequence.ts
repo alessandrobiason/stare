@@ -3,6 +3,7 @@ import { DeviceCapabilities } from "../device/capabilities";
 import { PassAlertAccess } from "../notifications/alertTypes";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { ObserverLocation } from "../types";
+import { BootFailure, bootFailureOf } from "./bootFailure";
 import {
   BootError,
   BootProgress,
@@ -203,7 +204,9 @@ export async function runBootSequence(
   const sensors = settleSensors(boot, "sensors", sensorsResult);
 
   // Ahead of the catalogue: it is the one failure retrying cannot fix.
-  if (sensors.missing) throw new BootError("sensors", sensors.missing, boot.steps);
+  if (sensors.missing) {
+    throw new BootError("sensors", sensors.missing, boot.steps, sensors.failure ?? undefined);
+  }
 
   const catalog = settleCatalog(boot, "catalog", catalogResult);
 
@@ -214,14 +217,24 @@ export async function runBootSequence(
   // sky mask is computed from, so refusing it leaves nothing to check a line of
   // sight against.
   if (access.camera instanceof Error) {
-    throw boot.fail("camera", describeError(access.camera, "The camera could not be opened"));
+    throw boot.fail(
+      "camera",
+      describeError(access.camera, "The camera could not be opened"),
+      // `requestCamera` throws a failure of its own, saying whether the prompt
+      // was refused or is off for good; anything else is the camera itself.
+      bootFailureOf(access.camera) ?? new BootFailure("cameraFailed", access.camera.message)
+    );
   }
   boot.update("camera", "done");
 
   // `null` only where the camera failed above, which has already thrown.
   const observer = access.observer;
   if (observer === null || observer instanceof Error) {
-    throw boot.fail("location", describeError(observer, "Your location could not be found"));
+    throw boot.fail(
+      "location",
+      describeError(observer, "Your location could not be found"),
+      bootFailureOf(observer) ?? new BootFailure("locationUnavailable")
+    );
   }
   boot.update(
     "location",

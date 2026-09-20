@@ -1,10 +1,7 @@
 import { ActiveCatalog, CatalogSource } from "../data/tleProvider";
-import {
-  DeviceCapabilities,
-  describeMissingCapabilities,
-  NO_CAPABILITIES
-} from "../device/capabilities";
+import { DeviceCapabilities, missingCapability, NO_CAPABILITIES } from "../device/capabilities";
 import { SatelliteCatalog } from "../satellite/catalog";
+import { BootFailure } from "./bootFailure";
 
 /**
  * The machinery every boot sequence shares: a list of steps, progress reported
@@ -45,13 +42,20 @@ export type BootProgress = {
  * A boot failure the user needs to see, carrying which step gave way. Anything
  * thrown out of a boot sequence is one of these, so the screen never has to
  * guess at an unknown error.
+ *
+ * The `message` is English and is what lands in a log or a step's detail line.
+ * What a person reads is the `cause`, where there is one: a `BootFailure`
+ * naming the situation, which the screen writes out in the reader's own
+ * language (`bootFailureText`). The replay harness throws these without a
+ * cause and gets the message printed as it stands, which is right for a
+ * developer's own tool.
  */
 export class BootError extends Error {
   readonly step: string;
   readonly steps: BootStep[];
 
-  constructor(step: string, message: string, steps: BootStep[]) {
-    super(message);
+  constructor(step: string, message: string, steps: BootStep[], cause?: BootFailure) {
+    super(message, cause ? { cause } : undefined);
     this.name = "BootError";
     this.step = step;
     this.steps = steps;
@@ -83,8 +87,11 @@ export type BootRun = {
   /**
    * Marks the step failed and returns the error to throw with it, so a caller
    * reads `throw boot.fail(...)` and the compiler can see the flow stop there.
+   *
+   * `cause` is what the screen actually prints, in the reader's language; the
+   * detail is the English line kept against the step.
    */
-  fail(id: string, detail: string): BootError;
+  fail(id: string, detail: string, cause?: BootFailure): BootError;
 };
 
 export function startBootRun(
@@ -123,9 +130,9 @@ export function startBootRun(
         return error instanceof Error ? error : new Error(String(error));
       }
     },
-    fail(id: string, detail: string): BootError {
+    fail(id: string, detail: string, cause?: BootFailure): BootError {
       update(id, "failed", detail);
-      return new BootError(id, detail, steps);
+      return new BootError(id, detail, steps, cause);
     }
   };
 }
@@ -178,7 +185,11 @@ export function settleCatalog(
   result: BuiltCatalog | Error
 ): SatelliteCatalog {
   if (result instanceof Error) {
-    throw boot.fail(id, describeError(result, "The satellite catalogue could not be loaded"));
+    const detail = describeError(result, "The satellite catalogue could not be loaded");
+    // The platform's own words travel with it: a 503 from CelesTrak and a
+    // parse that gave way are the same sentence to a reader and different
+    // bugs to whoever is sent the photograph of this screen.
+    throw boot.fail(id, detail, new BootFailure("catalogFailed", detail));
   }
 
   if (result.source === "bundled") {
@@ -186,13 +197,18 @@ export function settleCatalog(
       id,
       "No satellite catalogue could be downloaded, and none is cached on this device. " +
         "STARE gets orbital data from CelesTrak, a public satellite-tracking service — " +
-        "check your connection and try again in a few minutes."
+        "check your connection and try again in a few minutes.",
+      new BootFailure("catalogOffline")
     );
   }
 
   const { catalog } = result;
   if (catalog.size === 0) {
-    throw boot.fail(id, "The satellite catalogue downloaded but held no usable orbits.");
+    throw boot.fail(
+      id,
+      "The satellite catalogue downloaded but held no usable orbits.",
+      new BootFailure("catalogEmpty")
+    );
   }
 
   boot.update(
@@ -224,13 +240,11 @@ export function settleSkyModel(
 
   return () => {
     if (!(result instanceof Error)) return;
-    throw boot.fail(
-      id,
-      describeError(
-        result,
-        "The sky detection model could not be loaded, so nothing could be hidden behind terrain."
-      )
+    const detail = describeError(
+      result,
+      "The sky detection model could not be loaded, so nothing could be hidden behind terrain."
     );
+    throw boot.fail(id, detail, new BootFailure("skyModelFailed", detail));
   };
 }
 
@@ -238,9 +252,29 @@ export type SettledSensors = {
   capabilities: DeviceCapabilities;
   /** What is missing and what its absence costs, or `null` when both are there. */
   missing: string | null;
+  /**
+   * The same as something the boot screen can say in the reader's language, or
+   * `null` when nothing is missing. See `src/boot/bootFailure.ts`.
+   */
+  failure: BootFailure | null;
   /** The warning text when the sequence carries on without them. */
   warning: string | null;
 };
+
+/**
+ * The English line kept against the step for each way the sensors can be
+ * wanting.
+ *
+ * The step list is a developer's readout — the console, a progress line, a
+ * warning the replay carries — and stays in one language for the reason the
+ * technical detail in `bootFailure.ts` does. What the *user* reads is the key
+ * beside it, written out in `src/i18n/strings`.
+ */
+const SENSOR_DETAILS = {
+  noMotionSensor: "This device has no motion sensor, so there is no attitude to aim the view with.",
+  noMagnetometer: "This device has no magnetometer, so a heading cannot be referenced to north.",
+  sensorsUnknown: "The device's sensors could not be checked."
+} as const;
 
 /**
  * Records what the device's sensors turned out to be.
@@ -258,22 +292,37 @@ export function settleSensors(
   // A device that cannot be probed counts as having nothing, rather than
   // getting the benefit of the doubt and then aiming at nowhere.
   const capabilities = result instanceof Error ? NO_CAPABILITIES : result;
+  const probeFailed = result instanceof Error;
+  const key = probeFailed ? "sensorsUnknown" : missingCapability(capabilities);
+  // The step's own line keeps the platform's words where there are any — it is
+  // a developer's readout, and "no sensor service" is the half that says which
+  // device this was. The key beside it is what the user reads.
   const missing =
-    result instanceof Error
-      ? describeError(result, "The device's sensors could not be checked")
-      : describeMissingCapabilities(capabilities);
+    key === null
+      ? null
+      : probeFailed
+        ? describeError(result, SENSOR_DETAILS.sensorsUnknown)
+        : SENSOR_DETAILS[key];
 
-  if (!missing) {
+  if (key === null || missing === null) {
     boot.update(id, "done", "Motion and magnetometer");
-    return { capabilities, missing: null, warning: null };
+    return { capabilities, missing: null, failure: null, warning: null };
   }
+
+  const failure = new BootFailure(
+    key,
+    // Only the probe's own failure carries a platform message worth keeping;
+    // a device that answered and simply has no magnetometer has said all there
+    // is to say.
+    probeFailed && result instanceof Error && result.message ? result.message : null
+  );
 
   if (!fallbackNote) {
     boot.update(id, "failed", missing);
-    return { capabilities, missing, warning: null };
+    return { capabilities, missing, failure, warning: null };
   }
 
   const warning = `${missing} ${fallbackNote}`;
   boot.update(id, "warned", warning);
-  return { capabilities, missing, warning };
+  return { capabilities, missing, failure, warning };
 }

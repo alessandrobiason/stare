@@ -4,6 +4,7 @@ import { StatusBar, StyleSheet, View } from "react-native";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 import { runBootSequence } from "./boot/bootSequence";
 import { bootTasks } from "./boot/bootTasks";
+import { prewarmBoot } from "./boot/prewarm";
 import { BootScreen } from "./components/BootScreen";
 import { CameraLab } from "./debug/CameraLab";
 import { DeviceScene } from "./components/DeviceScene";
@@ -97,6 +98,20 @@ export default function App() {
   useKeepAwake();
 
   const intro = useIntro();
+
+  /**
+   * On the first launch, start the work that needs nobody's permission while
+   * the intro is still being read.
+   *
+   * The two pages below take some seconds to get through, and until this they
+   * were seconds the network spent idle: boot is mounted on the far side of
+   * them on purpose (see `BootedApp`), so the catalogue download did not begin
+   * until the intro was accepted. The prompts still wait — only the downloads
+   * move. See `prewarmBoot`.
+   */
+  React.useEffect(() => {
+    if (intro.pending) prewarmBoot();
+  }, [intro.pending]);
 
   if (CAMERA_LAB) {
     return (

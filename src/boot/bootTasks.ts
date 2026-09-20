@@ -4,6 +4,7 @@ import { readDeviceCapabilities } from "../device/deviceOrientation";
 import { readMagneticDeclinationDeg, requestObserverFix } from "../device/location";
 import { askForPassAlerts } from "../notifications/alertAccess";
 import { preloadSkySegmenter } from "../vision/skySegmenter";
+import { BootFailure } from "./bootFailure";
 import { BootTasks } from "./bootSequence";
 
 /**
@@ -17,11 +18,10 @@ import { BootTasks } from "./bootSequence";
 async function requestCamera(): Promise<void> {
   const permission = await Camera.requestCameraPermissionsAsync();
   if (permission.granted) return;
-  throw new Error(
-    permission.canAskAgain
-      ? "Camera access is needed to see the sky and to work out what is in front of it."
-      : "Camera access is off for this app. Turn it on in Settings to use the view."
-  );
+  // Both land on the phone's own settings page, because iOS raises its prompt
+  // once per install: `canAskAgain` decides which sentence is honest, not
+  // whether there is a way back. See `bootFailure.ts`.
+  throw new BootFailure(permission.canAskAgain ? "cameraRefused" : "cameraBlocked");
 }
 
 /**

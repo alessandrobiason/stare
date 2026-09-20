@@ -3,6 +3,7 @@ import { SAMPLE_TLE } from "./sampleTle";
 import {
   CachedCatalog,
   isFresh,
+  isUsable,
   mayRetry,
   readCache,
   recordFailedAttempt,
@@ -57,6 +58,43 @@ function shouldDownload(
   return force || mayRetry(cache, nowMs);
 }
 
+/**
+ * The background refresh in flight, if any.
+ *
+ * Its own guard rather than `inFlight`: that one is what a caller waiting on a
+ * catalogue is given, and this is a download nobody is waiting on. Sharing one
+ * would hand the next caller a promise that resolves to elements it was not
+ * asking to wait for.
+ */
+let refreshing = false;
+
+/**
+ * Fetches a newer catalogue for the *next* launch, without anybody waiting on
+ * it.
+ *
+ * Nothing here reaches the screen. The app is already running on the elements
+ * this was started beside, and swapping a sixteen-thousand-entry catalogue out
+ * from under a view that is drawing it would cost a rebuild of every SGP4
+ * record for a correction of a fraction of a pixel. What it buys is the next
+ * launch: the elements land on disk, and the one after this opens on a fresh
+ * cache without a request.
+ *
+ * Failures are noted and swallowed. A refresh nobody asked for must not become
+ * an unhandled rejection, and the app it is running behind is working.
+ */
+function refreshInBackground(url: string, nowMs: number): void {
+  if (refreshing) return;
+  refreshing = true;
+  void fetchActiveCatalog(url, nowMs)
+    .catch((error: unknown) => {
+      recordFailedAttempt(nowMs);
+      console.warn("Background TLE refresh failed; the cached catalogue stands", error);
+    })
+    .finally(() => {
+      refreshing = false;
+    });
+}
+
 async function resolveActiveCatalog(
   url: string,
   nowMs: number,
@@ -67,6 +105,22 @@ async function resolveActiveCatalog(
   // A cache still inside the refresh window is the answer. Not a fallback, not
   // a head start on a download — the request is simply not made.
   if (cache && !shouldDownload(cache, url, nowMs, force)) {
+    return { tles: cache.tles, source: "cache" };
+  }
+
+  // Past the refresh window and still well inside the accuracy one: open on
+  // what is already here and fetch the rest behind it.
+  //
+  // This is the launch people actually notice. Two hours is CelesTrak's rule
+  // about traffic, not a statement about where a satellite is, and treating it
+  // as both meant every evening's first launch blocked on a couple of
+  // megabytes before the app would draw anything — on a good connection as
+  // much as a bad one, since the wait is the download rather than the
+  // latency. A forced retry skips this: somebody who has pressed the button on
+  // a failure is asking for the network, not for what is on disk. See
+  // `TLE_USABLE_INTERVAL_MS`.
+  if (cache && !force && isUsable(cache, url, nowMs)) {
+    refreshInBackground(url, nowMs);
     return { tles: cache.tles, source: "cache" };
   }
 
@@ -90,12 +144,18 @@ async function resolveActiveCatalog(
 
 /**
  * Returns the active satellite catalog, degrading in this order:
- * cached-and-fresh -> network -> cached-but-stale -> the single bundled TLE.
+ * cached-and-fresh -> cached-and-still-accurate (refreshing behind it) ->
+ * network -> cached-but-old -> the single bundled TLE.
  *
  * It never rejects. `source` says how far down that list it had to go, so the
  * caller can decide what to make of it: a single bundled satellite keeps the
  * app renderable but is not a sky, and boot treats it as a failure worth
  * telling the user about rather than quietly showing one dot.
+ *
+ * Only the middle step ever blocks on the network, and only for a cache older
+ * than a day or a device with none at all. Everything else answers off the
+ * disk, which is what keeps a launch from being a download — see
+ * `resolveActiveCatalog`.
  *
  * The cache is on disk and carries its own timestamp, so closing and reopening
  * the app does not start the refresh window over — a cold launch inside it

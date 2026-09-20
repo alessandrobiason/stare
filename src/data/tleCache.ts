@@ -1,4 +1,8 @@
-import { TLE_REFRESH_INTERVAL_MS, TLE_RETRY_INTERVAL_MS } from "../constants";
+import {
+  TLE_REFRESH_INTERVAL_MS,
+  TLE_RETRY_INTERVAL_MS,
+  TLE_USABLE_INTERVAL_MS
+} from "../constants";
 import { Tle } from "../types";
 import { parseCatalogInSlices } from "./tleCatalog";
 import {
@@ -89,6 +93,26 @@ export function isFresh(cache: CachedCatalog, url: string, nowMs: number): boole
   if (cache.url !== url) return false;
   const age = nowMs - cache.downloadedAtMs;
   return age >= 0 && age < TLE_REFRESH_INTERVAL_MS;
+}
+
+/**
+ * Whether `cache` is good enough to open the app on while a fresh one is
+ * fetched behind it.
+ *
+ * A wider window than `isFresh` and a different question. That one asks
+ * whether CelesTrak may be left alone; this asks whether these elements would
+ * put a marker anywhere a person could tell apart from where the new ones
+ * would — and for the better part of a day the answer is no. See
+ * `TLE_USABLE_INTERVAL_MS`.
+ *
+ * The same two guards as `isFresh`, for the same reasons: a cache from a
+ * different URL is a different catalogue, and one stamped in the future means
+ * the device clock moved and no interval can be trusted against it.
+ */
+export function isUsable(cache: CachedCatalog, url: string, nowMs: number): boolean {
+  if (cache.url !== url) return false;
+  const age = nowMs - cache.downloadedAtMs;
+  return age >= 0 && age < TLE_USABLE_INTERVAL_MS;
 }
 
 /**

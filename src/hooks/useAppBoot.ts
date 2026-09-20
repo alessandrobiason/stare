@@ -11,8 +11,17 @@ export type AppBoot<T> = {
   phase: BootPhase;
   /** Populated once every required step has succeeded. */
   result: T | null;
-  /** What went wrong, when `phase` is `"failed"`. */
-  error: string | null;
+  /**
+   * What went wrong, when `phase` is `"failed"` — as the thing that was
+   * thrown, rather than as a sentence about it.
+   *
+   * Not flattened here, because the sentence depends on the language the app
+   * is in and this hook runs once per boot while the screen re-renders every
+   * time that changes. The screen turns it into words at the moment it draws
+   * (`bootFailureText`), which is also what lets it tell a refused permission
+   * from a dropped connection and offer the right way out of each.
+   */
+  error: unknown;
   /**
    * Whether running boot again could plausibly help. False for a device that
    * is missing a sensor, which no number of retries will grow.
@@ -57,7 +66,7 @@ export function useAppBoot<T>(
 ): AppBoot<T> {
   const [phase, setPhase] = useState<BootPhase>("loading");
   const [result, setResult] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [retryable, setRetryable] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const startRef = useLatestRef(start);
@@ -95,9 +104,7 @@ export function useAppBoot<T>(
       .catch((cause: unknown) => {
         if (!isCurrent()) return;
         if (cause instanceof BootError) setRetryable(cause.step !== "sensors");
-        setError(
-          cause instanceof Error && cause.message ? cause.message : "Something went wrong during start-up."
-        );
+        setError(cause);
         setPhase("failed");
       });
 
@@ -114,7 +121,7 @@ export function useAppBoot<T>(
     // Stop the current run from landing on top of the error being reported.
     runRef.current += 1;
     setResult(null);
-    setError(cause instanceof Error && cause.message ? cause.message : String(cause));
+    setError(cause);
     setPhase("failed");
   }, []);
 

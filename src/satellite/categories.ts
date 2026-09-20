@@ -340,6 +340,48 @@ export function noradId(line: string): number {
 }
 
 /**
+ * The international designator occupies columns 10-17 of TLE line 1: two
+ * digits of launch year, three of launch number within that year, and up to
+ * three letters for which piece of that launch this is.
+ */
+const DESIGNATOR_COLUMNS: [number, number] = [9, 17];
+
+/**
+ * The year this object went up, read off its international designator, or
+ * `null` where the elements do not carry one.
+ *
+ * The one fact about a satellite's own history that is in a TLE at all. The
+ * elements otherwise describe where a thing is this week and say nothing about
+ * what it is or how long it has been up there — which is the difference between
+ * a card that reads as a readout and one that reads as being about an object:
+ * Hubble is a telescope, and Hubble launched in 1990 is a telescope that has
+ * been up there longer than most of the people looking at it.
+ *
+ * A **year** and not a date, because a year is what is actually written down
+ * here. The designator's other half is the launch's number within the year —
+ * `1998-067` is the sixty-seventh launch of 1998 — which is an ordinal and not
+ * a day, and there is no day in the elements to recover. Saying the year is
+ * the whole of what the catalogue knows, and inventing the rest of a date from
+ * a table the app does not carry would be worse than saying less.
+ *
+ * The two-digit year is resolved against the space age rather than against
+ * 2000: nothing in orbit predates Sputnik in 1957, so `57` and up is the
+ * twentieth century and everything below it is this one. That rule has until
+ * 2057 to run, by which time the elements will have a wider field or the app
+ * will be long gone.
+ */
+export function launchYear(line1: string): number | null {
+  const designator = line1.slice(...DESIGNATOR_COLUMNS).trim();
+  if (designator.length < 2) return null;
+  const twoDigits = Number.parseInt(designator.slice(0, 2), 10);
+  if (!Number.isFinite(twoDigits)) return null;
+  return twoDigits >= SPACE_AGE_PIVOT ? 1900 + twoDigits : 2000 + twoDigits;
+}
+
+/** Sputnik's year, and so the earliest two-digit year that means the 1900s. */
+const SPACE_AGE_PIVOT = 57;
+
+/**
  * Whether the object holds station over the equator, and so does not appear to
  * move at all.
  *

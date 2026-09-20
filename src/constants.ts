@@ -261,7 +261,30 @@ export const SKY_VISIBILITY = {
    * it there is nothing to say to somebody standing outside, and the app says
    * so rather than leaving them to find out.
    */
-  binocularMagnitude: 8
+  binocularMagnitude: 8,
+  /**
+   * Beyond this range, in kilometres, nothing in this catalogue can be seen by
+   * eye — whatever it is, whatever the sky is doing, whatever the sun is doing
+   * to it.
+   *
+   * Not a guess, and not a separate rule bolted onto the brightness one: it is
+   * where the brightness rule runs out. Apparent magnitude gains 5·log₁₀(R/1000)
+   * with range (`apparentMagnitude`), the brightest standard magnitude anywhere
+   * in `standardMagnitude.ts` is the station's −1.8, and the most this app will
+   * claim any sky gives up is `nakedEyeMagnitude`. Put those together —
+   * −1.8 + 5·log₁₀(R/1000) = 4 — and the answer is about 14,500 km. Past that,
+   * an object as bright as the ISS is already off the ladder, and everything
+   * real is far fainter than the ISS.
+   *
+   * It is worth having as a *reason* rather than leaving it to come out as
+   * "too faint" because it is the commonest reason there is, and the least
+   * obvious one. Two thirds of what a southward sky draws is navigation and
+   * television satellites at twenty to thirty-six thousand kilometres, and
+   * "too faint" invites the reply that a darker garden would fix it. Nothing
+   * fixes this one: a GPS satellite is a bright object that happens to be
+   * three times further away than the diameter of the Earth.
+   */
+  tooFarKm: 14_500
 } as const;
 
 /**
@@ -1618,6 +1641,33 @@ export const TLE_REFRESH_INTERVAL_MS = 2 * 60 * 60 * 1000;
  * enough that an offline app is not hammering the server every launch.
  */
 export const TLE_RETRY_INTERVAL_MS = 15 * 60 * 1000;
+
+/**
+ * How old a cached catalogue may be and still be worth opening the app on
+ * while a fresh one downloads behind it.
+ *
+ * Between `TLE_REFRESH_INTERVAL_MS` and this, the elements on disk are stale
+ * by the rule that keeps CelesTrak happy and perfectly good by the rule that
+ * decides where a marker goes — those are two different questions and this app
+ * used to answer both with the two-hour figure. The cost was the launch
+ * everybody actually notices: come back to it the same evening, on a good
+ * connection, and boot blocked on a couple of megabytes before it would draw
+ * anything, for elements that would have moved the nearest marker by a
+ * fraction of a pixel.
+ *
+ * A day, because that is where SGP4's own accuracy starts to be the thing in
+ * question rather than the download. Element sets are published with a few
+ * hundred metres of along-track error at epoch and grow it by roughly a
+ * kilometre a day in low orbit; at a few hundred kilometres' range a kilometre
+ * is well under the width of the mark drawn for it. Past a day the error is
+ * still small, but it is no longer obviously smaller than everything else the
+ * projection is wrong by, and at that point waiting is the honest choice.
+ *
+ * Nothing stale is *kept*: serving it starts the refresh rather than skipping
+ * it, and the new elements are on disk for the next launch. See
+ * `resolveActiveCatalog`.
+ */
+export const TLE_USABLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Shortest time the boot screen stays up on a cold start, in milliseconds.

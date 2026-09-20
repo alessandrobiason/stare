@@ -314,7 +314,11 @@ describe("and says it in the space it is given", () => {
     for (const verdict of [t.visible, t.binoculars, t.tooFaint]) {
       expect(width(`${verdict} · ${magnitude}`, 12.5)).toBeLessThan(2 * CARD_COLUMN);
     }
-    for (const verdict of [t.eclipsed, t.daylight, t.unknown]) {
+    // The three that stand on their own. `tooFar` is among them: past
+    // `SKY_VISIBILITY.tooFarKm` the range has already settled the question, so
+    // a brightness offered beside it would be supporting a sentence that does
+    // not rest on one.
+    for (const verdict of [t.tooFar, t.eclipsed, t.daylight, t.unknown]) {
       expect(width(verdict, 12.5)).toBeLessThan(2 * CARD_COLUMN);
     }
   });
@@ -418,15 +422,31 @@ describe("the figures follow the reader's conventions", () => {
     // Minutes up to an hour and hours past it, which is the same split the
     // orbit period makes: an hour and a half is a wait to plan around and
     // ninety minutes is arithmetic to do.
-    expect(timeUntil(14 * 60_000)).toBe("14 min");
-    expect(timeUntil(82 * 60_000)).toBe("1h 22m");
+    //
+    // Said as a wait rather than as a bare span: `1h 22m` beside a name is the
+    // same shape as that object's orbital period two taps away, and the
+    // preposition is what says which of the two this is.
+    expect(timeUntil(14 * 60_000)).toBe("in 14 min");
+    expect(timeUntil(82 * 60_000)).toBe("in 1h 22m");
     // A pass already under way. The plan is remade once a minute, so its rise
     // is up to a minute in the past by the time the panel reads it — and there
-    // is nothing to count down to either way.
+    // is nothing to count down to either way. No preposition here: it is not a
+    // wait.
     expect(timeUntil(0)).toBe("now");
     expect(timeUntil(-45_000)).toBe("now");
     // Rounded rather than truncated: forty seconds off is closer to a minute.
-    expect(timeUntil(100_000)).toBe("2 min");
+    expect(timeUntil(100_000)).toBe("in 2 min");
+  });
+
+  test("and the wait is worded by the language rather than prefixed to it", () => {
+    // The preposition is a string of its own per language, not an English
+    // word glued onto a number: where it goes and what it is are properties
+    // of the language. The orbital period it would otherwise be mistaken for
+    // keeps the bare form.
+    setLocaleForTesting("it");
+    expect(timeUntil(82 * 60_000)).toBe("tra 1h 22m");
+    expect(timeUntil(14 * 60_000)).toBe("tra 14 min");
+    expect(orbitPeriod(82)).toBe("82 min");
   });
 
   test("and in the reader's own units", () => {

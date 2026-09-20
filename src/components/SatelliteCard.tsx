@@ -22,7 +22,8 @@ import {
   orbitPeriod,
   seeing,
   sightingLine,
-  speed
+  speed,
+  year
 } from "../i18n/format";
 import { briefingFor } from "../satellite/briefing";
 import { CATEGORY_COLORS } from "../satellite/categories";
@@ -340,6 +341,13 @@ export const SatelliteCard: React.FC<Props> = ({
             <Fact label={t.card.facts.speed} value={speed(detail.speedKmPerSecond)} />
             <Fact label={t.card.facts.look} value={lookDirection(detail)} />
             <Fact label={t.card.facts.orbit} value={orbitPeriod(detail.orbitPeriodMinutes)} />
+            {/* Last, and only where the elements carry one: it is the one row
+                here that is not a reading off this second, so it belongs under
+                the ones that are rather than among them. A dash in its place
+                would be a row spent saying the catalogue is missing a field. */}
+            {detail.launchYear !== null && (
+              <Fact label={t.card.facts.launched} value={year(detail.launchYear)} />
+            )}
           </View>
         ) : (
           // The catalog is reloaded every couple of hours and objects leave it

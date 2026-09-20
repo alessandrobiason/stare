@@ -618,6 +618,7 @@ describe("the tapped satellite's card", () => {
       category: "INTERNET",
       subcategory: "STARLINK",
       parked: false,
+      launchYear: 2019,
       rangeKm: 1240.4,
       altitudeKm: 547.8,
       speedKmPerSecond: 7.58,
@@ -687,6 +688,39 @@ describe("the tapped satellite's card", () => {
       const eclipsed = detail({ nakedEye: "eclipsed", apparentMagnitude: null });
       // A fragment, because the markup escapes the apostrophe in "Earth's".
       expect(textOf(card({ "STARLINK-1234": eclipsed }))).toContain("Not visible (in the Earth");
+    });
+
+    test("and distance is said as distance, not as faintness", () => {
+      // A navigation or television satellite is not dim, it is far, and the
+      // difference is whether coming back after dark would help. See
+      // `SKY_VISIBILITY.tooFarKm`.
+      const far = detail({ nakedEye: "tooFar", rangeKm: 36_200, apparentMagnitude: null });
+      const text = textOf(card({ "GSAT-30": far }, ["GSAT-30"], "GSAT-30"));
+
+      expect(text).toContain(strings().card.seeing.tooFar);
+      expect(text).not.toContain(strings().card.seeing.tooFaint);
+    });
+  });
+
+  describe("the year it went up", () => {
+    test("is on the card, under the figures that are about this second", () => {
+      // The one row here that is a fact about the object rather than a reading
+      // off the sky. See `SatelliteDetail.launchYear`.
+      const text = textOf(card({ "STARLINK-1234": detail({ launchYear: 2019 }) }));
+
+      expect(text).toContain(strings().card.facts.launched);
+      // Bare digits: a year is a label, not a quantity, so no thousands
+      // separator — `2.019` would read as a measurement of something.
+      expect(text).toContain("2019");
+      expect(text).not.toContain("2,019");
+    });
+
+    test("and is simply absent where the elements carry no designator", () => {
+      // A dash in its place would be a row spent saying the catalogue is
+      // missing a field.
+      const text = textOf(card({ "STARLINK-1234": detail({ launchYear: null }) }));
+
+      expect(text).not.toContain(strings().card.facts.launched);
     });
   });
 

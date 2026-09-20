@@ -16,22 +16,35 @@ import { SunlitState } from "./illumination";
  * empty. It was not wrong. It was answering a different question from the one
  * being asked of it.
  *
- * Three things decide it, and this module is where they meet:
+ * Four things decide it, and this module is where they meet:
  *
+ * - **Is it simply too far away?** `rangeKm` against `SKY_VISIBILITY.tooFarKm`.
+ *   The commonest answer of the four and the one the app used to bury: most of
+ *   what a southward sky draws is parked at thirty-six thousand kilometres or
+ *   circling at twenty, and no sky and no shadow changes what that costs.
  * - **Is the observer in the dark?** `sunAltitudeDeg`, which the palette
- *   already asks for. The single largest filter, and the one nobody expects:
- *   for most of the day the answer for every object overhead is no.
+ *   already asks for. The single largest filter among the rest, and the one
+ *   nobody expects: for most of the day the answer for every object overhead
+ *   is no.
  * - **Is the satellite in the sun?** `illumination.ts`. Geometry, exact, and
  *   known for every object in the catalogue.
  * - **Is what it reflects enough?** A magnitude against the limit the sky
  *   allows, where the object's reflectivity is recorded at all
  *   (`standardMagnitude.ts`). Where it is not, this says so instead of guessing.
  *
- * The order matters, because the first two are facts and the third is the only
+ * The order matters, because the first three are facts and the last is the only
  * one carrying an estimate. An object in the Earth's shadow is not visible and
  * that needs no brightness at all; the sun being up rules out the whole sky
  * with nothing known about any of it. Brightness is consulted last, and only
  * when everything else has already said yes.
+ *
+ * Range comes first of all, ahead even of the sun, and that ordering is a
+ * claim worth defending: it is the only one of the four that is a property of
+ * the *object* rather than of the moment. "Not visible (daylight)" said of a
+ * navigation satellite is true and is also an invitation to come back after
+ * dark, which is a promise this app cannot keep — nobody has ever seen a GPS
+ * satellite by eye, at any hour. Saying so plainly is both more useful and
+ * more honest than saying the sun is in the way.
  */
 
 /** How dark it is where the observer is standing. */
@@ -45,6 +58,11 @@ export type SkyDarkness =
 
 /** What the app can tell somebody about seeing one particular object. */
 export type NakedEyeVerdict =
+  /**
+   * So far away that no object in the catalogue could be seen from here,
+   * whatever the sky and the sun are doing. See `SKY_VISIBILITY.tooFarKm`.
+   */
+  | "tooFar"
   /** The sun is up here. Whatever the object is doing, it cannot be seen. */
   | "daylight"
   /** The object is in the Earth's shadow, with nothing to reflect. */
@@ -99,13 +117,19 @@ export function nakedEyeLimit(sunAltitudeDeg: number): number {
  * `magnitude` is `null` for an object whose reflectivity nobody has written
  * down, and that is carried through to `"unknown"` rather than resolved into a
  * yes or a no: the app knows where it is and knows it is in sunlight, and those
- * are worth saying on their own.
+ * are worth saying on their own. `rangeKm` needs no such hedge — it is the one
+ * figure here that is measured rather than estimated, which is the other half
+ * of why it is asked first.
  */
 export function nakedEyeVerdict(
   sunlit: SunlitState,
   magnitude: number | null,
-  sunAltitudeDeg: number
+  sunAltitudeDeg: number,
+  rangeKm: number
 ): NakedEyeVerdict {
+  // First, because it is the only one of these that is true of the object
+  // rather than of the minute it is being asked about. See the note above.
+  if (rangeKm > SKY_VISIBILITY.tooFarKm) return "tooFar";
   if (skyDarknessFor(sunAltitudeDeg) === "daylight") return "daylight";
   // The penumbra is the object on its way out, dimming by the second, and its
   // magnitude already carries how far through that it is — so it is judged on

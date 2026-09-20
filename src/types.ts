@@ -128,6 +128,17 @@ export type SatelliteDetail = {
   subcategory: SatelliteSubcategory | null;
   /** Holds station over the equator, which is why its orbit takes a day. */
   parked: boolean;
+  /**
+   * The year it went up, or `null` where the elements carry no designator.
+   *
+   * The one figure on the card that is not about this instant. Everything else
+   * here — the range, the bearing, how bright it looks — is true for the few
+   * seconds it is read in and is resampled twice a second; this is a fact
+   * about the object, and it is on the card because it is the one that makes
+   * the rest read as being about a thing rather than about a dot. See
+   * `launchYear`.
+   */
+  launchYear: number | null;
   /** Distance from the observer to the satellite, in kilometres. */
   rangeKm: number;
   /** Height above the WGS-84 ellipsoid, in kilometres: how high it orbits. */

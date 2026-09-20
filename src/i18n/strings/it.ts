@@ -3,7 +3,7 @@ import type { Strings } from "../types";
 export const it: Strings = {
   intro: {
     what: {
-      body: "Punta il telefono verso il cielo e muovilo piano: vedrai i satelliti sopra di te, esattamente dove si trovano."
+      body: "Benvenuto in Stare! Punta il telefono verso il cielo: vedrai i satelliti sopra di te, esattamente dove si trovano."
     },
     access: {
       title: "Tre permessi veloci",
@@ -35,15 +35,15 @@ export const it: Strings = {
       title: "Nel cielo",
       body: "Ogni segno è un satellite. Toccane uno per sapere cos'è.",
       longTail: {
-        name: "Coda lunga",
+        name: "Scia lunga",
         meaning: "Si muove veloce: di solito orbita bassa, circa 400–2.000 km di quota."
       },
       shortTail: {
-        name: "Coda corta",
+        name: "Scia corta",
         meaning: "Si muove piano: di solito orbita media, circa 2.000–20.000 km di quota."
       },
       parked: {
-        name: "Senza coda",
+        name: "Senza scia",
         meaning: "Resta fermo su un punto: molto lontano, circa 36.000 km di quota."
       }
     },
@@ -103,9 +103,10 @@ export const it: Strings = {
       open: "Prossimi passaggi",
       now: "ora",
       seeing: {
+        tooFar: "non visibile (troppo lontano)",
         visible: "visibile a occhio nudo",
-        binoculars: "visible col binocolo",
-        tooFaint: "non visible (troppo debole)",
+        binoculars: "visibile col binocolo",
+        tooFaint: "non visibile (troppo debole)",
         eclipsed: "non visibile (nel cono d'ombra della Terra)",
         daylight: "non visibile (è giorno)",
         unknown: "luminosità non registrata"
@@ -150,11 +151,12 @@ export const it: Strings = {
     photo: "Fotografia di {name}",
     missing: "Questo satellite non è più nel catalogo.",
     seeing: {
+      tooFar: "Non visibile — troppo lontano per vederlo",
       visible: "Visibile a occhio nudo",
       binoculars: "Visibile con un binocolo",
       tooFaint: "Non visibile (troppo debole)",
-      eclipsed: "Non visible (nel cono d'ombra della Terra)",
-      daylight: "Non visible (è giorno)",
+      eclipsed: "Non visibile (nel cono d'ombra della Terra)",
+      daylight: "Non visibile (è giorno)",
       unknown: "La sua luminosità non è registrata",
       magnitude: "magnitudine {value}",
       aboutMagnitude: "circa magnitudine {value}"
@@ -165,7 +167,8 @@ export const it: Strings = {
       altitude: "Quota",
       speed: "Velocità",
       look: "Direzione",
-      orbit: "Orbita"
+      orbit: "Orbita",
+      launched: "Lancio"
     }
   },
   units: {
@@ -173,6 +176,7 @@ export const it: Strings = {
     kmPerSecond: "{value} km/s",
     minutes: "{value} min",
     hoursMinutes: "{hours}h {minutes}m",
+    inTime: "tra {time}",
     up: "{degrees}° sopra",
     below: "{degrees}° sotto",
     unknown: "—"
@@ -196,7 +200,33 @@ export const it: Strings = {
   boot: {
     failed: "Avvio non riuscito",
     tryAgain: "RIPROVA",
-    unsupported: "Questo dispositivo non può mostrare la vista del cielo."
+    unsupported: "Questo dispositivo non può mostrare la vista del cielo.",
+    openSettings: "APRI IMPOSTAZIONI",
+    errors: {
+      cameraRefused:
+        "A Stare serve la fotocamera: è il cielo che vedi dietro ai segni, ed è così che l'app capisce cos'è un palazzo e cos'è cielo aperto. Attiva Fotocamera per Stare nelle Impostazioni, poi torna qui.",
+      cameraBlocked:
+        "L'accesso alla fotocamera è disattivato per Stare. Attivalo nelle Impostazioni: la fotocamera è il cielo dietro ai segni, ed è come l'app distingue un tetto dal cielo aperto.",
+      cameraFailed: "Non è stato possibile aprire la fotocamera.",
+      locationRefused:
+        "A Stare serve sapere all'incirca dove ti trovi: uno stesso satellite sta in un punto diverso del cielo da una città all'altra. Attiva Posizione per Stare nelle Impostazioni, poi torna qui.",
+      locationOff:
+        "I servizi di localizzazione sono disattivati su questo telefono, quindi non c'è un punto dove collocare i satelliti. Attivali nelle Impostazioni, poi torna qui.",
+      locationUnavailable:
+        "Non è stato possibile trovare la tua posizione. Di solito basta spostarsi dove il cielo è più aperto: al chiuso il primo rilevamento può richiedere parecchio.",
+      noMotionSensor:
+        "Questo dispositivo non ha un sensore di movimento, quindi non c'è un assetto con cui orientare la vista.",
+      noMagnetometer:
+        "Questo dispositivo non ha un magnetometro, quindi le direzioni non possono essere riferite al nord.",
+      sensorsUnknown: "Non è stato possibile verificare i sensori del dispositivo.",
+      catalogOffline:
+        "Non è stato possibile scaricare nessun catalogo di satelliti, e non ce n'è uno salvato su questo dispositivo. Stare prende i dati orbitali da CelesTrak, un servizio pubblico di tracciamento satellitare: controlla la connessione e riprova tra qualche minuto.",
+      catalogEmpty: "Il catalogo dei satelliti è stato scaricato ma non conteneva orbite utilizzabili.",
+      catalogFailed: "Non è stato possibile caricare il catalogo dei satelliti.",
+      skyModelFailed:
+        "Non è stato possibile caricare il modello di riconoscimento del cielo, quindi niente potrebbe essere nascosto dietro il terreno.",
+      unknown: "Qualcosa è andato storto durante l'avvio."
+    }
   },
   catalog: {
     about: "Tutto ciò che è in orbita, anche se non è sopra di te. Toccane uno per metterlo sul cielo.",

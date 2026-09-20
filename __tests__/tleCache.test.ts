@@ -1,4 +1,8 @@
-import { TLE_REFRESH_INTERVAL_MS, TLE_RETRY_INTERVAL_MS } from "../src/constants";
+import {
+  TLE_REFRESH_INTERVAL_MS,
+  TLE_RETRY_INTERVAL_MS,
+  TLE_USABLE_INTERVAL_MS
+} from "../src/constants";
 import { SAMPLE_TLE } from "../src/data/sampleTle";
 import { clearTleCache, loadActiveCatalog } from "../src/data/tleProvider";
 import { PersistentStore, setPersistentStoreForTesting } from "../src/data/tleStore";
@@ -54,6 +58,21 @@ afterEach(() => {
   setPersistentStoreForTesting(undefined);
 });
 
+/**
+ * Lets whatever the background refresh started settle.
+ *
+ * It is deliberately nobody's promise — see `refreshInBackground` — so there
+ * is nothing to await, and a test that wants to see its effect has to give the
+ * microtask queue a turn. Two, because the fetch resolves into a sliced parse.
+ */
+async function flush(): Promise<void> {
+  // Real turns of the event loop rather than microtasks: the download resolves
+  // into a sliced parse, which hands the thread back between slices.
+  for (let turn = 0; turn < 8; turn += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
 function respondWith(text: string) {
   return jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(text, { status: 200 }));
 }
@@ -95,16 +114,76 @@ test("the download time is written to storage, not just held in memory", () => {
   });
 });
 
-test("re-downloads once the refresh window has passed", async () => {
-  const fetchMock = respondWith(body).mockResolvedValue(new Response(otherBody, { status: 200 }));
+test("past the refresh window it opens on the cache and refreshes behind it", async () => {
+  // The launch everybody actually notices. Two hours is CelesTrak's rule about
+  // traffic rather than a statement about where a satellite is, and blocking
+  // the app on a couple of megabytes for elements that would move a marker by
+  // a fraction of a pixel is the wrong trade. See `TLE_USABLE_INTERVAL_MS`.
+  const fetchMock = respondWith(body);
   jest.spyOn(Date, "now").mockReturnValue(1_000_000);
   await loadActiveCatalog();
+  fetchMock.mockResolvedValue(new Response(otherBody, { status: 200 }));
 
   jest.spyOn(Date, "now").mockReturnValue(1_000_000 + TLE_REFRESH_INTERVAL_MS + 1);
+  const opened = await loadActiveCatalog();
+
+  // What the app opens on is what was already here — no wait at all.
+  expect(opened.source).toBe("cache");
+  expect(opened.tles[0].name).toBe("SAT ONE");
+  // And the newer elements are fetched anyway, for the next launch.
+  await flush();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test("and the elements it fetched behind it are what the next launch opens on", async () => {
+  const fetchMock = respondWith(body);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+  fetchMock.mockResolvedValue(new Response(otherBody, { status: 200 }));
+
+  const stale = 1_000_000 + TLE_REFRESH_INTERVAL_MS + 1;
+  jest.spyOn(Date, "now").mockReturnValue(stale);
+  await loadActiveCatalog();
+  await flush();
+
+  // Inside the refresh window of the *background* download, so this asks
+  // nothing of the network and still gets the new elements.
+  const next = await loadActiveCatalog();
+  expect(next.tles[0].name).toBe("SAT TWO");
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test("but elements old enough to have drifted are waited for", async () => {
+  // Past a day, SGP4's own accuracy rather than the download is the thing in
+  // question, and waiting becomes the honest choice.
+  const fetchMock = respondWith(body);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+  fetchMock.mockResolvedValue(new Response(otherBody, { status: 200 }));
+
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000 + TLE_USABLE_INTERVAL_MS + 1);
   const refreshed = await loadActiveCatalog();
 
   expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(refreshed.source).toBe("network");
   expect(refreshed.tles[0].name).toBe("SAT TWO");
+});
+
+test("a background refresh that fails leaves the app on the cache it opened with", async () => {
+  const fetchMock = respondWith(body);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  fetchMock.mockRejectedValue(new Error("offline"));
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000 + TLE_REFRESH_INTERVAL_MS + 1);
+  const opened = await loadActiveCatalog();
+  await flush();
+
+  // Nobody was waiting on it, so nothing is a failure: the app is running on
+  // elements that were already good enough to open it.
+  expect(opened.source).toBe("cache");
+  expect(opened.tles[0].name).toBe("SAT ONE");
 });
 
 test("serves the cached catalog when a refresh fails", async () => {

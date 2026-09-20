@@ -23,16 +23,18 @@ export type DeviceCapabilities = {
 export const NO_CAPABILITIES: DeviceCapabilities = { motion: false, magnetometer: false };
 
 /**
- * The missing sensor and what its absence costs, or `null` when both are there.
+ * Which sensor is missing, as a key the boot screen can write out in the
+ * reader's own language, or `null` when both are there.
+ *
  * Says what is missing, not how much it matters: that depends on the mode — see
- * `runBootSequence`.
+ * `runBootSequence`. A key rather than a sentence for the reason in
+ * `src/boot/bootFailure.ts`: this is the last thing somebody sees before the
+ * app gives up, and it was the one line on that screen still in English.
  */
-export function describeMissingCapabilities(capabilities: DeviceCapabilities): string | null {
-  if (!capabilities.motion) {
-    return "This device has no motion sensor, so there is no attitude to aim the view with.";
-  }
-  if (!capabilities.magnetometer) {
-    return "This device has no magnetometer, so a heading cannot be referenced to north.";
-  }
+export function missingCapability(
+  capabilities: DeviceCapabilities
+): "noMotionSensor" | "noMagnetometer" | null {
+  if (!capabilities.motion) return "noMotionSensor";
+  if (!capabilities.magnetometer) return "noMagnetometer";
   return null;
 }

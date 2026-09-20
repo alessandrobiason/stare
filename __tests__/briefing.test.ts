@@ -104,9 +104,22 @@ describe("what a tapped satellite says it is", () => {
     }
   });
 
-  test("two lines, because a card over a camera picture is not an article", () => {
+  test("a short paragraph, because a card over a camera picture is not an article", () => {
+    // This used to be two lines, and two lines turned out to be less than the
+    // question deserves. Somebody who has tapped a moving light in the sky is
+    // not skimming a list — they have stopped, pointed at one thing and asked
+    // what it is, and an answer that stops at "a Soyuz: the Russian crew
+    // ferry" leaves them where they started.
+    //
+    // A bound is still needed, and it is still about the sky rather than about
+    // the writing: the card is laid out at the foot of a live camera view and
+    // capped at a little under half the screen (`SatelliteCard`), so past a
+    // point the extra words are not read, they are scrolled. Six hundred is
+    // about a phone screen of prose under the photograph — long enough for
+    // what the thing is, who flies it and the one detail worth remembering,
+    // and short enough that the answer is still visible all at once.
     for (const briefing of briefings) {
-      expect(briefing.text.length).toBeLessThanOrEqual(260);
+      expect(briefing.text.length).toBeLessThanOrEqual(600);
     }
   });
 

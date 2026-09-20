@@ -1,3 +1,4 @@
+import type { BootFailureKey } from "../boot/bootFailure";
 import type { SatelliteCategory, SatelliteSubcategory } from "../satellite/categories";
 
 /**
@@ -220,6 +221,12 @@ export type Strings = {
      * shown.
      */
     seeing: {
+      /**
+       * Too far away for any object to be seen from here, whatever the sky is
+       * doing — the answer for most of a southward sky, and the one the card
+       * used to give as "too faint". See `SKY_VISIBILITY.tooFarKm`.
+       */
+      tooFar: string;
       /** Lit, dark here, and bright enough to find by eye. */
       visible: string;
       /** Lit and dark here, but past what an unaided eye picks up. */
@@ -263,6 +270,12 @@ export type Strings = {
       speed: string;
       look: string;
       orbit: string;
+      /**
+       * The year it went up. The only row on the card that is not a reading
+       * off this instant — see `SatelliteDetail.launchYear` — and drawn only
+       * for the objects whose elements carry one.
+       */
+      launched: string;
     };
   };
   units: {
@@ -271,6 +284,18 @@ export type Strings = {
     kmPerSecond: string;
     minutes: string;
     hoursMinutes: string;
+    /**
+     * A span of time read as a wait rather than as a duration. `{time}`, one
+     * of the two above.
+     *
+     * `20h 4m` beside a satellite's name is ambiguous in a way nobody notices
+     * until they have misread it once: it is exactly how long that object's
+     * orbit takes on the card two taps away, and the passes panel is the one
+     * place in the app writing about the future. The preposition is what
+     * settles it — "in 20h 4m" — and it is a separate string because where it
+     * goes and whether it is one word is a property of the language.
+     */
+    inTime: string;
     /** How far above the horizon. `{degrees}`. */
     up: string;
     /** The same for an object that has set. `{degrees}`, unsigned. */
@@ -291,10 +316,40 @@ export type Strings = {
     calibrate: Notice;
     magnetic: Notice;
   };
+  /**
+   * The boot screen: the one screen that is only ever read when something has
+   * gone wrong, and so the one whose words have to be in the reader's language
+   * most of all.
+   *
+   * The reasons themselves are `errors`. They used to be English sentences
+   * thrown from wherever the failure happened — a permission refused in
+   * `bootTasks`, a fix that never arrived in `device/location.ts` — which made
+   * the title of this screen the last translated thing on it. A failure now
+   * travels as a key (`BootFailureKey`) and is written out here, in the
+   * language the app is in, at the moment it is drawn.
+   */
   boot: {
     failed: string;
     tryAgain: string;
     unsupported: string;
+    /**
+     * The button beside the retry, on the failures the phone's own settings
+     * are the fix for: a refused camera, a refused fix, location services
+     * switched off. It opens this app's page in the system settings, which is
+     * two levels down a list somebody would otherwise have to be told how to
+     * find. See `opensSettings`.
+     */
+    openSettings: string;
+    /**
+     * Why boot stopped, one sentence per thing that can stop it.
+     *
+     * Each says what went wrong and, where there is one, what to do about it —
+     * a refusal is a sentence about a switch, not about an error. The
+     * platform's own message, when there is one, is kept underneath in
+     * whatever language it arrived in: it is a diagnostic to be photographed
+     * rather than a sentence to be read.
+     */
+    errors: Record<BootFailureKey, string>;
   };
   /**
    * The catalog tab: the whole catalogue as something to look things up in.
@@ -416,7 +471,14 @@ type Notice = { title: string; detail: string };
  * verdict added there and not here fails to compile, which is the check worth
  * having either way.
  */
-type PassSeeing = "visible" | "binoculars" | "tooFaint" | "eclipsed" | "daylight" | "unknown";
+type PassSeeing =
+  | "tooFar"
+  | "visible"
+  | "binoculars"
+  | "tooFaint"
+  | "eclipsed"
+  | "daylight"
+  | "unknown";
 
 export type TourStrings = {
   /** The settings row that opens the tour again, and the line under it. */

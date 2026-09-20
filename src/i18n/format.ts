@@ -70,6 +70,19 @@ export function speed(kmPerSecond: number): string {
 }
 
 /**
+ * A calendar year, as four bare digits.
+ *
+ * The one number on the card that is deliberately *not* run through
+ * `groupNumber`. A year is a label rather than a quantity, and nobody writes
+ * one with a thousands separator in it — `1.998` in Italian or `1,998` in
+ * English reads as a measurement of something, which is exactly the confusion
+ * the rest of this module exists to prevent.
+ */
+export function year(value: number): string {
+  return Math.round(value).toString();
+}
+
+/**
  * How long one orbit takes, in the units that make it readable: minutes for
  * anything in low orbit, hours and minutes once a period runs past a couple of
  * hours — a geostationary object comes out at a day, which is the whole reason
@@ -271,12 +284,20 @@ export function sunlightSummary(sky: {
 export function timeUntil(millisecondsAway: number): string {
   const t = strings();
   const minutes = Math.round(millisecondsAway / MS_PER_MINUTE);
+  // Already begun: the object is up, and "in no time" is not a wait.
   if (minutes <= 0) return t.scene.passes.now;
-  if (minutes < 60) return fill(t.units.minutes, { value: groupNumber(minutes) });
-  return fill(t.units.hoursMinutes, {
-    hours: groupNumber(Math.floor(minutes / 60)),
-    minutes: (minutes % 60).toString()
-  });
+  const span =
+    minutes < 60
+      ? fill(t.units.minutes, { value: groupNumber(minutes) })
+      : fill(t.units.hoursMinutes, {
+          hours: groupNumber(Math.floor(minutes / 60)),
+          minutes: (minutes % 60).toString()
+        });
+  // Said as a wait rather than as a bare span. `20h 4m` beside a name is the
+  // same shape as the orbital period on that object's own card, and the panel
+  // this is read in is the only one in the app written in the future tense —
+  // so the preposition is doing the work of saying which of the two it is.
+  return fill(t.units.inTime, { time: span });
 }
 
 const MS_PER_MINUTE = 60_000;

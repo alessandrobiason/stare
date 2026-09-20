@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { SATELLITE_MARKERS, SATELLITE_TRACKING } from "../src/constants";
+import { SATELLITE_MARKERS, SATELLITE_TRACKING, SKY_VISIBILITY } from "../src/constants";
 import {
   createObserverFrame,
   eciToEnuInFrame,
@@ -418,8 +418,10 @@ describe("what the card is told about seeing it", () => {
     primedTracker()
       .fixesAt(WHEN, observer)
       .filter((fix) => fix.sunlit === "sunlit");
-  const recorded = () =>
-    litFixes().find((fix) => standardMagnitudeFor(noradOf(fix.name), fix.name) !== null);
+  const recorded = (and: (fix: { name: string }) => boolean = () => true) =>
+    litFixes().find(
+      (fix) => standardMagnitudeFor(noradOf(fix.name), fix.name) !== null && and(fix)
+    );
   const unrecorded = () =>
     litFixes().find((fix) => standardMagnitudeFor(noradOf(fix.name), fix.name) === null);
 
@@ -438,11 +440,32 @@ describe("what the card is told about seeing it", () => {
 
   test("an object with a recorded brightness is judged on it", () => {
     const tracker = primedTracker();
-    const detail = tracker.describe(named(recorded()), WHEN, observer)!;
+    // A near one specifically. Past `SKY_VISIBILITY.tooFarKm` the range
+    // settles the question before the brightness is consulted at all — a
+    // different rule, with its own test below.
+    const near = recorded((fix) => {
+      const detail = tracker.describe(fix.name, WHEN, observer);
+      return detail !== null && detail.rangeKm <= SKY_VISIBILITY.tooFarKm;
+    });
+    const detail = tracker.describe(named(near), WHEN, observer)!;
 
     expect(detail.apparentMagnitude).not.toBeNull();
     expect(Number.isFinite(detail.apparentMagnitude!)).toBe(true);
     expect(["visible", "binoculars", "tooFaint"]).toContain(detail.nakedEye);
+  });
+
+  test("but one far enough out is out of reach whatever it reflects", () => {
+    // The navigation and television satellites, which are most of a southward
+    // sky. "Too faint" said of these invites the reply that a darker garden
+    // would fix it; nothing fixes twenty thousand kilometres.
+    const tracker = primedTracker();
+    const far = litFixes().find((fix) => {
+      const detail = tracker.describe(fix.name, WHEN, observer);
+      return detail !== null && detail.rangeKm > SKY_VISIBILITY.tooFarKm;
+    });
+    if (!far) return; // This sky happens to hold none; nothing to assert.
+
+    expect(tracker.describe(far.name, WHEN, observer)!.nakedEye).toBe("tooFar");
   });
 
   test("one nobody has recorded a brightness for says so instead of guessing", () => {
@@ -468,7 +491,13 @@ describe("what the card is told about seeing it", () => {
     for (const fix of fixes.slice(0, 30)) {
       const detail = tracker.describe(fix.name, noon, observer)!;
       expect(detail.sunAltitudeDeg).toBeGreaterThan(0);
-      expect(detail.nakedEye).toBe("daylight");
+      // The sun rules out everything near enough for the sun to be the point.
+      // Anything further out than `tooFarKm` was never going to be seen at any
+      // hour, and says that instead — a truer answer than one which implies
+      // coming back after dark would help.
+      expect(detail.nakedEye).toBe(
+        detail.rangeKm > SKY_VISIBILITY.tooFarKm ? "tooFar" : "daylight"
+      );
     }
   });
 });

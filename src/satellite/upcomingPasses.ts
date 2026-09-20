@@ -179,18 +179,24 @@ function visibilityAt(
   const enu = eciToEnuInFrame(eci, gmst, frame);
   const illumination = illuminationIn(eci, createShadowFrame(when));
   const standard = standardMagnitudeFor(entry.noradId, entry.name);
+  const range = rangeKm(enu);
   const magnitude =
     standard === null
       ? null
       : apparentMagnitude(
           standard.magnitude,
-          rangeKm(enu),
+          range,
           phaseAngleDeg(enu, eciToEnuInFrame(sunEciKm(when), gmst, frame)),
           illumination.litFraction
         );
 
   return {
-    nakedEye: nakedEyeVerdict(illumination.state, magnitude, sunAltitudeDeg(observer, when)),
+    nakedEye: nakedEyeVerdict(
+      illumination.state,
+      magnitude,
+      sunAltitudeDeg(observer, when),
+      range
+    ),
     apparentMagnitude: magnitude,
     magnitudeMeasured: standard?.measured ?? false
   };

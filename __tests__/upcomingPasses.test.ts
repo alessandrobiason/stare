@@ -121,7 +121,14 @@ test("a countdown is not a promise: daylight is said rather than left out", asyn
 
   expect(listed.length).toBeGreaterThan(0);
   for (const pass of listed) {
-    expect(pass.nakedEye).toBe("daylight");
+    // Not one of them is offered as a sighting, which is the whole point.
+    expect(["visible", "binoculars"]).not.toContain(pass.nakedEye);
+    // Which *reason* a row gives is the best one available for that object.
+    // The window this fixture's sky puts at noon is Chandra and XMM-Newton,
+    // both on orbits that take them a third of the way to the Moon: they are
+    // out of reach at midnight as surely as at noon, so they say that rather
+    // than blaming a sun which is beside the point for them.
+    expect(["daylight", "tooFar"]).toContain(pass.nakedEye);
   }
 });
 

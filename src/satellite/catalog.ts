@@ -1,7 +1,13 @@
 import { startSlicing } from "../timeSlice";
 import { Tle } from "../types";
 import { isUsableSatrec, parseTle, SatRec } from "./propagator";
-import { noradId, SatelliteCategory, SatelliteSubcategory, subcategoryOf } from "./categories";
+import {
+  launchYear,
+  noradId,
+  SatelliteCategory,
+  SatelliteSubcategory,
+  subcategoryOf
+} from "./categories";
 
 /** One catalog entry, ready to propagate. */
 export type CatalogEntry = {
@@ -12,6 +18,8 @@ export type CatalogEntry = {
   /** Which part of a split category it is, or `null`. See `SUBCATEGORIES_OF`. */
   subcategory: SatelliteSubcategory | null;
   parked: boolean;
+  /** The year it went up, off the elements, or `null`. See `launchYear`. */
+  launchYear: number | null;
   satrec: SatRec;
 };
 
@@ -28,6 +36,7 @@ function toEntry(tle: Tle): CatalogEntry | null {
       category: tle.category,
       subcategory: subcategoryOf(tle.name, tle.category),
       parked: tle.parked,
+      launchYear: launchYear(tle.line1),
       satrec
     };
   } catch {

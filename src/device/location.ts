@@ -1,4 +1,5 @@
 import * as Location from "expo-location";
+import { BootFailure } from "../boot/bootFailure";
 import { wrapDegrees180 } from "../math/angles";
 import { ObserverLocation } from "../types";
 
@@ -14,13 +15,6 @@ import { ObserverLocation } from "../types";
  * rather than of the phone.
  */
 
-/** Thrown when the fix cannot be had, with a reason worth showing someone. */
-export class LocationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LocationError";
-  }
-}
 
 const asObserver = (position: Location.LocationObject): ObserverLocation => ({
   latitudeDeg: position.coords.latitude,
@@ -40,21 +34,28 @@ const asObserver = (position: Location.LocationObject): ObserverLocation => ({
  */
 export async function requestObserverFix(): Promise<ObserverLocation> {
   const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== "granted") {
-    throw new LocationError(
-      "Location permission was refused, and satellites cannot be placed without knowing where you are."
-    );
-  }
+  // Three separate reasons rather than one "no location": a refusal and a
+  // system-wide switch are both fixed in the phone's settings and a fix that
+  // never arrives is fixed by walking outside, and the boot screen offers a
+  // different way out of each. See `src/boot/bootFailure.ts`.
+  if (status !== "granted") throw new BootFailure("locationRefused");
 
   const services = await Location.hasServicesEnabledAsync();
-  if (!services) {
-    throw new LocationError("Location services are turned off on this device.");
-  }
+  if (!services) throw new BootFailure("locationOff");
 
-  const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced
-  });
-  return asObserver(position);
+  try {
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced
+    });
+    return asObserver(position);
+  } catch (error) {
+    // Granted, switched on, and still nothing: indoors, or a cold receiver.
+    // The platform's own words are kept under the sentence as a diagnostic.
+    throw new BootFailure(
+      "locationUnavailable",
+      error instanceof Error && error.message ? error.message : null
+    );
+  }
 }
 
 /**

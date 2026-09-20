@@ -10,7 +10,7 @@ import type { Strings } from "../types";
 export const en: Strings = {
   intro: {
     what: {
-      body: "Point your phone up at the sky and move it slowly — you'll see the satellites above you, exactly where they are."
+      body: "Welcome to Stare! Point your phone up at the sky — you'll see the satellites above you, exactly where they are."
     },
     access: {
       title: "Three quick permissions",
@@ -110,6 +110,7 @@ export const en: Strings = {
       open: "Upcoming passes",
       now: "now",
       seeing: {
+        tooFar: "not visible (too far away)",
         visible: "visible to the eye",
         binoculars: "visible with binoculars",
         tooFaint: "not visible (too faint)",
@@ -157,6 +158,7 @@ export const en: Strings = {
     photo: "Photograph of {name}",
     missing: "This satellite has left the catalog.",
     seeing: {
+      tooFar: "Not visible — too far away to see",
       visible: "Visible to the eye",
       binoculars: "Visible with binoculars",
       tooFaint: "Not visible (too faint)",
@@ -172,7 +174,8 @@ export const en: Strings = {
       altitude: "Altitude",
       speed: "Speed",
       look: "Look",
-      orbit: "Orbit"
+      orbit: "Orbit",
+      launched: "Launched"
     }
   },
   units: {
@@ -180,6 +183,7 @@ export const en: Strings = {
     kmPerSecond: "{value} km/s",
     minutes: "{value} min",
     hoursMinutes: "{hours}h {minutes}m",
+    inTime: "in {time}",
     up: "{degrees}° up",
     below: "{degrees}° below",
     unknown: "—"
@@ -202,7 +206,33 @@ export const en: Strings = {
   boot: {
     failed: "Could not start",
     tryAgain: "TRY AGAIN",
-    unsupported: "This device cannot run the sky view."
+    unsupported: "This device cannot run the sky view.",
+    openSettings: "OPEN SETTINGS",
+    errors: {
+      cameraRefused:
+        "Stare needs the camera: it is the sky you see behind the marks, and it is how the app works out what is a building and what is open sky. Turn Camera on for Stare in Settings, then come back.",
+      cameraBlocked:
+        "Camera access is off for Stare. Turn it on in Settings — the camera is the sky behind the marks, and how the app tells a rooftop from open sky.",
+      cameraFailed: "The camera could not be opened.",
+      locationRefused:
+        "Stare needs to know roughly where you are: a satellite is in a different part of the sky from one town to the next. Turn Location on for Stare in Settings, then come back.",
+      locationOff:
+        "Location services are switched off on this phone, so there is nowhere to place the satellites. Turn them on in Settings, then come back.",
+      locationUnavailable:
+        "Your location could not be found. Somewhere with a clearer view of the sky usually fixes it — indoors, the first fix can take a while.",
+      noMotionSensor:
+        "This device has no motion sensor, so there is no attitude to aim the view with.",
+      noMagnetometer:
+        "This device has no magnetometer, so a heading cannot be referenced to north.",
+      sensorsUnknown: "The device's sensors could not be checked.",
+      catalogOffline:
+        "No satellite catalogue could be downloaded, and none is cached on this device. Stare gets orbital data from CelesTrak, a public satellite-tracking service — check your connection and try again in a few minutes.",
+      catalogEmpty: "The satellite catalogue downloaded but held no usable orbits.",
+      catalogFailed: "The satellite catalogue could not be loaded.",
+      skyModelFailed:
+        "The sky detection model could not be loaded, so nothing could be hidden behind terrain.",
+      unknown: "Something went wrong during start-up."
+    }
   },
   catalog: {
     about: "Everything in orbit, whether or not it is over you. Pick one to put it on the sky.",

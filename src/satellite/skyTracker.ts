@@ -290,6 +290,7 @@ export class SkyTracker {
       category: tracked.entry.category,
       subcategory: tracked.entry.subcategory,
       parked: tracked.entry.parked,
+      launchYear: tracked.entry.launchYear,
       rangeKm: range,
       altitudeKm: geodeticAltitudeKm(state.position, gmst),
       speedKmPerSecond: Math.hypot(velocity.x, velocity.y, velocity.z),
@@ -301,7 +302,7 @@ export class SkyTracker {
       sunlit: illumination.state,
       apparentMagnitude: magnitude,
       magnitudeMeasured: standard?.measured ?? false,
-      nakedEye: nakedEyeVerdict(illumination.state, magnitude, sunAltitude),
+      nakedEye: nakedEyeVerdict(illumination.state, magnitude, sunAltitude, range),
       sunAltitudeDeg: sunAltitude
     };
   }
