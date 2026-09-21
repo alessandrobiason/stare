@@ -34,14 +34,36 @@ export type SkyAim = {
   risen: boolean;
 };
 
-/** How long the sign takes to arrive, how long it stays, and how long it takes to go. */
-const IN_MS = 240;
-const HOLD_MS = 3400;
-const OUT_MS = 420;
-/** How far it drifts up as it arrives, in points. */
+/**
+ * How long the sign takes to arrive, how long it stays, and how long it takes
+ * to go, in milliseconds.
+ *
+ * The hold is long enough to read the longest of the two sentences this
+ * carries (`notRisenYet`) twice over, at an unhurried pace, rather than timed
+ * to the shorter one and cutting the other off — a sign that disappears before
+ * its own sentence has been read once is worse than one that stays a beat too
+ * long.
+ */
+const IN_MS = 260;
+const HOLD_MS = 6000;
+const OUT_MS = 520;
+/** How far it drifts down as it arrives, in points. */
 const RISE = 10;
 /** The phone animates off the UI thread; the browser has no such driver. */
 const useNativeDriver = Platform.OS !== "web";
+/**
+ * How far below the safe area's own top the sign sits, in points.
+ *
+ * Clear of `SkyHeader`'s row (a title, a count, two round buttons, all of it
+ * inside the first ~60pt) with room to spare, and nowhere near the card this
+ * sign is raised alongside: that opens from the bottom of the screen, and the
+ * two used to land on top of each other when the sign was centred on the whole
+ * frame instead of pinned under the header. Fixed rather than measured off the
+ * header, because a sign a few points further from it than it strictly needs
+ * to be costs nothing and a measurement that depends on another component
+ * rendering first is a race this does not need to run.
+ */
+const TOP_OFFSET = 92;
 
 type Props = {
   /** The aim to show, or `null` for nothing to say. */
@@ -51,7 +73,7 @@ type Props = {
 };
 
 /**
- * The line over the middle of the picture: go and look for it.
+ * The sign under the header: go and look for it.
  *
  * A row in the passes panel and a row in the catalog both end in the same
  * place — that object's card at the foot of the screen — and that is the whole
@@ -61,21 +83,22 @@ type Props = {
  * with its whole crossing drawn through it (`useFocusedPath`); nobody looks up
  * for something they have no reason to think is there.
  *
- * So the app says so, once, in the one part of the screen it otherwise never
- * writes on: the middle, which is where the camera picture is and where the
- * eyes of someone holding the phone already are. It fades in, holds for about
- * as long as it takes to read twice, and fades out on its own — the answer is a
- * bearing, and a bearing is read once and acted on. Nothing to dismiss and
- * nothing under it made unreachable: it takes no touches at all, so a tap that
- * lands on it is a tap on the sky behind it.
+ * So the app says so, once, pinned under the title and the count rather than
+ * centred on the whole frame — which is what kept landing this on top of the
+ * very card that raised it, since that card can run to nearly half the screen.
+ * It fades in, holds long enough to read at an unhurried pace, and fades out on
+ * its own. Nothing to dismiss and nothing under it made unreachable: it takes
+ * no touches at all, so a tap that lands on it is a tap on the sky behind it.
  *
- * Two things to say, because a list of *upcoming* passes is mostly objects that
- * have not risen: "look for it in the sky" is wrong for something still under
- * the horizon, and sending somebody out to look for a mark that is not drawn
- * would be the one way to make this worse than saying nothing. So the bearing
- * is given only for an object high enough to have a mark on the frame; for the
- * rest it says what is true — the crossing is already drawn, and the way to
- * see it is to raise the phone.
+ * One heading and two bodies, because a list of *upcoming* passes is mostly
+ * objects that have not risen. The heading never changes — there is something
+ * to find in the sky either way — and it is the body that carries the
+ * qualification, as one sentence rather than as a second, contradicting
+ * heading: an object already up gets a bearing to point along
+ * (`MINIMUM_SATELLITE_ELEVATION_DEG` decides which); one still under the
+ * horizon gets no bearing at all, since where it sits down there is not where
+ * it comes up, and gets told instead what is true and actionable — the
+ * crossing it is about to make is already drawn on the sky, raised now.
  */
 export const FindInSky: React.FC<Props> = ({ aim, onDone }) => {
   const t = strings().scene.findIt;
@@ -116,7 +139,7 @@ export const FindInSky: React.FC<Props> = ({ aim, onDone }) => {
   if (!aim) return null;
 
   return (
-    <View style={styles.middle}>
+    <View style={styles.top}>
       <Animated.View
         // Said rather than only drawn: this is the app volunteering something
         // that was not asked for, which is what a live region is.
@@ -135,9 +158,9 @@ export const FindInSky: React.FC<Props> = ({ aim, onDone }) => {
         <View style={styles.badge}>
           <Icon name="sky" size={20} color={theme.color.accent} />
         </View>
-        <Text style={styles.title}>{aim.risen ? t.look : t.notUp}</Text>
+        <Text style={styles.title}>{t.title}</Text>
         <Text style={styles.body}>
-          {aim.risen ? fill(t.aim, { direction: aim.direction }) : t.wait}
+          {aim.risen ? fill(t.aim, { direction: aim.direction }) : t.notRisenYet}
         </Text>
       </Animated.View>
     </View>
@@ -148,20 +171,20 @@ const BADGE_SIZE = 38;
 
 const styles = StyleSheet.create({
   /**
-   * The middle of the picture, and nothing else in the app is laid out here.
+   * Under the header, over the picture, and nowhere near the card this sign is
+   * raised alongside — that opens from the bottom of the screen and can run to
+   * nearly half of it, which is what the sign used to sit on top of when it
+   * was centred on the whole frame instead.
    *
-   * Over everything, because it is about the sky rather than about the panels;
-   * and transparent to touches down to the last pixel, because what is under it
-   * is the one control the normal view has.
+   * Transparent to touches down to the last pixel: what is under it is the one
+   * control the normal view has.
    */
-  middle: {
+  top: {
     position: "absolute",
     left: 0,
     right: 0,
-    top: 0,
-    bottom: 0,
+    top: TOP_OFFSET,
     alignItems: "center",
-    justifyContent: "center",
     // In the style rather than as the prop, which both React Native and the
     // web have moved on from.
     pointerEvents: "none"

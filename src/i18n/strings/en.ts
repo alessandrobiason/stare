@@ -120,10 +120,10 @@ export const en: Strings = {
       }
     },
     findIt: {
-      look: "LOOK FOR IT IN THE SKY",
-      notUp: "NOT UP YET",
+      title: "LOOK FOR IT IN THE SKY",
       aim: "Point the phone {direction}",
-      wait: "Its crossing is already drawn on the sky — raise the phone to find it"
+      notRisenYet:
+        "It hasn't risen yet, but its path is already drawn on the sky — raise the phone and follow the line to find it"
     },
     compass: {
       facing: "Facing {point}"

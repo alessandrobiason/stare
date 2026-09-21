@@ -113,10 +113,10 @@ export const it: Strings = {
       }
     },
     findIt: {
-      look: "CERCALO IN CIELO",
-      notUp: "NON È ANCORA SORTO",
+      title: "CERCALO IN CIELO",
       aim: "Punta il telefono verso {direction}",
-      wait: "Il suo passaggio è già tracciato sul cielo: alza il telefono per trovarlo"
+      notRisenYet:
+        "Non è ancora sorto, ma il suo percorso è già disegnato in cielo: alza il telefono e seguine la linea per trovarlo"
     },
     compass: {
       facing: "Direzione {point}"

@@ -595,7 +595,7 @@ const ScrollCue: React.FC<{ shown: boolean; onPress: () => void }> = ({ shown, o
             ]
           }}
         >
-          <Icon name="chevron" direction="down" size={13} color={theme.color.textBright} />
+          <Icon name="chevron" direction="down" size={16} color={theme.color.accent} />
         </Animated.View>
       </Pressable>
     </Animated.View>
@@ -1101,12 +1101,18 @@ const styles = StyleSheet.create({
     // also be pressed, and every point of it is a point of sky the card is
     // already covering. The gesture it stands for — a flick anywhere on the
     // body — is the size of the card.
-    width: 30,
-    height: 30,
+    width: 34,
+    height: 34,
     borderRadius: theme.radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    ...glass(theme.color.panelLight, 10)
+    // The accent rather than the plain glass every other chip on this card
+    // uses: this is the one thing on the sheet saying "there is more, and
+    // pressing this reaches it" rather than describing what is already on
+    // screen, and the accent is the app's own way of marking a control that
+    // does something. Plain glass at this size read as barely there at all.
+    ...glass(theme.color.accentSoft, 10),
+    borderColor: theme.color.accentBorder
   }
 });
 

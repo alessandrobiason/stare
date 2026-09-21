@@ -1109,7 +1109,7 @@ describe("the sign saying to look for it", () => {
       />
     );
 
-    expect(text).toContain(strings().scene.findIt.look);
+    expect(text).toContain(strings().scene.findIt.title);
     // The bearing the card gives, in the same words: one answer, said twice
     // rather than two answers to compare.
     expect(text).toContain("SE 143\u00b0 \u00b7 27\u00b0 up");
@@ -1119,7 +1119,10 @@ describe("the sign saying to look for it", () => {
     // Where a satellite sits under the horizon is not where it comes up, and a
     // list of upcoming passes is mostly objects that have not risen: a bearing
     // here would be the one figure on this screen that sends somebody out to
-    // face the wrong way.
+    // face the wrong way. The heading is the same either way \u2014 there is
+    // something to find in the sky in both cases \u2014 and it is the one sentence
+    // under it that carries the qualification, rather than a second heading
+    // seeming to contradict the first.
     const text = textOf(
       <FindInSky
         aim={{ id: 2, direction: "NW 312\u00b0 \u00b7 24\u00b0 below", risen: false }}
@@ -1127,8 +1130,12 @@ describe("the sign saying to look for it", () => {
       />
     );
 
-    expect(text).toContain(strings().scene.findIt.notUp);
-    expect(text).toContain(strings().scene.findIt.wait);
+    expect(text).toContain(strings().scene.findIt.title);
+    // A fragment either side of the apostrophe, which the markup escapes —
+    // the same reason the seeing-verdict tests below match on "Earth" rather
+    // than "Earth's".
+    expect(text).toContain("risen yet, but its path is already drawn");
+    expect(text).toContain("raise the phone and follow the line to find it");
     expect(text).not.toContain("312");
   });
 

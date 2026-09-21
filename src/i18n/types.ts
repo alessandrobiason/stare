@@ -148,7 +148,7 @@ export type Strings = {
       seeing: Record<PassSeeing, string>;
     };
     /**
-     * What is said over the middle of the picture when a pass is picked out of
+     * What is said near the top of the picture when a pass is picked out of
      * the list rather than tapped on the sky.
      *
      * A row in the passes panel is a name and a countdown, and pressing one
@@ -157,30 +157,35 @@ export type Strings = {
      * has just put a line across the sky and lit a mark somewhere on it, both
      * of them behind the phone somebody is holding at chest height. Nobody
      * looks up for something they do not know is there, so this says it: for a
-     * few seconds, over the middle of the frame, in the one place on this
-     * screen nothing else is ever drawn.
+     * few seconds, near the top of the frame, clear of the card that opens
+     * below it.
      */
     findIt: {
-      /** The heading while the object is up. Upper-cased, like every heading here. */
-      look: string;
       /**
-       * And while it has not risen yet, which is most of what a list of
-       * *upcoming* passes holds. A promise that it will be there is the wrong
-       * thing to open with when the object is still under the horizon.
+       * The heading, the same one whatever the object is doing — up already or
+       * still to rise. Upper-cased, like every heading here.
+       *
+       * One heading rather than two: a heading that changes with the object's
+       * state ("not up yet") read against a body that still says to look for it
+       * used to land as two contradictory sentences. This says the one thing
+       * that is true in both cases — there is something to find in the sky —
+       * and the body underneath carries whatever qualifies it.
        */
-      notUp: string;
-      /** Where to point the phone. `{direction}`, from `lookDirection`. */
+      title: string;
+      /** Where to point the phone, for an object already up. `{direction}`. */
       aim: string;
       /**
-       * And what there is to do about an object that has not risen.
+       * The line for an object that has not risen yet, which is most of what a
+       * list of *upcoming* passes holds.
        *
-       * No bearing, deliberately. Where a satellite sits while it is under the
-       * horizon is not where it will come up, and it is the one figure on this
-       * screen that would send somebody out to face the wrong way — so what is
-       * said instead is the thing that is true: the crossing is already drawn,
-       * and the phone is how it is looked at.
+       * One sentence rather than a bearing: where a satellite sits below the
+       * horizon is not where it comes up, so a direction here would send
+       * somebody to face the wrong way. What is true instead, and said as one
+       * sentence rather than split against the heading, is that the crossing
+       * this pass will make is already drawn on the sky — raised now, it can be
+       * found and watched for.
        */
-      wait: string;
+      notRisenYet: string;
     };
     /**
      * The strip of cardinal points along the bottom of the picture.

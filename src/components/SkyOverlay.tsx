@@ -739,6 +739,14 @@ export const SkyOverlay: React.FC<Props> = ({
                 onToggleSubcategory={onToggleSubcategory}
                 onEnableAll={onEnableAll}
               />
+
+              {/* Pinned under the header rather than centred on the frame, so
+                  it never lands on the card it was raised alongside — that
+                  opens from the bottom and can run to nearly half the screen.
+                  In the safe area layer for the same reason the header is: it
+                  is inset off a notch exactly as that title is. Not under the
+                  debug overlays, where the picture belongs to the mask. */}
+              {!debug && <FindInSky aim={aim} onDone={() => setAim(null)} />}
             </>
           )}
 
@@ -836,15 +844,6 @@ export const SkyOverlay: React.FC<Props> = ({
             />
           </View>
         </SafeAreaLayer>
-
-        {/* Over the picture and over the panels, in the middle of the screen,
-            for a few seconds after a pass is picked out of the list: which way
-            to point the phone. Not under the debug overlays, where the picture
-            belongs to the mask, and not while another tab is over the sky —
-            there is nothing to aim at behind a sheet. */}
-        {tab === "sky" && !debug && (
-          <FindInSky aim={aim} onDone={() => setAim(null)} />
-        )}
 
         {/* Last, so it is over every panel: it lights up the real ones. */}
         {guide && <GuideTour onDone={onCloseGuide} />}
