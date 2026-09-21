@@ -15,7 +15,7 @@ import { strings } from "../i18n";
 import { BootProgressFeed } from "../hooks/useAppBoot";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
 import { BootProgressBar } from "./BootProgressBar";
-import { APP_NAME } from "./wordmark";
+import { APP_NAME, WORDMARK_WEIGHT, wordmarkTracking } from "./wordmark";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
 import { theme } from "./theme";
@@ -218,9 +218,9 @@ const styles = StyleSheet.create({
   wordmark: {
     color: theme.color.textBright,
     fontSize: 17,
-    fontWeight: "500",
-    letterSpacing: 9,
-    marginLeft: 9,
+    fontWeight: WORDMARK_WEIGHT,
+    letterSpacing: wordmarkTracking(17),
+    marginLeft: wordmarkTracking(17),
     opacity: 0.92
   },
   card: {

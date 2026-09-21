@@ -17,6 +17,7 @@ import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
 import { SafeAreaLayer } from "./SafeAreaLayer";
 import { theme } from "./theme";
+import { WORDMARK_WEIGHT, wordmarkTracking } from "./wordmark";
 
 type Props = {
   /** Called once the second page is accepted. Boot starts on the other side. */
@@ -234,9 +235,9 @@ const styles = StyleSheet.create({
   wordmark: {
     color: theme.color.textBright,
     fontSize: 17,
-    fontWeight: "500",
-    letterSpacing: 9,
-    marginLeft: 9,
+    fontWeight: WORDMARK_WEIGHT,
+    letterSpacing: wordmarkTracking(17),
+    marginLeft: wordmarkTracking(17),
     opacity: 0.92
   },
   page: {

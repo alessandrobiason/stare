@@ -7,7 +7,7 @@ import { clockTime, sunlightSummary } from "../i18n/format";
 import { Icon, IconButton } from "./Icon";
 import { glass, lift, theme } from "./theme";
 import { useTourTarget } from "./tourTargets";
-import { APP_NAME } from "./wordmark";
+import { APP_NAME, WORDMARK_WEIGHT, wordmarkTracking } from "./wordmark";
 
 type Props = {
   /**
@@ -196,8 +196,12 @@ const styles = StyleSheet.create({
   wordmark: {
     color: theme.color.textBright,
     fontSize: 27,
-    fontWeight: "600",
-    letterSpacing: -0.4,
+    // Same weight and tracking as the wordmark on the boot screen and the
+    // intro, scaled to this size, so STARE reads as one mark across all three
+    // rather than a headline here and a wordmark there. See `wordmarkTracking`.
+    fontWeight: WORDMARK_WEIGHT,
+    letterSpacing: wordmarkTracking(27),
+    opacity: 0.92,
     // The one shadow spent on text. A title over a camera picture has no
     // background to be read against, so it carries its own.
     textShadowColor: "rgba(0, 0, 0, 0.55)",
