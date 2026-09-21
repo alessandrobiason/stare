@@ -3,7 +3,9 @@ import { loadActiveCatalog } from "../data/tleProvider";
 import { readDeviceCapabilities } from "../device/deviceOrientation";
 import { readMagneticDeclinationDeg, requestObserverFix } from "../device/location";
 import { askForPassAlerts } from "../notifications/alertAccess";
+import { SkyModelLoad } from "../vision/skyModelProgress";
 import { preloadSkySegmenter } from "../vision/skySegmenter";
+import { BootActivity, BootStepReport } from "./bootRunner";
 import { BootFailure } from "./bootFailure";
 import { BootTasks } from "./bootSequence";
 
@@ -22,6 +24,25 @@ async function requestCamera(): Promise<void> {
   // once per install: `canAskAgain` decides which sentence is honest, not
   // whether there is a way back. See `bootFailure.ts`.
   throw new BootFailure(permission.canAskAgain ? "cameraRefused" : "cameraBlocked");
+}
+
+/**
+ * What the model load is doing, as something the boot screen can write out.
+ *
+ * Only the two phases worth a line on screen get one. "Starting" is Core ML
+ * compiling the graph, which is seconds rather than minutes and has no figure
+ * to show; it keeps the bar's position and says nothing, which is the right
+ * amount to say about a wait that short.
+ */
+function activityOf(load: SkyModelLoad): BootActivity | undefined {
+  if (load.phase === "downloading") {
+    return {
+      kind: "downloading",
+      receivedBytes: load.receivedBytes ?? 0,
+      totalBytes: load.totalBytes
+    };
+  }
+  return load.phase === "preparing" ? { kind: "preparing" } : undefined;
 }
 
 /**
@@ -44,6 +65,7 @@ export function bootTasks({ force = false }: { force?: boolean } = {}): BootTask
     // ever shows is worth spending where somebody has just been told it is
     // coming, on the page before this.
     requestAlerts: askForPassAlerts,
-    loadSkyModel: preloadSkySegmenter
+    loadSkyModel: (report: BootStepReport) =>
+      preloadSkySegmenter((load) => report(load.fraction, activityOf(load)))
   };
 }

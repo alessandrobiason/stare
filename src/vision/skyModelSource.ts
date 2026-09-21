@@ -34,3 +34,19 @@ export const SKY_MODEL_CREDIT = {
   /** The model card, which is where the licence and the weights both are. */
   page: "https://huggingface.co/Realcat/skywater_seg"
 } as const;
+
+/**
+ * Roughly how large that file is, for the one case where the bar would
+ * otherwise have no denominator.
+ *
+ * The download reports its own total, taken from the response's
+ * `Content-Length`, and that is the figure used whenever there is one — this is
+ * only what stands in when a server answers without it. Being approximate
+ * costs nothing: it is never shown as the *finished* size, only divided into
+ * what has arrived so far, and a bar that is a percent out is a bar, where a
+ * bar with no denominator is a stripe that does not move.
+ *
+ * Measured against the pinned revision above. A different revision is a
+ * different file, so this moves with the URL.
+ */
+export const SKY_MODEL_APPROXIMATE_BYTES = 99_310_780;

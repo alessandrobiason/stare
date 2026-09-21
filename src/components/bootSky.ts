@@ -21,12 +21,16 @@ import { dashedRuns } from "./markerScene";
  * when the marks became light it was the one place left drawing them as
  * paint. Five of anything also made a diagram of it. One light is a sky.
  *
- * The motion is the whole of the loading indicator. There is no spinner, no
- * progress bar and no step list, because none of them told anyone anything
- * they could act on: the app either opens or comes back with a reason. So the
- * screen says only "something is still happening", which motion says on its
- * own, and it says it with the thing the app is for: something crossing your
- * sky.
+ * The motion is what says that something is still happening, and it says it
+ * with the thing the app is for: something crossing your sky. There is no
+ * spinner and no step list — naming each step told nobody anything they could
+ * act on, and the app either opens or comes back with a reason.
+ *
+ * What motion cannot say is *how much longer*, and on the first launch of an
+ * install that is a 95 MB download and minutes of it. So there is one short
+ * bar under the name (`BootProgressBar`), and the light and the bar divide the
+ * work between them: the light says the app is alive, the bar says how far it
+ * has got. Neither is a step list, and neither names anything.
  *
  * Nothing here knows about Skia, about a browser canvas or about React — the
  * same split as `markerScene`, and for the same reason. A pass is built once

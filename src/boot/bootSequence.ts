@@ -7,6 +7,7 @@ import { BootFailure, bootFailureOf } from "./bootFailure";
 import {
   BootError,
   BootProgress,
+  BootStepReport,
   BootRun,
   BootStep,
   BootStepDefinition,
@@ -30,12 +31,24 @@ import {
  * share their mechanism through `bootRunner.ts` rather than one sequence
  * branching on which it is.
  */
+/**
+ * The weights are what the progress bar is drawn on, and they are not a guess
+ * at how long each step takes so much as a statement of which one is the wait.
+ *
+ * Two of these are a system prompt, one is a sensor probe that answers at once,
+ * and one is a couple of megabytes of orbital elements. The sky model is 95 MB
+ * downloaded once per install, rewritten, and compiled by Core ML — on a first
+ * launch the other four are over before it has started, and it is the only
+ * step that can say how far through itself it is (`skyModelProgress.ts`). So
+ * it is given most of the bar, and the bar spends most of its travel on a
+ * figure that is real rather than on four steps' worth of jumps.
+ */
 const STEPS: readonly BootStepDefinition[] = [
-  { id: "catalog", label: "Satellite catalogue" },
-  { id: "sensors", label: "Device sensors" },
-  { id: "location", label: "Your location" },
-  { id: "camera", label: "Camera" },
-  { id: "skyModel", label: "Sky detection model" }
+  { id: "catalog", label: "Satellite catalogue", weight: 3 },
+  { id: "sensors", label: "Device sensors", weight: 1 },
+  { id: "location", label: "Your location", weight: 2 },
+  { id: "camera", label: "Camera", weight: 1 },
+  { id: "skyModel", label: "Sky detection model", weight: 13 }
 ] as const;
 
 /** The step list before anything has run, for the boot screen's first frame. */
@@ -95,8 +108,12 @@ export type BootTasks = {
    * and everything else exactly as it was.
    */
   requestAlerts(): Promise<PassAlertAccess>;
-  /** Downloads the segmentation model and starts the runtime. */
-  loadSkyModel(): Promise<void>;
+  /**
+   * Downloads the segmentation model and starts the runtime, saying how far
+   * through it is as it goes. It is the one step with a real figure to report,
+   * and the reason the boot screen has a bar at all.
+   */
+  loadSkyModel(report: BootStepReport): Promise<void>;
 };
 
 /** What the operating system was asked for, and what came back. */
@@ -195,7 +212,9 @@ export async function runBootSequence(
     runCatalogStep(boot, "catalog", tasks.loadCatalog),
     boot.run("sensors", tasks.checkSensors),
     requestAccess(boot, tasks),
-    boot.run("skyModel", tasks.loadSkyModel)
+    boot.run("skyModel", () =>
+      tasks.loadSkyModel((fraction, activity) => boot.advance("skyModel", fraction, activity))
+    )
   ]);
 
   // Settled before anything is thrown, so a failure below still shows the full

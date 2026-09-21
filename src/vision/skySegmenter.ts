@@ -1,6 +1,7 @@
 import { startSlicing } from "../timeSlice";
 import { SkyMask } from "./skyMask";
 import { createSkyModel } from "./skyModel";
+import { resetSkyModelLoad, SkyModelLoad, subscribeSkyModelLoad } from "./skyModelProgress";
 import { SkyModel, SkyModelDiagnostics } from "./skyModelTypes";
 import {
   maskGridFor,
@@ -96,6 +97,9 @@ function loadModel(): Promise<SkyModel> {
       .catch((error: unknown) => {
         // Allow a later call to retry rather than pinning the failure forever.
         modelPromise = null;
+        // And start the next attempt's bar from the bottom rather than from
+        // wherever this one gave way. See `resetSkyModelLoad`.
+        resetSkyModelLoad();
         throw error;
       });
   }
@@ -117,9 +121,24 @@ export function skyModelDiagnostics(): SkyModelDiagnostics | null {
  * Called during boot, and required to succeed: without a mask nothing can be
  * said about what is behind a building, and the view would be claiming a clear
  * line of sight it has not checked. Boot stops on the failure instead.
+ *
+ * `onLoad` follows how far that has got, for the boot screen's bar. It is fed
+ * from the published state rather than from this call, because by the time boot
+ * makes it the download has usually been running for the length of the intro
+ * (`prewarmBoot`) — so what a caller needs is to be told where the load already
+ * is, which `subscribeSkyModelLoad` does on subscribing. The subscription is
+ * dropped when the load settles either way; it is a boot screen's business, and
+ * the boot screen is gone by then.
  */
-export async function preloadSkySegmenter(): Promise<void> {
-  await loadModel();
+export async function preloadSkySegmenter(
+  onLoad?: (load: SkyModelLoad) => void
+): Promise<void> {
+  const unsubscribe = onLoad ? subscribeSkyModelLoad(onLoad) : null;
+  try {
+    await loadModel();
+  } finally {
+    unsubscribe?.();
+  }
 }
 
 /**

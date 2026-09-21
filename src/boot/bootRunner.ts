@@ -21,6 +21,18 @@ export type BootStepDefinition = {
   id: string;
   /** Shown to the user, so it says what is happening rather than what runs. */
   label: string;
+  /**
+   * What share of the progress bar this step is worth, against the others in
+   * its sequence. Any scale; only the ratios are read.
+   *
+   * Counting steps instead would put the bar on a scale nothing on the phone
+   * moves at. Four of the five are a permission prompt or a couple of
+   * megabytes, seconds at the outside; the fifth is 95 MB and a Core ML
+   * compilation, and on a first launch it is essentially the whole wait. A bar
+   * that gave them a fifth each would cross four fifths of itself in a moment
+   * and then stop dead for minutes, which is the shape people read as a hang.
+   */
+  weight: number;
 };
 
 export type BootStepState = "pending" | "running" | "done" | "warned" | "failed";
@@ -29,13 +41,60 @@ export type BootStep = BootStepDefinition & {
   state: BootStepState;
   /** A short note on a warning or failure, shown under the step. */
   detail?: string;
+  /**
+   * How far through itself a running step is, from 0 to 1, for the steps that
+   * can say. Absent on the ones that cannot: a permission prompt is waiting on
+   * a person and has no inside to report from.
+   */
+  fraction?: number;
+  /** What it is doing, when that is worth naming on screen. See `BootActivity`. */
+  activity?: BootActivity;
 };
+
+/**
+ * The thing a step is busy with, in a form a screen can write out in the
+ * reader's own language.
+ *
+ * A key and its figures rather than a sentence, for the reason every other
+ * message that reaches the boot screen is one (`bootFailure.ts`): what is
+ * shown has to be written in the language the app is in at the moment it is
+ * drawn, and this is produced deep in the vision code where that is not known.
+ *
+ * Deliberately a short list. Almost nothing in start-up is worth narrating —
+ * naming each step as it ran was what the old boot screen did, and it told
+ * nobody anything they could act on. What earns a line is a wait long enough
+ * to need explaining, which in this app is one download and the work
+ * immediately after it.
+ */
+export type BootActivity =
+  /** A large file is coming down. `totalBytes` is `null` until the server says. */
+  | { kind: "downloading"; receivedBytes: number; totalBytes: number | null }
+  /** It has arrived, and is being made ready to use. */
+  | { kind: "preparing" };
+
+/**
+ * How a step says where it has got to, handed to the tasks that can report.
+ *
+ * The shape of `BootRun.advance` with the step already chosen, so a task never
+ * has to know its own id.
+ */
+export type BootStepReport = (fraction: number, activity?: BootActivity) => void;
 
 export type BootProgress = {
   steps: BootStep[];
-  /** Fraction of the steps that have settled, for a progress bar. */
+  /** Fraction of the steps that have settled, for a step list. */
   completed: number;
   total: number;
+  /**
+   * How far through the whole sequence it is, from 0 to 1: every settled step's
+   * weight, plus the share a running step has reported of its own.
+   *
+   * Only ever rises within a run. A bar that went backwards would be worse
+   * than one that stalled.
+   */
+  fraction: number;
+  /** What is taking the time, when something is. `null` the rest of the while. */
+  activity: BootActivity | null;
 };
 
 /**
@@ -92,6 +151,14 @@ export type BootRun = {
    * detail is the English line kept against the step.
    */
   fail(id: string, detail: string, cause?: BootFailure): BootError;
+  /**
+   * Reports how far a running step has got, and what it is doing.
+   *
+   * Never moves a step backwards: the source of a fraction is a network
+   * download, and one that reconnects and restarts would otherwise drag the bar
+   * back with it.
+   */
+  advance(id: string, fraction: number, activity?: BootActivity): void;
 };
 
 export function startBootRun(
@@ -99,12 +166,26 @@ export function startBootRun(
   onProgress: (progress: BootProgress) => void
 ): BootRun {
   const steps = initialBootSteps(definitions);
+  const totalWeight = steps.reduce((sum, step) => sum + step.weight, 0);
+
+  /** A step's own contribution: all of its weight once settled, its share while running. */
+  const earned = (step: BootStep): number => {
+    if (step.state === "pending") return 0;
+    if (step.state === "running") return step.weight * (step.fraction ?? 0);
+    return step.weight;
+  };
 
   const report = () => {
     onProgress({
       steps: steps.map((step) => ({ ...step })),
       completed: steps.filter((step) => step.state !== "pending" && step.state !== "running").length,
-      total: steps.length
+      total: steps.length,
+      fraction:
+        totalWeight > 0 ? steps.reduce((sum, step) => sum + earned(step), 0) / totalWeight : 0,
+      // The first running step with something to say. There is at most one in
+      // practice — only the sky model reports an activity — and taking the
+      // first keeps that from being a rule the type has to enforce.
+      activity: steps.find((step) => step.state === "running" && step.activity)?.activity ?? null
     });
   };
 
@@ -113,6 +194,11 @@ export function startBootRun(
     if (step) {
       step.state = state;
       step.detail = detail;
+      // A settled step is counted whole, and has stopped doing whatever it was
+      // doing. Leaving either behind would keep a finished download's megabytes
+      // on screen under the next step.
+      step.fraction = undefined;
+      step.activity = undefined;
     }
     report();
   };
@@ -133,6 +219,15 @@ export function startBootRun(
     fail(id: string, detail: string, cause?: BootFailure): BootError {
       update(id, "failed", detail);
       return new BootError(id, detail, steps, cause);
+    },
+    advance(id: string, fraction: number, activity?: BootActivity): void {
+      const step = steps.find((candidate) => candidate.id === id);
+      if (!step || step.state !== "running") return;
+      const clamped = Math.min(1, Math.max(0, fraction));
+      if (clamped <= (step.fraction ?? 0) && step.activity?.kind === activity?.kind) return;
+      step.fraction = Math.max(step.fraction ?? 0, clamped);
+      step.activity = activity;
+      report();
     }
   };
 }

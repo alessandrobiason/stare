@@ -1,11 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BootError, BootProgress } from "../boot/bootRunner";
+import { BootActivity, BootError, BootProgress } from "../boot/bootRunner";
 import { MIN_BOOT_SCREEN_MS } from "../constants";
 import { useLatestRef } from "./useLatestRef";
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export type BootPhase = "loading" | "ready" | "failed";
+
+/**
+ * How far start-up has got, for the boot screen's bar to read at draw time.
+ *
+ * A mutable object rather than state, and deliberately so. The sky model's
+ * download reports every chunk that lands — hundreds of times over a 95 MB
+ * fetch — and putting that through `setState` would re-render the app's root,
+ * and everything under it, for a bar two pixels tall. The bar is already
+ * redrawing on the display clock for its own easing (`BootProgressBar`), so it
+ * reads this when it draws and nothing above it renders at all.
+ *
+ * `fraction` only rises. See `BootProgress.fraction`.
+ */
+export type BootProgressFeed = {
+  fraction: number;
+  /** What is taking the time, when something is. See `BootActivity`. */
+  activity: BootActivity | null;
+};
 
 export type AppBoot<T> = {
   phase: BootPhase;
@@ -34,17 +52,21 @@ export type AppBoot<T> = {
    * show up once running — the kind the boot sequence cannot see coming.
    */
   reportFatal: (error: unknown) => void;
+  /** How far the run in flight has got. See `BootProgressFeed`. */
+  progress: BootProgressFeed;
 };
 
 /**
  * Runs a boot sequence and keeps the boot screen fed: a reason and a retry
  * when it does not finish.
  *
- * The sequence reports its progress step by step and this throws that away.
- * The screen it feeds shows a satellite crossing the sky and nothing else while
- * boot runs (see `bootSky`), and what a failure needs is the error, not the
- * tally — the steps that had settled travel on `BootError` instead, which is
- * where the decision about retrying reads them from.
+ * The sequence reports its progress step by step and this keeps only the one
+ * number a person can read: how far along the whole thing is, in a mutable
+ * object the bar reads when it draws (`BootProgressFeed`). The step list itself
+ * is not passed on. Naming each step as it settled is what the boot screen used
+ * to do, and none of it was actionable — the steps that had settled travel on
+ * `BootError` instead, which is where the decision about retrying reads them
+ * from.
  *
  * A successful run does not switch to `"ready"` the moment the sequence
  * resolves — it waits out `MIN_BOOT_SCREEN_MS` first, so the boot screen
@@ -70,6 +92,9 @@ export function useAppBoot<T>(
   const [retryable, setRetryable] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const startRef = useLatestRef(start);
+  // One object for the life of the hook: the boot screen holds it across
+  // retries and reads whatever the current run has put in it.
+  const progressRef = useRef<BootProgressFeed>({ fraction: 0, activity: null });
 
   /**
    * Identifies the run this render belongs to. A retry started while an earlier
@@ -88,11 +113,24 @@ export function useAppBoot<T>(
     setResult(null);
 
     const startedAt = Date.now();
+    // A retry starts the bar again from nothing. The run it replaces may have
+    // reached four fifths before the network gave way, and a bar that opened
+    // there would be describing work this attempt has not done.
+    progressRef.current.fraction = 0;
+    progressRef.current.activity = null;
+
+    const onProgress = (progress: BootProgress) => {
+      if (!isCurrent()) return;
+      // `Math.max` guards the one case the sequence itself cannot: an abandoned
+      // run that reports once more before its cleanup lands.
+      progressRef.current.fraction = Math.max(progressRef.current.fraction, progress.fraction);
+      progressRef.current.activity = progress.activity;
+    };
 
     // The first run is a cold start; anything after it is a retry the user
     // asked for, and should get past the post-failure throttle.
     startRef
-      .current(() => undefined, { force: attempt > 0 })
+      .current(onProgress, { force: attempt > 0 })
       .then(async (booted) => {
         if (!isCurrent()) return;
         const remaining = MIN_BOOT_SCREEN_MS - (Date.now() - startedAt);
@@ -131,6 +169,7 @@ export function useAppBoot<T>(
     error,
     retryable,
     retry,
-    reportFatal
+    reportFatal,
+    progress: progressRef.current
   };
 }

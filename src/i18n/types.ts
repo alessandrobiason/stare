@@ -414,6 +414,31 @@ export type Strings = {
     tryAgain: string;
     unsupported: string;
     /**
+     * The line under the progress bar, on the launches slow enough to need
+     * one — which in practice means the first one on a device, where 95 MB of
+     * segmentation model comes down before anything can be drawn.
+     *
+     * Shown only once a launch has outlasted `MIN_BOOT_SCREEN_MS`, so an
+     * ordinary one never carries any of it. See `BootProgressBar`.
+     */
+    activity: {
+      /** What is coming down. Followed by `size` on the same line. */
+      downloading: string;
+      /** How much of it has: `{done}` and `{total}` are whole megabytes. */
+      size: string;
+      /** The pass that rewrites it for the phone's own runtime, after the download. */
+      preparing: string;
+      /**
+       * Why the wait is not going to be part of every launch.
+       *
+       * Careful not to promise "once": the file lives in the cache directory,
+       * which the system may reclaim when the device is short of space
+       * (`skyModel.ts`), and a launch that has to fetch it again would make a
+       * liar of a stronger sentence.
+       */
+      kept: string;
+    };
+    /**
      * The button beside the retry, on the failures the phone's own settings
      * are the fix for: a refused camera, a refused fix, location services
      * switched off. It opens this app's page in the system settings, which is

@@ -214,6 +214,12 @@ export const it: Strings = {
     failed: "Avvio non riuscito",
     tryAgain: "RIPROVA",
     unsupported: "Questo dispositivo non può mostrare la vista del cielo.",
+    activity: {
+      downloading: "Scarico il modello che riconosce il cielo",
+      size: "{done} di {total} MB",
+      preparing: "Preparo il modello che riconosce il cielo",
+      kept: "Poi resta sul dispositivo."
+    },
     openSettings: "APRI IMPOSTAZIONI",
     errors: {
       cameraRefused:

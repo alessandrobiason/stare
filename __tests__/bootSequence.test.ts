@@ -1,5 +1,6 @@
 import {
   BootError,
+  BootProgress,
   BootStep,
   BootStepDefinition
 } from "../src/boot/bootRunner";
@@ -61,6 +62,35 @@ test("progress is reported before any step has finished", async () => {
 
   expect(seen[0]).toBe(0);
   expect(seen[seen.length - 1]).toBe(5);
+});
+
+test("what the sky model reports of itself reaches the bar", async () => {
+  // The model is the only step with a real figure to give, and the reason the
+  // boot screen has a bar at all: on a first launch it is 95 MB, and every
+  // other step is over before it has begun.
+  const seen: number[] = [];
+  let activity: BootProgress["activity"] = null;
+
+  await runBootSequence(
+    tasks({
+      loadSkyModel: async (report) => {
+        report(0.25, { kind: "downloading", receivedBytes: 25, totalBytes: 100 });
+        report(0.5, { kind: "downloading", receivedBytes: 50, totalBytes: 100 });
+      }
+    }),
+    (progress) => {
+      seen.push(progress.fraction);
+      if (progress.activity) activity = progress.activity;
+    }
+  );
+
+  // Rising, never falling, and finishing full.
+  expect(seen[0]).toBe(0);
+  expect(seen[seen.length - 1]).toBeCloseTo(1);
+  expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+  // And the download was named while it was happening, for the line under the
+  // bar. It is cleared once the step settles, hence the running tally.
+  expect(activity).toEqual({ kind: "downloading", receivedBytes: 50, totalBytes: 100 });
 });
 
 test("every step is reported, in a fixed order", async () => {

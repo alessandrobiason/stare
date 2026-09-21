@@ -48,6 +48,7 @@ export default function App() {
             error={boot.error}
             retryable={boot.retryable}
             onRetry={boot.retry}
+            progress={boot.progress}
           />
         )}
       </View>

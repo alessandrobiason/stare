@@ -12,7 +12,9 @@ import { bootFailureText, opensSettings } from "../boot/bootFailure";
 import { describeBuild } from "../debug/buildIdentity";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
+import { BootProgressFeed } from "../hooks/useAppBoot";
 import { BOOT_SKY_BACKGROUND } from "./bootSky";
+import { BootProgressBar } from "./BootProgressBar";
 import { APP_NAME } from "./wordmark";
 import { BootSky } from "./BootSky";
 import { FrameSize } from "./markerGeometry";
@@ -47,18 +49,27 @@ type Props = {
   /** Whether trying again could help; a missing sensor is not going to appear. */
   retryable?: boolean;
   onRetry: () => void;
+  /**
+   * How far start-up has got, for the bar under the name. Optional so that a
+   * screen shown for a failure alone — and the tests that render one — does not
+   * have to invent one. See `BootProgressBar`.
+   */
+  progress?: BootProgressFeed;
 };
 
 /**
  * The screen the app opens on, and the one it comes back to when something
  * fatal happens.
  *
- * While it is loading it is the sky and the app's name — one satellite
- * crossing the night above the one word (see `bootSky`). It used to carry
- * a tagline, a progress bar and the list of start-up steps as they settled,
- * which was a lot of screen spent telling someone that a catalogue they have
- * never heard of is being downloaded. None of it was actionable: the app either
- * opens, or it comes back here with a reason.
+ * While it is loading it is the sky, the app's name and one short bar — a
+ * satellite crossing the night above the word, and under it how far start-up
+ * has got (see `bootSky` and `BootProgressBar`). It used to carry a tagline and
+ * the list of start-up steps as they settled as well, which was a lot of screen
+ * spent telling someone that a catalogue they have never heard of is being
+ * downloaded; none of that was actionable. The bar is, in the one way that
+ * matters on the launch that fetches 95 MB of segmentation model: it separates
+ * an app that is working from an app that has hung, which nothing else on this
+ * screen can do.
  *
  * A failure is that reason, and is the only other thing this screen ever
  * writes. The name gives way to it, and the light stops where it is
@@ -69,7 +80,8 @@ export const BootScreen: React.FC<Props> = ({
   failed,
   error,
   retryable = true,
-  onRetry
+  onRetry,
+  progress
 }) => {
   // Subscribed to, so a failure is written in the language the app is in. See
   // `useLocale`.
@@ -103,7 +115,10 @@ export const BootScreen: React.FC<Props> = ({
       <BootSky frame={frame} turning={!failed} />
 
       {!failed && (
-        <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>
+        <>
+          <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>
+          {progress ? <BootProgressBar progress={progress} /> : null}
+        </>
       )}
 
       {failed && (

@@ -160,6 +160,7 @@ const BootedApp: React.FC = () => {
           error={boot.error}
           retryable={boot.retryable}
           onRetry={boot.retry}
+          progress={boot.progress}
         />
       )}
     </Screen>

@@ -26,12 +26,20 @@ import { RecordingData } from "./recordingDataset";
  * through `bootRunner.ts`, so the parts that are meant to be identical cannot
  * drift apart, and neither carries branches for the other.
  */
+
+/**
+ * The weights are the app's in spirit: the model is the wait here too, since
+ * ONNX Runtime Web fetches the same 95 MB graph. It reports nothing from inside
+ * itself the way the phone's loader does (`skyModelProgress.ts` is native), so
+ * the harness's bar crosses that share in one step rather than filling through
+ * it. The harness is a developer's tool and that is good enough for it.
+ */
 const STEPS: readonly BootStepDefinition[] = [
-  { id: "catalog", label: "Satellite catalogue" },
-  { id: "sensors", label: "Device sensors" },
-  { id: "recording", label: "Sensor timeline" },
-  { id: "video", label: "Camera recording" },
-  { id: "skyModel", label: "Sky detection model" }
+  { id: "catalog", label: "Satellite catalogue", weight: 3 },
+  { id: "sensors", label: "Device sensors", weight: 1 },
+  { id: "recording", label: "Sensor timeline", weight: 1 },
+  { id: "video", label: "Camera recording", weight: 2 },
+  { id: "skyModel", label: "Sky detection model", weight: 13 }
 ] as const;
 
 /** The step list before anything has run, for the boot screen's first frame. */

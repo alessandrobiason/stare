@@ -211,8 +211,12 @@ what the harness substitutes and what it does not.
   but the wrong distance from centre.
 - Propagation is synchronous on the main thread: ~60 ms per full catalogue tick
   against a 100 ms budget, which is why the tracker sweeps a slice per frame.
-- The first run downloads a 95 MB model, and the catalogue is cached for two
-  hours because that is CelesTrak's rate limit.
+- The first run downloads a 95 MB model — the bar under the name on the boot
+  screen is that download's own byte progress — and the catalogue is cached for
+  two hours because that is CelesTrak's rate limit. The model and everything
+  derived from it live in the cache directory, not in Documents: it is
+  re-downloadable content, and iOS backs Documents up to iCloud. See the header
+  of `src/vision/skyModel.ts`.
 - **Pass alerts are only as fresh as the last time the app was open.** A week
   of them is queued at a time, so an app left shut for longer goes quiet once
   the week runs out. There is no background refresh; the week is the limit of

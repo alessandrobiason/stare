@@ -1,6 +1,8 @@
 import { Directory, File, FileMode, Paths } from "expo-file-system";
 import { env, InferenceSession, Tensor } from "onnxruntime-react-native";
 import { DEVICE_CAMERA } from "../constants";
+import { yieldToEventLoop } from "../timeSlice";
+import { reportSkyModelDownload, reportSkyModelPhase } from "./skyModelProgress";
 import { SKY_MODEL_URL } from "./skyModelSource";
 import { prepareSkyModel } from "./skyModelPreparation";
 import { modelInputSize, Size } from "./skySegmentation";
@@ -17,8 +19,37 @@ import { SkyModel, SkyModelDiagnostics } from "./skyModelTypes";
  *
  * The one difference the runtimes force is where the file comes from. ONNX
  * Runtime Web fetches a URL itself; the native runtime takes a path, so the
- * model is downloaded to the app's own storage first and kept there — and on
- * the phone it is then rewritten once for Core ML, and that is kept too.
+ * model is downloaded to the app's own storage first and rewritten once for
+ * Core ML, and it is the rewrite that is kept.
+ *
+ * **Where "the app's own storage" is, which is not a detail.** Everything this
+ * file writes goes under `Paths.cache` — `Library/Caches` on iOS — and that is
+ * a deliberate move from the document directory, where it used to live.
+ *
+ * iOS backs the document directory up to iCloud. Apple's data storage
+ * guidelines say plainly that re-downloadable content must not go there, and a
+ * 95 MB model fetched from a pinned URL is the example they give: an app that
+ * kept it in Documents would be charging every user's iCloud quota — and every
+ * restore — for a file any phone can fetch again in a few minutes. `Caches` is
+ * the directory that exists for exactly this, so the correct fix is to use it
+ * rather than to keep the file where it was and flag it.
+ *
+ * The reason it was in Documents was that the system may purge `Caches` when
+ * the device is short of space, and a re-download nobody asked for read as the
+ * app being broken. Two things have since made that the wrong trade:
+ *
+ * - **A purge is now visible.** The boot screen has a bar fed by this
+ *   download's own byte progress (`skyModelProgress.ts`), so a launch that has
+ *   to fetch the model again says so and shows how far along it is. The old
+ *   objection was to a silent wait, and the wait is no longer silent.
+ * - **The app was never offline-durable anyway.** It refuses to open on orbital
+ *   elements older than `TLE_USABLE_INTERVAL_MS`, which is a day. A launch that
+ *   finds the model purged is, more often than not, a launch that would have
+ *   stopped at the catalogue regardless. Keeping 95 MB out of the reach of a
+ *   purge bought an offline guarantee the rest of the app does not make.
+ *
+ * What a purge costs is therefore a visible download on one launch. What
+ * Documents cost was every user's backup, permanently.
  */
 
 const MODEL_DIRECTORY = "stare";
@@ -108,20 +139,27 @@ function executionProviders(cacheDirectory: string): InferenceSession.ExecutionP
 }
 
 /**
- * The model in the app's document directory, downloaded if it is not there yet.
+ * The downloaded model, fetched if it is not on disk yet, reporting as it comes.
  *
- * The document directory rather than the cache: iOS evicts the latter when it is
- * short of space, and re-downloading 95 MB on a launch the user expected to be
- * offline is worse than the space it costs. `downloadFileAsync` completes into a
- * temporary location and moves the file into place only on success, so an
- * interrupted download cannot leave a truncated model behind to be loaded next
- * time.
+ * `downloadFileAsync` completes into a temporary location and moves the file
+ * into place only on success, so an interrupted download cannot leave a
+ * truncated model behind to be loaded next time. Its progress is what the boot
+ * screen's bar is made of on a first launch: 95 MB is minutes on an ordinary
+ * connection, and every one of them used to pass with nothing on screen moving.
+ * See `skyModelProgress.ts`.
  */
-async function localModel(directory: Directory): Promise<File> {
+async function downloadedModel(directory: Directory): Promise<File> {
   const file = new File(directory, MODEL_FILE);
   if (file.exists && (file.size ?? 0) > 0) return file;
 
-  return File.downloadFileAsync(SKY_MODEL_URL, file, { idempotent: true });
+  // Published before the request goes out rather than on the first chunk back:
+  // a connection can spend seconds resolving and handshaking, and the bar
+  // should be saying "downloading" through those too.
+  reportSkyModelDownload(0, 0);
+  return File.downloadFileAsync(SKY_MODEL_URL, file, {
+    idempotent: true,
+    onProgress: ({ bytesWritten, totalBytes }) => reportSkyModelDownload(bytesWritten, totalBytes)
+  });
 }
 
 /** What `preparedModel` did, for the Console's "Sky model" page. */
@@ -133,7 +171,21 @@ type PreparationOutcome = {
 };
 
 /**
- * The downloaded model rewritten for Core ML, made once and kept beside it.
+ * The model rewritten for Core ML: made once, kept, and the only copy kept.
+ *
+ * The download is behind this rather than beside it, which is the whole of the
+ * arrangement: a launch that already has a prepared file never asks the network
+ * anything, and a launch that does not is the only one that pays for 95 MB.
+ * They used to be resolved in the other order — the source first, then the
+ * rewrite — which meant a phone whose *source* file had been evicted from the
+ * cache re-downloaded the whole thing to prepare a file it already had.
+ *
+ * The source is then deleted, because after this it is dead weight. It is only
+ * ever read again if `PREPARATION_VERSION` or the input size moves, which is an
+ * app update away and a fresh download either way; keeping it against that
+ * charged every phone a permanent 95 MB, and charged it *in the cache*, where
+ * the two files compete for the same purgeable budget as each other. Holding
+ * the spare made losing the one that matters more likely.
  *
  * Written to a partial file and renamed into place, for the reason the download
  * is: a launch interrupted mid-write must not find a truncated model next time
@@ -141,12 +193,28 @@ type PreparationOutcome = {
  * another input size — are removed once this one is in place, since each is the
  * size of the model.
  */
-async function preparedModel(directory: Directory, source: File): Promise<PreparationOutcome> {
+async function preparedModel(directory: Directory): Promise<PreparationOutcome> {
   const prepared = new File(directory, PREPARED_FILE);
   if (prepared.exists && (prepared.size ?? 0) > 0) {
     return { file: prepared, freshlyPrepared: false, gathersRewritten: null };
   }
 
+  const source = await downloadedModel(directory);
+  reportSkyModelPhase("preparing");
+  /**
+   * One frame for the screen to say so, before the rewrite takes the thread.
+   *
+   * `prepareSkyModel` is a synchronous walk over 95 MB of protobuf and it holds
+   * the JS thread for the whole of its length: the boot sky stops turning and
+   * the bar stops moving, which is exactly the shape this release set out to
+   * stop looking like. It cannot be sliced without restructuring the rewrite,
+   * and it does not need to be — a freeze that happens while the screen already
+   * reads "preparing the sky detection model" is a wait somebody can make sense
+   * of. Without this yield the phase is published to a ref and the thread is
+   * gone before any frame carrying it is drawn, so the words would arrive only
+   * after the wait they explain.
+   */
+  await yieldToEventLoop();
   const { parts, gathersRewritten } = prepareSkyModel(await source.bytes(), {
     dimensions: { batch: 1, height: INPUT_SIZE.height, width: INPUT_SIZE.width },
     coreMlCacheKey: COREML_CACHE_KEY
@@ -170,6 +238,10 @@ async function preparedModel(directory: Directory, source: File): Promise<Prepar
       entry.delete();
     }
   }
+  // Only once the rewrite is safely under its finished name: an interruption
+  // between the two must cost the preparation, never both copies.
+  if (source.exists) source.delete();
+
   return { file: new File(directory, PREPARED_FILE), freshlyPrepared: true, gathersRewritten };
 }
 
@@ -194,12 +266,35 @@ function coreMlCacheDirectory(directory: Directory): string {
   return decodeURIComponent(cache.uri.replace(/^file:\/\//, "")).replace(/\/$/, "");
 }
 
+/**
+ * Clears out the copy earlier builds kept in the document directory.
+ *
+ * Cheap — one `exists` on a launch that has nothing to remove — and the only
+ * thing that makes the move above real for a phone that has already run an
+ * older build. Without it those phones keep ~190 MB of a re-downloadable model
+ * in the backed-up directory forever, which is the whole of what the move was
+ * for; the new build would simply have stopped reading it.
+ *
+ * Swallowed on failure: this is housekeeping, and a phone that will not let go
+ * of the old directory is not a reason to refuse to start.
+ */
+function discardLegacyDocumentCopy(): void {
+  try {
+    const legacy = new Directory(Paths.document, MODEL_DIRECTORY);
+    if (legacy.exists) legacy.delete();
+  } catch {
+    // Nothing to do about it, and nothing worth stopping boot for.
+  }
+}
+
 export async function createSkyModel(): Promise<SkyModel> {
   const startedAtMs = performance.now();
-  const directory = new Directory(Paths.document, MODEL_DIRECTORY);
+  const directory = new Directory(Paths.cache, MODEL_DIRECTORY);
   directory.create({ intermediates: true, idempotent: true });
+  discardLegacyDocumentCopy();
 
-  const preparation = await preparedModel(directory, await localModel(directory));
+  const preparation = await preparedModel(directory);
+  reportSkyModelPhase("starting");
   const session = await InferenceSession.create(preparation.file.uri, {
     executionProviders: executionProviders(coreMlCacheDirectory(directory)),
     graphOptimizationLevel: "all",
@@ -247,6 +342,8 @@ export async function createSkyModel(): Promise<SkyModel> {
       bytes: preparation.file.size ?? 0
     }
   };
+
+  reportSkyModelPhase("ready");
 
   return {
     async run(input: Float32Array, size: Size): Promise<Float32Array> {

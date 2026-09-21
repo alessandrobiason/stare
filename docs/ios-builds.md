@@ -152,7 +152,9 @@ need no Apple review, external ones do — and install through the TestFlight ap
 on the phone.
 
 First launch still downloads the 95 MB segmentation model before anything is
-detected, so give it a minute on Wi-Fi before pointing it at the sky.
+detected, so give it a minute on Wi-Fi before pointing it at the sky. The bar
+under the app's name is that download, byte for byte, and the line under the bar
+appears once a launch has run long enough to need explaining.
 
 Once a build made after the updates setup below is installed, most later fixes
 do not come this way at all — see

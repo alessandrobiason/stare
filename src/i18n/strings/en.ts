@@ -220,6 +220,12 @@ export const en: Strings = {
     failed: "Could not start",
     tryAgain: "TRY AGAIN",
     unsupported: "This device cannot run the sky view.",
+    activity: {
+      downloading: "Downloading the sky detection model",
+      size: "{done} of {total} MB",
+      preparing: "Preparing the sky detection model",
+      kept: "It stays on the device afterwards."
+    },
     openSettings: "OPEN SETTINGS",
     errors: {
       cameraRefused:

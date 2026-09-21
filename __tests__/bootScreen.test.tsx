@@ -38,6 +38,23 @@ test("the loading screen says the app's name, and nothing else at all", () => {
   expect(textOf(screen())).toBe("STARE");
 });
 
+test("the bar under it adds no words to an ordinary launch", () => {
+  // The bar is drawn on every launch, and on the overwhelming majority of them
+  // that is all it is: a line filling. The sentence under it belongs to a
+  // launch slow enough to have earned an explanation, and one that has only
+  // just started has not. See `BootProgressBar`.
+  const text = textOf(
+    screen({
+      progress: {
+        fraction: 0.4,
+        activity: { kind: "downloading", receivedBytes: 40 * 1024 * 1024, totalBytes: 99_310_780 }
+      }
+    })
+  );
+
+  expect(text).toBe("STARE");
+});
+
 test("a failure takes the screen from the name rather than sharing it", () => {
   const text = textOf(
     screen({ failed: true, error: new BootFailure("locationUnavailable") })
