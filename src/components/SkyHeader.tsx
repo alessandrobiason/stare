@@ -195,12 +195,12 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     color: theme.color.textBright,
-    fontSize: 27,
-    // Same weight and tracking as the wordmark on the boot screen and the
-    // intro, scaled to this size, so STARE reads as one mark across all three
-    // rather than a headline here and a wordmark there. See `wordmarkTracking`.
+    // Same size, weight and tracking as the wordmark on the boot screen and
+    // the intro, so STARE reads as one mark across all three rather than a
+    // headline here and a wordmark there. See `wordmarkTracking`.
+    fontSize: 17,
     fontWeight: WORDMARK_WEIGHT,
-    letterSpacing: wordmarkTracking(27),
+    letterSpacing: wordmarkTracking(17),
     opacity: 0.92,
     // The one shadow spent on text. A title over a camera picture has no
     // background to be read against, so it carries its own.
