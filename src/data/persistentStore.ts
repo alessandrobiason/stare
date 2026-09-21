@@ -13,6 +13,8 @@
  * tour starts — and an asynchronous read means a decision that lands late.
  */
 
+import { Platform } from "react-native";
+
 /** The handful of operations a cache needs from whatever storage exists. */
 export type PersistentStore = {
   read(): string | null;
@@ -24,11 +26,18 @@ export type PersistentStore = {
 const FILE_DIRECTORY = "stare";
 
 /**
- * Web storage. Tried first because its presence is a reliable signal that we
- * are in a browser, which keeps this module from having to ask React Native
- * what platform it is on.
+ * Web storage. Gated on `Platform.OS` rather than on `localStorage` merely
+ * existing: with a JS debugger attached, the app's JS runs inside the
+ * debugger's own browser context, which hands out a real, working
+ * `localStorage` on a native build too — backed by the debugger session, not
+ * the device. Every reconnect (including the next launch) is a fresh session
+ * with an empty one, which reads exactly like a phone that remembers nothing.
+ * `Platform.OS` reports the device underneath regardless of where the JS
+ * happens to be running.
  */
 function browserStore(key: string): PersistentStore | null {
+  if (Platform.OS !== "web") return null;
+
   let storage: Storage;
   try {
     if (typeof localStorage === "undefined") return null;
@@ -86,7 +95,10 @@ function deviceFileStore(fileName: string): PersistentStore | null {
         if (file.exists) file.delete();
       }
     };
-  } catch {
+  } catch (error) {
+    // Silent otherwise: this is the difference between a real device (where
+    // it always resolves) and the failure this diagnostic exists to catch.
+    console.warn("Could not open the on-device store", fileName, error);
     return null;
   }
 }

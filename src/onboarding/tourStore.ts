@@ -40,7 +40,8 @@ export function hasSeenTour(): boolean {
       parsed !== null &&
       typeof (parsed as Partial<StoredTour>).seenAtMs === "number"
     );
-  } catch {
+  } catch (error) {
+    console.warn("Could not read whether the tour has been seen", error);
     return false;
   }
 }
@@ -49,8 +50,8 @@ export function hasSeenTour(): boolean {
 export function markTourSeen(seenAtMs: number = Date.now()): void {
   try {
     store.get()?.write(JSON.stringify({ seenAtMs } satisfies StoredTour));
-  } catch {
-    // Nothing to do, and nothing worth saying about it on screen.
+  } catch (error) {
+    console.warn("Could not record that the tour has been seen", error);
   }
 }
 

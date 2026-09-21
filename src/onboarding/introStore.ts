@@ -40,7 +40,8 @@ export function hasSeenIntro(): boolean {
       parsed !== null &&
       typeof (parsed as Partial<StoredIntro>).seenAtMs === "number"
     );
-  } catch {
+  } catch (error) {
+    console.warn("Could not read whether the intro has been seen", error);
     return false;
   }
 }
@@ -53,8 +54,8 @@ export function hasSeenIntro(): boolean {
 export function markIntroSeen(seenAtMs: number = Date.now()): void {
   try {
     store.get()?.write(JSON.stringify({ seenAtMs } satisfies StoredIntro));
-  } catch {
-    // Nothing to do, and nothing worth saying about it on screen.
+  } catch (error) {
+    console.warn("Could not record that the intro has been seen", error);
   }
 }
 
