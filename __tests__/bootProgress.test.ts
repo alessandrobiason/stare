@@ -184,10 +184,8 @@ test("the line under the bar names the download and how much of it has landed", 
     totalBytes: SKY_MODEL_APPROXIMATE_BYTES
   });
 
-  expect(caption?.line).toContain(t.downloading);
-  expect(caption?.line).toContain("40 of 95 MB");
-  // And says the wait is not going to be part of every launch.
-  expect(caption?.note).toBe(t.kept);
+  expect(caption).toContain(t.downloading);
+  expect(caption).toContain("40 of 95 MB");
 });
 
 test("and is written in the language the app is in", () => {
@@ -198,8 +196,8 @@ test("and is written in the language the app is in", () => {
     totalBytes: SKY_MODEL_APPROXIMATE_BYTES
   });
 
-  expect(caption?.line).toContain(stringsFor("it").boot.activity.downloading);
-  expect(caption?.line).toContain("40 di 95 MB");
+  expect(caption).toContain(stringsFor("it").boot.activity.downloading);
+  expect(caption).toContain("40 di 95 MB");
 });
 
 test("a size with half of it missing is not shown at all", () => {
@@ -209,13 +207,10 @@ test("a size with half of it missing is not shown at all", () => {
     totalBytes: null
   });
 
-  expect(caption?.line).toBe(stringsFor("en").boot.activity.downloading);
+  expect(caption).toBe(stringsFor("en").boot.activity.downloading);
 });
 
 test("nothing is said when nothing is taking the time", () => {
   expect(bootActivityText(null)).toBeNull();
-  expect(bootActivityText({ kind: "preparing" })).toEqual({
-    line: stringsFor("en").boot.activity.preparing,
-    note: null
-  });
+  expect(bootActivityText({ kind: "preparing" })).toBe(stringsFor("en").boot.activity.preparing);
 });

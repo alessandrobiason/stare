@@ -223,8 +223,7 @@ export const en: Strings = {
     activity: {
       downloading: "Downloading the sky detection model",
       size: "{done} of {total} MB",
-      preparing: "Preparing the sky detection model",
-      kept: "It stays on the device afterwards."
+      preparing: "Preparing the sky detection model"
     },
     openSettings: "OPEN SETTINGS",
     errors: {

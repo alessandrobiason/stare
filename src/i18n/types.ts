@@ -433,15 +433,6 @@ export type Strings = {
       size: string;
       /** The pass that rewrites it for the phone's own runtime, after the download. */
       preparing: string;
-      /**
-       * Why the wait is not going to be part of every launch.
-       *
-       * Careful not to promise "once": the file lives in the cache directory,
-       * which the system may reclaim when the device is short of space
-       * (`skyModel.ts`), and a launch that has to fetch it again would make a
-       * liar of a stronger sentence.
-       */
-      kept: string;
     };
     /**
      * The button beside the retry, on the failures the phone's own settings

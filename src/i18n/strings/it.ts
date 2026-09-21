@@ -217,8 +217,7 @@ export const it: Strings = {
     activity: {
       downloading: "Scarico il modello che riconosce il cielo",
       size: "{done} di {total} MB",
-      preparing: "Preparo il modello che riconosce il cielo",
-      kept: "Poi resta sul dispositivo."
+      preparing: "Preparo il modello che riconosce il cielo"
     },
     openSettings: "APRI IMPOSTAZIONI",
     errors: {

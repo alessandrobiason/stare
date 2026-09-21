@@ -81,21 +81,19 @@ export function bootBarTarget(fraction: number, elapsedMs: number): number {
 }
 
 /** The line under the bar, or `null` when there is nothing worth saying. */
-export function bootActivityText(
-  activity: BootActivity | null
-): { line: string; note: string | null } | null {
+export function bootActivityText(activity: BootActivity | null): string | null {
   if (!activity) return null;
   const t = strings().boot.activity;
 
-  if (activity.kind === "preparing") return { line: t.preparing, note: null };
+  if (activity.kind === "preparing") return t.preparing;
 
   const done = groupNumber(Math.floor(activity.receivedBytes / BYTES_PER_MB));
   // Without a `Content-Length` there is no total to quote, and a size with one
   // half missing is worse than the sentence on its own.
-  if (activity.totalBytes === null) return { line: t.downloading, note: t.kept };
+  if (activity.totalBytes === null) return t.downloading;
 
   const total = groupNumber(Math.round(activity.totalBytes / BYTES_PER_MB));
-  return { line: `${t.downloading} · ${fill(t.size, { done, total })}`, note: t.kept };
+  return `${t.downloading} · ${fill(t.size, { done, total })}`;
 }
 
 export const BootProgressBar: React.FC<Props> = ({ progress }) => {
@@ -154,8 +152,7 @@ export const BootProgressBar: React.FC<Props> = ({ progress }) => {
 
       {caption && captionOpacity > 0 ? (
         <View style={[styles.caption, { opacity: captionOpacity }]}>
-          <Text style={styles.captionLine}>{caption.line}</Text>
-          {caption.note ? <Text style={styles.captionNote}>{caption.note}</Text> : null}
+          <Text style={styles.captionLine}>{caption}</Text>
         </View>
       ) : null}
     </View>
@@ -176,7 +173,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: "50%",
-    marginTop: 34,
+    marginTop: 52,
     alignItems: "center"
   },
   /**
@@ -224,13 +221,6 @@ const styles = StyleSheet.create({
     color: theme.color.textDim,
     fontSize: 11,
     letterSpacing: 0.3,
-    textAlign: "center"
-  },
-  captionNote: {
-    marginTop: 4,
-    color: theme.color.textFaint,
-    fontSize: 10,
-    letterSpacing: 0.2,
     textAlign: "center"
   }
 });
