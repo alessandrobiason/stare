@@ -75,9 +75,13 @@ const PREPARATION_VERSION = 1;
  * Where the prepared model is kept, and the key its Core ML compilation is
  * cached under. Both carry the input size, which is compiled in.
  */
+const PREPARED_INFIX = ".coreml-";
 const PREPARED_TAG = `w${INPUT_SIZE.width}h${INPUT_SIZE.height}v${PREPARATION_VERSION}`;
-const PREPARED_FILE = `skywater-segformer-b2.coreml-${PREPARED_TAG}.onnx`;
+const PREPARED_FILE = `skywater-segformer-b2${PREPARED_INFIX}${PREPARED_TAG}.onnx`;
 const COREML_CACHE_KEY = `skywaterb2${PREPARED_TAG}`;
+
+/** Core ML's compilations, under whichever directory the model lives in. */
+const COREML_CACHE_DIRECTORY = "coreml-cache";
 
 /**
  * Core ML on the Neural Engine, and the model whole.
@@ -234,7 +238,7 @@ async function preparedModel(directory: Directory): Promise<PreparationOutcome> 
   partial.rename(PREPARED_FILE);
 
   for (const entry of directory.list()) {
-    if (entry instanceof File && entry.name.includes(".coreml-") && entry.name !== PREPARED_FILE) {
+    if (entry instanceof File && entry.name.includes(PREPARED_INFIX) && entry.name !== PREPARED_FILE) {
       entry.delete();
     }
   }
@@ -253,7 +257,7 @@ async function preparedModel(directory: Directory): Promise<PreparationOutcome> 
  * runtime's.
  */
 function coreMlCacheDirectory(directory: Directory): string {
-  const root = new Directory(directory, "coreml-cache");
+  const root = new Directory(directory, COREML_CACHE_DIRECTORY);
   // The binding's version, which the pod is pinned to (see the patch to
   // `onnxruntime-react-native`), and so the native runtime's as well.
   const current = `onnxruntime-${env.versions["react-native"] ?? "unknown"}`;
@@ -269,6 +273,14 @@ function coreMlCacheDirectory(directory: Directory): string {
 /**
  * Clears out the copy earlier builds kept in the document directory.
  *
+ * The model's own files, named, rather than the directory that holds them.
+ * `Documents/stare` is not this file's to remove: it is also where everything
+ * the app remembers between launches lives — the intro and tour flags, the TLE
+ * catalogue — which `src/data/persistentStore.ts` keeps under the same name.
+ * Deleting it whole took those with it on every launch, so every launch was a
+ * first launch: the intro again, the tour again, the catalogue downloaded
+ * again.
+ *
  * Cheap — one `exists` on a launch that has nothing to remove — and the only
  * thing that makes the move above real for a phone that has already run an
  * older build. Without it those phones keep ~190 MB of a re-downloadable model
@@ -276,12 +288,19 @@ function coreMlCacheDirectory(directory: Directory): string {
  * for; the new build would simply have stopped reading it.
  *
  * Swallowed on failure: this is housekeeping, and a phone that will not let go
- * of the old directory is not a reason to refuse to start.
+ * of the old files is not a reason to refuse to start.
  */
 function discardLegacyDocumentCopy(): void {
   try {
     const legacy = new Directory(Paths.document, MODEL_DIRECTORY);
-    if (legacy.exists) legacy.delete();
+    if (!legacy.exists) return;
+    for (const entry of legacy.list()) {
+      if (entry instanceof Directory) {
+        if (entry.name === COREML_CACHE_DIRECTORY) entry.delete();
+      } else if (entry.name === MODEL_FILE || entry.name.includes(PREPARED_INFIX)) {
+        entry.delete();
+      }
+    }
   } catch {
     // Nothing to do about it, and nothing worth stopping boot for.
   }
