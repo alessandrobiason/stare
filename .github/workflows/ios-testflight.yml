@@ -77,6 +77,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The catalogue a phone falls back on offline is baked into the build and
+      # ages with it for as long as it is installed, so a release must not ship
+      # one more than a day old. First, because the remedy -- npm run
+      # bundle-tle and a commit -- means a new run from a new commit anyway.
+      # Needs nothing but the runner's own node.
+      - name: Check the bundled TLE catalogue is fresh
+        run: node tools/check-bundled-tle.mjs
+
       # Every credential below is first used deep inside the 10x job, where a
       # bad one surfaces as something unreadable: a .p8 that is not valid PEM
       # fails the archive with "Invalid authentication key credential specified

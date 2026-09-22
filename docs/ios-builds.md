@@ -146,6 +146,11 @@ opaque authentication failure. TestFlight needs no tax or banking details.
 
 ### 7. Release
 
+Refresh the offline catalogue first: `npm run bundle-tle`, then commit
+`src/data/bundledCatalog.json`. The workflow refuses to build from a commit
+whose bundled TLEs are more than a day old (see "Things the workflow handles for
+you" below), so this has to happen within a day of pressing the button.
+
 Run the workflow from the Actions tab. Once the build appears in App Store
 Connect, add yourself under TestFlight -> Internal Testing — internal testers
 need no Apple review, external ones do — and install through the TestFlight app
@@ -513,6 +518,14 @@ So the release signs manually, with the profile from step 4, and:
   `assets/icon.svg` from the same geometry: the PNG is what `app.json` names and
   what ships, so an icon edited only as SVG never reaches the App Store. Change
   the mark there and re-run `node tools/make-logo.mjs`.
+- **Offline catalogue age.** `src/data/bundledCatalog.json` is what a phone
+  draws when CelesTrak cannot be reached and nothing newer is cached, and it
+  ages with the build for as long as the build is installed. The first step of
+  the Linux gate, `tools/check-bundled-tle.mjs`, fails the release if it is more
+  than 24 hours old — the age at which the app starts telling the user its
+  orbits are out of date. The fix is `npm run bundle-tle` (one CelesTrak
+  request, refused within two hours of the last one), a commit, and a new run
+  from that commit.
 - **Export compliance.** `ITSAppUsesNonExemptEncryption` is `false` in
   `app.json`, since the app only makes ordinary HTTPS requests. Without it, App
   Store Connect asks the question again on every single upload.
