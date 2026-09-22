@@ -59,6 +59,11 @@ export function initialSteps(): BootStep[] {
 /** Everything boot produces, handed over once every step has settled. */
 export type BootResult = {
   catalog: SatelliteCatalog;
+  /**
+   * When the catalogue's elements were downloaded, which is how the view tells
+   * a sky out of date from a current one. See `useLiveCatalog`.
+   */
+  catalogDownloadedAtMs: number;
   /** What the device's own sensors turned out to be. */
   capabilities: DeviceCapabilities;
   /** Non-fatal problems worth mentioning but not worth stopping for. */
@@ -227,7 +232,11 @@ export async function runBootSequence(
     throw new BootError("sensors", sensors.missing, boot.steps, sensors.failure ?? undefined);
   }
 
-  const catalog = settleCatalog(boot, "catalog", catalogResult);
+  const { catalog, downloadedAtMs: catalogDownloadedAtMs } = settleCatalog(
+    boot,
+    "catalog",
+    catalogResult
+  );
 
   // Settled in the order they were asked for, so the reason boot stopped is the
   // first prompt that went against it rather than the last.
@@ -265,6 +274,7 @@ export async function runBootSequence(
 
   return {
     catalog,
+    catalogDownloadedAtMs,
     capabilities: sensors.capabilities,
     warnings: [],
     observer,

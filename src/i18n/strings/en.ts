@@ -216,6 +216,17 @@ export const en: Strings = {
         "by the local declination — a few degrees in most places."
     }
   },
+  catalogNotice: {
+    stale: {
+      title: "Satellite orbits are out of date",
+      detail:
+        "Stare could not reach CelesTrak, so it is drawing orbits from {age} ago and " +
+        "satellites may be off from where they are shown. It keeps trying the server " +
+        "and will update them by itself."
+    },
+    oneDay: "a day",
+    days: "{days} days"
+  },
   boot: {
     failed: "Could not start",
     tryAgain: "TRY AGAIN",

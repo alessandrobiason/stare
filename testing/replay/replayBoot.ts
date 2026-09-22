@@ -113,7 +113,7 @@ export async function runReplayBoot(
   );
   const warnings = sensors.warning ? [sensors.warning] : [];
 
-  const catalog = settleCatalog(boot, "catalog", catalogResult);
+  const { catalog } = settleCatalog(boot, "catalog", catalogResult);
 
   if (recordingResult instanceof Error) {
     throw boot.fail(

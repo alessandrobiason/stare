@@ -24,7 +24,8 @@ const observer = { latitudeDeg: 60.17, longitudeDeg: 24.94, heightM: 12 };
 
 const catalog: ActiveCatalog = {
   tles: [SAMPLE_TLE, { ...SAMPLE_TLE, name: "SAT TWO" }],
-  source: "network"
+  source: "network",
+  downloadedAtMs: 1_000_000
 };
 
 function tasks(overrides: Partial<BootTasks> = {}): BootTasks {
@@ -436,11 +437,30 @@ describe("failures that stop the app", () => {
     await expect(failure).rejects.toThrow("offline");
   });
 
-  test("falling back to the bundled TLE is fatal, not a working app", async () => {
-    // One bundled satellite renders, but it is not a sky, and quietly showing
-    // a single dot would look like a bug rather than a missing download.
+  test("the catalogue the app shipped with is a working app, dated as it was", async () => {
+    // Old elements put a satellite a few degrees from where it is; the view
+    // says so over them rather than boot stopping on them.
+    let last: BootStep[] = [];
+    const booted = await runBootSequence(
+      tasks({
+        loadCatalog: () =>
+          Promise.resolve({ ...catalog, source: "bundled", downloadedAtMs: 123_000 })
+      }),
+      (progress) => {
+        last = progress.steps;
+      }
+    );
+
+    expect(booted.catalog.size).toBe(2);
+    expect(booted.catalogDownloadedAtMs).toBe(123_000);
+    expect(stepOf(last, "catalog").detail).toContain("(bundled)");
+  });
+
+  test("no catalogue from anywhere is fatal", async () => {
     const failure = runBootSequence(
-      tasks({ loadCatalog: () => Promise.resolve({ tles: [SAMPLE_TLE], source: "bundled" }) }),
+      tasks({
+        loadCatalog: () => Promise.resolve({ tles: [], source: "none", downloadedAtMs: 0 })
+      }),
       () => undefined
     );
 
@@ -456,7 +476,10 @@ describe("failures that stop the app", () => {
       parked: false
     };
     const failure = runBootSequence(
-      tasks({ loadCatalog: () => Promise.resolve({ tles: [unusable], source: "network" }) }),
+      tasks({
+        loadCatalog: () =>
+          Promise.resolve({ tles: [unusable], source: "network", downloadedAtMs: 1_000_000 })
+      }),
       () => undefined
     );
 

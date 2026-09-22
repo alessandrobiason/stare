@@ -25,7 +25,8 @@ const allSensors: DeviceCapabilities = { motion: true, magnetometer: true };
 
 const catalog: ActiveCatalog = {
   tles: [SAMPLE_TLE, { ...SAMPLE_TLE, name: "SAT TWO" }],
-  source: "network"
+  source: "network",
+  downloadedAtMs: 1_000_000
 };
 
 function tasks(overrides: Partial<ReplayBootTasks> = {}): ReplayBootTasks {

@@ -140,6 +140,47 @@ export async function storeCatalog(
   return tles;
 }
 
+/**
+ * What `CachedCatalog.url` says for the catalogue the app shipped with, which
+ * came from no URL this device asked. Never equal to a real one, so it is never
+ * `isFresh` or `isUsable` and every launch that holds it still asks CelesTrak —
+ * subject to `mayRetry`, which is the point of holding it here at all.
+ */
+export const BUNDLED_CATALOG_URL = "bundled";
+
+/**
+ * Serves the shipped catalogue from memory, as though it had been downloaded
+ * when it was, with the attempt that failed to replace it stamped `nowMs`.
+ *
+ * Memory only. Written to disk it would be two and a half megabytes of a file
+ * the app already has, and it would take the place of a cache that — however
+ * old — is at least this device's own.
+ *
+ * Held rather than handed back loose because of the retry throttle: that is
+ * `attemptedAtMs` on the cache, and with no cache on disk there would be
+ * nothing to hang it on, so a view that keeps asking for fresh elements would
+ * ask CelesTrak every time it did.
+ */
+export function holdBundledCatalog(tles: Tle[], downloadedAtMs: number, nowMs: number): void {
+  memory = {
+    tles,
+    downloadedAtMs,
+    attemptedAtMs: nowMs,
+    url: BUNDLED_CATALOG_URL,
+    sizeBytes: 0
+  };
+}
+
+/**
+ * Whether elements downloaded at `downloadedAtMs` are old enough to say so on
+ * screen: past `TLE_USABLE_INTERVAL_MS`, the age the app would rather block on
+ * a download than open on. Elements stamped in the future are not called
+ * stale — the clock moved, and nothing about their age can be told.
+ */
+export function isStale(downloadedAtMs: number, nowMs: number): boolean {
+  return nowMs - downloadedAtMs >= TLE_USABLE_INTERVAL_MS;
+}
+
 /** Notes a failed attempt, so the retry interval starts running. */
 export function recordFailedAttempt(nowMs: number): void {
   if (memory) memory = { ...memory, attemptedAtMs: nowMs };

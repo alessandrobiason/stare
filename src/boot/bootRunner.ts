@@ -237,6 +237,8 @@ export type BuiltCatalog = {
   catalog: SatelliteCatalog;
   /** Where the elements came from, for what the step reports. */
   source: CatalogSource;
+  /** When they were downloaded. See `ActiveCatalog.downloadedAtMs`. */
+  downloadedAtMs: number;
 };
 
 /**
@@ -260,7 +262,11 @@ export function runCatalogStep(
 ): Promise<BuiltCatalog | Error> {
   return boot.run(id, async () => {
     const active = await loadCatalog();
-    return { catalog: await SatelliteCatalog.build(active.tles), source: active.source };
+    return {
+      catalog: await SatelliteCatalog.build(active.tles),
+      source: active.source,
+      downloadedAtMs: active.downloadedAtMs
+    };
   });
 }
 
@@ -268,9 +274,10 @@ export function runCatalogStep(
  * The catalogue step's outcome, which is the same question in both sequences:
  * is there a downloaded sky to draw?
  *
- * The bundled fallback counts as a failure. One bundled satellite renders, but
- * it is not a sky, and quietly showing a single dot looks like a bug rather
- * than a missing download.
+ * The catalogue the app ships with counts as one. It is a whole sky, out of
+ * date by however long ago the build was made, and the view says so over it
+ * (`CatalogNotice`) rather than boot stopping on it: old elements put a
+ * satellite a few degrees from where it is, no elements put it nowhere.
  *
  * @throws BootError when there is no usable catalogue.
  */
@@ -278,7 +285,7 @@ export function settleCatalog(
   boot: BootRun,
   id: string,
   result: BuiltCatalog | Error
-): SatelliteCatalog {
+): BuiltCatalog {
   if (result instanceof Error) {
     const detail = describeError(result, "The satellite catalogue could not be loaded");
     // The platform's own words travel with it: a 503 from CelesTrak and a
@@ -287,7 +294,10 @@ export function settleCatalog(
     throw boot.fail(id, detail, new BootFailure("catalogFailed", detail));
   }
 
-  if (result.source === "bundled") {
+  // Nothing downloaded, nothing cached, and nothing shipped either — a build
+  // missing its bundled file, which is a bug, but the reader's remedy is the
+  // same as for a dropped connection.
+  if (result.source === "none") {
     throw boot.fail(
       id,
       "No satellite catalogue could be downloaded, and none is cached on this device. " +
@@ -306,12 +316,9 @@ export function settleCatalog(
     );
   }
 
-  boot.update(
-    id,
-    "done",
-    `${catalog.size.toLocaleString()} satellites${result.source === "cache" ? " (cached)" : ""}`
-  );
-  return catalog;
+  const origin = { network: "", cache: " (cached)", bundled: " (bundled)", none: "" }[result.source];
+  boot.update(id, "done", `${catalog.size.toLocaleString()} satellites${origin}`);
+  return result;
 }
 
 /**

@@ -9,6 +9,7 @@ import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
 import { useCompassAccuracy } from "../hooks/useCompassAccuracy";
 import { useLocale } from "../hooks/useLocale";
 import { useDeviceOrientation } from "../hooks/useDeviceOrientation";
+import { useLiveCatalog } from "../hooks/useLiveCatalog";
 import { useLiveSky } from "../hooks/useLiveSky";
 import { usePassAlertAccess } from "../hooks/usePassAlertAccess";
 import { usePassAlerts } from "../hooks/usePassAlerts";
@@ -16,6 +17,7 @@ import { useSceneControls } from "../hooks/useSceneControls";
 import { AttitudeSource } from "../hooks/useSmoothedOrientation";
 import { cameraFrameGrabber } from "../vision/cameraFrameGrabber";
 import { CameraBackground } from "./CameraBackground";
+import { CatalogNotice } from "./CatalogNotice";
 import { CompassNotice } from "./CompassNotice";
 import { SceneFrame, SkyOverlay } from "./SkyOverlay";
 
@@ -46,6 +48,12 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
   useLocale();
   const { observer, epochRef } = useLiveSky(boot.observer);
   /**
+   * The catalogue boot got, until a fresher one replaces it: when CelesTrak
+   * could not be reached boot opens on old elements, and this keeps asking for
+   * new ones and says how old the ones on screen are. See `useLiveCatalog`.
+   */
+  const { catalog, staleDays } = useLiveCatalog(boot.catalog, boot.catalogDownloadedAtMs);
+  /**
    * The pass alerts: what the phone allows, and the week's worth of
    * notifications queued against it.
    *
@@ -57,7 +65,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
    * `usePassAlerts`.
    */
   const alertAccess = usePassAlertAccess();
-  usePassAlerts({ catalog: boot.catalog, epochRef, access: alertAccess });
+  usePassAlerts({ catalog, epochRef, access: alertAccess });
   const orientation = useDeviceOrientation(boot.capabilities, boot.declinationDeg);
   // The one thing about the sensors this view renders from, and it renders only
   // when the platform regrades its compass — a handful of times a session
@@ -183,7 +191,7 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
     <View style={styles.root}>
       <SkyOverlay
         frame={frame}
-        catalog={boot.catalog}
+        catalog={catalog}
         epochRef={epochRef}
         attitude={attitude}
         enabledCategories={controls.enabledCategories}
@@ -210,15 +218,20 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
         onToggleSkyMaskFiltering={controls.toggleSkyMaskFiltering}
         celestialAlignment={controls.celestialAlignment}
         onToggleCelestialAlignment={controls.toggleCelestialAlignment}
-        // The one line only a phone can draw: what its own compass is worth.
-        // Handed to the overlay rather than drawn over it, so it is laid out
-        // with the compass strip and the card instead of on top of them.
+        // The lines only a phone draws: how old the orbits are, and what its
+        // own compass is worth — the compass last, directly above the strip it
+        // is about. Handed to the overlay rather than drawn over it, so they
+        // are laid out with the compass strip and the card instead of on top
+        // of them.
         notice={
-          <CompassNotice
-            accuracy={compass.accuracy}
-            declinationKnown={compass.declinationKnown}
-            skyFixStanding={skyFixStanding}
-          />
+          <View style={styles.notices}>
+            <CatalogNotice staleDays={staleDays} />
+            <CompassNotice
+              accuracy={compass.accuracy}
+              declinationKnown={compass.declinationKnown}
+              skyFixStanding={skyFixStanding}
+            />
+          </View>
         }
         sceneDebugSections={() => [
           deviceSensorSection({
@@ -252,6 +265,10 @@ export const DeviceScene: React.FC<Props> = ({ boot }) => {
 const styles = StyleSheet.create({
   root: {
     flex: 1
+  },
+  notices: {
+    gap: 8,
+    pointerEvents: "none"
   }
 });
 

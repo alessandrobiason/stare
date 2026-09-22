@@ -4,6 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Metrics, SafeAreaProvider } from "react-native-safe-area-context";
 import { CatalogScreen } from "../src/components/CatalogScreen";
+import { CatalogNotice } from "../src/components/CatalogNotice";
 import { CategoryLegend } from "../src/components/CategoryLegend";
 import { CompassNotice } from "../src/components/CompassNotice";
 import { FindInSky } from "../src/components/FindInSky";
@@ -613,6 +614,29 @@ describe("the compass notice", () => {
     expect(textOf(<CompassNotice accuracy={3} declinationKnown={false} skyFixStanding />)).toBe(
       ""
     );
+  });
+});
+
+describe("the out-of-date orbits notice", () => {
+  afterEach(() => setLocaleForTesting(undefined));
+
+  test("says nothing while the orbits are current", () => {
+    expect(textOf(<CatalogNotice staleDays={null} />)).toBe("");
+  });
+
+  test("says how old the orbits are, and that CelesTrak is being tried", () => {
+    const text = textOf(<CatalogNotice staleDays={30} />);
+    expect(text).toContain("Satellite orbits are out of date");
+    expect(text).toContain("30 days ago");
+    expect(text).toContain("CelesTrak");
+    expect(textOf(<CatalogNotice staleDays={1} />)).toContain("a day ago");
+  });
+
+  test("in the reader's language", () => {
+    setLocaleForTesting("it");
+    const text = textOf(<CatalogNotice staleDays={4} />);
+    expect(text).toContain("Orbite dei satelliti non aggiornate");
+    expect(text).toContain("4 giorni fa");
   });
 });
 

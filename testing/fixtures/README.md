@@ -13,7 +13,9 @@ longer ago that date was — SGP4 accuracy degrades over days, not months, so
 positions computed from this file are wrong by kilometres and getting worse, and
 objects launched or decayed since are respectively missing and still present.
 The app fetches its own catalog at runtime (`src/satellite/`, cached for two
-hours); nothing in the shipped product reads this file.
+hours); nothing in the shipped product reads this file. The offline fallback the
+app *does* ship is a separate copy, `src/data/bundledCatalog.json`, refreshed by
+`npm run bundle-tle`.
 
 Regenerate it by downloading the same endpoint the app uses:
 

@@ -193,6 +193,7 @@ something else.
 | `npm run e2e` | Playwright, against the replay harness |
 | `npm run mock-celestrak` | A local CelesTrak stand-in on `:8787`, serving a dated snapshot |
 | `npm run prepare-test-data` | Stages a recording from `TEST_DATA_DIR` |
+| `npm run bundle-tle` | Refreshes the catalogue shipped as the offline fallback — one CelesTrak request, refused within two hours of the last |
 | `npm run prebuild` | Regenerates `ios/` from `app.json` — a config check, not a build |
 
 No recording ships with the repo; stage your own, and see
@@ -213,7 +214,11 @@ what the harness substitutes and what it does not.
   against a 100 ms budget, which is why the tracker sweeps a slice per frame.
 - The first run downloads a 95 MB model — the bar under the name on the boot
   screen is that download's own byte progress — and the catalogue is cached for
-  two hours because that is CelesTrak's rate limit. The model and everything
+  two hours because that is CelesTrak's rate limit. When CelesTrak cannot be
+  reached the app opens on whichever is newer of its cache and the catalogue it
+  ships with (`src/data/bundledCatalog.json`, refreshed by `npm run bundle-tle`
+  before a release), says over the sky that the orbits are out of date once they
+  are more than a day old, and keeps retrying on the same throttle. The model and everything
   derived from it live in the cache directory, not in Documents: it is
   re-downloadable content, and iOS backs Documents up to iCloud. See the header
   of `src/vision/skyModel.ts`.

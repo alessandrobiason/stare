@@ -17,6 +17,7 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "mock-celestrak": "node testing/tools/mock-celestrak-server.mjs",
     "prepare-test-data": "node testing/tools/prepare-test-data.mjs",
+    "bundle-tle": "node tools/bundle-tle.mjs",
     "e2e": "playwright test",
     "measure-jitter": "node testing/tools/measure-jitter.mjs"
   },

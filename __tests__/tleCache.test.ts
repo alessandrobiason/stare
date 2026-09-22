@@ -1,11 +1,37 @@
 import {
+  TLE_CONNECT_TIMEOUT_MS,
   TLE_REFRESH_INTERVAL_MS,
   TLE_RETRY_INTERVAL_MS,
   TLE_USABLE_INTERVAL_MS
 } from "../src/constants";
+import { forgetBundledCatalogForTesting } from "../src/data/bundledCatalog";
 import { SAMPLE_TLE } from "../src/data/sampleTle";
-import { clearTleCache, loadActiveCatalog } from "../src/data/tleProvider";
+import {
+  clearTleCache,
+  loadActiveCatalog,
+  refreshStaleCatalog
+} from "../src/data/tleProvider";
 import { PersistentStore, setPersistentStoreForTesting } from "../src/data/tleStore";
+
+/**
+ * What the app ships with, in place of the real two-and-a-half megabytes.
+ *
+ * Dated before every clock these tests set, so that it only wins where there is
+ * no cache at all — unless a test moves it. Through getters, so the module the
+ * factory builds after a simulated restart (`jest.resetModules`) still reads
+ * whatever the test in hand set.
+ */
+let mockBundled: { downloadedAtMs: number; catalog: string } | null = null;
+jest.mock("../src/data/bundledCatalog.json", () => ({
+  get downloadedAtMs() {
+    if (!mockBundled) throw new Error("no bundled catalogue");
+    return mockBundled.downloadedAtMs;
+  },
+  get catalog() {
+    if (!mockBundled) throw new Error("no bundled catalogue");
+    return mockBundled.catalog;
+  }
+}));
 
 /** Stands in for the device's file system, and survives a simulated restart. */
 function fakeDevice() {
@@ -44,10 +70,13 @@ function clearMemoryOnly(): void {
 
 const body = `SAT ONE\n${SAMPLE_TLE.line1}\n${SAMPLE_TLE.line2}\n`;
 const otherBody = `SAT TWO\n${SAMPLE_TLE.line1}\n${SAMPLE_TLE.line2}\n`;
+const bundledBody = `SHIPPED SAT\n${SAMPLE_TLE.line1}\n${SAMPLE_TLE.line2}\n`;
 
 let device: ReturnType<typeof fakeDevice>;
 
 beforeEach(() => {
+  mockBundled = { downloadedAtMs: 500_000, catalog: bundledBody };
+  forgetBundledCatalogForTesting();
   device = fakeDevice();
   setPersistentStoreForTesting(device.store);
   clearTleCache();
@@ -249,10 +278,114 @@ test("a failed refresh is not retried on every call", async () => {
   expect(failing).toHaveBeenCalledTimes(2);
 });
 
-test("reports the bundled fallback when there is nothing cached at all", async () => {
+test("opens on the catalogue the app shipped with when there is nothing cached at all", async () => {
   jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 403 }));
-  // Boot treats this as a failure worth showing rather than a working app.
-  await expect(loadActiveCatalog()).resolves.toEqual({ tles: [SAMPLE_TLE], source: "bundled" });
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+
+  const opened = await loadActiveCatalog();
+  expect(opened.source).toBe("bundled");
+  expect(opened.tles.map((tle) => tle.name)).toEqual(["SHIPPED SAT"]);
+  // Dated by when it was downloaded for the build, not by when it was opened:
+  // that is what the view measures its age from.
+  expect(opened.downloadedAtMs).toBe(500_000);
+  // And nothing of it is written to the device, which already has the file.
+  expect(device.store.read()).toBeNull();
+});
+
+test("the shipped catalogue wins over an older cache", async () => {
+  respondWith(body);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+
+  // An app update that carries elements newer than the ones this device last
+  // managed to download.
+  mockBundled = { downloadedAtMs: 2_000_000, catalog: bundledBody };
+  forgetBundledCatalogForTesting();
+  jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000 + TLE_USABLE_INTERVAL_MS * 3);
+  const opened = await loadActiveCatalog();
+
+  expect(opened.source).toBe("bundled");
+  expect(opened.downloadedAtMs).toBe(2_000_000);
+});
+
+test("a failure is retried on the throttle even with nothing cached", async () => {
+  // The shipped catalogue is held in memory, and the attempt with it, so a view
+  // asking again and again does not become a request each time.
+  const failing = jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+  await loadActiveCatalog();
+  await expect(refreshStaleCatalog()).resolves.toBeNull();
+  expect(failing).toHaveBeenCalledTimes(1);
+
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000 + TLE_RETRY_INTERVAL_MS + 1);
+  await expect(refreshStaleCatalog()).resolves.toBeNull();
+  expect(failing).toHaveBeenCalledTimes(2);
+});
+
+test("a stale view gets fresh elements once CelesTrak answers again", async () => {
+  jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+
+  const later = 1_000_000 + TLE_RETRY_INTERVAL_MS + 1;
+  jest.spyOn(Date, "now").mockReturnValue(later);
+  respondWith(body);
+  const fresh = await refreshStaleCatalog();
+  expect(fresh).toMatchObject({ source: "network", downloadedAtMs: later });
+  expect(fresh?.tles[0].name).toBe("SAT ONE");
+  // Stored like any download, for the next launch.
+  expect(device.store.read()).toContain("SAT ONE");
+});
+
+test("a stale view is handed elements a background refresh already fetched", async () => {
+  const fetchMock = respondWith(body);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+  fetchMock.mockClear();
+
+  await expect(refreshStaleCatalog()).resolves.toMatchObject({
+    source: "cache",
+    downloadedAtMs: 1_000_000
+  });
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test("with nothing cached and nothing shipped there is no catalogue", async () => {
+  mockBundled = null;
+  forgetBundledCatalogForTesting();
+  jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+  await expect(loadActiveCatalog()).resolves.toEqual({
+    tles: [],
+    source: "none",
+    downloadedAtMs: 0
+  });
+});
+
+test("a server that never answers is given up on", async () => {
+  jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+  try {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.spyOn(globalThis, "fetch").mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        })
+    );
+
+    const opened = loadActiveCatalog();
+    await jest.advanceTimersByTimeAsync(TLE_CONNECT_TIMEOUT_MS);
+    await expect(opened).resolves.toMatchObject({ source: "bundled" });
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 test("a rejected download does not overwrite a good cache", async () => {

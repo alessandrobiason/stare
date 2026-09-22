@@ -13,7 +13,7 @@ import { CameraAttitude } from "../camera/attitude";
 import { localeReport } from "../i18n/locale";
 import { CelestialAlignmentStats } from "../hooks/useCelestialAlignment";
 import { sunAltitudeDeg } from "../coordinates/sunAltitude";
-import { CachedCatalog } from "../data/tleCache";
+import { BUNDLED_CATALOG_URL, CachedCatalog } from "../data/tleCache";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
 import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
@@ -509,11 +509,16 @@ export function catalogSection({ cache, nowMs }: CatalogDebugInput): DebugSectio
     title: "TLE",
     rows: [
       { label: "Satellites", value: cache.tles.length.toLocaleString() },
-      { label: "Size", value: bytes(cache.sizeBytes) },
+      // The shipped catalogue is held in memory without its text.
+      ...(cache.url === BUNDLED_CATALOG_URL ? [] : [{ label: "Size", value: bytes(cache.sizeBytes) }]),
       { label: "Downloaded", value: `${duration(age)} ago` },
       { label: "Last attempt", value: `${duration(sinceAttempt)} ago` },
       { label: "Next refresh", value: nextRefresh },
-      { label: "Source", value: cache.url, wrap: true }
+      {
+        label: "Source",
+        value: cache.url === BUNDLED_CATALOG_URL ? "Bundled with the app" : cache.url,
+        wrap: true
+      }
     ]
   };
 }

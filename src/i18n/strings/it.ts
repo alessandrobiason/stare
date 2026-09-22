@@ -210,6 +210,17 @@ export const it: Strings = {
         "è disegnato spostato della declinazione locale — pochi gradi quasi ovunque."
     }
   },
+  catalogNotice: {
+    stale: {
+      title: "Orbite dei satelliti non aggiornate",
+      detail:
+        "Stare non riesce a contattare CelesTrak, quindi usa orbite di {age} fa e i " +
+        "satelliti possono non essere dove sono disegnati. Continua a provare a " +
+        "contattare il server e le aggiornerà da sola."
+    },
+    oneDay: "un giorno",
+    days: "{days} giorni"
+  },
   boot: {
     failed: "Avvio non riuscito",
     tryAgain: "RIPROVA",

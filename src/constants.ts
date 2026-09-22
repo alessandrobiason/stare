@@ -1755,6 +1755,27 @@ export const TLE_RETRY_INTERVAL_MS = 15 * 60 * 1000;
 export const TLE_USABLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * How long a catalogue download may wait for CelesTrak to *answer* before it is
+ * given up on — the headers, not the whole body, which on a slow connection
+ * takes as long as it takes.
+ *
+ * Without it an unreachable server is waited out for as long as the platform
+ * cares to, which on a phone is a minute or more of boot screen in front of a
+ * cached or bundled catalogue the app could have opened on.
+ */
+export const TLE_CONNECT_TIMEOUT_MS = 15 * 1000;
+
+/**
+ * How often a running view checks whether the elements it is drawing have gone
+ * stale, and — when they have — asks for new ones.
+ *
+ * Asking is not downloading: `refreshStaleCatalog` answers from memory until
+ * `TLE_RETRY_INTERVAL_MS` has passed since the last attempt, so this sets how
+ * soon a notice appears and goes, and CelesTrak sees no more traffic for it.
+ */
+export const TLE_STALE_CHECK_INTERVAL_MS = 60 * 1000;
+
+/**
  * Shortest time the boot screen stays up on a cold start, in milliseconds.
  *
  * Boot's five steps race each other (`runBootSequence`), and a warm cache can

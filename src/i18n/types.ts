@@ -403,6 +403,19 @@ export type Strings = {
     magnetic: Notice;
   };
   /**
+   * The line over the sky when the orbits it is drawn from are out of date:
+   * CelesTrak could not be reached, and the app is on an old cache or on the
+   * catalogue it shipped with. See `CatalogNotice`.
+   */
+  catalogNotice: {
+    /** `{age}` in the detail is one of the two below. */
+    stale: Notice;
+    /** The age, when it is a single day. */
+    oneDay: string;
+    /** The age in whole days, when it is more than one. `{days}`. */
+    days: string;
+  };
+  /**
    * The boot screen: the one screen that is only ever read when something has
    * gone wrong, and so the one whose words have to be in the reader's language
    * most of all.

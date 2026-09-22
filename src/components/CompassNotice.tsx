@@ -1,8 +1,7 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
 import { COMPASS_ACCURACY } from "../constants";
 import { strings } from "../i18n";
-import { glass, theme } from "./theme";
+import { Notice, NoticeCard } from "./NoticeCard";
 
 type Props = {
   /** The platform's grade of its own compass, or `undefined` before the first heading. */
@@ -59,20 +58,8 @@ type Props = {
  */
 export const CompassNotice: React.FC<Props> = (props) => {
   const notice = noticeFor(props);
-  if (!notice) return null;
-
-  return (
-    <View style={styles.notice} accessibilityRole="alert">
-      <View style={styles.mark} />
-      <View style={styles.words}>
-        <Text style={styles.title}>{notice.title}</Text>
-        <Text style={styles.detail}>{notice.detail}</Text>
-      </View>
-    </View>
-  );
+  return notice ? <NoticeCard notice={notice} /> : null;
 };
-
-type Notice = { title: string; detail: string };
 
 function noticeFor({ accuracy, declinationKnown, skyFixStanding }: Props): Notice | null {
   // Nothing at all while the sky is aiming the view: both notices are about the
@@ -87,47 +74,5 @@ function noticeFor({ accuracy, declinationKnown, skyFixStanding }: Props): Notic
   if (!declinationKnown) return notices.magnetic;
   return null;
 }
-
-const styles = StyleSheet.create({
-  notice: {
-    // Nothing here is touchable, and it sits over the picture.
-    pointerEvents: "none",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.panel,
-    ...glass(theme.color.panelDeep, 20),
-    borderColor: "rgba(240, 198, 116, 0.35)"
-  },
-  /**
-   * The warning colour, as a bar down the side rather than as an outline.
-   *
-   * An amber border around a panel over a camera picture is a rectangle of
-   * colour on the sky; a bar is the same claim in a tenth of the ink, and it
-   * is the shape every notice on this platform wears.
-   */
-  mark: {
-    width: 3,
-    alignSelf: "stretch",
-    borderRadius: 2,
-    backgroundColor: theme.color.warning
-  },
-  words: {
-    flex: 1
-  },
-  title: {
-    color: theme.color.warning,
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  detail: {
-    marginTop: 3,
-    color: theme.color.textDim,
-    fontSize: 11,
-    lineHeight: 15
-  }
-});
 
 export default CompassNotice;
