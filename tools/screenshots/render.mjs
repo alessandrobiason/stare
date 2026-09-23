@@ -34,9 +34,9 @@
  * system sans is used if that fetch fails.
  */
 
-import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -46,8 +46,8 @@ import {
 } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
 import scenes from "./scenes.mjs";
+import { loadFromSource as loadTsModule } from "./tsModule.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -57,27 +57,8 @@ const backgrounds = join(here, "backgrounds");
 
 /* ---- The language this run is drawing. ----------------------------------- */
 
-/**
- * Reads a TypeScript module out of `src/` and hands back what it exports.
- *
- * The app's strings are `.ts`, this tool is `.mjs`, and the two have to meet
- * somewhere. They meet here rather than in a copy of the strings, because the
- * whole reason to reach into `src/` is that a second copy would be free to be
- * wrong. Every file this loads is a plain object literal behind an
- * `import type`, so stripping the types leaves runnable JavaScript and no
- * bundler is needed — `transpileModule` does not typecheck, which is what
- * `npm run typecheck` is for.
- */
-async function loadFromSource(relative) {
-  const file = join(root, relative);
-  const js = ts.transpileModule(readFileSync(file, "utf8"), {
-    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-    fileName: file
-  }).outputText;
-  // Imports inside the transpiled text resolve against this data URL, which has
-  // no directory, so anything the strings reach for has to be a type. They are.
-  return import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
-}
+/** The app's own modules, read out of `src/`. See `tsModule.mjs`. */
+const loadFromSource = (relative) => loadTsModule(join(root, relative));
 
 /**
  * The languages the app has interface text for, which is the directory listing
@@ -100,6 +81,12 @@ const locale = (() => {
   }
   return asked;
 })();
+
+/**
+ * Where `capture.mjs` leaves its photographs of the running app, for this
+ * language. Keep the two in step.
+ */
+const captures = join(here, ".capture", locale);
 
 /** What the app says, in that language. */
 const { [locale]: t } = await loadFromSource(`src/i18n/strings/${locale}.ts`);
@@ -208,6 +195,25 @@ const VIEWPORT = {
 /** How wide the phone sits in the frame, and the scale that follows from it. */
 const SCREEN_IN_FRAME_PX = 1090;
 const DEVICE_SCALE = SCREEN_IN_FRAME_PX / SCREEN.width;
+
+/** Screen points to frame pixels, which is how every part of the phone is sized. */
+const pt = (points) => Math.round(points * DEVICE_SCALE);
+
+/*
+ * The body around the display: a titanium rail and the black bezel inside it.
+ *
+ * Both are thinner than they look on a real phone and deliberately so — what
+ * the eye reads as "a phone" is the corner radius and the island, and a fat
+ * bezel at this scale reads as a case.
+ */
+const RAIL_PX = pt(2.6);
+const BEZEL_PX = pt(4.2);
+const RADIUS = { screen: pt(55), bezel: pt(59.2), rail: pt(61.8) };
+
+const DEVICE_WIDTH = SCREEN_IN_FRAME_PX + 2 * (RAIL_PX + BEZEL_PX);
+const DEVICE_HEIGHT = Math.round(SCREEN.height * DEVICE_SCALE) + 2 * (RAIL_PX + BEZEL_PX);
+/** Chosen so the screen itself still starts where it always did. */
+const DEVICE_TOP = 402 - (RAIL_PX + BEZEL_PX);
 
 /*
  * The headless shell first, and it matters which.
@@ -772,6 +778,67 @@ render();
 
 /* ---- The store frame around it. ------------------------------------------ */
 
+/**
+ * The scenes as the harness knows them, for the one thing the store frame needs
+ * from that side: what a clock in that place would read at the instant the sky
+ * was drawn for. See `ShotScene.clock`.
+ */
+const { SHOT_SCENES } = await loadTsModule(join(root, "testing/screenshots/scenes.ts"));
+
+const clockFor = (scene) =>
+  SHOT_SCENES.find((shot) => shot.id === scene.id)?.clock ?? "9:41";
+
+/**
+ * Every frame is square-on, and that is a quality decision as much as a taste
+ * one.
+ *
+ * Turning the phone in 3-D was tried and dropped. It looked cheap at this size,
+ * and it cost sharpness outright: a rotated, scaled element means the browser
+ * resamples the screen image instead of drawing it pixel for pixel, which is
+ * exactly what the rest of this pipeline is arranged to avoid. Square-on, the
+ * capture lands 1:1 — see `assertNativeSize`.
+ */
+
+/**
+ * Fails if a captured screen is not exactly the size the frame lays it in.
+ *
+ * The whole pipeline is built so the phone screen is rasterised once, at the
+ * size it is shown, and never resampled: the browser captures at a device scale
+ * factor of 1090/430 rather than the phone's 3, and the frame then draws that
+ * image at its own pixel size. A capture of any other size still *works* — the
+ * browser will scale it and the text goes soft — so nothing would fail, and the
+ * listing would quietly get blurrier. Hence this.
+ */
+function assertNativeSize(file) {
+  const png = readFileSync(file);
+  // IHDR is the first chunk: width and height as big-endian 32-bit, at byte 16.
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  const wanted = { width: SCREEN_IN_FRAME_PX, height: Math.round(SCREEN.height * DEVICE_SCALE) };
+  if (width !== wanted.width || height !== wanted.height) {
+    throw new Error(
+      `${relative(root, file)} is ${width}x${height}, and the frame lays it in at ` +
+        `${wanted.width}x${wanted.height}. Scaling it would soften the panels; ` +
+        "recapture instead (the device scale factor in capture.mjs has to match DEVICE_SCALE here)."
+    );
+  }
+}
+
+/**
+ * The right-hand end of the status bar: signal, wi-fi, battery.
+ *
+ * Drawn here rather than captured, because they are the operating system's and
+ * a browser has none of them. Everything to the left of them — the whole of the
+ * app — is the capture.
+ */
+function statusIcons() {
+  const h = pt(11);
+  return `
+<svg width="${pt(18)}" height="${h}" viewBox="0 0 18 11" fill="#fff"><rect x="0" y="7.5" width="3" height="3.5" rx="1"/><rect x="5" y="5" width="3" height="6" rx="1"/><rect x="10" y="2.5" width="3" height="8.5" rx="1"/><rect x="15" y="0" width="3" height="11" rx="1"/></svg>
+<svg width="${pt(16)}" height="${h}" viewBox="0 0 16 11" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1 3.6a10 10 0 0 1 14 0"/><path d="M3.6 6.4a6.3 6.3 0 0 1 8.8 0"/><circle cx="8" cy="9.4" r="1.1" fill="#fff" stroke="none"/></svg>
+<svg width="${pt(27)}" height="${h}" viewBox="0 0 27 13" fill="none"><rect x="0.6" y="0.6" width="22" height="11.8" rx="3.4" stroke="#fff" stroke-opacity="0.55" stroke-width="1.2"/><rect x="2.2" y="2.2" width="16" height="8.6" rx="2.2" fill="#fff"/><path d="M24.4 4.6v3.8a2.2 2.2 0 0 0 0-3.8z" fill="#fff" fill-opacity="0.6"/></svg>`;
+}
+
 function frameHtml(scene, index, faces, screenPng) {
   return `<!doctype html>
 <html lang="en">
@@ -812,19 +879,94 @@ body {
   letter-spacing: -0.1px;
   color: rgba(216, 228, 237, 0.62);
 }
+/*
+ * The phone.
+ *
+ * Three concentric rounded rectangles — the rail, the black bezel and the
+ * display — plus the chrome that sits over the display: the Dynamic Island, the
+ * status bar and the home indicator. Without them the frame is a screenshot
+ * with rounded corners, which does not read as a phone at all; the black pill
+ * at the top is the single detail that makes it one.
+ *
+ * Everything is in points off a 430 x 932 screen, scaled by DEVICE_SCALE, so
+ * the proportions are the phone's: a 55pt display radius, a 125 x 36.7pt
+ * island 11pt down, a 140 x 5pt home indicator 8pt up, and the status bar in
+ * the 59pt the app itself is inset by (SAFE.top, which the capture is laid out
+ * against — see testing/screenshots/ShotApp.tsx).
+ */
 .device {
   position: absolute;
   left: 50%;
-  top: 402px;
-  width: ${SCREEN_IN_FRAME_PX}px;
-  height: ${Math.round(SCREEN.height * DEVICE_SCALE)}px;
-  margin-left: -${SCREEN_IN_FRAME_PX / 2}px;
-  border-radius: 139px;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 60px 140px rgba(0, 0, 0, 0.55), 0 0 120px rgba(88, 132, 190, 0.14);
+  top: ${DEVICE_TOP}px;
+  width: ${DEVICE_WIDTH}px;
+  height: ${DEVICE_HEIGHT}px;
+  margin-left: -${DEVICE_WIDTH / 2}px;
+  border-radius: ${RADIUS.rail}px;
+  /* The titanium band. A flat gradient rather than an extruded edge: under the
+     small rotations used here it reads as the rail and costs nothing. */
+  background: linear-gradient(115deg, #e8ecf1 0%, #9aa3ad 18%, #5d656e 46%, #b9c1c9 78%, #6f777f 100%);
+  padding: ${RAIL_PX}px;
+  box-shadow:
+    0 70px 150px rgba(0, 0, 0, 0.6),
+    0 0 130px rgba(88, 132, 190, 0.16);
 }
-.device img { display: block; width: 100%; height: 100%; }
+.bezel {
+  width: 100%;
+  height: 100%;
+  border-radius: ${RADIUS.bezel}px;
+  background: #05070a;
+  padding: ${BEZEL_PX}px;
+}
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: ${RADIUS.screen}px;
+  overflow: hidden;
+  background: #000;
+}
+.screen img { display: block; width: 100%; height: 100%; }
+.island {
+  position: absolute;
+  left: 50%;
+  top: ${pt(11)}px;
+  width: ${pt(125)}px;
+  height: ${pt(36.7)}px;
+  margin-left: -${pt(125) / 2}px;
+  border-radius: ${pt(18.4)}px;
+  background: #000;
+}
+.status {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: ${pt(SAFE.top)}px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: ${pt(14)}px ${pt(26)}px 0;
+  color: #fff;
+}
+.status .clock {
+  font-size: ${pt(17)}px;
+  font-weight: 600;
+  letter-spacing: ${pt(0.3)}px;
+  /* The ear is narrower than the island is wide; the time sits centred in it. */
+  width: ${pt(96)}px;
+  text-align: center;
+}
+.status .icons { display: flex; align-items: center; gap: ${pt(7)}px; }
+.home {
+  position: absolute;
+  left: 50%;
+  bottom: ${pt(8)}px;
+  width: ${pt(140)}px;
+  height: ${pt(5)}px;
+  margin-left: -${pt(140) / 2}px;
+  border-radius: ${pt(2.5)}px;
+  background: rgba(255, 255, 255, 0.86);
+}
 </style>
 </head>
 <body>
@@ -833,7 +975,19 @@ body {
   <h1>${escape(caption(scene).title)}</h1>
   <p>${escape(caption(scene).body)}</p>
 </div>
-<div class="device"><img src="data:image/png;base64,${screenPng}" alt=""></div>
+<div class="device">
+  <div class="bezel">
+    <div class="screen">
+      <img src="data:image/png;base64,${screenPng}" alt="">
+      <div class="status">
+        <span class="clock">${escape(clockFor(scene))}</span>
+        <span class="icons">${statusIcons()}</span>
+      </div>
+      <div class="island"></div>
+      <div class="home"></div>
+    </div>
+  </div>
+</div>
 <script>
 /*
  * A night in the app's own blues: a radial grade with a thin scatter of stars,
@@ -908,16 +1062,30 @@ function main() {
   scenes.forEach((scene, index) => {
     // The phone first, at the scale the phone itself draws at, and then the
     // store's frame with that image laid into it.
-    const screenPage = join(build, `screen-${scene.id}.html`);
+    //
+    // A capture from the running app is used where there is one
+    // (`capture.mjs`), and the drawn mirror below is the fallback for a run
+    // with no dev server — a caption tweak, say. The two are not equal in
+    // standing: the capture is the app, the mirror is a picture of it that only
+    // stays true while somebody maintains it. See `docs/app-store-screenshots.md`.
     const screenPng = join(build, `screen-${scene.id}.png`);
-    writeFileSync(screenPage, screenHtml(scene, faces));
-    shoot({
-      page: screenPage,
-      out: screenPng,
-      width: SCREEN.width,
-      height: SCREEN.height,
-      scale: DEVICE_SCALE
-    });
+    const captured = join(captures, `${scene.id}.png`);
+
+    if (existsSync(captured)) {
+      assertNativeSize(captured);
+      copyFileSync(captured, screenPng);
+    } else {
+      console.log(`  ${scene.id}: no capture, drawing the mirror instead`);
+      const screenPage = join(build, `screen-${scene.id}.html`);
+      writeFileSync(screenPage, screenHtml(scene, faces));
+      shoot({
+        page: screenPage,
+        out: screenPng,
+        width: SCREEN.width,
+        height: SCREEN.height,
+        scale: DEVICE_SCALE
+      });
+    }
 
     const framePage = join(build, `frame-${scene.id}.html`);
     writeFileSync(

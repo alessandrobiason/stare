@@ -1,10 +1,15 @@
 # App Store screenshots
 
 Six frames for the iPhone listing, one set per storefront language, and the
-generator that draws them: `docs/app-store/`, from `tools/screenshots/`.
+pipeline that makes them: `docs/app-store/`, from `tools/screenshots/`.
 
-    node tools/screenshots/render.mjs              # docs/app-store/
-    node tools/screenshots/render.mjs --locale it  # docs/app-store/it/
+    npm run screenshots                            # docs/app-store/
+    npm run screenshots -- --locale it             # docs/app-store/it/
+
+That is two steps, and they can be run apart:
+
+    node tools/screenshots/capture.mjs   # photograph the running app
+    node tools/screenshots/render.mjs    # lay the captions around it
 
 Output is **1290 × 2796**, which App Store Connect takes for the 6.9 and
 6.7-inch classes and scales down for every size below them. Nothing else has to
@@ -24,13 +29,26 @@ The rest of the listing — the names, the keywords, the description, the age
 rating, the trader status, the privacy answers and the note to App Review — is
 [docs/app-store-listing.md](app-store-listing.md).
 
-**The camera picture in these frames is drawn, not photographed.** Everything
-laid over it is the app: the panels are the app's own styles at the app's own
-sizes, and the markers come from a transcription of `markerScene.ts`, so a mark
-is the size, shape, glow and edge the phone would give an object at that range,
-and a landmark's path is the line, the weight and the minute marks the app would
-draw along the arc that object is on. What no machine here can produce is a
-photograph of the sky with a building in it. See
+**The phone screen in these frames is the app, photographed.** Not a drawing of
+it: the web build is booted against a real photograph at a fixed place and
+instant, driven through real taps, and screenshotted. The marks are where the
+app's own SGP4 puts them, the counts are what it counted, the briefing is the
+one it would show, and the marks behind a building are missing because the app's
+own segmentation model looked at that photograph and cut them out. A change to a
+panel changes these frames, which is the whole point — see
+[How a frame is built](#how-a-frame-is-built) and
+[Keeping them current](#keeping-them-current).
+
+It was not always so. Until this pipeline existed the screen was drawn by a
+second implementation of the app's panels in HTML and CSS, which had to be
+edited by hand whenever the app changed and silently advertised the old app
+whenever nobody did. That mirror is still in the tree as a fallback for a run
+with no dev server, and it is not equal in standing to a capture.
+
+**The sky behind the marks is a real photograph, and it is somebody else's.**
+Six stock photographs, listed with their sources in
+`tools/screenshots/backgrounds.mjs` and fetched rather than committed. They are
+not captures from the phone the app runs on — see
 [What is still needed](#what-is-still-needed).
 
 ## The six, and why they are these six
@@ -68,16 +86,109 @@ screen's own wording (`src/i18n/strings/en.ts`).
 
 ## How a frame is built
 
-Two passes, in `tools/screenshots/render.mjs`:
+Two passes, and they are two different programs:
 
-1. **The phone screen**, laid out at 430 × 932 points and rasterised at the
-   device scale factor a 6.9-inch iPhone has, so the panels are drawn at the
-   size the phone draws them rather than being drawn small and scaled up.
-2. **The store frame** around it: the caption, the night the boot screen is
-   drawn on, and that image laid in.
+1. **The phone screen** — `tools/screenshots/capture.mjs`. It starts the mock
+   CelesTrak server and Metro, opens the web build at `/?shot=<scene id>` in
+   Chromium sized to a 6.9-inch iPhone, waits for the app to boot, presses
+   whatever that scene is about, waits for the picture to stop changing, and
+   saves the screen to `.capture/<locale>/<id>.png`.
+2. **The store frame** around it — `tools/screenshots/render.mjs`. The caption,
+   the night the boot screen is drawn on, the phone, and that image laid into
+   it. It uses the capture when there is one and falls back to the drawn mirror
+   when there is not.
 
-The layout inside the screen is the app's, and reproduces three things that
-are easy to get wrong by eye:
+The browser is set to a device scale factor of 1090/430, not the phone's 3, so
+the screen is rasterised once at exactly the size the store frame lays it in
+rather than being resampled on the way.
+
+### The phone around the screen
+
+A screenshot with rounded corners does not read as a phone. What the second pass
+draws around it: a titanium rail, a black bezel, a 55-point display radius, the
+Dynamic Island, the home indicator, and a status bar whose clock is the scene's
+own local time rather than Apple's 9:41 — a night sky under a morning clock is
+the kind of detail that makes a listing look assembled.
+
+**All six are square-on.** Turning the phone a few degrees in 3-D, the way a lot
+of App Store pages do, was tried and dropped: it looked cheap at this size, and
+it softened the panels, because a rotated and scaled element is one the browser
+resamples rather than drawing pixel for pixel. Square-on, the capture lands 1:1
+— `assertNativeSize` in `render.mjs` fails the run if it ever stops doing so,
+since a resampled screen still renders and simply looks worse.
+
+The chrome is drawn over the capture rather than inside it, because it is the
+operating system's and a browser has none of it. For it to land in empty space
+rather than over the app's own controls, the capture has to be laid out as the
+phone lays it out — so the harness forces the 6.9-inch safe area (59 points at
+the top, 34 at the bottom) instead of the zeroes a browser window reports. See
+`IPHONE_INSETS` in `testing/screenshots/ShotApp.tsx`.
+
+### What the app is given
+
+The harness lives in `testing/screenshots/` and is the third scene in the
+codebase, beside the phone's (`DeviceScene`) and the replay's (`ReplayScene`).
+Like them it owns nothing on screen: everything visible is `SkyOverlay`. What
+it supplies is the four things a scene is:
+
+- **A place and an instant** (`OrbitEpoch`), held still. Nothing advances, which
+  is what makes two runs produce the same pixels.
+- **A bearing**, published as a fixed attitude reading. A scene that names a
+  target resolves it through the app's own tracker first, so the object lands in
+  the middle of the frame.
+- **A photograph** where the camera preview goes, laid into the camera's own 3:4
+  box with `object-fit: cover` exactly as the phone fills it.
+- **The same pixels, to the segmenter.** `stillFrameGrabber` reproduces that
+  cover crop when it reads the image, so the mask lines up with what is on
+  screen. Read the whole file instead and every mask boundary lands in the wrong
+  place.
+
+Everything else — the projection, the marker sizes, the tails, the palette, the
+counts, the passes, the wording — is the app, unmodified.
+
+### Which way to point, which is measured rather than reasoned
+
+How full a frame looks depends on where it is pointed, and the answer is not
+something to work out on paper. Three things bear on it at once:
+
+- **The sky is not evenly populated.** From these latitudes the geostationary
+  belt is an arc across the south at about 30 degrees up. A frame pointed into
+  it is worth three times one pointed north-west.
+- **Most of the camera frame is off the screen.** The picture covers a
+  430-point-wide screen with a 699-point-wide frame, so a third of the width is
+  lost off the sides, and the count is measured against what is left
+  (`viewport` in `useAnimatedMarkers`).
+- **The mask takes out whatever is behind the terrain** in that particular
+  photograph, which is different for every scene.
+
+Two attempts to model that were both wrong by an order of magnitude — the first
+set of bearings came back drawing between one and forty marks. So the app is
+asked instead:
+
+    node tools/screenshots/probe-aims.mjs 01-sky --az 90,120,150,180 --el 12,20,30
+
+It turns the running view through a grid of bearings and prints the count the
+header publishes at each. The figures on each scene in `scenes.ts` came from it,
+and it is how to move one. It needs a dev server up, which `capture.mjs` leaves
+behind if you interrupt it.
+
+### The scenes, and why their times are what they are
+
+`testing/screenshots/scenes.ts` holds them. The times were found by search, not
+picked, and three things constrain each one: the TLE fixture's own epoch
+(2026-08-23 — SGP4 drifts badly away from it), the sun's altitude at that place
+(the app colours the sky by it, so a night photograph needs a dark sky), and
+whether the thing being shown is actually happening. The station in `02-tap` is
+40° up in a sky 5° past sunset, which is the window a satellite is really
+visible in; CHEOPS in `06-pass` is eight minutes from rising, which is why there
+is no mark for it and a countdown instead.
+
+### The drawn mirror, which is now the fallback
+
+`render.mjs` still carries the hand-written HTML and CSS reproduction of the
+panels (`page/screen.css`, `page/markers.js`, `page/sky.js`, and the panel
+builders in `render.mjs` itself), and uses it for any scene with no capture. It
+reproduces things that are easy to get wrong by eye:
 
 - The picture is the camera's own 3:4 box **covering** the screen
   (`frameBoxFor`), not fitted into it — so it is 699 × 932 points, centred, with
@@ -127,7 +238,49 @@ Where the numbers come from, if a frame has to be argued about:
 | Every word on screen | `src/i18n/strings/en.ts` |
 | The ISS briefing and its link | `src/satellite/briefing.ts` |
 
+## Keeping them current
+
+The frames are photographs of the app, so they go stale when the app moves.
+`.github/workflows/screenshots.yml` is what notices:
+
+- **A push that changes the view** — `src/components/`, `src/i18n/strings/`,
+  `src/constants.ts` or the pipeline itself — regenerates the frames on Linux,
+  attaches them to the run as an artifact, and fails if they differ from what is
+  committed. That is a prompt to look at them, not a verdict: browsers do not
+  rasterise identically across machines.
+- **A manual run with `commit: true`** regenerates them and pushes the result.
+  That is how the listing is actually updated, once somebody has looked.
+
+Committing six 2 MB PNGs on every interface tweak would bloat the history, which
+is why the automatic half stops at telling you.
+
+The staging in `capture.mjs` presses the app's own controls, found by the
+accessibility labels the app publishes — the same surface
+`testing/e2e/replay.spec.ts` drives. A control that is renamed or moved fails
+the capture rather than quietly producing last month's picture.
+
 ## Editing them
+
+- **The scenes**: `testing/screenshots/scenes.ts` — where the phone is standing,
+  when, where it is pointing, and which panel to open. Read the note at the top
+  of that file before moving a time.
+- **The photographs**: `tools/screenshots/backgrounds.mjs` — the list of six and
+  where each came from. Drop a different file at `backgrounds/<scene id>.jpg`
+  and update its entry. Portrait, and at least 2100 × 2800.
+
+  **Swapping one in is not a cosmetic change, and two of the six proved it.** A
+  photograph of a tower that filled the frame left the mask nothing to do and
+  the capture read "0 visible satellites". A dark long-exposure Milky Way shot
+  was read by the segmentation model as terrain rather than sky, and the same
+  scene at the same instant drew two marks where another photograph drew 111.
+  Both are written up in `backgrounds.mjs`. After a swap, run `probe-aims.mjs`
+  and look at the number before believing the frame.
+- **The captions**: `tools/screenshots/scenes.mjs`, which still holds the words
+  around the frame in each language.
+
+### Editing the fallback mirror
+
+Only worth doing if the mirror is still being used for something:
 
 - **The story**: `tools/screenshots/scenes.mjs` — one entry per frame, holding
   the caption in each language, the sky, the markers on it, the landmark paths
@@ -153,37 +306,39 @@ Where the numbers come from, if a frame has to be argued about:
 
 Ranked by what each is worth.
 
-1. **Real camera captures behind the markers.** Six stills from the phone the
-   app is built for, one per frame: a night sky over a street, the same with a
-   tall building crossing the upper half (frame 3 lives or dies on this), a
-   bright daylit sky with a roof line at the bottom (frame 4), and three more
-   night skies — one of them with the horizon low enough to put a rise point
-   over the rooftops (frame 6). Portrait, from the rear wide camera, and framed as the app
-   frames it — mostly sky, the horizon in the bottom quarter. Only the middle
-   third of the width is on screen, so whatever the frame is about belongs
-   there. Drop them in
+1. **Captures from the phone, behind the markers.** The six photographs are
+   real, but they are stock: taken by other people, with other cameras, at
+   places the app was not being held up in. Six stills from the phone the app is
+   built for would be better on every count — the framing would be the app's own
+   (mostly sky, the horizon in the bottom quarter, and only the middle third of
+   the width on screen), and frame 3 would be proving the occlusion against a
+   building somebody actually stood under. Drop them in
    `tools/screenshots/backgrounds/` named after the scene (`03-occlusion.jpg`)
-   and they replace the drawn sky with nothing else changed.
-2. **Or, better, six real screenshots.** A TestFlight build on a phone, the
-   sky in front of it, and the volume-down + side-button capture: then the
-   frames are the app rather than a drawing of it, and the generator only lays
-   the caption around them. That needs a build on a device and a clear evening;
-   it is the honest version of frames 1, 2 and 5, and the only version of frame
-   3 that proves anything.
+   and the next capture uses them with nothing else changed.
+2. **Somewhere to put the observer that matches them.** A photograph swapped in
+   needs its scene's place, time and bearing moved with it, or the app will be
+   drawing the sky of one location over a photograph of another. That is the
+   note at the top of `testing/screenshots/scenes.ts`.
 3. **A 30-second preview video.** Optional, and hard to shoot honestly for
-   this app for the same reason the frames are: it wants a real sky. Worth
+   this app for the same reason the frames were: it wants a real sky. Worth
    doing only once there is one.
 
-Two things that used to be on this list are done. The captions exist in both
+Three things that used to be on this list are done. The captions exist in both
 languages the app speaks, and so does everything else on the frame — a
-storefront gets its own set from `--locale`. And the marketing name is
-settled: the record is "Stare - Watch the Satellites", with the subtitle and
-keywords written out in
-[docs/app-store-listing.md](app-store-listing.md).
+storefront gets its own set from `--locale`. The marketing name is settled: the
+record is "Stare - Watch the Satellites", with the subtitle and keywords written
+out in [docs/app-store-listing.md](app-store-listing.md). And the phone screen
+is no longer a drawing.
 
 ## What a reviewer will ask
 
-Apple's guideline is that screenshots show the app in use. Frames drawn with a
-synthetic sky are a risk under that rule if they are shipped as they stand —
-the panels are real, the marks are real, but the photograph is not. Ship real
-captures behind them (1 or 2 above) before the listing goes to review.
+Apple's guideline is that screenshots show the app in use, and the screen in
+these frames now is: the app, running, photographed. The panels, the marks, the
+counts and the briefing are what it produced from the real catalogue at the
+instant each scene names.
+
+What is not from a phone is the picture behind the marks, which is a stock
+photograph rather than a camera frame. That is a weaker claim than it was but
+not nothing — a frame is still saying "this is what you would see", and what
+somebody would see through their own camera is their own street. Item 1 above
+is the fix, and it needs a build on a device and a clear evening.

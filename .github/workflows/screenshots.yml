@@ -1,0 +1,158 @@
+# Regenerates the App Store screenshots from the app itself.
+#
+# The store frames are photographs of the running app (see
+# `docs/app-store-screenshots.md`), which means they go stale the moment a panel
+# moves. This is the thing that notices. It boots the web build against the
+# committed TLE fixture and six still photographs, drives it through real taps,
+# screenshots each scene and lays the captions around them.
+#
+# Linux, about ten minutes, 1x — nothing here touches macOS or Apple. The two
+# slow parts are Metro's first bundle and the 95 MB segmentation model, and the
+# model is cached between runs.
+#
+# **Two triggers, and they do different things on purpose:**
+#
+#   * a push that changes the view (`paths` below) regenerates the frames and
+#     uploads them as an artifact, then fails if they differ from what is
+#     committed. That is the "your change moved the store listing" signal, and
+#     it costs the repository nothing: six 2 MB PNGs committed on every UI tweak
+#     would bloat the history fast.
+#   * a manual run with `commit: true` regenerates them and pushes the result.
+#     That is how the listing is actually updated, when somebody has looked at
+#     the frames and wants them.
+#
+# Rendering is not bit-exact across machines — fonts and the browser's
+# rasteriser differ — so the staleness check is deliberately run only against
+# this runner image, and a diff it reports is a prompt to look, not a verdict.
+
+name: App Store screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Push the regenerated frames to this branch'
+        type: boolean
+        default: false
+      locale:
+        description: 'Which storefront language to draw'
+        type: string
+        default: en
+  push:
+    branches: [main]
+    paths:
+      # What the frames are pictures of: the view, the words on it, and the
+      # figures the marks are drawn from.
+      - 'src/components/**'
+      - 'src/i18n/strings/**'
+      - 'src/constants.ts'
+      # And the pipeline itself.
+      - 'testing/screenshots/**'
+      - 'tools/screenshots/**'
+      - '.github/workflows/screenshots.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+
+jobs:
+  screenshots:
+    name: capture + compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      # Only the manual commit path writes; a push run reports and stops.
+      contents: ${{ inputs.commit && 'write' || 'read' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      # --legacy-peer-deps as in check.yml: the onnxruntime and react 19 peer
+      # ranges do not resolve without it.
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # The photographs behind the marks are not committed — see
+      # tools/screenshots/backgrounds.mjs — so they are fetched, and kept
+      # between runs because they never change.
+      - name: Cache the background photographs
+        uses: actions/cache@v4
+        with:
+          path: tools/screenshots/backgrounds
+          key: screenshot-backgrounds-${{ hashFiles('tools/screenshots/backgrounds.mjs') }}
+
+      - name: Fetch the background photographs
+        run: node tools/screenshots/backgrounds.mjs
+
+      # Boot will not finish without the segmentation model, and fetching 95 MB
+      # from Hugging Face on every run is the slowest thing here by far.
+      - name: Cache the sky model
+        id: model
+        uses: actions/cache@v4
+        with:
+          path: public/skywater.onnx
+          key: skywater-model-${{ hashFiles('src/vision/skyModelSource.ts') }}
+
+      - name: Fetch the sky model
+        if: steps.model.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p public
+          url=$(node -e "process.stdout.write(require('fs').readFileSync('src/vision/skyModelSource.ts','utf8').match(/\"(https:[^\"]+\.onnx)\"/)[1])")
+          echo "fetching $url"
+          curl -sSL --retry 3 -o public/skywater.onnx "$url"
+
+      - name: Capture the app and compose the frames
+        run: |
+          node tools/screenshots/capture.mjs --locale "${{ inputs.locale || 'en' }}"
+          node tools/screenshots/render.mjs --locale "${{ inputs.locale || 'en' }}"
+
+      - name: Upload the frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-store-screenshots-${{ inputs.locale || 'en' }}
+          path: docs/app-store/**/*.png
+          if-no-files-found: error
+
+      - name: Push them
+        if: inputs.commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add docs/app-store
+          if git diff --cached --quiet; then
+            echo "The frames are unchanged; nothing to push."
+            exit 0
+          fi
+          git commit -m 'chore: regenerate the App Store screenshots from the app'
+          git push
+
+      - name: Say whether the listing has drifted
+        if: '!inputs.commit'
+        run: |
+          if git diff --quiet -- docs/app-store; then
+            echo "The committed frames still match the app." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### The App Store frames no longer match the app"
+            echo
+            echo "This change moved something the store listing shows. The regenerated"
+            echo "frames are attached to this run as an artifact — look at them, and if"
+            echo "they are what you want, run this workflow by hand with \`commit: true\`."
+            echo
+            git diff --stat -- docs/app-store
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
