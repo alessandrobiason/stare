@@ -3,6 +3,8 @@
  *
  *     node tools/screenshots/capture.mjs [--locale it] [--only 03-occlusion]
  *
+ * Every language the app speaks, unless one is named with --locale.
+ *
  * This is the first of the two passes behind the store frames, and it is the
  * one that used to be a lie. The phone screen was drawn by a second
  * implementation of the app's panels in HTML and CSS
@@ -24,8 +26,8 @@
  */
 
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import { backgroundPath, ensureBackgrounds } from "./backgrounds.mjs";
@@ -43,13 +45,33 @@ const flag = (name, fallback = null) => {
   return at === -1 ? fallback : process.argv[at + 1];
 };
 
-const locale = flag("locale", "en");
+/**
+ * Every language the app has interface text for — the directory listing, as in
+ * `render.mjs`.
+ *
+ * All of them, in one run, by default. The expensive parts of a capture are
+ * Metro's first bundle and the model, and both are paid once however many
+ * languages come out of it; running the tool twice paid them twice, and the
+ * listing that came out was half captured from the app and half drawn by the
+ * old mirror, which is where the two sets' marker colours went out of step.
+ */
+const LOCALES = readdirSync(join(root, "src", "i18n", "strings"))
+  .filter((file) => extname(file) === ".ts")
+  .map((file) => file.replace(/\.ts$/, ""));
+
+const locales = (flag("locale") ?? LOCALES.join(",")).split(",").map((one) => one.trim());
+for (const one of locales) {
+  if (!LOCALES.includes(one)) {
+    throw new Error(`no such locale: ${one} (the app speaks ${LOCALES.join(", ")})`);
+  }
+}
+
 const only = flag("only");
 const scenes = only ? SHOT_SCENES.filter((scene) => scene.id === only) : SHOT_SCENES;
 if (!scenes.length) throw new Error(`no scene called ${only}`);
 
-/** Where `render.mjs` looks for the captured screens. Keep the two in step. */
-const screensDir = join(here, ".capture", locale);
+/** Where `render.mjs` looks for a language's captured screens. Keep the two in step. */
+const screensDir = (locale) => join(here, ".capture", locale);
 
 /*
  * The phone screen, in points and in pixels.
@@ -162,6 +184,32 @@ function stagePhotos(ids) {
 /* ---- Driving the app. ---------------------------------------------------- */
 
 /**
+ * The handles the staging presses, in the language the app is about to speak.
+ *
+ * Read out of `src/i18n/strings/<locale>.ts` rather than written down here,
+ * because they are the app's own accessibility labels and an Italian app
+ * publishes Italian ones: `Catalogo`, `satelliti visibili`, `MOSTRA TUTTO`. A
+ * selector copied into this file would work for English and quietly time out
+ * for everything else.
+ */
+async function handlesFor(locale) {
+  const strings = (await loadFromSource(join(root, `src/i18n/strings/${locale}.ts`)))[locale];
+  // "{count} visible satellites" without the number, which is what the header
+  // publishes and what an attribute-suffix selector can match.
+  const counted = strings.scene.visibleSatellites.replace("{count}", "").trim();
+  return {
+    booted: `[aria-label$="${counted}"]`,
+    count: `[role="button"][aria-label$="${counted}"]`,
+    catalogTab: `[role="tab"][aria-label="${strings.tabs.catalog}"]`,
+    search: strings.catalog.search,
+    filter: `[aria-label="${strings.filter.open}"]`,
+    showAll: strings.filter.showAll,
+    passes: `[aria-label="${strings.scene.passes.open}"]`,
+    card: `[aria-label="${strings.card.details}"]`
+  };
+}
+
+/**
  * Opens the panel each scene is about, by pressing what a person would press.
  *
  * Every selector here is an accessibility label the app publishes, which is the
@@ -169,8 +217,8 @@ function stagePhotos(ids) {
  * matching, the app's controls have moved and these frames need looking at —
  * which is the failure this whole pipeline exists to produce.
  */
-async function stage(page, scene) {
-  const count = page.locator('[role="button"][aria-label$="visible satellites"]').first();
+async function stage(page, scene, handles) {
+  const count = page.locator(handles.count).first();
 
   switch (scene.staging) {
     case "sky":
@@ -185,18 +233,18 @@ async function stage(page, scene) {
         throw new Error(`${scene.id}: "tapped" needs a scene that aims at a target`);
       }
       const { name } = scene.aim;
-      await page.locator('[role="tab"][aria-label="Catalog"]').click();
-      await page.getByPlaceholder("Search by name").fill(name);
+      await page.locator(handles.catalogTab).click();
+      await page.getByPlaceholder(handles.search).fill(name);
       const row = page.locator(`[role="button"][aria-label="${name}"]`).first();
       await row.waitFor({ timeout: 30000 });
       await row.click();
-      await page.locator('[aria-label="Satellite details"]').waitFor({ timeout: 30000 });
+      await page.locator(handles.card).waitFor({ timeout: 30000 });
       return;
     }
 
     case "filter":
-      await page.locator('[aria-label="Category filter"]').click();
-      await page.getByText("SHOW ALL").first().waitFor({ timeout: 30000 });
+      await page.locator(handles.filter).click();
+      await page.getByText(handles.showAll).first().waitFor({ timeout: 30000 });
       return;
 
     case "breakdown":
@@ -204,7 +252,7 @@ async function stage(page, scene) {
       return;
 
     case "passes": {
-      const passes = page.locator('[aria-label="Upcoming passes"]');
+      const passes = page.locator(handles.passes);
       // The plan is made a moment after the view opens, not with it.
       await passes.waitFor({ timeout: 120000 });
       await passes.click();
@@ -238,7 +286,7 @@ async function settled(page, { attempts = 20, gapMs = 1500 } = {}) {
   return previous;
 }
 
-async function capture(browser, scene) {
+async function capture(browser, locale, handles, scene) {
   const context = await browser.newContext({
     viewport: SCREEN,
     deviceScaleFactor: DEVICE_SCALE,
@@ -258,18 +306,15 @@ async function capture(browser, scene) {
 
     // Boot runs a catalogue download, a 95 MB model and a JPEG; on a cold
     // Metro it also waits out the first bundle.
-    await page
-      .locator('[aria-label$="visible satellites"]')
-      .first()
-      .waitFor({ timeout: 300000 });
-    await stage(page, scene);
+    await page.locator(handles.booted).first().waitFor({ timeout: 300000 });
+    await stage(page, scene, handles);
 
     const shot = await settled(page);
     if (failures.length) {
       throw new Error(`the app logged errors:\n  ${failures.join("\n  ")}`);
     }
 
-    const out = join(screensDir, `${scene.id}.png`);
+    const out = join(screensDir(locale), `${scene.id}.png`);
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, shot);
     console.log(`  ${scene.id} → ${relative(root, out)}`);
@@ -281,16 +326,18 @@ async function capture(browser, scene) {
 /* ---- The run. ------------------------------------------------------------ */
 
 async function main() {
-  console.log(`  capturing the ${locale} set from the running app`);
+  console.log(`  capturing ${locales.join(" and ")} from the running app`);
 
   await ensureBackgrounds(scenes.map((scene) => scene.id));
   stagePhotos(scenes.map((scene) => scene.id));
 
-  // Only what this run is about to replace: `--only 03-occlusion` must not
-  // throw away the other five, which `render.mjs` would then quietly draw from
-  // the mirror instead.
-  mkdirSync(screensDir, { recursive: true });
-  for (const scene of scenes) rmSync(join(screensDir, `${scene.id}.png`), { force: true });
+  for (const locale of locales) {
+    // Only what this run is about to replace: `--only 03-occlusion` must not
+    // throw away the other five, which `render.mjs` would then quietly draw
+    // from the mirror instead.
+    mkdirSync(screensDir(locale), { recursive: true });
+    for (const scene of scenes) rmSync(join(screensDir(locale), `${scene.id}.png`), { force: true });
+  }
 
   const started = [];
   let browser = null;
@@ -320,7 +367,13 @@ async function main() {
       args: ["--no-sandbox"]
     });
 
-    for (const scene of scenes) await capture(browser, scene);
+    // One browser and one dev server for every language: only the context's
+    // `locale` changes, which is what the app reads to choose its strings.
+    for (const locale of locales) {
+      console.log(`  ${locale}:`);
+      const handles = await handlesFor(locale);
+      for (const scene of scenes) await capture(browser, locale, handles, scene);
+    }
   } finally {
     if (browser) await browser.close();
     // The group, not the child: see the note in `serve`.

@@ -3,13 +3,21 @@
 Six frames for the iPhone listing, one set per storefront language, and the
 pipeline that makes them: `docs/app-store/`, from `tools/screenshots/`.
 
-    npm run screenshots                            # docs/app-store/
-    npm run screenshots -- --locale it             # docs/app-store/it/
+    npm run screenshots                            # every language
+    npm run screenshots -- --locale it             # just that one
 
 That is two steps, and they can be run apart:
 
     node tools/screenshots/capture.mjs   # photograph the running app
     node tools/screenshots/render.mjs    # lay the captions around it
+
+**Every language in one run.** English writes `docs/app-store/`, each other
+language a directory beside it. One invocation covers them all because the
+expensive parts — Metro's first bundle, the segmentation model, the browser —
+are paid once however many sets come out, and because running the tool once per
+language is how the sets drifted apart before: only English had been captured
+from the app, and Italian was still the old hand-drawn mirror, with its own copy
+of the marker colours.
 
 Output is **1290 × 2796**, which App Store Connect takes for the 6.9 and
 6.7-inch classes and scales down for every size below them. Nothing else has to
@@ -58,12 +66,12 @@ listing: most people see one and a half frames.
 
 | # | File | What it shows | Caption |
 | --- | --- | --- | --- |
-| 1 | `01-sky.png` | The plain view: a night sky over a city filling the screen, twenty-one marks on it, the app's name over what it counts, the filter button, the compass strip along the foot of the frame and the card saying the station is crossing now. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
-| 2 | `02-tap.png` | A tap on the ISS: the selection ring on the sky, the strip of names the tap covered, the briefing and the five figures. | **Tap a light, learn what it is** — What it is, who flies it, how far away — and the figures keep moving while you read. |
-| 3 | `03-occlusion.png` | A tower up the right of the frame. The Starlink train runs down to its corner, one mark mid-fade on the edge, and nothing over the building. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
-| 4 | `04-legend.png` | The same app at midday, filter open: the six categories with their colours and the switches under them, the parked ring, and the same pastel marks read by their dark edges on a bright sky. | **Colour is what it is for** — The same soft colours by day and by night. Size is how far away; a ring holds station over the equator. |
-| 5 | `05-inview.png` | The count opened into the breakdown behind it: Starlink 6, SES 3, Galileo 2, GPS 2, ISS 1, six others. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
-| 6 | `06-pass.png` | Two landmark paths: CHEOPS crossing now, at full strength with an arrowhead on each of its minutes, and the station's next pass — no marker, since it has not risen — faded by how far off it is, named and timed where it will come up, with the card along the bottom counting it down. | **Know when to look up** — Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up. |
+| 1 | `01-sky.png` | The plain view: the Alpe di Siusi under the Milky Way, about a hundred marks across it, the app's name over what it counts, the freeze and filter buttons, the compass strip along the foot of the frame and the station's next pass on the card. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
+| 2 | `02-tap.png` | The station picked out: its card open over the Seceda ridge, with the photograph, who flies it and what it is. | **Tap a light, learn what it is** — What it is, who flies it, how far away — and the figures keep moving while you read. |
+| 3 | `03-occlusion.png` | Straight up a gap between two buildings: the marks fill the channel of sky and stop dead at the walls, because the mask read that photograph. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
+| 4 | `04-legend.png` | The same app over Rome in daylight, filter open: the six categories with their colours and the switches under them, and the same marks read by their dark edges against a bright sky. | **Colour is what it is for** — The same soft colours by day and by night. Size is how far away; a ring holds station over the equator. |
+| 5 | `05-inview.png` | A city at dusk with the count opened into the breakdown behind it: how many are Starlink, how many Eutelsat, how many of them are lit. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
+| 6 | `06-pass.png` | A twilight sky over a low ridge, arcs drawn across it with an arrowhead on every minute, and the panel along the bottom naming what is coming up and counting it down. | **Know when to look up** — Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up. |
 
 Frames 3 and 4 are the two that are hard to copy and are the reason to keep
 them: hiding satellites behind buildings is the thing no other sky app does,
@@ -251,13 +259,18 @@ The frames are photographs of the app, so they go stale when the app moves.
 - **A manual run with `commit: true`** regenerates them and pushes the result.
   That is how the listing is actually updated, once somebody has looked.
 
+Both cover every language the app speaks, so a change to an Italian string is
+caught by the same run that catches a change to an English one.
+
 Committing six 2 MB PNGs on every interface tweak would bloat the history, which
 is why the automatic half stops at telling you.
 
 The staging in `capture.mjs` presses the app's own controls, found by the
 accessibility labels the app publishes — the same surface
 `testing/e2e/replay.spec.ts` drives. A control that is renamed or moved fails
-the capture rather than quietly producing last month's picture.
+the capture rather than quietly producing last month's picture. Those labels are
+read out of `src/i18n/strings/<locale>.ts` per language rather than written into
+the tool, since an Italian app publishes `Catalogo` and `satelliti visibili`.
 
 ## Editing them
 

@@ -132,7 +132,7 @@ export const SHOT_SCENES: readonly ShotScene[] = [
     observer: { latitudeDeg: 46.5405, longitudeDeg: 11.62, heightM: 1800 },
     timeIso: "2026-08-23T20:20:00Z",
     clock: "22:20",
-    aim: { kind: "fixed", azimuthDeg: 155, elevationDeg: 12 },
+    aim: { kind: "fixed", azimuthDeg: 168, elevationDeg: 12 },
     staging: "sky"
   },
   {
@@ -169,7 +169,7 @@ export const SHOT_SCENES: readonly ShotScene[] = [
     observer: { latitudeDeg: 41.8925, longitudeDeg: 12.4853, heightM: 30 },
     timeIso: "2026-08-23T07:40:00Z",
     clock: "09:40",
-    aim: { kind: "fixed", azimuthDeg: 130, elevationDeg: 12 },
+    aim: { kind: "fixed", azimuthDeg: 142, elevationDeg: 12 },
     staging: "filter"
   },
   {

@@ -1,11 +1,12 @@
 /*
  * Builds the App Store screenshots.
  *
- *     node tools/screenshots/render.mjs [--locale it]
+ *     node tools/screenshots/render.mjs              # every language
+ *     node tools/screenshots/render.mjs --locale it  # just that one
  *
- * One set per storefront language. English writes `docs/app-store/`, every
- * other locale writes `docs/app-store/<locale>/`, and the language comes from
- * `LOCALES` in `src/i18n/locale.ts` — the same list the app itself speaks.
+ * One set per storefront language, and all of them by default. English writes
+ * `docs/app-store/`, every other locale writes `docs/app-store/<locale>/`, and
+ * the list is the one the app itself speaks.
  *
  * Two passes, and the split is the point. The phone screen is rendered on its
  * own at the device scale factor a 6.9-inch iPhone actually has, so every panel
@@ -72,33 +73,52 @@ const LOCALES = readdirSync(join(root, "src", "i18n", "strings"))
   .map((file) => file.replace(/\.ts$/, ""));
 const FALLBACK_LOCALE = "en";
 
-const locale = (() => {
+/**
+ * Which languages this run draws. All of them unless one is named, so a single
+ * `npm run screenshots` produces the whole listing: a storefront set that is
+ * half captured from the app and half drawn by the mirror is how the two got
+ * out of step in the first place.
+ */
+const asked = (() => {
   const flag = process.argv.indexOf("--locale");
-  if (flag === -1) return FALLBACK_LOCALE;
-  const asked = process.argv[flag + 1];
-  if (!LOCALES.includes(asked)) {
-    throw new Error(`no such locale: ${asked} (the app speaks ${LOCALES.join(", ")})`);
+  if (flag === -1) return LOCALES;
+  const one = process.argv[flag + 1];
+  if (!LOCALES.includes(one)) {
+    throw new Error(`no such locale: ${one} (the app speaks ${LOCALES.join(", ")})`);
   }
-  return asked;
+  return [one];
 })();
 
-/**
- * Where `capture.mjs` leaves its photographs of the running app, for this
- * language. Keep the two in step.
+/*
+ * The language currently being drawn, and everything that depends on it.
+ *
+ * Reassigned per pass by `selectLocale` rather than fixed at start-up, which is
+ * what lets one run cover every storefront. Everything below reads these as it
+ * draws.
  */
-const captures = join(here, ".capture", locale);
-
+let locale = FALLBACK_LOCALE;
 /** What the app says, in that language. */
-const { [locale]: t } = await loadFromSource(`src/i18n/strings/${locale}.ts`);
-
+let t = null;
+/** Where `capture.mjs` left its photographs of the running app for it. */
+let captures = null;
 /**
  * English keeps the directory it has always had, so the six paths the listing
  * already points at do not move; every other language gets one beside it.
  */
-const outDir =
-  locale === FALLBACK_LOCALE
-    ? join(root, "docs", "app-store")
-    : join(root, "docs", "app-store", locale);
+let outDir = null;
+/** The eight points of the compass, in that language. */
+let COMPASS_POINTS = null;
+
+async function selectLocale(next) {
+  locale = next;
+  ({ [locale]: t } = await loadFromSource(`src/i18n/strings/${locale}.ts`));
+  captures = join(here, ".capture", locale);
+  outDir =
+    locale === FALLBACK_LOCALE
+      ? join(root, "docs", "app-store")
+      : join(root, "docs", "app-store", locale);
+  COMPASS_POINTS = t.compass;
+}
 
 /**
  * `fill` and `compassPoint` from `src/i18n/format.ts`, which cannot be loaded
@@ -378,7 +398,6 @@ const ICONS = {
 
 /** The eight points the compass strip carries, from north, clockwise. */
 /** The app's own letters, which are not the same eight in every language. */
-const COMPASS_POINTS = t.compass;
 
 /**
  * How far either side of the middle the strip reaches, in degrees.
@@ -1050,14 +1069,9 @@ function shoot({ page, out, width, height, scale }) {
   }
 }
 
-function main() {
-  if (!CHROME) throw new Error("no chromium found; set CHROME to one");
+function drawSet(faces) {
   console.log(`  drawing the ${locale} set`);
-  rmSync(build, { recursive: true, force: true });
-  mkdirSync(build, { recursive: true });
   mkdirSync(outDir, { recursive: true });
-
-  const faces = fontFaces(fonts());
 
   scenes.forEach((scene, index) => {
     // The phone first, at the scale the phone itself draws at, and then the
@@ -1098,4 +1112,16 @@ function main() {
   });
 }
 
-main();
+async function main() {
+  if (!CHROME) throw new Error("no chromium found; set CHROME to one");
+  rmSync(build, { recursive: true, force: true });
+  mkdirSync(build, { recursive: true });
+  const faces = fontFaces(fonts());
+
+  for (const one of asked) {
+    await selectLocale(one);
+    drawSet(faces);
+  }
+}
+
+await main();

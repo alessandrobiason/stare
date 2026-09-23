@@ -6,9 +6,10 @@
 # committed TLE fixture and six still photographs, drives it through real taps,
 # screenshots each scene and lays the captions around them.
 #
-# Linux, about ten minutes, 1x — nothing here touches macOS or Apple. The two
-# slow parts are Metro's first bundle and the 95 MB segmentation model, and the
-# model is cached between runs.
+# Every storefront language, in one run. Linux, about fifteen minutes, 1x —
+# nothing here touches macOS or Apple. The two slow parts are Metro's first
+# bundle and the 95 MB segmentation model, and both are paid once however many
+# languages come out of the other end; the model is also cached between runs.
 #
 # **Two triggers, and they do different things on purpose:**
 #
@@ -34,10 +35,6 @@ on:
         description: 'Push the regenerated frames to this branch'
         type: boolean
         default: false
-      locale:
-        description: 'Which storefront language to draw'
-        type: string
-        default: en
   push:
     branches: [main]
     paths:
@@ -114,15 +111,19 @@ jobs:
           echo "fetching $url"
           curl -sSL --retry 3 -o public/skywater.onnx "$url"
 
+      # Every storefront language in one pass: the dev server, the browser and
+      # the model are paid for once, and a set that is half captured from the
+      # app and half left over from an older run is how the languages' marker
+      # colours went out of step before.
       - name: Capture the app and compose the frames
         run: |
-          node tools/screenshots/capture.mjs --locale "${{ inputs.locale || 'en' }}"
-          node tools/screenshots/render.mjs --locale "${{ inputs.locale || 'en' }}"
+          node tools/screenshots/capture.mjs
+          node tools/screenshots/render.mjs
 
       - name: Upload the frames
         uses: actions/upload-artifact@v4
         with:
-          name: app-store-screenshots-${{ inputs.locale || 'en' }}
+          name: app-store-screenshots
           path: docs/app-store/**/*.png
           if-no-files-found: error
 
