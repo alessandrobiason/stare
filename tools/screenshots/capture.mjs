@@ -26,7 +26,16 @@
  */
 
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
@@ -167,7 +176,17 @@ function metroEnv() {
 /* ---- Staging the photographs. -------------------------------------------- */
 
 /**
- * Copies each scene's photograph to where the dev server will serve it.
+ * Copies each scene's photograph to where the dev server will serve it, under a
+ * name that changes whenever the photograph does.
+ *
+ * **The name carries a hash of the contents, and it has to.** Metro caches what
+ * it serves out of `public/` and does not watch it, so replacing a photograph
+ * under a dev server that is already up — which this tool deliberately reuses —
+ * left it serving the bytes it read the first time. The capture then came back
+ * showing the *previous* photograph, the frame was composed from it faithfully,
+ * and nothing anywhere said so: the file on disk, the staged copy and the
+ * manifest all agreed, and only the picture disagreed. A new name is a new
+ * request, which no cache can answer from the old one.
  *
  * Copied rather than symlinked: Metro's static handler follows a symlink out of
  * the project on some platforms and refuses on others, and these files are a
@@ -176,9 +195,21 @@ function metroEnv() {
 function stagePhotos(ids) {
   const publicDir = join(root, "public");
   mkdirSync(publicDir, { recursive: true });
+
+  const staged = new Map();
   for (const id of ids) {
-    copyFileSync(backgroundPath(id), join(publicDir, `shot-${id}.jpg`));
+    const source = backgroundPath(id);
+    const hash = createHash("md5").update(readFileSync(source)).digest("hex").slice(0, 8);
+    const name = `shot-${id}-${hash}.jpg`;
+    // Whatever this scene left behind last time, so `public/` does not collect
+    // a copy of every photograph ever tried.
+    for (const old of readdirSync(publicDir)) {
+      if (old.startsWith(`shot-${id}`) && old !== name) rmSync(join(publicDir, old), { force: true });
+    }
+    copyFileSync(source, join(publicDir, name));
+    staged.set(id, name);
   }
+  return staged;
 }
 
 /* ---- Driving the app. ---------------------------------------------------- */
@@ -286,7 +317,7 @@ async function settled(page, { attempts = 20, gapMs = 1500 } = {}) {
   return previous;
 }
 
-async function capture(browser, locale, handles, scene) {
+async function capture(browser, locale, handles, scene, photo) {
   const context = await browser.newContext({
     viewport: SCREEN,
     deviceScaleFactor: DEVICE_SCALE,
@@ -313,7 +344,9 @@ async function capture(browser, locale, handles, scene) {
   page.on("pageerror", (error) => failures.push(error.message));
 
   try {
-    await page.goto(`${APP_URL}/?shot=${scene.id}`, { waitUntil: "commit" });
+    // The photograph is named rather than derived, so the page asks for the
+    // file this run staged and not one a cache is still holding. See `stagePhotos`.
+    await page.goto(`${APP_URL}/?shot=${scene.id}&photo=${photo}`, { waitUntil: "commit" });
 
     // Boot runs a catalogue download, a 95 MB model and a JPEG; on a cold
     // Metro it also waits out the first bundle.
@@ -340,7 +373,7 @@ async function main() {
   console.log(`  capturing ${locales.join(" and ")} from the running app`);
 
   await ensureBackgrounds(scenes.map((scene) => scene.id));
-  stagePhotos(scenes.map((scene) => scene.id));
+  const staged = stagePhotos(scenes.map((scene) => scene.id));
 
   for (const locale of locales) {
     // Only what this run is about to replace: `--only 03-occlusion` must not
@@ -383,7 +416,9 @@ async function main() {
     for (const locale of locales) {
       console.log(`  ${locale}:`);
       const handles = await handlesFor(locale);
-      for (const scene of scenes) await capture(browser, locale, handles, scene);
+      for (const scene of scenes) {
+        await capture(browser, locale, handles, scene, staged.get(scene.id));
+      }
     }
   } finally {
     if (browser) await browser.close();

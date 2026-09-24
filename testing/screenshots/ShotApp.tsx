@@ -23,8 +23,26 @@ import { ShotScene } from "./ShotScene";
  * `tools/screenshots/capture.mjs` for the other half.
  */
 
-/** Where `capture.mjs` stages each scene's photograph for the dev server to serve. */
-export const photoUriFor = (id: string): string => `/shot-${id}.jpg`;
+/**
+ * Where this run's photograph is being served from.
+ *
+ * The capture names the file in the URL, because the name carries a hash of the
+ * photograph's contents: Metro caches what it serves out of `public/` and does
+ * not watch it, so a photograph swapped under a running dev server went on
+ * being served as it was, and the frame came back showing the old one with
+ * nothing to say so. Asking for a different name is the one thing no cache can
+ * answer wrongly. See `stagePhotos` in `tools/screenshots/capture.mjs`.
+ *
+ * The plain name is the fallback, for opening a scene by hand in a browser.
+ */
+export function photoUriFor(id: string): string {
+  const asked =
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("photo");
+  // Only a name of the shape this tool stages: it goes straight into a URL.
+  return asked && /^shot-[a-z0-9-]+\.jpg$/.test(asked) ? `/${asked}` : `/shot-${id}.jpg`;
+}
 
 /**
  * The 6.9-inch iPhone's safe area, in points, forced on the layout.

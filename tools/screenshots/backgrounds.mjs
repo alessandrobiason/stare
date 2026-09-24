@@ -86,9 +86,16 @@ export const BACKGROUNDS = {
     file: "https://images.pexels.com/photos/29736776/pexels-photo-29736776.jpeg?cs=srgb&fm=jpg"
   },
   "06-pass": {
-    what: "Tre Cime di Lavaredo at the blue hour, which is when a pass is worth waiting for.",
-    page: "https://www.pexels.com/photo/tre-cime-di-lavaredo-under-a-night-sky-13405515/",
-    file: "https://images.pexels.com/photos/13405515/pexels-photo-13405515.jpeg?cs=srgb&fm=jpg"
+    // Tre Cime di Lavaredo at the blue hour (pexels 13405515) was here and was
+    // dropped for grain: a high-ISO night exposure compressed at about half the
+    // bits per pixel of the rest of the set, which reads as mottling across a
+    // smooth twilight gradient. Refetching it at a smaller size changed
+    // nothing, because the noise is in the photograph and not in the scaling.
+    // This one is a clean gradient with a low silhouette and, as it happens, a
+    // few contrails — which suit a frame about looking up.
+    what: "A twilight gradient over a low mountain silhouette.",
+    page: "https://www.pexels.com/photo/serene-sunset-sky-with-mountain-silhouette-34892669/",
+    file: "https://images.pexels.com/photos/34892669/pexels-photo-34892669.jpeg?cs=srgb&fm=jpg"
   }
 };
 
