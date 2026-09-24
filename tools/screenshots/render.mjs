@@ -182,6 +182,8 @@ function figureRows(figures) {
 
 /** The store's frame, and the phone inside it. */
 const FRAME = { width: 1290, height: 2796 };
+/** What the headline starts at, before the fitting below brings it down. */
+const TITLE_SIZE_PX = 78;
 /** iPhone 6.9": 430 x 932 points at three times the pixels. */
 const SCREEN = { width: 430, height: 932 };
 /**
@@ -883,11 +885,17 @@ body {
   top: 118px;
 }
 .caption h1 {
-  font-size: 78px;
+  /* The starting size. A title that does not fit on one line at it is set
+     smaller — the whole set together, never one frame on its own. See the
+     script at the foot of this page. */
+  font-size: ${TITLE_SIZE_PX}px;
   font-weight: 700;
   line-height: 1.06;
   letter-spacing: -1.8px;
   color: #ffffff;
+  /* One line, always: a headline that wraps takes the body copy down with it
+     and the six frames stop lining up with each other. */
+  white-space: nowrap;
 }
 .caption p {
   margin-top: 26px;
@@ -1008,6 +1016,44 @@ body {
   </div>
 </div>
 <script>
+/*
+ * One line for the headline, at one size across the whole set.
+ *
+ * The titles are written per language and Italian runs longer than English —
+ * "Cosa hai sopra, proprio adesso" is 1122 pixels at the size English is happy
+ * at, against 1098 of room — so one of six frames wrapped to two lines while
+ * the other five did not, and the block under it sat lower on that one frame.
+ *
+ * Measured rather than guessed at, and measured against *every* title in this
+ * language's set rather than this frame's own: shrinking each frame to its own
+ * title would leave six headlines at six sizes, which reads worse than the
+ * wrap did. So the longest one decides, and the rest are set to match.
+ */
+(() => {
+  const titles = ${JSON.stringify(scenes.map((one) => caption(one).title))};
+  const heading = document.querySelector(".caption h1");
+  const probe = heading.cloneNode(false);
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.left = "-9999px";
+  document.body.appendChild(probe);
+
+  let widest = 0;
+  for (const title of titles) {
+    probe.textContent = title;
+    widest = Math.max(widest, probe.getBoundingClientRect().width);
+  }
+  probe.remove();
+
+  const room = heading.parentElement.getBoundingClientRect().width;
+  if (widest > room) {
+    const size = Math.floor(${TITLE_SIZE_PX} * (room / widest));
+    heading.style.fontSize = size + "px";
+    // The tracking is part of the type's shape, so it scales with it.
+    heading.style.letterSpacing = (-1.8 * size) / ${TITLE_SIZE_PX} + "px";
+  }
+})();
+
 /*
  * A night in the app's own blues: a radial grade with a thin scatter of stars,
  * so the frame around the phone belongs to the app rather than to a template.

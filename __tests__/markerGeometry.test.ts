@@ -127,17 +127,14 @@ test("writes no name under the app's own header", () => {
   // The band the title and the count cover. A name there is written across
   // them and cannot be read, so it is not written — while the same object a
   // little lower down keeps its name, and the mark itself is unaffected either
-  // way. The region is in the frame's own percentages, and is the middle of the
-  // width because the picture is wider than the screen.
-  const header = { left: 20, top: 0, right: 80, bottom: 12 };
+  // way. The band runs the full width of the frame, margins included: a name
+  // anchored off the side of the screen still writes its text back into view.
+  const header = { left: 0, top: 0, right: 100, bottom: 12 };
   const points = [
     { left: 50, top: 6 },
     { left: 50, top: 40 }
   ];
   expect(labellablePoints(points, FRAME, [header])).toEqual([false, true]);
-  // Beside the header rather than under it — the picture runs off the sides of
-  // the screen, and that part of it carries no chrome.
-  expect(labellablePoints([{ left: 5, top: 6 }], FRAME, [header])).toEqual([true]);
   // And with nothing reserved, which is what the tour's pictures of a mark
   // pass, the same point keeps its name.
   expect(labellablePoints(points, FRAME)).toEqual([true, true]);

@@ -467,7 +467,7 @@ const scenes = [
         body: "The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds."
       },
       it: {
-        title: "Cosa hai sopra, proprio adesso",
+        title: "Cosa c’è sopra di te",
         body: "Il catalogo pubblico in tempo reale — circa 16.000 oggetti tracciati — diviso per quello che il cielo davanti a te contiene davvero."
       }
     },

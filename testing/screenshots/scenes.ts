@@ -142,7 +142,14 @@ export const SHOT_SCENES: readonly ShotScene[] = [
     observer: { latitudeDeg: 46.5405, longitudeDeg: 11.62, heightM: 1800 },
     timeIso: "2026-08-23T20:20:00Z",
     clock: "22:20",
-    aim: { kind: "fixed", azimuthDeg: 168, elevationDeg: 12 },
+    // Aimed a little above the busiest sky on purpose. Lower, the arc of a
+    // pass hours away — the station's sister station, rising at 5:42 — was
+    // drawn with its name across the face of the mountain, which reads as "it
+    // is over there" on a photograph whose whole point is that the app knows
+    // what is in the way. Higher, that arc falls below the compass and the
+    // frame is marks and their tails, which is what the caption promises. It
+    // costs about twenty marks.
+    aim: { kind: "fixed", azimuthDeg: 168, elevationDeg: 26 },
     staging: "sky"
   },
   {

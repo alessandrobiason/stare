@@ -421,7 +421,16 @@ export const SkyOverlay: React.FC<Props> = ({
     // a two-line name that would otherwise reach into it from just outside.
     const top = insets.top + headerHeight + LABEL_CHROME_MARGIN_PT;
     const bottom = insets.bottom + bottomHeight + LABEL_CHROME_MARGIN_PT;
-    const across = { left: viewport.left, right: viewport.right };
+    /*
+     * The whole width of the frame, not just the part on screen.
+     *
+     * A name is written from its mark outwards, so one anchored in the strip of
+     * picture that runs off the side of the screen still draws its text back
+     * into view — which arrived as a clipped word lying across the app's title,
+     * the exact thing this is here to stop. Nothing is lost by reserving the
+     * margins too: a name out there is one nobody can read anyway.
+     */
+    const across = { left: 0, right: 100 };
     return [
       { ...across, top: viewport.top, bottom: viewport.top + percent(top) },
       { ...across, top: viewport.bottom - percent(bottom), bottom: viewport.bottom }
