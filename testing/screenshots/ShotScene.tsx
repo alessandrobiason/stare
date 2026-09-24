@@ -75,7 +75,10 @@ function aimOf(scene: Scene, catalog: SatelliteCatalog): { azimuthDeg: number; e
       `${scene.id}: ${scene.aim.name} is ${detail.elevationDeg.toFixed(1)} degrees up at ${scene.timeIso}, so there is no mark to photograph`
     );
   }
-  return { azimuthDeg: detail.azimuthDeg, elevationDeg: detail.elevationDeg };
+  return {
+    azimuthDeg: detail.azimuthDeg,
+    elevationDeg: detail.elevationDeg - (scene.aim.lowerBy ?? 0)
+  };
 }
 
 export const ShotScene: React.FC<Props> = ({ scene, catalog, photoUri }) => {
@@ -111,12 +114,20 @@ export const ShotScene: React.FC<Props> = ({ scene, catalog, photoUri }) => {
   useEffect(() => {
     const target = window as unknown as {
       stareShotAim?: (azimuthDeg: number, elevationDeg: number) => void;
+      stareShotTime?: (iso: string) => void;
     };
     target.stareShotAim = (azimuthDeg, elevationDeg) => {
       aimRef.current = { azimuthDeg, elevationDeg };
     };
+    // And the instant, for the same reason: which names end up on the frame
+    // depends on what is overhead, and that is a search over time. The tracker
+    // reads the epoch as it draws, so moving it is enough.
+    target.stareShotTime = (iso) => {
+      epochRef.current.time = new Date(iso);
+    };
     return () => {
       delete target.stareShotAim;
+      delete target.stareShotTime;
     };
   }, []);
 

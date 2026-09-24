@@ -44,6 +44,16 @@ export type ShotAim =
        */
       kind: "target";
       name: string;
+      /**
+       * Point this many degrees *below* it, so its mark rides high in the frame
+       * instead of dead centre.
+       *
+       * Centre is where the card opens over, so a scene whose whole subject is
+       * one object was putting that object's mark behind the panel describing
+       * it — the frame read as an empty sky with a card on it. Aiming low lifts
+       * the mark into the open half.
+       */
+      lowerBy?: number;
     }
   | {
       /** Point at a fixed bearing and height, for the frames about the sky at large. */
@@ -144,9 +154,9 @@ export const SHOT_SCENES: readonly ShotScene[] = [
     // scene drew two marks.
     id: "02-tap",
     observer: { latitudeDeg: 46.606, longitudeDeg: 11.672, heightM: 2500 },
-    timeIso: "2026-08-23T02:12:00Z",
-    clock: "04:12",
-    aim: { kind: "target", name: "ISS" },
+    timeIso: "2026-08-22T03:01:00Z",
+    clock: "05:01",
+    aim: { kind: "target", name: "ISS", lowerBy: 22 },
     staging: "tapped"
   },
   {
@@ -157,9 +167,9 @@ export const SHOT_SCENES: readonly ShotScene[] = [
     // mask is what decides which marks survive. About 130 objects in frame.
     id: "03-occlusion",
     observer: { latitudeDeg: 45.4642, longitudeDeg: 9.19, heightM: 120 },
-    timeIso: "2026-08-23T02:15:00Z",
-    clock: "04:15",
-    aim: { kind: "fixed", azimuthDeg: 160, elevationDeg: 62 },
+    timeIso: "2026-08-24T19:39:00Z",
+    clock: "21:39",
+    aim: { kind: "target", name: "Chandra", lowerBy: 12 },
     staging: "sky"
   },
   {
@@ -169,7 +179,7 @@ export const SHOT_SCENES: readonly ShotScene[] = [
     observer: { latitudeDeg: 41.8925, longitudeDeg: 12.4853, heightM: 30 },
     timeIso: "2026-08-23T07:40:00Z",
     clock: "09:40",
-    aim: { kind: "fixed", azimuthDeg: 142, elevationDeg: 12 },
+    aim: { kind: "fixed", azimuthDeg: 152, elevationDeg: 32 },
     staging: "filter"
   },
   {
@@ -182,7 +192,7 @@ export const SHOT_SCENES: readonly ShotScene[] = [
     observer: { latitudeDeg: 44.4949, longitudeDeg: 11.3426, heightM: 54 },
     timeIso: "2026-08-23T18:40:00Z",
     clock: "20:40",
-    aim: { kind: "fixed", azimuthDeg: 130, elevationDeg: 16 },
+    aim: { kind: "fixed", azimuthDeg: 130, elevationDeg: 30 },
     staging: "breakdown"
   },
   {

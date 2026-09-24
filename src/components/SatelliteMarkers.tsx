@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet } from "react-native";
 import { MarkerSource, useMarkerFrames } from "../hooks/useAnimatedMarkers";
 import { MarkerLabels } from "./MarkerLabels";
-import { FrameSize } from "./markerGeometry";
+import { FrameSize, FrameViewport } from "./markerGeometry";
 import { fadeShader, RadialFade, skiaColor } from "./lightShaders";
 import {
   buildMarkerScene,
@@ -35,6 +35,12 @@ type Props = {
   selectedName?: string | null;
   /** Mark sizes against the design width, for a box that is not a camera frame. */
   scale?: number;
+  /**
+   * The bands of the frame the app's own panels cover, which no name may be
+   * written into. Empty for the tour's pictures of a mark, which have no panels
+   * over them. See `labellablePoints`.
+   */
+  labelKeepOut?: readonly FrameViewport[];
 };
 
 /**
@@ -73,13 +79,14 @@ export const SatelliteMarkers: React.FC<Props> = React.memo(({
   frame,
   palette,
   selectedName = null,
-  scale
+  scale,
+  labelKeepOut
 }) => {
   const drawn = useMarkerFrames(markers);
   if (!frame) return null;
 
   const sceneStarted = performance.now();
-  const scene = buildMarkerScene(drawn, frame, palette, selectedName, scale);
+  const scene = buildMarkerScene(drawn, frame, palette, selectedName, scale, labelKeepOut);
   const sceneMs = performance.now() - sceneStarted;
   const picture = record(scene, frame, sceneMs);
   return (

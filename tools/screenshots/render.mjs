@@ -1046,6 +1046,10 @@ document.documentElement.dataset.ready = "true";
 /* ---- Shooting. ----------------------------------------------------------- */
 
 function shoot({ page, out, width, height, scale }) {
+  // Success is judged by the file being there afterwards, so anything left over
+  // from a previous run has to go first — otherwise a chromium that fell over
+  // leaves last week's frame in `docs/app-store` and says nothing.
+  rmSync(out, { force: true });
   const shell = CHROME.includes("headless_shell");
   const run = spawnSync(
     CHROME,

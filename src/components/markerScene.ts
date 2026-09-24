@@ -7,6 +7,7 @@ import { SATELLITE_CATEGORIES } from "../satellite/categories";
 import { fleetOf } from "../satellite/fleets";
 import {
   FrameSize,
+  FrameViewport,
   labellablePoints,
   markerDiameterPx,
   pointOnFrame,
@@ -377,7 +378,12 @@ export function buildMarkerScene(
   box: FrameSize,
   palette: MarkerPalette,
   selectedName: string | null = null,
-  scale: number = box.width / DESIGN_FRAME_WIDTH_PX
+  scale: number = box.width / DESIGN_FRAME_WIDTH_PX,
+  /**
+   * The parts of the frame the app's own panels cover, where a name would be
+   * written over them and could not be read. See `labellablePoints`.
+   */
+  labelKeepOut: readonly FrameViewport[] = []
 ): MarkerScene {
   const glyphs: GlyphShape[] = [];
 
@@ -422,7 +428,8 @@ export function buildMarkerScene(
   ];
   const allowed = labellablePoints(
     [...arcs.map((arc) => arc.anchor.at), ...ordered.map((marker) => marker.point)],
-    box
+    box,
+    labelKeepOut
   );
   const named = new Set(
     ordered.filter((_, index) => allowed[arcs.length + index]).map((one) => one.name)

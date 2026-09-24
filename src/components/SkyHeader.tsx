@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { SkySummary } from "../hooks/useAnimatedMarkers";
 import { useLocale } from "../hooks/useLocale";
 import { fill, strings } from "../i18n";
@@ -23,6 +23,12 @@ type Props = {
   /** The moment it froze, while it is. */
   frozenAt: Date | null;
   onToggleFrozen: () => void;
+  /**
+   * Told how tall this ended up, so the overlay under it knows which band of
+   * sky it is covering and can keep satellite names out of it. See
+   * `labelKeepOut` in `SkyOverlay`.
+   */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 /**
@@ -65,7 +71,8 @@ export const SkyHeader: React.FC<Props> = React.memo(({
   onToggleFilter,
   frozen,
   frozenAt,
-  onToggleFrozen
+  onToggleFrozen,
+  onLayout
 }) => {
   // Nothing in this component's props changes when the console's picker
   // changes the language, and every word in it does. See `useLocale`.
@@ -80,7 +87,7 @@ export const SkyHeader: React.FC<Props> = React.memo(({
   const counted = fill(t.visibleSatellites, { count });
 
   return (
-    <View style={styles.header}>
+    <View style={styles.header} onLayout={onLayout}>
       <View style={styles.row}>
         <View style={styles.titles}>
           <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>

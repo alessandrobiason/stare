@@ -331,13 +331,32 @@ const JOIN_EPSILON = 1e-9;
  * the thing being kept apart does not either: a label is set at a fixed size
  * whatever the window is, so shrinking the window brings the names closer
  * together rather than further apart — and fewer of them fit.
+ *
+ * `keepOut` are regions of the frame that may not carry one at all, in the same
+ * percentages as the points: the bands the app's own panels occupy, the header
+ * along the top and the card and tab bar along the bottom. Names are kept clear
+ * of each other by the ellipses above, and were kept clear of nothing else — so
+ * a bright satellite crossing the top of the screen printed its name over the
+ * app's title, which is unreadable twice over. Empty by default, because the
+ * same builder draws the tour's little pictures of a mark and those have no
+ * panels over them.
  */
-export function labellablePoints(points: FramePoint[], frame: FrameSize): boolean[] {
+export function labellablePoints(
+  points: FramePoint[],
+  frame: FrameSize,
+  keepOut: readonly FrameViewport[] = []
+): boolean[] {
   const spaceX = SATELLITE_MARKERS.labelSpacingPx.x;
   const spaceY = SATELLITE_MARKERS.labelSpacingPx.y;
   const placed: { x: number; y: number }[] = [];
 
   return points.map((point) => {
+    // Under the app's own header, a name is written on top of the title and
+    // the count and cannot be read at all — so it is not written. The mark
+    // itself stays: it is a satellite up there, and the header is glass over
+    // the picture rather than a hole in it. See `keepOut`.
+    if (keepOut.some((region) => inside(point, region))) return false;
+
     const x = (point.left / 100) * frame.width;
     const y = (point.top / 100) * frame.height;
     const crowded = placed.some((other) => {
@@ -349,4 +368,14 @@ export function labellablePoints(points: FramePoint[], frame: FrameSize): boolea
     placed.push({ x, y });
     return true;
   });
+}
+
+/** Whether a point falls within a region of the frame, both in percentages. */
+function inside(point: FramePoint, region: FrameViewport): boolean {
+  return (
+    point.left >= region.left &&
+    point.left <= region.right &&
+    point.top >= region.top &&
+    point.top <= region.bottom
+  );
 }

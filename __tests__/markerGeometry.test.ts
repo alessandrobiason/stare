@@ -123,6 +123,35 @@ test("keeps the label clearance in layout pixels, not in frame percent", () => {
   expect(labellablePoints(points, { width: 360, height: 640 })).toEqual([true, false]);
 });
 
+test("writes no name under the app's own header", () => {
+  // The band the title and the count cover. A name there is written across
+  // them and cannot be read, so it is not written — while the same object a
+  // little lower down keeps its name, and the mark itself is unaffected either
+  // way. The region is in the frame's own percentages, and is the middle of the
+  // width because the picture is wider than the screen.
+  const header = { left: 20, top: 0, right: 80, bottom: 12 };
+  const points = [
+    { left: 50, top: 6 },
+    { left: 50, top: 40 }
+  ];
+  expect(labellablePoints(points, FRAME, [header])).toEqual([false, true]);
+  // Beside the header rather than under it — the picture runs off the sides of
+  // the screen, and that part of it carries no chrome.
+  expect(labellablePoints([{ left: 5, top: 6 }], FRAME, [header])).toEqual([true]);
+  // And with nothing reserved, which is what the tour's pictures of a mark
+  // pass, the same point keeps its name.
+  expect(labellablePoints(points, FRAME)).toEqual([true, true]);
+});
+
+test("a name kept out of the header does not take the space of one lower down", () => {
+  // The dropped name must not claim its ellipse on the way out: the next
+  // object down would then lose its own label to a name nobody can see.
+  const header = { left: 0, top: 0, right: 100, bottom: 12 };
+  const underHeader = { left: 50, top: 11 };
+  const justBelow = { left: 50, top: 13 };
+  expect(labellablePoints([underHeader, justBelow], FRAME, [header])).toEqual([false, true]);
+});
+
 test("gives a label to the first of two landmarks sharing a coordinate", () => {
   // The station and the vehicles docked to it project onto the same point.
   const station = { left: 50, top: 50 };

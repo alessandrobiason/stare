@@ -125,6 +125,14 @@ resamples rather than drawing pixel for pixel. Square-on, the capture lands 1:1
 — `assertNativeSize` in `render.mjs` fails the run if it ever stops doing so,
 since a resampled screen still renders and simply looks worse.
 
+Two things about the app in these frames come from this pipeline having been
+built. Names are kept out of the bands the app's own panels cover — a satellite
+crossing the top of the screen used to print its name across the title, which is
+unreadable on a phone as much as in a listing (`labelKeepOut` in `SkyOverlay`).
+And the capture runs in `Europe/Rome`, because the app formats pass times in the
+device's zone: in UTC, as CI is, a card read "3:01 AM" under a status bar
+reading 05:01.
+
 The chrome is drawn over the capture rather than inside it, because it is the
 operating system's and a browser has none of it. For it to land in empty space
 rather than over the app's own controls, the capture has to be laid out as the

@@ -294,6 +294,17 @@ async function capture(browser, locale, handles, scene) {
     // around these frames is in one language. Pinned so a machine set to
     // another one does not quietly produce a mixed set.
     locale: locale === "en" ? "en-US" : locale,
+    /*
+     * The clock the app formats its times against.
+     *
+     * Every scene stands somewhere in central Europe, and a phone standing
+     * there is set to that zone — so a pass at 03:01 UTC is written "05:01" on
+     * the card, which is what the status bar in the store frame says too
+     * (`ShotScene.clock`). Left alone, the capture runs in whatever the machine
+     * is set to, which in CI is UTC: the frames then showed a pass two hours
+     * before the clock above it.
+     */
+    timezoneId: "Europe/Rome",
     reducedMotion: "reduce"
   });
   const page = await context.newPage();

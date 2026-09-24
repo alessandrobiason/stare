@@ -6,6 +6,7 @@ import {
   StyleSheet,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FrameLens } from "../camera/projection";
 import { MINIMUM_SATELLITE_ELEVATION_DEG, SKY_MASK_CHASE_FRACTION } from "../constants";
 import { cachedCatalog } from "../data/tleCache";
@@ -126,6 +127,15 @@ export type SceneFrame = {
  * and the empty sky before boot has finished should not be claiming the sun is
  * down. The first frame replaces it a sixtieth of a second later.
  */
+/**
+ * Room left between the app's own panels and the first name, in points.
+ *
+ * A name is set above or below its mark, so a mark just clear of a panel can
+ * still print its two lines into it. Two lines of the label's own type, near
+ * enough. See `labelKeepOut`.
+ */
+const LABEL_CHROME_MARGIN_PT = 28;
+
 const NO_SKY: SkySummary = {
   count: 0,
   fleets: { rows: [], other: 0 },
@@ -363,6 +373,68 @@ export const SkyOverlay: React.FC<Props> = ({
     () => (available && frameStyle ? viewportOf(frameStyle, available) : WHOLE_FRAME),
     [available, frameStyle]
   );
+
+  /** Where the notch and the home indicator are, which is what the header is inset by. */
+  const insets = useSafeAreaInsets();
+
+  /**
+   * How tall the header turned out, measured rather than assumed.
+   *
+   * It is two lines of type whose length depends on the language and on the
+   * reader's text size, over a pair of round buttons — so a constant here would
+   * be right for one phone in one language. See `labelKeepOut`.
+   */
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const onHeaderLayout = useCallback(
+    (event: LayoutChangeEvent) => setHeaderHeight(event.nativeEvent.layout.height),
+    []
+  );
+
+  /**
+   * And how tall the stack along the bottom is — the compass rule, the card and
+   * the tab bar, which grow and shrink as panels open. Measured for the same
+   * reason and used the same way.
+   */
+  const [bottomHeight, setBottomHeight] = useState(0);
+  const onBottomLayout = useCallback(
+    (event: LayoutChangeEvent) => setBottomHeight(event.nativeEvent.layout.height),
+    []
+  );
+
+  /**
+   * The band of the picture the app's own chrome sits over, where a satellite's
+   * name would be written across the title and could not be read.
+   *
+   * The marks themselves stay: the header is glass over the picture, and a
+   * satellite behind it is still up there. It is only the *names* that are not
+   * worth writing, and `labellablePoints` drops the ones that land here.
+   *
+   * Only while the picture covers the screen, which is the app. Fitted — the
+   * replay harness — the box is letterboxed into the middle of the window and
+   * the header is above it rather than over it, so there is nothing to keep
+   * clear of.
+   */
+  const labelKeepOut = useMemo<FrameViewport[]>(() => {
+    if (frame.fit !== "cover" || !frameStyle || headerHeight === 0) return [];
+    const percent = (points: number) => (points / frameStyle.height) * 100;
+    // The inset each is pushed off the edge by, the panel itself, and room for
+    // a two-line name that would otherwise reach into it from just outside.
+    const top = insets.top + headerHeight + LABEL_CHROME_MARGIN_PT;
+    const bottom = insets.bottom + bottomHeight + LABEL_CHROME_MARGIN_PT;
+    const across = { left: viewport.left, right: viewport.right };
+    return [
+      { ...across, top: viewport.top, bottom: viewport.top + percent(top) },
+      { ...across, top: viewport.bottom - percent(bottom), bottom: viewport.bottom }
+    ];
+  }, [
+    bottomHeight,
+    frame.fit,
+    frameStyle,
+    headerHeight,
+    insets.bottom,
+    insets.top,
+    viewport
+  ]);
   /**
    * Half the field of view the screen is actually showing, across.
    *
@@ -697,6 +769,7 @@ export const SkyOverlay: React.FC<Props> = ({
             frame={frameStyle}
             palette={palette}
             selectedName={selection?.selected ?? null}
+            labelKeepOut={labelKeepOut}
           />
 
           {/* The picture itself is the control: over the markers, which are drawn
@@ -723,6 +796,7 @@ export const SkyOverlay: React.FC<Props> = ({
           {tab === "sky" && (
             <>
               <SkyHeader
+                onLayout={onHeaderLayout}
                 sky={sky}
                 filterOpen={filterOpen}
                 onToggleFilter={onToggleFilter}
@@ -780,7 +854,7 @@ export const SkyOverlay: React.FC<Props> = ({
               below it down instead of landing on top of it — which is what the
               old corners did to each other, and why the passes panel used to be
               taken off the screen whenever the compass notice was up. */}
-          <View style={styles.bottom}>
+          <View style={styles.bottom} onLayout={onBottomLayout}>
             {tab === "sky" && (
               <>
                 {notice ? <View style={styles.inset}>{notice}</View> : null}

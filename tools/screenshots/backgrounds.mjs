@@ -38,9 +38,14 @@ export const BACKGROUNDS = {
     file: "https://images.pexels.com/photos/4215109/pexels-photo-4215109.jpeg?cs=srgb&fm=jpg"
   },
   "02-tap": {
-    what: "The Seceda ridge under the Milky Way.",
-    page: "https://www.pexels.com/photo/a-rocky-mountain-under-starry-night-4293644/",
-    file: "https://images.pexels.com/photos/4293644/pexels-photo-4293644.jpeg?cs=srgb&fm=jpg"
+    // The Seceda ridge under the Milky Way (pexels 4293644) was here and had to
+    // go for the same reason the old 05-inview did: the segmentation model
+    // reads that kind of dark long-exposure astrophotograph as terrain, so the
+    // mask hid everything and the frame came back reading one mark — including
+    // the station the frame is about.
+    what: "A road under the Milky Way, mountains either side.",
+    page: "https://www.pexels.com/photo/road-under-a-sky-full-of-stars-and-by-the-mountains-in-the-evening-24702426/",
+    file: "https://images.pexels.com/photos/24702426/pexels-photo-24702426.jpeg?cs=srgb&fm=jpg"
   },
   "03-occlusion": {
     // The one the frame lives or dies on, and the one with a real constraint on
