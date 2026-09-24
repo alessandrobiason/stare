@@ -109,15 +109,33 @@ let outDir = null;
 /** The eight points of the compass, in that language. */
 let COMPASS_POINTS = null;
 
+/** Switches the frame being drawn to one of `SIZES`. */
+function selectSize(size) {
+  FRAME = size;
+  DEVICE_TOP = FRAME.height - DEVICE_HEIGHT - DEVICE_BOTTOM_GAP;
+}
+
 async function selectLocale(next) {
   locale = next;
   ({ [locale]: t } = await loadFromSource(`src/i18n/strings/${locale}.ts`));
   captures = join(here, ".capture", locale);
-  outDir =
-    locale === FALLBACK_LOCALE
-      ? join(root, "docs", "app-store")
-      : join(root, "docs", "app-store", locale);
   COMPASS_POINTS = t.compass;
+  setOutDir();
+}
+
+/**
+ * Where this language's frames at this size go.
+ *
+ * English at the default size keeps the six paths the listing has always
+ * pointed at; every other language is a directory beside them, and every other
+ * size is a directory named for its pixels with the same shape inside it.
+ */
+function setOutDir() {
+  const base =
+    FRAME.id === DEFAULT_SIZE
+      ? join(root, "docs", "app-store")
+      : join(root, "docs", "app-store", FRAME.id);
+  outDir = locale === FALLBACK_LOCALE ? base : join(base, locale);
 }
 
 /**
@@ -180,8 +198,27 @@ function figureRows(figures) {
   ];
 }
 
-/** The store's frame, and the phone inside it. */
-const FRAME = { width: 1290, height: 2796 };
+/*
+ * The store's frame, and the phone inside it.
+ *
+ * App Store Connect does not take one size for every slot: the 6.9-inch class
+ * wants 1290 x 2796, and the 6.5 and 6.7-inch classes reject it and want
+ * 1284 x 2778 (or 1242 x 2688). A set uploaded into the wrong slot comes back
+ * as "the dimensions of one or more screenshots are not correct" and nothing
+ * more specific than that.
+ *
+ * Both are drawn from the same captures, and neither resamples the phone
+ * screen: it is laid in at its own 1090 pixels either way, and only the space
+ * around it changes. Adding 1242 x 2688 is a line here.
+ */
+const SIZES = [
+  { id: "1290x2796", width: 1290, height: 2796, slot: "6.9-inch" },
+  { id: "1284x2778", width: 1284, height: 2778, slot: "6.5 and 6.7-inch" }
+];
+/** The one that keeps the paths the listing already points at. */
+const DEFAULT_SIZE = SIZES[0].id;
+
+let FRAME = SIZES[0];
 /** What the headline starts at, before the fitting below brings it down. */
 const TITLE_SIZE_PX = 78;
 /** iPhone 6.9": 430 x 932 points at three times the pixels. */
@@ -234,8 +271,12 @@ const RADIUS = { screen: pt(55), bezel: pt(59.2), rail: pt(61.8) };
 
 const DEVICE_WIDTH = SCREEN_IN_FRAME_PX + 2 * (RAIL_PX + BEZEL_PX);
 const DEVICE_HEIGHT = Math.round(SCREEN.height * DEVICE_SCALE) + 2 * (RAIL_PX + BEZEL_PX);
-/** Chosen so the screen itself still starts where it always did. */
-const DEVICE_TOP = 402 - (RAIL_PX + BEZEL_PX);
+/**
+ * How much frame is left under the phone. The caption takes what is left above,
+ * so a shorter frame moves the phone up rather than cropping it.
+ */
+const DEVICE_BOTTOM_GAP = 13;
+let DEVICE_TOP = FRAME.height - DEVICE_HEIGHT - DEVICE_BOTTOM_GAP;
 
 /*
  * The headless shell first, and it matters which.
@@ -1120,7 +1161,7 @@ function shoot({ page, out, width, height, scale }) {
 }
 
 function drawSet(faces) {
-  console.log(`  drawing the ${locale} set`);
+  console.log(`  drawing the ${locale} set at ${FRAME.width}x${FRAME.height} (${FRAME.slot})`);
   mkdirSync(outDir, { recursive: true });
 
   scenes.forEach((scene, index) => {
@@ -1168,9 +1209,12 @@ async function main() {
   mkdirSync(build, { recursive: true });
   const faces = fontFaces(fonts());
 
-  for (const one of asked) {
-    await selectLocale(one);
-    drawSet(faces);
+  for (const size of SIZES) {
+    selectSize(size);
+    for (const one of asked) {
+      await selectLocale(one);
+      drawSet(faces);
+    }
   }
 }
 

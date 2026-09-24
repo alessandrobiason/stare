@@ -19,10 +19,20 @@ language is how the sets drifted apart before: only English had been captured
 from the app, and Italian was still the old hand-drawn mirror, with its own copy
 of the marker colours.
 
-Output is **1290 × 2796**, which App Store Connect takes for the 6.9 and
-6.7-inch classes and scales down for every size below them. Nothing else has to
-be uploaded unless the listing is later given iPad screenshots, which this app
-cannot have — `supportsTablet` is false.
+**Two sizes, because App Store Connect will not take one.** The 6.9-inch slot
+wants **1290 × 2796** and the 6.5 and 6.7-inch slots reject it and want
+**1284 × 2778**; uploading the wrong one is answered with "the dimensions of one
+or more screenshots are not correct" and nothing more specific. So a run draws
+both:
+
+    docs/app-store/              1290 × 2796, English
+    docs/app-store/it/           1290 × 2796, Italian
+    docs/app-store/1284x2778/    and the same again, one size down
+
+Neither is a resize of the other. The phone screen is laid into both at its own
+1090 pixels and only the space around it changes, so no capture is ever
+resampled. A third size — 1242 × 2688, which those slots also accept — is one
+line in `SIZES`. No iPad screenshots are needed: `supportsTablet` is false.
 
 **The words inside the phone are the app's own.** The filter's categories, the
 count in the header, the card's five labels, the letters on the compass and the
