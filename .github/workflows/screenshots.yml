@@ -63,9 +63,6 @@ jobs:
     name: capture + compose
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    permissions:
-      # Only the manual commit path writes; a push run reports and stops.
-      contents: ${{ inputs.commit && 'write' || 'read' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -127,19 +124,6 @@ jobs:
           path: docs/app-store/**/*.png
           if-no-files-found: error
 
-      - name: Push them
-        if: inputs.commit
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add docs/app-store
-          if git diff --cached --quiet; then
-            echo "The frames are unchanged; nothing to push."
-            exit 0
-          fi
-          git commit -m 'chore: regenerate the App Store screenshots from the app'
-          git push
-
       - name: Say whether the listing has drifted
         if: '!inputs.commit'
         run: |
@@ -157,3 +141,42 @@ jobs:
             git diff --stat -- docs/app-store
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
+
+  # A second job for the one step that writes, so the job that runs a browser
+  # over the network never holds a token that can push.
+  #
+  # `permissions` cannot be decided from `inputs` — it is read before the
+  # dispatch inputs exist, and a workflow that tries is rejected outright — so
+  # the two levels of access are two jobs rather than one expression. `if` has
+  # no such limit, and on a push run there are no inputs, so this is skipped.
+  commit:
+    name: push the frames
+    needs: screenshots
+    if: ${{ inputs.commit }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # The frames as the other job rendered them. Its artifact is rooted at
+      # `docs/app-store`, so this puts `01-sky.png` and `it/01-sky.png` back
+      # exactly where they came from.
+      - name: Fetch the rendered frames
+        uses: actions/download-artifact@v4
+        with:
+          name: app-store-screenshots
+          path: docs/app-store
+
+      - name: Push them
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add docs/app-store
+          if git diff --cached --quiet; then
+            echo "The frames are unchanged; nothing to push." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit -m 'chore: regenerate the App Store screenshots from the app'
+          git push
