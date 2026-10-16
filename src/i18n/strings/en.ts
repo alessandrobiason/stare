@@ -206,8 +206,7 @@ export const en: Strings = {
     calibrate: {
       title: "Compass needs calibrating",
       detail:
-        "Move the phone in a figure eight, away from magnets, metal and other phones. " +
-        "Until then the satellites can be tens of degrees from where they are drawn."
+        "Move the phone in a figure eight, away from magnets, metal and other phones."
     },
     magnetic: {
       title: "Headings point to magnetic north",

@@ -200,8 +200,7 @@ export const it: Strings = {
       title: "La bussola va calibrata",
       detail:
         "Muovi il telefono a forma di otto, lontano da calamite, metallo e altri " +
-        "telefoni. Fino ad allora i satelliti possono trovarsi decine di gradi lontano " +
-        "da dove sono disegnati."
+        "telefoni."
     },
     magnetic: {
       title: "Le direzioni indicano il nord magnetico",
