@@ -76,12 +76,12 @@ listing: most people see one and a half frames.
 
 | # | File | What it shows | Caption |
 | --- | --- | --- | --- |
-| 1 | `01-sky.png` | The plain view: the Alpe di Siusi under the Milky Way, the satellite count, the freeze and filter buttons, the compass strip and the station's next pass. | **Name that light in the sky** — Point your phone at the sky to find the satellites passing overhead. |
-| 2 | `02-tap.png` | The station picked out over the Seceda ridge, with its card open on the 24-hour orbit preview and mission description. | **A day in orbit** — Discover each satellite’s mission and follow its orbit over the next 24 hours. |
-| 3 | `03-occlusion.png` | Straight up a gap between two buildings: the marks fill the channel of sky and stop dead at the walls, because the mask read that photograph. | **Between the rooftops** — Satellites disappear behind buildings and trees on your screen, too. |
-| 4 | `04-legend.png` | The same app over Rome in daylight, filter open: the six categories with their colours and the switches under them, and the same marks read by their dark edges against a bright sky. | **Choose what to follow** — From the ISS to Starlink, use colours and filters to choose what you see. |
-| 5 | `05-inview.png` | A city at dusk with the count opened into the breakdown behind it: how many are Starlink, how many Eutelsat, how many of them are lit. | **Your sky in numbers** — See how many satellites are in view, from Starlink to GPS. |
-| 6 | `06-pass.png` | A twilight sky over a low ridge, satellite paths drawn across it and the panel along the bottom naming upcoming passes with their local times and visibility. | **Catch the next pass** — Find out when the ISS will pass, where to look and whether you can see it. |
+| 1 | `01-sky.png` | The plain view: the Alpe di Siusi under the Milky Way, the satellite count, the freeze and filter buttons, the compass strip and the station's next pass. | **Satellite positions** — Locate satellites in real time in your camera’s view of the sky. |
+| 2 | `02-tap.png` | The station picked out over the Seceda ridge, with its card open on the 24-hour orbit preview and mission description. | **Satellite data and orbits** — View each satellite’s data and its predicted path over the next 24 hours. |
+| 3 | `03-occlusion.png` | Straight up a gap between two buildings: the marks fill the channel of sky and stop dead at the walls, because the mask read that photograph. | **Sky detection** — Satellites behind buildings or vegetation are hidden from view. |
+| 4 | `04-legend.png` | The same app over Rome in daylight, filter open: the six categories with their colours and the switches under them, and the same marks read by their dark edges against a bright sky. | **Category filters** — Select which satellites to display based on their purpose. |
+| 5 | `05-inview.png` | A city at dusk with the count opened into the breakdown behind it: how many are Starlink, how many Eutelsat, how many of them are lit. | **Satellite counts** — Check satellite counts within your field of view, grouped by constellation. |
+| 6 | `06-pass.png` | A twilight sky over a low ridge, satellite paths drawn across it and the panel along the bottom naming upcoming passes with their local times and visibility. | **Pass predictions** — Check the time, direction and naked-eye visibility of upcoming passes. |
 
 Frames 3 and 4 are the two that are hard to copy and are the reason to keep
 them: hiding satellites behind buildings is the thing no other sky app does,

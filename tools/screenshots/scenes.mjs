@@ -222,12 +222,12 @@ const scenes = [
     headingDeg: 41,
     caption: {
       en: {
-        title: "Name that light in the sky",
-        body: "Point your phone at the sky to find the satellites passing overhead."
+        title: "Satellite positions",
+        body: "Locate satellites in real time in your camera’s view of the sky."
       },
       it: {
-        title: "Dai un nome a quella luce",
-        body: "Inquadra il cielo e scopri quali satelliti ti passano sopra."
+        title: "Posizione dei satelliti",
+        body: "Visualizza in tempo reale i satelliti presenti nel cielo inquadrato."
       }
     },
     sky: NIGHT_CITY,
@@ -281,12 +281,12 @@ const scenes = [
     headingDeg: 38,
     caption: {
       en: {
-        title: "A day in orbit",
-        body: "Discover each satellite’s mission and follow its orbit over the next 24 hours."
+        title: "Satellite data and orbits",
+        body: "View each satellite’s data and its predicted path over the next 24 hours."
       },
       it: {
-        title: "Un giorno in orbita",
-        body: "Scopri a cosa serve ogni satellite e segui la sua orbita nelle prossime 24 ore."
+        title: "Dati e orbite",
+        body: "Consulta i dati del satellite e il percorso previsto nelle prossime 24 ore."
       }
     },
     sky: { ...NIGHT_CITY, seed: 23 },
@@ -360,12 +360,12 @@ const scenes = [
     headingDeg: 128,
     caption: {
       en: {
-        title: "Between the rooftops",
-        body: "Satellites disappear behind buildings and trees on your screen, too."
+        title: "Sky detection",
+        body: "Satellites behind buildings or vegetation are hidden from view."
       },
       it: {
-        title: "Il cielo tra i palazzi",
-        body: "I satelliti scompaiono dietro edifici e alberi, anche sullo schermo."
+        title: "Riconoscimento del cielo",
+        body: "La vista esclude i satelliti coperti da edifici e vegetazione."
       }
     },
     sky: {
@@ -417,12 +417,12 @@ const scenes = [
     headingDeg: 196,
     caption: {
       en: {
-        title: "Choose what to follow",
-        body: "From the ISS to Starlink, use colours and filters to choose what you see."
+        title: "Category filters",
+        body: "Select which satellites to display based on their purpose."
       },
       it: {
-        title: "Scegli cosa seguire",
-        body: "Dalla ISS a Starlink, usa colori e filtri per scegliere cosa mostrare."
+        title: "Filtri per categoria",
+        body: "Seleziona i satelliti da visualizzare in base alla loro funzione."
       }
     },
     sky: {
@@ -463,12 +463,12 @@ const scenes = [
     headingDeg: 22,
     caption: {
       en: {
-        title: "Your sky in numbers",
-        body: "See how many satellites are in view, from Starlink to GPS."
+        title: "Satellite counts",
+        body: "Check satellite counts within your field of view, grouped by constellation."
       },
       it: {
-        title: "Il tuo cielo, in numeri",
-        body: "Scopri quanti satelliti hai davanti, da Starlink ai sistemi GPS."
+        title: "Conteggio dei satelliti",
+        body: "Consulta il numero di satelliti nel campo visivo, suddivisi per costellazione."
       }
     },
     sky: { ...NIGHT_CITY, seed: 77 },
@@ -518,12 +518,12 @@ const scenes = [
     headingDeg: 305,
     caption: {
       en: {
-        title: "Catch the next pass",
-        body: "Find out when the ISS will pass, where to look and whether you can see it."
+        title: "Pass predictions",
+        body: "Check the time, direction and naked-eye visibility of upcoming passes."
       },
       it: {
-        title: "Il prossimo passaggio",
-        body: "Scopri quando passa la ISS, dove guardare e se sarà visibile a occhio nudo."
+        title: "Previsione dei passaggi",
+        body: "Verifica orario, direzione e visibilità a occhio nudo dei prossimi passaggi."
       }
     },
     sky: { ...NIGHT_CITY, seed: 53 },
