@@ -971,8 +971,8 @@ export const GROUND_TRACK = {
   hours: 24,
   /** Keep low-orbit curves smooth without allowing unbounded propagation. */
   maximumSamples: 7200,
-  /** One day in 50 seconds, so individual low-orbit crossings remain legible. */
-  loopSeconds: 50,
+  /** One day in 40 seconds, so individual low-orbit crossings remain legible. */
+  loopSeconds: 40,
   /**
    * How many points one orbit is sampled at.
    *

@@ -43,7 +43,7 @@ type Props = {
  * planet, and with the phone's own position marked inside or outside it, "is
  * that one serving me" stops being an abstract question.
  *
- * The next 24 hours are flown in 50 seconds, at the same compression for
+ * The next 24 hours are flown in 40 seconds, at the same compression for
  * every satellite. Dates and local times identify the window and the animated
  * moment, including crossings of midnight.
  *
