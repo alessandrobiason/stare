@@ -19,7 +19,7 @@ type Props = {
 };
 
 /**
- * What the satellite *does*, as a map at the foot of its card.
+ * What the satellite *does*, as the opening map of its card.
  *
  * Everything above this on the card is about here and now — how far away it is,
  * which way to look, whether it can be seen. That is the whole answer to

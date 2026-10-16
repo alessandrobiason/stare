@@ -72,7 +72,7 @@ type Props = {
    */
   sighting?: UpcomingPass | null;
   /**
-   * The orbit this object draws on the ground, for the map at the foot of the
+   * The orbit this object draws on the ground, for the map at the top of the
    * card, or `null` while there is none to draw.
    *
    * Planned outside the card (`useGroundTrack`) rather than read off
@@ -162,24 +162,20 @@ const CUE_BOB = 3;
  * else, and it carries the operator's own page where there is one — see
  * `briefingFor`.
  *
- * **And a photograph, for the objects there is one of.** Words cannot settle
- * what a thing looks like, and for the stations, the observatories and the
- * vehicles visiting them the picture is the answer to the question that was
- * actually asked. It sits above the text, because it is understood before the
- * text is read. It is fetched rather than bundled, so it arrives a moment after
- * the card does and is absent entirely for a phone with no signal — which is why
- * it is drawn as a strip that appears rather than a gap that fills, and why
- * every failure in `landmarkPhotos.ts` ends as a card with no picture on it.
+ * **The map opens the card; the photograph closes it.** The orbit is visible
+ * immediately, with the description and figures below. Photographs are fetched
+ * rather than bundled and appear at the foot once loaded; a phone with no
+ * signal keeps the rest of the card.
  *
  * **And it says when it goes on below the fold.** The card is capped at a
- * little under half the screen and the ground track map lives at the foot of
+ * little under half the screen and the photograph lives at the foot of
  * it, so on most cards the best thing on it is under the edge — and a sheet
  * with no scrollbar over a camera picture reads as a sheet that ends where it
  * ends. Nobody scrolls something they have no reason to think is scrollable. So
  * a card with more in it than fits fades its bottom edge into its own glass and
  * puts an arrow on it (`ScrollCue`): the fade says the content is continuing
  * rather than finishing, the arrow says which way, and pressing it takes the
- * body down to the map. It is drawn only while there is really something below
+ * body down to the end. It is drawn only while there is really something below
  * (`CUE_MIN_OVERFLOW`) and goes the moment anybody scrolls, because by then it
  * is an arrow over the thing it was pointing at.
  *
@@ -348,7 +344,7 @@ export const SatelliteCard: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Under the name, and scrolling: the picture and the paragraph are the
+      {/* Under the name, and scrolling: the map and the paragraph are the
           tall half of this card, and a card that grows past its share of the
           screen is a card over the sky it is describing. */}
       <ScrollView
@@ -364,10 +360,14 @@ export const SatelliteCard: React.FC<Props> = ({
         // read off them is whether the body has moved at all.
         scrollEventThrottle={200}
       >
-        {/* Keyed by the file, so switching between two satellites under one
-            finger starts the picture over rather than showing the Soyuz's for
-            the frame before the ISS's effect has run. */}
-        {photoFile && <Photograph key={photoFile} file={photoFile} of={selected} />}
+        {detail && groundTrack?.track && (
+          <GroundTrackMap
+            key={selected}
+            plan={groundTrack}
+            name={selected}
+            color={CATEGORY_COLORS[detail.category]}
+          />
+        )}
 
         {briefing && (
           <View style={styles.briefing}>
@@ -425,25 +425,11 @@ export const SatelliteCard: React.FC<Props> = ({
           <Text style={styles.missing}>{t.card.missing}</Text>
         )}
 
-        {/* Last, and the only thing on the card that is not about this instant
-            or about this place: what the object *does*. It is the tallest block
-            here, which is why it is at the bottom — the card opens on the
-            picture of the thing and the paragraph about it, as it always has,
-            and the map is what a scroll gets you.
-
-            Directly under the figures rather than under the paragraph, because
-            it belongs with them: the row above it says an orbit takes an hour
-            and a half, and this is that hour and a half drawn. Absent entirely
-            where the elements will not yield an orbit, rather than drawn as an
-            empty world — see `useGroundTrack`. */}
-        {detail && groundTrack?.track && (
+        {/* Keyed by the file so a new selection never inherits its photo. */}
+        {photoFile && (
           <>
             <View style={styles.rule} />
-            <GroundTrackMap
-              plan={groundTrack}
-              name={selected}
-              color={CATEGORY_COLORS[detail.category]}
-            />
+            <Photograph key={photoFile} file={photoFile} of={selected} />
           </>
         )}
       </ScrollView>

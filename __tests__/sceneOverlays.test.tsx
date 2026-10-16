@@ -1037,15 +1037,13 @@ describe("the tapped satellite's card", () => {
   });
 
   describe("the map of where it goes", () => {
-    test("is drawn under the figures, with the circle explained", () => {
+    test("opens the card before the figures, with the circle explained", () => {
       const text = textOf(card({ "STARLINK-1234": detail() }, undefined, undefined, null, plan()));
 
       expect(text).toContain(strings().card.map.title);
       expect(text).toContain(strings().card.map.footprint);
-      // Under the figures rather than over them: the card still opens on what
-      // the object is, and the map is what a scroll gets you.
-      expect(text.indexOf(strings().card.facts.orbit)).toBeLessThan(
-        text.indexOf(strings().card.map.title)
+      expect(text.indexOf(strings().card.map.title)).toBeLessThan(
+        text.indexOf(strings().card.facts.orbit)
       );
     });
 
