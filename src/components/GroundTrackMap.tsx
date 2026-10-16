@@ -43,7 +43,7 @@ type Props = {
  * planet, and with the phone's own position marked inside or outside it, "is
  * that one serving me" stops being an abstract question.
  *
- * The next 24 hours are flown in one minute, at the same compression for
+ * The next 24 hours are flown in 50 seconds, at the same compression for
  * every satellite. Dates and local times identify the window and the animated
  * moment, including crossings of midnight.
  *
@@ -64,7 +64,7 @@ export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
     [track, box, width, plan.observer]
   );
 
-  // The same time compression for every object: one forecast day per minute.
+  // The same time compression for every object over the full forecast window.
   const phase = useOrbitPhase(track && backdrop ? GROUND_TRACK.loopSeconds : null);
   const moment = track && backdrop ? groundTrackMoment(track, phase, box) : null;
 
