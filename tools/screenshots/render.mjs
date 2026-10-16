@@ -941,6 +941,8 @@ body {
 .caption p {
   margin-top: 26px;
   max-width: 1000px;
+  /* Keep two-line descriptions even instead of leaving a single word below. */
+  text-wrap: balance;
   font-size: 31px;
   font-weight: 400;
   line-height: 1.42;
