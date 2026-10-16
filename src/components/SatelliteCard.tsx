@@ -560,6 +560,7 @@ const ScrollCue: React.FC<{ shown: boolean; onPress: () => void }> = ({ shown, o
       // and the arrow stops taking them the moment it is answered. In the style
       // rather than as the prop, which both React Native and the web have
       // moved on from.
+      aria-hidden={!shown}
       style={[styles.cue, { opacity: fade, pointerEvents: shown ? "box-none" : "none" }]}
     >
       <View style={styles.cueFade}>
@@ -571,7 +572,8 @@ const ScrollCue: React.FC<{ shown: boolean; onPress: () => void }> = ({ shown, o
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={strings().card.more}
-        style={styles.cueButton}
+        style={[styles.cueButton, { pointerEvents: shown ? "auto" : "none" }]}
+        tabIndex={shown ? 0 : -1}
         onPress={onPress}
       >
         <Animated.View
@@ -581,8 +583,9 @@ const ScrollCue: React.FC<{ shown: boolean; onPress: () => void }> = ({ shown, o
             ]
           }}
         >
-          <Icon name="chevron" direction="down" size={16} color={theme.color.accent} />
+          <Icon name="chevron" direction="down" size={20} color={theme.color.background} />
         </Animated.View>
+        <Text style={styles.cueLabel}>{strings().card.more}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -592,7 +595,7 @@ const ScrollCue: React.FC<{ shown: boolean; onPress: () => void }> = ({ shown, o
 const CUE_NATIVE_DRIVER = Platform.OS !== "web";
 
 /** How tall the fade at the foot of the card is, in points, and in how many bands. */
-const CUE_FADE = 52;
+const CUE_FADE = 64;
 const CUE_BANDS = 8;
 
 /**
@@ -1083,22 +1086,20 @@ const styles = StyleSheet.create({
     pointerEvents: "none"
   },
   cueButton: {
-    // The one control in the app smaller than a thumb: it is a hint that can
-    // also be pressed, and every point of it is a point of sky the card is
-    // already covering. The gesture it stands for — a flick anywhere on the
-    // body — is the size of the card.
-    width: 34,
-    height: 34,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    gap: 8,
     borderRadius: theme.radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    // The accent rather than the plain glass every other chip on this card
-    // uses: this is the one thing on the sheet saying "there is more, and
-    // pressing this reaches it" rather than describing what is already on
-    // screen, and the accent is the app's own way of marking a control that
-    // does something. Plain glass at this size read as barely there at all.
-    ...glass(theme.color.accentSoft, 10),
-    borderColor: theme.color.accentBorder
+    backgroundColor: theme.color.accent,
+    ...lift
+  },
+  cueLabel: {
+    color: theme.color.background,
+    fontSize: 12,
+    fontWeight: "700"
   }
 });
 

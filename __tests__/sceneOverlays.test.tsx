@@ -1100,9 +1100,8 @@ describe("the tapped satellite's card", () => {
       // Everything the card says is still said.
       expect(text).toContain("1,240 km");
       expect(text).toContain(strings().card.map.title);
-      // And the cue itself says nothing: it is an arrow, not a sentence over a
-      // camera picture.
-      expect(text).not.toContain(strings().card.more);
+      // The visible label makes the scroll control easier to discover.
+      expect(text).toContain(strings().card.more);
     });
   });
 
