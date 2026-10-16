@@ -823,13 +823,6 @@ export const SkyOverlay: React.FC<Props> = ({
                 onEnableAll={onEnableAll}
               />
 
-              {/* Pinned under the header rather than centred on the frame, so
-                  it never lands on the card it was raised alongside — that
-                  opens from the bottom and can run to nearly half the screen.
-                  In the safe area layer for the same reason the header is: it
-                  is inset off a notch exactly as that title is. Not under the
-                  debug overlays, where the picture belongs to the mask. */}
-              {!debug && <FindInSky aim={aim} onDone={() => setAim(null)} />}
             </>
           )}
 
@@ -866,7 +859,14 @@ export const SkyOverlay: React.FC<Props> = ({
           <View style={styles.bottom} onLayout={onBottomLayout}>
             {tab === "sky" && (
               <>
-                {notice ? <View style={styles.inset}>{notice}</View> : null}
+                {/* One message slot: the brief pointing instruction temporarily
+                    replaces the notices, which return when its animation ends.
+                    Normal layout keeps either message clear of the card. */}
+                {!debug && aim ? (
+                  <View style={styles.inset}>
+                    <FindInSky aim={aim} onDone={() => setAim(null)} />
+                  </View>
+                ) : notice ? <View style={styles.inset}>{notice}</View> : null}
 
                 {/* Where the camera is pointing, as a rule under the picture.
                     Drawn under the debug overlays too: it is a fact about the

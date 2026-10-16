@@ -51,20 +51,6 @@ const OUT_MS = 520;
 const RISE = 10;
 /** The phone animates off the UI thread; the browser has no such driver. */
 const useNativeDriver = Platform.OS !== "web";
-/**
- * How far below the safe area's own top the sign sits, in points.
- *
- * Clear of `SkyHeader`'s row (a title, a count, two round buttons, all of it
- * inside the first ~60pt) with room to spare, and nowhere near the card this
- * sign is raised alongside: that opens from the bottom of the screen, and the
- * two used to land on top of each other when the sign was centred on the whole
- * frame instead of pinned under the header. Fixed rather than measured off the
- * header, because a sign a few points further from it than it strictly needs
- * to be costs nothing and a measurement that depends on another component
- * rendering first is a race this does not need to run.
- */
-const TOP_OFFSET = 92;
-
 type Props = {
   /** The aim to show, or `null` for nothing to say. */
   aim: SkyAim | null;
@@ -139,7 +125,7 @@ export const FindInSky: React.FC<Props> = ({ aim, onDone }) => {
   if (!aim) return null;
 
   return (
-    <View style={styles.top}>
+    <View style={styles.container}>
       <Animated.View
         // Said rather than only drawn: this is the app volunteering something
         // that was not asked for, which is what a live region is.
@@ -170,20 +156,8 @@ export const FindInSky: React.FC<Props> = ({ aim, onDone }) => {
 const BADGE_SIZE = 38;
 
 const styles = StyleSheet.create({
-  /**
-   * Under the header, over the picture, and nowhere near the card this sign is
-   * raised alongside — that opens from the bottom of the screen and can run to
-   * nearly half of it, which is what the sign used to sit on top of when it
-   * was centred on the whole frame instead.
-   *
-   * Transparent to touches down to the last pixel: what is under it is the one
-   * control the normal view has.
-   */
-  top: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: TOP_OFFSET,
+  /** In the shared message slot above the compass and the card. */
+  container: {
     alignItems: "center",
     // In the style rather than as the prop, which both React Native and the
     // web have moved on from.
