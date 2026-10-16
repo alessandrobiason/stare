@@ -222,12 +222,12 @@ const scenes = [
     headingDeg: 41,
     caption: {
       en: {
-        title: "Point it at the sky",
-        body: "The satellites passing over you, drawn on the picture where they actually are."
+        title: "Name that light in the sky",
+        body: "Point your phone at the sky to find the satellites passing overhead."
       },
       it: {
-        title: "Puntalo verso il cielo",
-        body: "I satelliti che ti passano sopra, disegnati sull’immagine dove si trovano davvero."
+        title: "Dai un nome a quella luce",
+        body: "Inquadra il cielo e scopri quali satelliti ti passano sopra."
       }
     },
     sky: NIGHT_CITY,
@@ -281,12 +281,12 @@ const scenes = [
     headingDeg: 38,
     caption: {
       en: {
-        title: "Tap a light, learn what it is",
-        body: "What it is, who flies it, how far away — and the figures keep moving while you read."
+        title: "A day in orbit",
+        body: "Discover each satellite’s mission and follow its orbit over the next 24 hours."
       },
       it: {
-        title: "Tocca una luce, scopri cos’è",
-        body: "Che cos’è, chi lo fa volare, quanto è lontano — e i numeri continuano a muoversi mentre leggi."
+        title: "Un giorno in orbita",
+        body: "Scopri a cosa serve ogni satellite e segui la sua orbita nelle prossime 24 ore."
       }
     },
     sky: { ...NIGHT_CITY, seed: 23 },
@@ -360,12 +360,12 @@ const scenes = [
     headingDeg: 128,
     caption: {
       en: {
-        title: "It knows what is in the way",
-        body: "Anything behind a building or a tree is left out, rather than drawn over it."
+        title: "Between the rooftops",
+        body: "Satellites disappear behind buildings and trees on your screen, too."
       },
       it: {
-        title: "Sa cosa c’è di mezzo",
-        body: "Quello che sta dietro a un palazzo o a un albero viene escluso, invece di essere disegnato sopra."
+        title: "Il cielo tra i palazzi",
+        body: "I satelliti scompaiono dietro edifici e alberi, anche sullo schermo."
       }
     },
     sky: {
@@ -417,12 +417,12 @@ const scenes = [
     headingDeg: 196,
     caption: {
       en: {
-        title: "Colour is what it is for",
-        body: "The same soft colours by day and by night. Size is how far away; a ring holds station over the equator."
+        title: "Choose what to follow",
+        body: "From the ISS to Starlink, use colours and filters to choose what you see."
       },
       it: {
-        title: "Il colore dice a cosa serve",
-        body: "Gli stessi colori tenui di giorno e di notte. La dimensione è la distanza; un anello sta fermo sopra l’equatore."
+        title: "Scegli cosa seguire",
+        body: "Dalla ISS a Starlink, usa colori e filtri per scegliere cosa mostrare."
       }
     },
     sky: {
@@ -463,12 +463,12 @@ const scenes = [
     headingDeg: 22,
     caption: {
       en: {
-        title: "What is overhead, right now",
-        body: "The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds."
+        title: "Your sky in numbers",
+        body: "See how many satellites are in view, from Starlink to GPS."
       },
       it: {
-        title: "Cosa c’è sopra di te",
-        body: "Il catalogo pubblico in tempo reale — circa 16.000 oggetti tracciati — diviso per quello che il cielo davanti a te contiene davvero."
+        title: "Il tuo cielo, in numeri",
+        body: "Scopri quanti satelliti hai davanti, da Starlink ai sistemi GPS."
       }
     },
     sky: { ...NIGHT_CITY, seed: 77 },
@@ -518,12 +518,12 @@ const scenes = [
     headingDeg: 305,
     caption: {
       en: {
-        title: "Know when to look up",
-        body: "Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up."
+        title: "Catch the next pass",
+        body: "Find out when the ISS will pass, where to look and whether you can see it."
       },
       it: {
-        title: "Sai quando guardare in su",
-        body: "Ogni passaggio porta con sé l’arco che percorrerà, una punta di freccia per ogni minuto, e l’ora in cui sorge."
+        title: "Il prossimo passaggio",
+        body: "Scopri quando passa la ISS, dove guardare e se sarà visibile a occhio nudo."
       }
     },
     sky: { ...NIGHT_CITY, seed: 53 },

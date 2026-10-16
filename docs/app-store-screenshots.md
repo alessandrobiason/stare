@@ -76,18 +76,18 @@ listing: most people see one and a half frames.
 
 | # | File | What it shows | Caption |
 | --- | --- | --- | --- |
-| 1 | `01-sky.png` | The plain view: the Alpe di Siusi under the Milky Way, about a hundred marks across it, the app's name over what it counts, the freeze and filter buttons, the compass strip along the foot of the frame and the station's next pass on the card. | **Point it at the sky** — The satellites passing over you, drawn on the picture where they actually are. |
-| 2 | `02-tap.png` | The station picked out: its card open over the Seceda ridge, with the photograph, who flies it and what it is. | **Tap a light, learn what it is** — What it is, who flies it, how far away — and the figures keep moving while you read. |
-| 3 | `03-occlusion.png` | Straight up a gap between two buildings: the marks fill the channel of sky and stop dead at the walls, because the mask read that photograph. | **It knows what is in the way** — Anything behind a building or a tree is left out, rather than drawn over it. |
-| 4 | `04-legend.png` | The same app over Rome in daylight, filter open: the six categories with their colours and the switches under them, and the same marks read by their dark edges against a bright sky. | **Colour is what it is for** — The same soft colours by day and by night. Size is how far away; a ring holds station over the equator. |
-| 5 | `05-inview.png` | A city at dusk with the count opened into the breakdown behind it: how many are Starlink, how many Eutelsat, how many of them are lit. | **What is overhead, right now** — The live public catalogue — some 16,000 tracked objects — sorted into what the sky in front of you actually holds. |
-| 6 | `06-pass.png` | A twilight sky over a low ridge, arcs drawn across it with an arrowhead on every minute, and the panel along the bottom naming what is coming up and counting it down. | **Know when to look up** — Each landmark carries the arc it will cross, an arrowhead for every minute, and the time it comes up. |
+| 1 | `01-sky.png` | The plain view: the Alpe di Siusi under the Milky Way, the satellite count, the freeze and filter buttons, the compass strip and the station's next pass. | **Name that light in the sky** — Point your phone at the sky to find the satellites passing overhead. |
+| 2 | `02-tap.png` | The station picked out over the Seceda ridge, with its card open on the 24-hour orbit preview and mission description. | **A day in orbit** — Discover each satellite’s mission and follow its orbit over the next 24 hours. |
+| 3 | `03-occlusion.png` | Straight up a gap between two buildings: the marks fill the channel of sky and stop dead at the walls, because the mask read that photograph. | **Between the rooftops** — Satellites disappear behind buildings and trees on your screen, too. |
+| 4 | `04-legend.png` | The same app over Rome in daylight, filter open: the six categories with their colours and the switches under them, and the same marks read by their dark edges against a bright sky. | **Choose what to follow** — From the ISS to Starlink, use colours and filters to choose what you see. |
+| 5 | `05-inview.png` | A city at dusk with the count opened into the breakdown behind it: how many are Starlink, how many Eutelsat, how many of them are lit. | **Your sky in numbers** — See how many satellites are in view, from Starlink to GPS. |
+| 6 | `06-pass.png` | A twilight sky over a low ridge, satellite paths drawn across it and the panel along the bottom naming upcoming passes with their local times and visibility. | **Catch the next pass** — Find out when the ISS will pass, where to look and whether you can see it. |
 
 Frames 3 and 4 are the two that are hard to copy and are the reason to keep
 them: hiding satellites behind buildings is the thing no other sky app does,
 and a legible daylit sky is the thing every other one gets wrong. Frame 5
-answers the question the count provokes, and is the only place the size of the
-catalogue is claimed. Frame 6 is the one that answers "so when do I go
+answers the question the count provokes by showing which satellites are in
+view. Frame 6 is the one that answers "so when do I go
 outside" — the other five all show a sky someone is already standing under,
 and this is the only one that is about a sky that has not arrived yet.
 
@@ -96,11 +96,9 @@ rather than the app's, and a benefit frame this plain would carry earlier — th
 say, after the tap — at the cost of renumbering the files. Left where it is
 because moving it is a marketing decision rather than a technical one.
 
-The captions describe what is in the frame under them rather than the app in
-general, and none of them promises anything the app does not do. Two words are
-worth keeping as they are: "drawn where they actually are" (the claim the whole
-app rests on) and "left out, rather than drawn over it", which is the intro
-screen's own wording (`src/i18n/strings/en.ts`).
+Each caption pairs a short heading with one plain sentence about what the
+frame shows. English and Italian cover the same feature in natural wording
+for each language, without relying on a catalogue count that can change.
 
 ## How a frame is built
 
