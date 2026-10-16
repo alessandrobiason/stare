@@ -967,6 +967,12 @@ export const FULL_TRAJECTORY = {
  * the animation runs at the rate it does.
  */
 export const GROUND_TRACK = {
+  /** The forecast window shown on every satellite card. */
+  hours: 24,
+  /** Keep low-orbit curves smooth without allowing unbounded propagation. */
+  maximumSamples: 7200,
+  /** One day in one minute, so individual low-orbit crossings remain legible. */
+  loopSeconds: 60,
   /**
    * How many points one orbit is sampled at.
    *

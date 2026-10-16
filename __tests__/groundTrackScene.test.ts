@@ -103,6 +103,20 @@ describe("the backdrop", () => {
   test("a satellite that holds station needs the track drawn once", () => {
     expect(groundTrackBackdrop(trackNamed("ASTRA 1KR"), BOX, MILAN).track).toHaveLength(1);
   });
+
+  test("keeps every revolution of a full day on the map", () => {
+    const track = trackNamed("ISS");
+    const points = groundTrackBackdrop(track, BOX, MILAN).track.flat();
+    // Include early and late turns: repeating the entire day with a small
+    // copy limit silently drops most of them off the edge of the map.
+    for (let index = 0; index < track.samples.length; index += 101) {
+      const sample = track.samples[index];
+      const longitude = ((sample.longitudeDeg + 180) % 360 + 360) % 360 - 180;
+      const [x, y] = project(longitude, sample.latitudeDeg, BOX);
+      expect(points.some(([px, py]) => Math.abs(px - x) < 0.001 && Math.abs(py - y) < 0.001)).toBe(true);
+    }
+    expect(points.length).toBeLessThan(track.samples.length * 4);
+  });
 });
 
 describe("a moment of the animation", () => {
@@ -123,7 +137,7 @@ describe("a moment of the animation", () => {
     const track = trackNamed("ISS");
     const moment = groundTrackMoment(track, 0.25, BOX);
     expect(moment.atMs).toBeCloseTo(track.fromMs + track.spanMs * 0.25, 6);
-    expect(moment.intoOrbitMinutes).toBeCloseTo(track.periodMinutes * 0.25, 6);
+    expect(moment.intoOrbitMinutes).toBeCloseTo(track.spanMs / 60000 * 0.25, 6);
     // A low orbit sees a few per cent of the world at a time.
     expect(moment.share).toBeGreaterThan(0.01);
     expect(moment.share).toBeLessThan(0.1);
@@ -140,7 +154,7 @@ describe("a moment of the animation", () => {
     // And at the very start, where the wake reaches back past the beginning of
     // the track into the end of it — two runs rather than a line drawn
     // straight back across the map.
-    const opening = groundTrackMoment(track, 0.01, BOX);
+    const opening = groundTrackMoment(track, 0.001, BOX);
     expect(opening.wake.length).toBeGreaterThan(1);
     expect(touchesMap(opening.wake, BOX)).toBe(true);
   });

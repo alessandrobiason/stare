@@ -58,7 +58,7 @@ export type GroundSample = {
   altitudeKm: number;
 };
 
-/** One orbit's worth of ground track, ready to draw. */
+/** The next day's ground track, ready to draw. */
 export type GroundTrack = {
   /** The object it belongs to, so a stale track cannot be drawn for a new one. */
   name: string;
@@ -66,9 +66,9 @@ export type GroundTrack = {
   samples: readonly GroundSample[];
   /** When the track starts: the moment it was planned at. */
   fromMs: number;
-  /** How long it covers, in milliseconds — one orbit. */
+  /** How long it covers, in milliseconds. */
   spanMs: number;
-  /** The same, in minutes, as the card writes it. */
+  /** One orbit's period in minutes, independent of the forecast window. */
   periodMinutes: number;
 };
 
@@ -82,7 +82,7 @@ export type GroundTrack = {
 const EARTH_RADIUS_KM = 6378.137;
 
 /**
- * One orbit of ground track from `atMs`, or `null` where SGP4 cannot place the
+ * The next 24 hours from `atMs`, or `null` where SGP4 cannot place the
  * object or its elements do not describe an orbit worth drawing.
  *
  * Sampled in equal steps of time rather than of arc, which is the point: an
@@ -103,14 +103,15 @@ export function groundTrackFor(entry: CatalogEntry, atMs: number): GroundTrack |
   // catalogue's real orbits run from ninety minutes to a sidereal day.
   if (periodMinutes > GROUND_TRACK.maximumPeriodMinutes) return null;
 
-  const spanMs = periodMinutes * 60 * 1000;
-  const steps = GROUND_TRACK.samples;
+  const spanMs = GROUND_TRACK.hours * 60 * 60 * 1000;
+  const steps = Math.min(
+    GROUND_TRACK.maximumSamples,
+    Math.max(GROUND_TRACK.samples, Math.ceil(GROUND_TRACK.samples * spanMs / (periodMinutes * 60000)))
+  );
   const samples: GroundSample[] = [];
   let previousLongitude: number | null = null;
 
-  // The closing point repeats the opening one, so the track is a closed curve:
-  // a loop that stops one step short of itself has a gap in it, and on a figure
-  // of eight that gap is where the two halves cross.
+  // Include both ends of the forecast; the last point is not joined to the first.
   for (let step = 0; step <= steps; step += 1) {
     const sampleMs = atMs + (step / steps) * spanMs;
     const when = new Date(sampleMs);

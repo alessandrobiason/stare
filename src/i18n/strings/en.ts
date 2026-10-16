@@ -179,8 +179,10 @@ export const en: Strings = {
     map: {
       label: "Ground track of {name}",
       title: "GROUND TRACK",
+      window: "NEXT 24 HOURS",
+      range: "{from} → {to}",
       footprint: "Inside the circle it is above the horizon",
-      at: "at {time}"
+      at: "{time}"
     },
     facts: {
       distance: "Distance",

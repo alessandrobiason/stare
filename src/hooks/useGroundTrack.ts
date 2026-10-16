@@ -12,7 +12,7 @@ type Options = {
   name: string | null;
 };
 
-/** One orbit drawn on the world, and where the phone was when it was planned. */
+/** The next 24 hours drawn on the world, and the observer at planning time. */
 export type GroundTrackPlan = {
   /**
    * The orbit, or `null` where the elements will not yield one.

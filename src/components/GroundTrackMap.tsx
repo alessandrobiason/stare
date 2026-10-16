@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { GROUND_TRACK } from "../constants";
 import { GroundTrackPlan } from "../hooks/useGroundTrack";
 import { useOrbitPhase } from "../hooks/useOrbitPhase";
 import { fill, strings } from "../i18n";
-import { clockTime } from "../i18n/format";
-import { loopSecondsFor } from "../satellite/groundTrack";
+import { calendarTime } from "../i18n/format";
 import { GroundTrackCanvas } from "./GroundTrackCanvas";
 import { groundTrackBackdrop, groundTrackMoment, MAP_INK, mapBoxFor } from "./groundTrackScene";
 import { theme } from "./theme";
@@ -43,14 +43,9 @@ type Props = {
  * planet, and with the phone's own position marked inside or outside it, "is
  * that one serving me" stops being an abstract question.
  *
- * **It is flown at the orbit's own speed, compressed.** Which is the one thing
- * here that had to be decided rather than drawn: the catalogue's periods differ
- * by a factor of sixteen, so a single compression makes a geostationary orbit
- * unwatchable and a single loop length quietly flattens the difference.
- * `loopSecondsFor` splits it — a fraction of the ratio, so a slower orbit takes
- * visibly longer to come round — and the clock under the map runs in the
- * orbit's own time, so what has been compressed is on the card rather than
- * hidden in it.
+ * The next 24 hours are flown in one minute, at the same compression for
+ * every satellite. Dates and local times identify the window and the animated
+ * moment, including crossings of midnight.
  *
  * The width is measured rather than assumed: this sits in a card whose width is
  * the phone's, and the map's height follows from it at the projection's aspect.
@@ -69,9 +64,8 @@ export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
     [track, box, width, plan.observer]
   );
 
-  // Keyed on the orbit's own period, so a replan underneath does not restart
-  // the loop — see `useOrbitPhase`.
-  const phase = useOrbitPhase(track && backdrop ? loopSecondsFor(track.periodMinutes) : null);
+  // The same time compression for every object: one forecast day per minute.
+  const phase = useOrbitPhase(track && backdrop ? GROUND_TRACK.loopSeconds : null);
   const moment = track && backdrop ? groundTrackMoment(track, phase, box) : null;
 
   const onLayout = ({ nativeEvent }: LayoutChangeEvent) => {
@@ -81,7 +75,15 @@ export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
 
   return (
     <View style={styles.block}>
-      <Text style={styles.title}>{t.card.map.title}</Text>
+      <Text style={styles.title}>{t.card.map.title} · {t.card.map.window}</Text>
+      {track && (
+        <Text style={styles.range}>
+          {fill(t.card.map.range, {
+            from: calendarTime(new Date(track.fromMs)),
+            to: calendarTime(new Date(track.fromMs + track.spanMs))
+          })}
+        </Text>
+      )}
 
       {/* The corner radius lives here rather than in either backend: it is the
           one part of the map's shape that is not drawn, and a rounded canvas
@@ -107,7 +109,7 @@ export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
 /** The clock beside the map, or nothing before there is a moment to name. */
 function atLabel(atMs: number | null): string {
   if (atMs === null) return "";
-  return fill(strings().card.map.at, { time: clockTime(new Date(atMs)) });
+  return fill(strings().card.map.at, { time: calendarTime(new Date(atMs)) });
 }
 
 /**
@@ -142,6 +144,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 0.7,
+    marginBottom: 7
+  },
+  range: {
+    color: theme.color.textDim,
+    fontSize: 11,
+    fontVariant: ["tabular-nums"],
     marginBottom: 7
   },
   frame: {

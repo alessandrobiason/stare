@@ -172,8 +172,10 @@ export const it: Strings = {
     map: {
       label: "Traccia a terra di {name}",
       title: "TRACCIA A TERRA",
+      window: "PROSSIME 24 ORE",
+      range: "{from} → {to}",
       footprint: "Dentro il cerchio è sopra l'orizzonte",
-      at: "alle {time}"
+      at: "{time}"
     },
     facts: {
       distance: "Distanza",

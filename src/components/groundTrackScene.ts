@@ -204,7 +204,7 @@ export function groundTrackBackdrop(
     ),
     graticule: graticuleOf(box),
     equator: [project(-180, 0, box), project(180, 0, box)],
-    track: repeated(track.samples.map(pointOf(box)), box),
+    track: trackLines(track, box),
     observer: observer
       ? project(wrapDegrees180(observer.longitudeDeg), observer.latitudeDeg, box)
       : null
@@ -247,6 +247,27 @@ function pointOf(box: MapBox) {
     project(sample.longitudeDeg, sample.latitudeDeg, box);
 }
 
+/** Repeat short runs separately so a full day never exceeds the copy limit. */
+function trackLines(track: GroundTrack, box: MapBox): Polyline[] {
+  const runs: Point[][] = [];
+  let run: Point[] = [];
+  let low = Infinity;
+  let high = -Infinity;
+  for (const sample of track.samples) {
+    const point = pointOf(box)(sample);
+    if (run.length > 1 && Math.max(high, point[0]) - Math.min(low, point[0]) > box.width) {
+      runs.push(run);
+      run = [run[run.length - 1]];
+      low = high = run[0][0];
+    }
+    run.push(point);
+    low = Math.min(low, point[0]);
+    high = Math.max(high, point[0]);
+  }
+  if (run.length > 0) runs.push(run);
+  return runs.flatMap((piece) => repeated(piece, box));
+}
+
 /**
  * The bright piece of track behind the dot: `wakeFraction` of an orbit, as one
  * run of samples or two where it reaches back past the start of the track.
@@ -258,7 +279,8 @@ function pointOf(box: MapBox) {
  * map on its own, and they meet at the edges where they should.
  */
 function wakeOf(track: GroundTrack, phase: number): GroundSample[][] {
-  const behind = clamp(phase, 0, 1) - GROUND_TRACK.wakeFraction;
+  const fraction = GROUND_TRACK.wakeFraction * Math.min(1, track.periodMinutes * 60000 / track.spanMs);
+  const behind = clamp(phase, 0, 1) - fraction;
   const head = sampleAt(track, phase);
   if (behind >= 0) return [[...runBetween(track, behind, phase), head]];
   // Round the back of the loop: the tail end of the last orbit, then this one

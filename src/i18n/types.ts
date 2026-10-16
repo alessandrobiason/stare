@@ -322,6 +322,9 @@ export type Strings = {
      * counting. See `src/components/GroundTrackMap.tsx`.
      */
     map: {
+      /** The explicitly named 24-hour forecast and its local date/time bounds. */
+      window: string;
+      range: string;
       /**
        * What the picture is, for a screen reader. `{name}`.
        *

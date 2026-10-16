@@ -133,28 +133,35 @@ export function clockTime(when: Date): string {
   return `${when.getHours()}:${when.getMinutes().toString().padStart(2, "0")}`;
 }
 
+/** Local date and time, so a forecast stays clear across midnight and DST. */
+export function calendarTime(when: Date): string {
+  const formatter = clockFormat(localeReport(), true);
+  if (formatter) return formatter.format(when);
+  return `${when.getDate()}/${when.getMonth() + 1} ${clockTime(when)}`;
+}
+
 const clockFormats = new Map<string, Intl.DateTimeFormat | null>();
 
-function clockFormat(report: LocaleReport): Intl.DateTimeFormat | null {
+function clockFormat(report: LocaleReport, dated = false): Intl.DateTimeFormat | null {
   const preferred = [...report.tags, report.locale];
-  const key = preferred.join(",");
+  const key = `${dated ? "date:" : ""}${preferred.join(",")}`;
   const known = clockFormats.get(key);
   if (known !== undefined) return known;
 
   // The platform's own tags first, then the language on its own: `Intl` throws
   // on the whole list if the first tag in it is malformed, and a tag arrives
   // here as whatever the platform put in it.
-  const made = timeFormat(preferred) ?? timeFormat([report.locale]);
+  const made = timeFormat(preferred, dated) ?? timeFormat([report.locale], dated);
   clockFormats.set(key, made);
   return made;
 }
 
-function timeFormat(tags: readonly string[]): Intl.DateTimeFormat | null {
+function timeFormat(tags: readonly string[], dated: boolean): Intl.DateTimeFormat | null {
   try {
     // The `-u-nu-latn` extension pins the digits, as above.
     return new Intl.DateTimeFormat(
       tags.map((tag) => `${tag}-u-nu-latn`),
-      { hour: "numeric", minute: "2-digit" }
+      { ...(dated ? { day: "numeric", month: "short" } as const : {}), hour: "numeric", minute: "2-digit" }
     );
   } catch {
     return null;

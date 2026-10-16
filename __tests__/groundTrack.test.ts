@@ -119,9 +119,11 @@ describe("the shape a ground track draws", () => {
 
   test("a track is sampled in equal steps of time", () => {
     const track = trackNamed("ISS");
-    expect(track.samples).toHaveLength(GROUND_TRACK.samples + 1);
+    expect(track.samples.length).toBeGreaterThan(GROUND_TRACK.samples);
+    expect(track.samples.length).toBeLessThanOrEqual(GROUND_TRACK.maximumSamples + 1);
     expect(track.fromMs).toBe(AT_MS);
-    expect(track.spanMs).toBeCloseTo(track.periodMinutes * 60000, 6);
+    expect(track.spanMs).toBe(24 * 60 * 60 * 1000);
+    expect(track.samples.at(-1)?.atMs).toBe(AT_MS + track.spanMs);
 
     // To well inside a millisecond, which is as equal as a fraction of a
     // period computed in floating point gets to be.
