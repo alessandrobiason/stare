@@ -22,7 +22,7 @@ export const it: Strings = {
       footnote: "La tua posizione non viene mai condivisa con altri."
     },
     next: "AVANTI",
-    allowAccess: "CONSENTI"
+    continue: "CONTINUA"
   },
   tour: {
     open: "Aiuto",

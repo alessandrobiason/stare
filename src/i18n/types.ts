@@ -681,8 +681,8 @@ export type IntroStrings = {
   };
   /** The button on every page but the last. */
   next: string;
-  /** The last page's button: accepting it is what lets boot begin. */
-  allowAccess: string;
+  /** Neutral navigation on the last page; the system prompts collect consent. */
+  continue: string;
 };
 
 /** One thing the operating system will ask about, and why the app needs it. */

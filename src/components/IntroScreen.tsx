@@ -20,7 +20,7 @@ import { theme } from "./theme";
 import { WORDMARK_WEIGHT, wordmarkTracking } from "./wordmark";
 
 type Props = {
-  /** Called once the second page is accepted. Boot starts on the other side. */
+  /** Called once the second page is completed. Boot starts on the other side. */
   onDone: () => void;
 };
 
@@ -194,7 +194,7 @@ export const IntroScreen: React.FC<Props> = ({ onDone }) => {
 
                 <Pressable accessibilityRole="button" style={styles.button} onPress={advance}>
                   <Text style={styles.buttonLabel}>
-                    {page === pages.length - 1 ? t.allowAccess : t.next}
+                    {page === pages.length - 1 ? t.continue : t.next}
                   </Text>
                 </Pressable>
               </View>

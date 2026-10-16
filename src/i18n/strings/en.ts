@@ -29,7 +29,7 @@ export const en: Strings = {
       footnote: "Your location is never shared with others."
     },
     next: "NEXT",
-    allowAccess: "ALLOW ACCESS"
+    continue: "CONTINUE"
   },
   tour: {
     open: "Help",
