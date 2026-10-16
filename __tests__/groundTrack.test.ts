@@ -136,14 +136,19 @@ describe("the shape a ground track draws", () => {
 
   test("elements that do not describe a drawable orbit get no track", () => {
     const entry = entryNamed("ISS");
-    // An orbit slower than the ceiling: whatever the elements are doing, one
-    // turn of it is not a picture of anything.
-    const slow: CatalogEntry = {
-      ...entry,
-      satrec: { ...entry.satrec, no: (2 * Math.PI) / (GROUND_TRACK.maximumPeriodMinutes + 1) }
-    };
-    expect(groundTrackFor(slow, AT_MS)).toBeNull();
     expect(groundTrackFor({ ...entry, satrec: { ...entry.satrec, no: 0 } }, AT_MS)).toBeNull();
+    expect(groundTrackFor({ ...entry, satrec: { ...entry.satrec, no: Number.NaN } }, AT_MS)).toBeNull();
+  });
+
+  test.each(["Chandra", "MMS 1"])("shows the evolving orbit of %s despite its long period", (name) => {
+    const track = trackNamed(name);
+    expect(track.periodMinutes).toBeGreaterThan(2 * 24 * 60);
+    expect(track.spanMs).toBe(24 * 60 * 60 * 1000);
+    expect(track.samples).toHaveLength(GROUND_TRACK.samples + 1);
+    expect(spanOf(track).longitudeDeg).toBeGreaterThan(30);
+    const first = sampleAt(track, 0);
+    const last = sampleAt(track, 1);
+    expect(Math.abs(last.longitudeDeg - first.longitudeDeg)).toBeGreaterThan(10);
   });
 });
 

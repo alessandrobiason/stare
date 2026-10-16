@@ -986,15 +986,6 @@ export const GROUND_TRACK = {
   /** Too few to draw a curve with: a track this broken is not drawn at all. */
   minimumSamples: 8,
   /**
-   * Past this, one orbit is not a picture of anything, in minutes.
-   *
-   * Two days. A real catalogue orbit tops out at a sidereal day — that is what
-   * geostationary *means* — so anything beyond this is decaying elements, an
-   * escape trajectory, or a set of numbers SGP4 should not have been given.
-   * Those objects keep their card and lose their map.
-   */
-  maximumPeriodMinutes: 2880,
-  /**
    * The map itself: an equirectangular world, twice as wide as it is tall.
    *
    * The plainest projection there is — longitude straight across, latitude

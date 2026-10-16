@@ -98,10 +98,8 @@ const EARTH_RADIUS_KM = 6378.137;
 export function groundTrackFor(entry: CatalogEntry, atMs: number): GroundTrack | null {
   const periodMinutes = orbitPeriodMinutes(entry.satrec);
   if (!Number.isFinite(periodMinutes) || periodMinutes <= 0) return null;
-  // An object whose elements put a single orbit past this is either decaying,
-  // outbound, or a set of elements nobody should be drawing a day of. The
-  // catalogue's real orbits run from ninety minutes to a sidereal day.
-  if (periodMinutes > GROUND_TRACK.maximumPeriodMinutes) return null;
+  // Long periods are valid too: Chandra and MMS take more than two days.
+  // Sampling is bounded by the forecast window, regardless of orbit length.
 
   const spanMs = GROUND_TRACK.hours * 60 * 60 * 1000;
   const steps = Math.min(
