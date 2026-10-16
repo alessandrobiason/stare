@@ -794,10 +794,13 @@ describe("the tapped satellite's card", () => {
       sunAltitudeDeg: 2
     });
 
-    test("is said on a line of its own, beside what is true now", () => {
-      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", sighting));
+    test("leads with the next visible pass before the map", () => {
+      const text = textOf(card({ ISS: overhead }, ["ISS"], "ISS", sighting, plan("ISS")));
 
       expect(text).toMatch(/Visible to the eye at \d{1,2}:31/);
+      expect(text.indexOf("Visible to the eye at")).toBeLessThan(
+        text.indexOf(strings().card.map.title)
+      );
       // Where to stand and how bright, as the passes panel says it.
       expect(text).toContain("68° up");
       expect(text).toContain("magnitude -2.2");

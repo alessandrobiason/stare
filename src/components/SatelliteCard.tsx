@@ -66,9 +66,9 @@ type Props = {
    * The next pass this object makes that can be seen with the naked eye, within
    * the next day, or `null` for none.
    *
-   * Its own line, under the seeing line: that one is about now, and whether the
-   * object is worth going outside for later is a different question with a
-   * different answer most of the time. See `sightingLine`.
+   * The first detail under the heading, kept visible while the body scrolls.
+   * The seeing line is about now; this answers when to look later. See
+   * `sightingLine`.
    */
   sighting?: UpcomingPass | null;
   /**
@@ -162,7 +162,10 @@ const CUE_BOB = 3;
  * else, and it carries the operator's own page where there is one — see
  * `briefingFor`.
  *
- * **The map opens the card; the photograph closes it.** The orbit is visible
+ * **The next sighting stays under the heading.** Its time is visible as soon
+ * as the card opens and stays there while the rest of the card scrolls.
+ *
+ * **The map opens the body; the photograph closes it.** The orbit is visible
  * immediately, with the description and figures below. Photographs are fetched
  * rather than bundled and appear at the foot once loaded; a phone with no
  * signal keeps the rest of the card.
@@ -344,9 +347,13 @@ export const SatelliteCard: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Under the name, and scrolling: the map and the paragraph are the
-          tall half of this card, and a card that grows past its share of the
-          screen is a card over the sky it is describing. */}
+      {detail && sighting && (
+        <Text style={styles.sighting}>{sightingLine(sighting)}</Text>
+      )}
+
+      {/* Under the heading and next sighting, and scrolling: the map and
+          paragraph are the tall half of this card, and a card that grows past
+          its share of the screen is a card over the sky it is describing. */}
       <ScrollView
         ref={cue.bodyRef}
         style={styles.body}
@@ -392,15 +399,6 @@ export const SatelliteCard: React.FC<Props> = ({
             tells nobody anything they did not know by looking up. */}
         {detail && showsSeeing(detail) && (
           <Text style={styles.seeing}>{seeing(detail)}</Text>
-        )}
-
-        {/* And whether it is worth going out for later: the next pass that can
-            be seen without help, in the accent a sighting has in the passes
-            panel. */}
-        {detail && sighting && (
-          <Text style={[styles.sighting, !showsSeeing(detail) && styles.lineFirst]}>
-            {sightingLine(sighting)}
-          </Text>
         )}
 
         {detail ? (
@@ -1014,15 +1012,12 @@ const styles = StyleSheet.create({
   },
   sighting: {
     marginHorizontal: 14,
-    marginTop: 4,
+    marginTop: 8,
+    marginBottom: 2,
     color: theme.color.accent,
     fontSize: 12.5,
     fontWeight: "600",
     lineHeight: 18
-  },
-  /** The sighting line with no seeing line above it, spaced off the rule instead. */
-  lineFirst: {
-    marginTop: 9
   },
   facts: {
     paddingHorizontal: 14,
