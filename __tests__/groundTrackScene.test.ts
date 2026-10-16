@@ -147,16 +147,22 @@ describe("a moment of the animation", () => {
     expect(groundTrackMoment(trackNamed("ASTRA 1KR"), 0, BOX).share).toBeGreaterThan(0.4);
   });
 
-  test("draws a wake behind the dot, and wraps it round the start of the loop", () => {
+  test("clears the wake at restart and grows it only from the new run", () => {
     const track = trackNamed("ISS");
     // Part way in: one run of track behind the satellite.
     expect(groundTrackMoment(track, 0.5, BOX).wake.length).toBeGreaterThan(0);
-    // And at the very start, where the wake reaches back past the beginning of
-    // the track into the end of it — two runs rather than a line drawn
-    // straight back across the map.
+    expect(groundTrackMoment(track, 0, BOX).wake).toEqual([]);
     const opening = groundTrackMoment(track, 0.001, BOX);
-    expect(opening.wake.length).toBeGreaterThan(1);
     expect(touchesMap(opening.wake, BOX)).toBe(true);
+    const first = track.samples[0];
+    const [startX, startY] = project(first.longitudeDeg, first.latitudeDeg, BOX);
+    // Every date-line copy starts at the opening sample. No piece from the
+    // end of yesterday's animation can masquerade as a connected orbit.
+    for (const run of opening.wake) {
+      expect(run[0][1]).toBeCloseTo(startY, 6);
+      const turns = (run[0][0] - startX) / BOX.width;
+      expect(turns).toBeCloseTo(Math.round(turns), 6);
+    }
   });
 
   test("ends the wake at the satellite", () => {

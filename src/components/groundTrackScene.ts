@@ -269,26 +269,15 @@ function trackLines(track: GroundTrack, box: MapBox): Polyline[] {
 }
 
 /**
- * The bright piece of track behind the dot: `wakeFraction` of an orbit, as one
- * run of samples or two where it reaches back past the start of the track.
- *
- * Two, rather than one run stitched together, because the track's longitudes
- * run continuously (`GroundSample.longitudeDeg`) and the two ends of a closed
- * orbit are a world apart in them — joined into a single run they would draw a
- * line straight back across the map. As separate runs each is repeated onto the
- * map on its own, and they meet at the edges where they should.
+ * A short wake within this forecast run. At a restart it grows from nothing;
+ * the previous run's end is a different time and must never be carried over.
  */
 function wakeOf(track: GroundTrack, phase: number): GroundSample[][] {
+  const headPhase = clamp(phase, 0, 1);
+  if (headPhase === 0) return [];
   const fraction = GROUND_TRACK.wakeFraction * Math.min(1, track.periodMinutes * 60000 / track.spanMs);
-  const behind = clamp(phase, 0, 1) - fraction;
-  const head = sampleAt(track, phase);
-  if (behind >= 0) return [[...runBetween(track, behind, phase), head]];
-  // Round the back of the loop: the tail end of the last orbit, then this one
-  // from its start.
-  return [
-    runBetween(track, 1 + behind, 1),
-    [...runBetween(track, 0, phase), head]
-  ];
+  const behind = Math.max(0, headPhase - fraction);
+  return [[...runBetween(track, behind, headPhase), sampleAt(track, headPhase)]];
 }
 
 /**
