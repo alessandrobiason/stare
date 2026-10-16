@@ -155,12 +155,12 @@ describe("the header", () => {
     />
   );
 
-  test("is the app's name and what is over you, and nothing else", () => {
+  test("leads with the satellite count in place of the app's name", () => {
     // The breakdown is behind the tap: the line sits over a photograph of the
     // sky, and the sky is what the screen is for.
     const text = textOf(header(sky(17)));
 
-    expect(text).toContain("STARE");
+    expect(text).not.toContain("STARE");
     expect(text).toContain("17 visible satellites");
     expect(text).not.toContain("Starlink");
     expect(text).not.toContain("IN VIEW");

@@ -7,7 +7,6 @@ import { clockTime, sunlightSummary } from "../i18n/format";
 import { Icon, IconButton } from "./Icon";
 import { glass, lift, theme } from "./theme";
 import { useTourTarget } from "./tourTargets";
-import { APP_NAME, WORDMARK_WEIGHT, wordmarkTracking } from "./wordmark";
 
 type Props = {
   /**
@@ -34,12 +33,9 @@ type Props = {
 /**
  * The title of the screen, which is also the one figure the sky view reports.
  *
- * Two lines in the top left and one round button in the top right, and that is
- * the whole of the top of this app. The first line is the app's name, which is
- * what makes a camera picture with dots on it read as a thing somebody built
- * rather than as a phone that has gone wrong. The second is the count — *what
- * is over you right now* — which used to be a bare number in a pill in the same
- * corner and said nothing about what it was counting.
+ * The satellite count is the heading in the top left, on a dark surface that
+ * stays readable over either a bright sky or a night scene. The filter and
+ * freeze controls sit beside it.
  *
  * **The count opens.** "Twelve" is a number; "eight Starlink, one ISS and three
  * others, all of them in sunlight" is a thing somebody can go and look for.
@@ -90,8 +86,6 @@ export const SkyHeader: React.FC<Props> = React.memo(({
     <View style={styles.header} onLayout={onLayout}>
       <View style={styles.row}>
         <View style={styles.titles}>
-          <Text style={styles.wordmark}>{APP_NAME.toUpperCase()}</Text>
-
           <Pressable
             ref={countRef}
             accessibilityRole="button"
@@ -105,14 +99,17 @@ export const SkyHeader: React.FC<Props> = React.memo(({
             style={styles.countRow}
             onPress={() => setExpanded((open) => !open)}
           >
-            <Text numberOfLines={1} style={styles.count}>
-              {counted}
+            <Text style={styles.count}>
+              {count}
+            </Text>
+            <Text numberOfLines={2} style={styles.countLabel}>
+              {fill(t.visibleSatellites, { count: "" }).trim()}
             </Text>
             <Icon
               name="chevron"
-              size={12}
+              size={16}
               direction={expanded ? "up" : "down"}
-              color={theme.color.textFaint}
+              color={theme.color.text}
             />
           </Pressable>
 
@@ -196,41 +193,37 @@ const styles = StyleSheet.create({
   },
   titles: {
     flex: 1,
-    // The writing sits straight on the picture rather than in a pill: this is
-    // the title of the screen, and a box around it would make it a panel.
     paddingTop: 2
   },
-  wordmark: {
-    color: theme.color.textBright,
-    // Same size, weight and tracking as the wordmark on the boot screen and
-    // the intro, so STARE reads as one mark across all three rather than a
-    // headline here and a wordmark there. See `wordmarkTracking`.
-    fontSize: 17,
-    fontWeight: WORDMARK_WEIGHT,
-    letterSpacing: wordmarkTracking(17),
-    opacity: 0.92,
-    // The one shadow spent on text. A title over a camera picture has no
-    // background to be read against, so it carries its own.
-    textShadowColor: "rgba(0, 0, 0, 0.55)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8
-  },
   countRow: {
-    marginTop: 1,
+    minHeight: 44,
+    maxWidth: "100%",
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: theme.radius.control,
+    ...glass(theme.color.panelDeep, 18),
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 7,
     // Left to its own width, so the tap lands on the line rather than on the
     // sky beside it.
     alignSelf: "flex-start"
   },
   count: {
-    color: theme.color.textDim,
-    fontSize: 13,
-    fontWeight: "500",
+    color: theme.color.textBright,
+    fontSize: 26,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
     textShadowColor: "rgba(0, 0, 0, 0.5)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6
+  },
+  countLabel: {
+    flexShrink: 1,
+    color: theme.color.text,
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 15
   },
   frozen: {
     marginTop: 6,
