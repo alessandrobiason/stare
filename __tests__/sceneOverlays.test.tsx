@@ -17,6 +17,7 @@ import { SettingsScreen } from "../src/components/SettingsScreen";
 import { CONSOLE_LABEL } from "../src/components/consoleLabel";
 import { UpcomingPasses } from "../src/components/UpcomingPasses";
 import { fill, setLocaleForTesting, strings } from "../src/i18n";
+import { passTime } from "../src/i18n/format";
 import { setPassAlertAccessForTesting } from "../src/notifications/alertAccess";
 import { UpcomingPass } from "../src/satellite/upcomingPasses";
 import {
@@ -512,7 +513,7 @@ describe("what is coming", () => {
     const text = textOf(panel([pass()]));
 
     expect(text).toContain("ISS");
-    expect(text).toContain("14 min");
+    expect(text).toContain(passTime(NOW + 14 * 60_000, NOW));
     expect(text).not.toContain("COMING UP");
   });
 
@@ -525,7 +526,7 @@ describe("what is coming", () => {
     );
 
     expect(text).toContain("Hubble");
-    expect(text).toContain("5 min");
+    expect(text).toContain(passTime(NOW + 5 * 60_000, NOW));
   });
 
   test("a pass already under way has nothing to wait for", () => {

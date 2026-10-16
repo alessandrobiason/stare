@@ -109,6 +109,14 @@ export const en: Strings = {
       title: "COMING UP",
       open: "Upcoming passes",
       now: "now",
+      time: {
+        today: "today at {time}",
+        tonight: "tonight at {time}",
+        tomorrow: "tomorrow at {time}",
+        tomorrowMorning: "tomorrow morning at {time}",
+        tomorrowEvening: "tomorrow evening at {time}",
+        onDate: "on {time}"
+      },
       seeing: {
         tooFar: "not visible (too far away)",
         visible: "visible to the eye",

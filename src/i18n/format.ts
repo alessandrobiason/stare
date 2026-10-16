@@ -309,6 +309,27 @@ export function timeUntil(millisecondsAway: number): string {
 
 const MS_PER_MINUTE = 60_000;
 
+/** A pass's local clock time and day, compared with the scene's own clock. */
+export function passTime(startsAtMs: number, nowMs: number): string {
+  const t = strings().scene.passes;
+  if (startsAtMs <= nowMs) return t.now;
+
+  const when = new Date(startsAtMs);
+  const now = new Date(nowMs);
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const hour = when.getHours();
+  let template: string;
+  if (when.toDateString() === now.toDateString()) {
+    template = hour >= 18 ? t.time.tonight : t.time.today;
+  } else if (when.toDateString() === tomorrow.toDateString()) {
+    template = hour >= 5 && hour < 12 ? t.time.tomorrowMorning
+      : hour >= 18 ? t.time.tomorrowEvening : t.time.tomorrow;
+  } else {
+    return fill(t.time.onDate, { time: calendarTime(when) });
+  }
+  return fill(template, { time: clockTime(when) });
+}
+
 /**
  * Whether a pass can be seen, in the few words a row has for it.
  *

@@ -130,6 +130,14 @@ export type Strings = {
        * rise that has happened would be counting the wrong way.
        */
       now: string;
+      time: {
+        today: string;
+        tonight: string;
+        tomorrow: string;
+        tomorrowMorning: string;
+        tomorrowEvening: string;
+        onDate: string;
+      };
       /**
        * Whether the pass can be seen, in the few words a row has for it.
        *

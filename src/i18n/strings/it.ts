@@ -102,6 +102,14 @@ export const it: Strings = {
       title: "IN ARRIVO",
       open: "Prossimi passaggi",
       now: "ora",
+      time: {
+        today: "oggi alle {time}",
+        tonight: "stasera alle {time}",
+        tomorrow: "domani alle {time}",
+        tomorrowMorning: "domattina alle {time}",
+        tomorrowEvening: "domani sera alle {time}",
+        onDate: "il {time}"
+      },
       seeing: {
         tooFar: "non visibile (troppo lontano)",
         visible: "visibile a occhio nudo",

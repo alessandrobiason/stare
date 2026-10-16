@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useLocale } from "../hooks/useLocale";
 import { strings } from "../i18n";
-import { passDirection, passSeeing, timeUntil } from "../i18n/format";
+import { passDirection, passSeeing, passTime } from "../i18n/format";
 import { UpcomingPass } from "../satellite/upcomingPasses";
 import { OrbitEpoch } from "../types";
 import { Icon } from "./Icon";
@@ -152,7 +152,7 @@ const SLIDE_MS = 260;
  * Only ever read on the first frames of the first drag: the list is laid out
  * the moment it is mounted and its own height replaces this.
  */
-const ROW_ESTIMATE = 52;
+const ROW_ESTIMATE = 68;
 /**
  * How many rows the open card shows before the rest is a scroll away.
  *
@@ -314,7 +314,7 @@ export const PassesPanel: React.FC<PanelProps> = ({
                     <Text numberOfLines={1} style={styles.name}>
                       {next.name}
                     </Text>
-                    <Text style={styles.when}>{timeUntil(next.startsAtMs - nowMs)}</Text>
+                    <Text style={styles.when}>{passTime(next.startsAtMs, nowMs)}</Text>
                   </View>
                   {/* Two lines rather than one: this is a bearing, a height
                       and a verdict, and in the longer languages that runs
@@ -379,7 +379,7 @@ export const PassesPanel: React.FC<PanelProps> = ({
                       <Text numberOfLines={1} style={styles.rowName}>
                         {pass.name}
                       </Text>
-                      <Text style={styles.when}>{timeUntil(pass.startsAtMs - nowMs)}</Text>
+                      <Text style={styles.when}>{passTime(pass.startsAtMs, nowMs)}</Text>
                     </View>
                     {/* Where to stand and what it is worth, then whether it
                         can be seen at all — in that order, because the first
@@ -504,12 +504,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4
   },
   nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
+    alignItems: "flex-start",
+    gap: 2
   },
   name: {
-    flex: 1,
+    maxWidth: "100%",
     color: theme.color.textBright,
     fontSize: 15,
     fontWeight: "600"
@@ -549,7 +548,7 @@ const styles = StyleSheet.create({
     gap: 2
   },
   rowName: {
-    flex: 1,
+    maxWidth: "100%",
     color: theme.color.text,
     fontSize: 13,
     fontWeight: "600"

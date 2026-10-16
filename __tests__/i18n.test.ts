@@ -10,6 +10,7 @@ import {
   orbitPeriod,
   passDirection,
   passSeeing,
+  passTime,
   seeing,
   speed,
   sunlightSummary,
@@ -447,6 +448,40 @@ describe("the figures follow the reader's conventions", () => {
     expect(timeUntil(82 * 60_000)).toBe("tra 1h 22m");
     expect(timeUntil(14 * 60_000)).toBe("tra 14 min");
     expect(orbitPeriod(82)).toBe("82 min");
+  });
+
+  test("pass times name the local day and clock rather than a countdown", () => {
+    setLocaleForTesting("it");
+    const now = new Date(2026, 9, 24, 17).getTime();
+    const evening = new Date(2026, 9, 24, 21, 30);
+    const morning = new Date(2026, 9, 25, 7, 15);
+    expect(passTime(evening.getTime(), now)).toBe(`stasera alle ${clockTime(evening)}`);
+    expect(passTime(morning.getTime(), now)).toBe(`domattina alle ${clockTime(morning)}`);
+    expect(passTime(now, now)).toBe("ora");
+    expect(passTime(now - 1000, now)).toBe("ora");
+    // A future rise a few seconds away still reports its actual clock time.
+    expect(passTime(now + 1000, now)).toContain("alle");
+  });
+
+  test("tomorrow follows the calendar across midnight, year and DST boundaries", () => {
+    setLocaleForTesting("it");
+    for (const now of [
+      new Date(2026, 11, 31, 23, 50),
+      new Date(2026, 2, 28, 23, 50),
+      new Date(2026, 9, 24, 23, 50)
+    ]) {
+      const morning = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 7, 15);
+      expect(passTime(morning.getTime(), now.getTime())).toBe(`domattina alle ${clockTime(morning)}`);
+    }
+  });
+
+  test("English pass times retain the device's clock convention", () => {
+    setLocaleForTesting("en");
+    const now = new Date(2026, 9, 16, 17).getTime();
+    const tonight = new Date(2026, 9, 16, 21, 30);
+    const tomorrow = new Date(2026, 9, 17, 7, 15);
+    expect(passTime(tonight.getTime(), now)).toBe(`tonight at ${clockTime(tonight)}`);
+    expect(passTime(tomorrow.getTime(), now)).toBe(`tomorrow morning at ${clockTime(tomorrow)}`);
   });
 
   test("and in the reader's own units", () => {
