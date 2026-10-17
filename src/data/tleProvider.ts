@@ -63,7 +63,7 @@ async function fetchActiveCatalog(url: string, nowMs: number): Promise<Tle[]> {
   );
   if (!response.ok) throw new CatalogDownloadError({
     kind: "http", status: response.status, message: `CelesTrak returned HTTP ${response.status}`
-  }, retryDeadline(response, nowMs));
+  }, retryDeadline(response, Date.now()));
   const text = await bounded(response.text(), controller, TLE_DOWNLOAD_TIMEOUT_MS);
   let tles: Tle[];
   try { tles = await storeCatalog(url, text, nowMs); }

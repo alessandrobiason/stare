@@ -501,3 +501,16 @@ test("a retry cooldown still chooses a newer bundled catalogue after an app upda
   await expect(loadActiveCatalog()).resolves.toMatchObject({ source: "bundled", downloadedAtMs: now - 3_600_000 });
   expect(request).not.toHaveBeenCalled();
 });
+
+
+test("Retry-After starts when the response arrives, not when a slow request began", async () => {
+  const now = 1_000_000;
+  const clock = jest.spyOn(Date, "now").mockReturnValue(now);
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  jest.spyOn(globalThis, "fetch").mockImplementation(async () => {
+    clock.mockReturnValue(now + 18_000);
+    return new Response("", { status: 429, headers: { "Retry-After": "10800" } });
+  });
+  await loadActiveCatalog();
+  expect(tleDownloadStatus().retryAtMs).toBe(now + 18_000 + 10_800_000);
+});
