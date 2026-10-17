@@ -148,9 +148,9 @@ export const SkyHeader: React.FC<Props> = React.memo(({
         <View style={styles.breakdown}>
           {empty ? (
             <Text style={styles.emptyLabel}>{t.breakdown.empty}</Text>
-          ) : (
+          ) : sky.darkness !== "daylight" && sky.sunlit > 0 ? (
             <Text style={styles.sunlight}>{sunlightSummary(sky)}</Text>
-          )}
+          ) : null}
           {fleets.rows.map((fleet) => (
             <View key={fleet.name} style={styles.fleet}>
               <Text style={styles.fleetName}>{fleet.name}</Text>

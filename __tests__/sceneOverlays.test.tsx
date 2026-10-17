@@ -166,6 +166,21 @@ describe("the header", () => {
     expect(text).not.toContain("IN VIEW");
   });
 
+  test.each([
+    { darkness: "daylight" as const, sunlit: 17 },
+    { darkness: "dark" as const, sunlit: 0 }
+  ])("omits negative visibility summaries: %j", (over) => {
+    const expanded = jest.spyOn(React, "useState").mockReturnValueOnce([true, jest.fn()]);
+    try {
+      const text = textOf(header(sky(17, SKY, over)));
+      expect(text).toContain("Starlink");
+      expect(text).not.toContain("Daylight");
+      expect(text).not.toContain("shadow");
+    } finally {
+      expanded.mockRestore();
+    }
+  });
+
   test("has a freeze button beside the filter, which says when it is holding the view", () => {
     const live = renderToStaticMarkup(header(sky(17)));
     expect(live).toContain('aria-label="Freeze the view"');
@@ -517,6 +532,16 @@ describe("what is coming", () => {
     expect(text).not.toContain("COMING UP");
   });
 
+  test.each(["tooFar", "tooFaint", "eclipsed", "daylight", "unknown"] as const)(
+    "omits %s explanations from pass rows",
+    (nakedEye) => {
+      const text = textOf(panel([pass({ nakedEye })]));
+      expect(text).not.toContain(strings().scene.passes.seeing[nakedEye].split("'")[0]);
+      expect(text).toContain("68° up");
+      expect(text).not.toMatch(/up\s*·\s*$/);
+    }
+  );
+
   test("and the soonest one, not whichever came first", () => {
     const text = textOf(
       panel([
@@ -719,31 +744,22 @@ describe("the tapped satellite's card", () => {
       expect(text).not.toContain("When it comes over");
     });
 
-    test("says nothing by day, when the sun has already given the answer", () => {
-      // True of every object overhead at once, so a line saying it on every
-      // card tells nobody anything. The figures are still there.
-      const daylit = detail({ nakedEye: "daylight", sunAltitudeDeg: 24 });
-      const text = textOf(card({ "STARLINK-1234": daylit }));
-
-      expect(text).not.toContain(strings().card.seeing.daylight);
-      expect(text).toContain("1,240 km");
-    });
-
-    test("still says it at night, in shadow or not", () => {
-      const eclipsed = detail({ nakedEye: "eclipsed", apparentMagnitude: null });
-      // A fragment, because the markup escapes the apostrophe in "Earth's".
-      expect(textOf(card({ "STARLINK-1234": eclipsed }))).toContain("Not visible (in the Earth");
-    });
-
-    test("and distance is said as distance, not as faintness", () => {
-      // A navigation or television satellite is not dim, it is far, and the
-      // difference is whether coming back after dark would help. See
-      // `SKY_VISIBILITY.tooFarKm`.
-      const far = detail({ nakedEye: "tooFar", rangeKm: 36_200, apparentMagnitude: null });
-      const text = textOf(card({ "GSAT-30": far }, ["GSAT-30"], "GSAT-30"));
-
-      expect(text).toContain(strings().card.seeing.tooFar);
-      expect(text).not.toContain(strings().card.seeing.tooFaint);
+    test.each(["en", "it"] as const)("%s shows only positive current visibility", (locale) => {
+      setLocaleForTesting(locale);
+      try {
+        for (const nakedEye of ["tooFar", "tooFaint", "eclipsed", "daylight", "unknown"] as const) {
+          const text = textOf(card({ "STARLINK-1234": detail({ nakedEye }) }));
+          const label = strings().card.seeing[nakedEye];
+          // Apostrophes in the rendered markup are HTML entities.
+          expect(text).not.toContain(label.split("'")[0]);
+          expect(text).not.toContain(strings().card.seeing.magnitude.split("{value}")[0]);
+          expect(text).toContain("STARLINK-1234");
+        }
+        const text = textOf(card({ "STARLINK-1234": detail({ nakedEye: "binoculars" }) }));
+        expect(text).toContain(strings().card.seeing.binoculars);
+      } finally {
+        setLocaleForTesting(undefined);
+      }
     });
   });
 

@@ -322,8 +322,10 @@ export const PassesPanel: React.FC<PanelProps> = ({
                       the verdict, which is the half that decides whether the
                       countdown is worth acting on. */}
                   <Text numberOfLines={2} style={styles.meta}>
-                    {passDirection(next)} ·{" "}
-                    <Text style={seeingStyle(next)}>{passSeeing(next.nakedEye)}</Text>
+                    {passDirection(next)}
+                    {(next.nakedEye === "visible" || next.nakedEye === "binoculars") && (
+                      <Text style={seeingStyle(next)}> · {passSeeing(next.nakedEye)}</Text>
+                    )}
                   </Text>
                 </>
               )}
@@ -386,8 +388,10 @@ export const PassesPanel: React.FC<PanelProps> = ({
                         two are facts about the sky and the third is the one
                         that decides whether either is worth acting on. */}
                     <Text style={styles.meta}>
-                      {passDirection(pass)} ·{" "}
-                      <Text style={seeingStyle(pass)}>{passSeeing(pass.nakedEye)}</Text>
+                      {passDirection(pass)}
+                      {(pass.nakedEye === "visible" || pass.nakedEye === "binoculars") && (
+                        <Text style={seeingStyle(pass)}> · {passSeeing(pass.nakedEye)}</Text>
+                      )}
                     </Text>
                   </View>
                   <Icon name="chevron" size={14} color={theme.color.textFaint} />

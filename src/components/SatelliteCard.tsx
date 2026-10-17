@@ -394,9 +394,8 @@ export const SatelliteCard: React.FC<Props> = ({
             somebody who has just tapped a mark asks in: what is that, can I see
             it, where do I look — about now, like every figure under it.
 
-            Nothing at all by day. That the sun rules out the whole sky is true
-            of every object on it at once, and a line saying so on every card
-            tells nobody anything they did not know by looking up. */}
+            Only positive sightings are shown; unavailable or unknown
+            visibility leaves this line out. */}
         {detail && showsSeeing(detail) && (
           <Text style={styles.seeing}>{seeing(detail)}</Text>
         )}
@@ -799,13 +798,10 @@ const Fact: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 );
 
 /**
- * Whether the card says whether this object can be seen now.
- *
- * Every verdict but one: by day the answer is the same for everything overhead,
- * and the sun in the sky has already given it. See the seeing line.
+ * Show the current sighting only when the satellite can be seen.
  */
 function showsSeeing(detail: SatelliteDetail): boolean {
-  return detail.nakedEye !== "daylight";
+  return detail.nakedEye === "visible" || detail.nakedEye === "binoculars";
 }
 
 const BADGE_SIZE = 38;
