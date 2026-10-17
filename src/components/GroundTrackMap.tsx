@@ -19,6 +19,7 @@ type Props = {
   name: string;
   /** Its category's colour, which is what the sky drew the mark in. */
   color: string;
+  onScrubbingChange?: (scrubbing: boolean) => void;
 };
 
 /**
@@ -55,7 +56,7 @@ type Props = {
  * the phone's, and the map's height follows from it at the projection's aspect.
  * Nothing is drawn until that measurement lands, which is one frame.
  */
-export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
+export const GroundTrackMap: React.FC<Props> = ({ plan, name, color, onScrubbingChange }) => {
   const t = strings();
   const [width, setWidth] = useState(0);
   // Once someone takes control, keep that forecast window fixed. Background
@@ -124,6 +125,7 @@ export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
           </Pressable>
           <View style={styles.timeline}>
             <OrbitScrubber
+              onScrubbingChange={onScrubbingChange}
               value={phase}
               label={t.card.map.timeline}
               valueText={atLabel(track.fromMs + phase * track.spanMs)}

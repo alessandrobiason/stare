@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { PanResponder, StyleSheet, View } from "react-native";
 import { clamp } from "../math/angles";
 import { theme } from "./theme";
@@ -8,28 +8,48 @@ export type OrbitScrubberProps = {
   label: string;
   valueText: string;
   onChange: (value: number) => void;
+  /** Suspend the enclosing card's scroll until release, cancellation or unmount. */
+  onScrubbingChange?: (scrubbing: boolean) => void;
 };
 
 /** A thin rail with a full-height touch target, inside the card's ScrollView. */
-export const OrbitScrubber: React.FC<OrbitScrubberProps> = ({ value, label, valueText, onChange }) => {
+export const OrbitScrubber: React.FC<OrbitScrubberProps> = ({ value, label, valueText, onChange, onScrubbingChange }) => {
   const width = useRef(0);
   const startX = useRef(0);
-  const current = useRef({ value, onChange });
-  current.current = { value, onChange };
+  const active = useRef(false);
+  const current = useRef({ value, onChange, onScrubbingChange });
+  current.current = { value, onChange, onScrubbingChange };
   const responder = useMemo(() => {
     const seekAt = (x: number) => {
       if (width.current > 0) current.current.onChange(clamp(x / width.current, 0, 1));
     };
+    const finish = () => {
+      if (!active.current) return;
+      active.current = false;
+      current.current.onScrubbingChange?.(false);
+    };
     return PanResponder.create({
+      onStartShouldSetPanResponderCapture: () => true,
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (event) => {
+        active.current = true;
+        current.current.onScrubbingChange?.(true);
         startX.current = event.nativeEvent.locationX;
         seekAt(startX.current);
       },
-      onPanResponderMove: (_, gesture) => seekAt(startX.current + gesture.dx),
-      onPanResponderTerminationRequest: () => true
+      onPanResponderMove: (_, gesture) => {
+        if (active.current) seekAt(startX.current + gesture.dx);
+      },
+      onPanResponderRelease: finish,
+      onPanResponderTerminate: finish,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true
     });
+  }, []);
+  useEffect(() => () => {
+    if (active.current) current.current.onScrubbingChange?.(false);
+    active.current = false;
   }, []);
 
   return (

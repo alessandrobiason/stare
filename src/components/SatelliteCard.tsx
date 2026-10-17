@@ -1,4 +1,4 @@
-import React, { MutableRefObject, useEffect, useRef, useState } from "react";
+import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -243,6 +243,13 @@ export const SatelliteCard: React.FC<Props> = ({
 
   const drag = useSwipeToDismiss(onClose);
   const cue = useScrollCue(selected);
+  const [scrubbing, setScrubbing] = useState(false);
+  const onScrubbingChange = useCallback((active: boolean) => {
+    // Lock the native scroll view immediately, before a diagonal drag can
+    // start its pan recognizer; state keeps subsequent renders in agreement.
+    if (Platform.OS !== "web") cue.bodyRef.current?.setNativeProps({ scrollEnabled: !active });
+    setScrubbing(active);
+  }, [cue.bodyRef]);
 
   return (
     <Animated.View
@@ -356,6 +363,7 @@ export const SatelliteCard: React.FC<Props> = ({
           its share of the screen is a card over the sky it is describing. */}
       <ScrollView
         ref={cue.bodyRef}
+        scrollEnabled={!scrubbing}
         style={styles.body}
         showsVerticalScrollIndicator={false}
         // What the cue is worked out from: how tall the card's window is, how
@@ -373,6 +381,7 @@ export const SatelliteCard: React.FC<Props> = ({
             plan={groundTrack}
             name={selected}
             color={CATEGORY_COLORS[detail.category]}
+            onScrubbingChange={onScrubbingChange}
           />
         )}
 

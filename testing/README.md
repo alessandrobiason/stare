@@ -61,6 +61,21 @@ No recording ships with the repo — see **Test data** in the root README for th
 shape one has to be in, and `tools/prepare-test-data.mjs` for the exact file
 names. Staged output lands in `public/`, which is gitignored.
 
+## Timeline gestures
+
+The isolated real satellite card in `gestures/` needs no recording, camera or
+segmentation model. It checks touch drags above and below the timeline, scroll
+locking and recovery after release or cancellation, and keyboard seeking:
+
+```bash
+npx playwright install chromium
+npx playwright test -c testing/gestures/playwright.config.ts
+```
+
+The app pipeline runs these checks before capturing its App Store screenshots.
+The native responder's ownership and drag lifecycle are covered by
+`__tests__/orbitScrubber.test.tsx` in the regular Jest suite.
+
 ## Unit tests
 
 The unit tests for this folder live with all the others, in `__tests__/` at the
