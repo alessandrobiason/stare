@@ -23,34 +23,52 @@ and when-in-use location strings, `UIRequiredDeviceCapabilities` for gyroscope,
 magnetometer and location services, the launch screen's colour (see below) and
 the privacy manifest.
 
-Both of the build workflows are `workflow_dispatch` only — no push or schedule
-trigger — because a macOS runner is 20-30 minutes of wall clock and bills at
-10x on a private fork. (The two that run on a push are Linux and cost nothing
-worth counting: `check.yml`, which runs typecheck, lint and jest on every push,
-and `pages.yml`, which republishes the privacy policy and support pages in
-`site/` and only when something in `site/` changed.)
+## One pipeline, with release gates
 
-- **`.github/workflows/ios-build.yml`** — a Linux job regenerates the native
-  project first (so a broken `app.json` fails fast at the 1x rate), then a
-  `macos-26` runner runs `pod install` and `xcodebuild` against the simulator
-  with signing off. No Apple Developer account, no secrets. It answers "does
-  this still compile for iOS", not "here is an installable build".
-- **`.github/workflows/ios-testflight.yml`** — a signed archive uploaded
-  to App Store Connect, from which TestFlight installs it on a phone. Needs a
-  paid Apple Developer account (99 EUR/year) and the seven secrets below. A run
-  takes 20–30 minutes, plus a further 5–15 while Apple processes the build.
-  Standard runners are free on a public repo; on a private fork that is roughly
-  250 of the free 2,000 monthly Actions minutes, because macOS bills at 10x. Its
-  `configuration` input picks between the shipping app (`Release`) and a
-  development build (`Debug`) — see below.
+[`.github/workflows/pipeline.yml`](../.github/workflows/pipeline.yml) is the only
+Actions workflow. Every push to `main`, pull request, and manual run starts with:
 
-The third one is not a build at all, and is the one to reach for first:
+1. **Check** — typecheck, lint and the Jest suites.
+2. **App Store screenshots** — capture the actual app in every language, compose
+   both App Store sizes, validate the complete output, and upload the frames.
+3. **Manual publishing** — TestFlight or OTA, selected when starting a run.
 
-- **`.github/workflows/ota-update.yml`** — publishes the JavaScript half of the
-  app to phones that already have it. Runs entirely on Linux at 1x, takes about
-  two minutes, needs one Expo access token and nothing from Apple.
+Both publishing jobs depend on successful Check and screenshots jobs in the
+**same run and for the same commit SHA**. A failed, cancelled or skipped gate
+blocks publishing. Every checkout is pinned to that SHA, including the native
+preflight. No push or pull request publishes a build or an OTA update.
 
-Start any of them from the Actions tab, or `gh workflow run ios-build.yml`.
+GitHub Actions has no manual button on an individual completed job. Start a
+manual run of **Pipeline** and select `operation: testflight` or `operation: ota`.
+The run repeats both gates before reaching the selected publisher. The default
+operation is `validate`, which never publishes. A new push can supersede an
+older validation run; manual runs and in-progress uploads are not cancelled by it.
+
+```bash
+gh workflow run pipeline.yml --ref main -f operation=testflight -f configuration=Release
+gh workflow run pipeline.yml --ref main -f operation=ota -f ota_branch=production -f message="Describe the fix"
+```
+
+TestFlight still needs the seven Apple secrets below and a `macos-26` runner.
+Its native preflight checks the bundled catalogue, signing material, patched
+sources, generated project, icon and update configuration before the archive.
+`configuration: Debug` produces the development client; `Release` is the shipping
+app. OTA runs on Linux and needs `EXPO_TOKEN`.
+
+Other operations in the same workflow preserve the maintenance tasks:
+
+- `ios-build`: native preflight and an unsigned simulator build, without uploading.
+- `screenshots`: commit the generated screenshot artifact back to the selected
+  branch. A concurrent branch update makes the push fail rather than attaching
+  images to code they were not captured from.
+- `pages`: deploy `site/` to GitHub Pages. Site changes on `main` also deploy
+  automatically after the two gates. Pages setup remains Settings → Pages →
+  Build and deployment → Source: **GitHub Actions**.
+
+Screenshot success means that this run captured and rendered the complete listing,
+not byte equality with committed PNGs. Browser rendering and animated content can
+vary; a stale PNG comparison is not a reliable release gate. Review the run's
+`app-store-screenshots` artifact for the listing being validated.
 
 ## TestFlight setup
 
@@ -167,7 +185,7 @@ do not come this way at all — see
 
 ### 8. The App Store, when the time comes
 
-Nothing about the pipeline changes. `ios-testflight.yml` exports with
+Nothing about the pipeline changes. The pipeline’s TestFlight job exports with
 `method: app-store-connect` and uploads with `altool`, which is the same
 delivery a public release is made from: a build that reached TestFlight is a
 build that can be attached to a version and submitted. There is no second
@@ -279,7 +297,7 @@ graph is up.
 
 `postinstall` runs `patch-package --error-on-fail`, so an install whose patch no
 longer applies fails the job rather than quietly producing an unpatched binary.
-Both iOS workflows then grep the patched sources in `node_modules` before
+Both native build jobs then check the patched sources in `node_modules` before
 anything expensive runs, which catches the other half: a `postinstall` that
 never ran at all. A build that reaches `pod install` has the patch in the
 sources CocoaPods compiles.
@@ -287,22 +305,19 @@ sources CocoaPods compiles.
 **Which build is on the phone.** The release workflow stamps
 `ios.buildNumber` as `<run_number + BUILD_NUMBER_OFFSET>.<run_attempt>`, so the
 build number TestFlight shows is the GitHub Actions run number plus a constant
-set at the top of the `release` job. When a fix appears not to have worked,
+set at the top of the `testflight` job. When a fix appears not to have worked,
 check that first: the number in TestFlight against the number of the run that
 was supposed to carry it (run number, not the stamped build number, if the
 offset has moved since). A native fix reaching a phone that is still on the
 previous binary looks exactly like a native fix that does not work, and
 telling those apart by reasoning is not possible.
 
-The offset exists because `run_number` counts only this workflow's own runs,
-starting at 1 -- it has no memory of builds TestFlight already has from before
-the workflow existed, from a different pipeline, or from a run whose own
-history was later rewritten out from under it (which is exactly how this one
-went stale once already: a run uploaded build 20 while the offset was on
-main, a later rewrite dropped that commit, and the next runs went back to
-`run_number` alone -- 6.1, 7.1 -- both rejected as not higher than 20.1).
-Move it to keep the numbering continuous with whatever TestFlight is actually
-showing, checked there rather than assumed from the git history.
+The offset preserves numbering across the workflow migration: the former
+TestFlight workflow reached run 48 with offset 14 (build 62), so the consolidated
+pipeline starts with `BUILD_NUMBER_OFFSET: 62`. Its own increasing run number
+is added to that, and `run_attempt` distinguishes retries. Validation runs also
+advance the pipeline run number; gaps in TestFlight build numbers are expected.
+If numbering is migrated again, keep the offset above the last uploaded build.
 
 That string doubles as a check on which binary is running: if a phone reports
 the bare "Image could not be captured" with nothing after the colon, it is
@@ -404,8 +419,8 @@ or spell the package out as below.
    same name here.
 5. expo.dev -> account settings -> access tokens -> create one, and put it in
    the repository as the `EXPO_TOKEN` secret. It is the only credential
-   `ota-update.yml` needs.
-6. Run `ios-testflight.yml` once. **Updates only reach a build that was made
+   the pipeline’s OTA job needs.
+6. Run the pipeline’s TestFlight job once. **Updates only reach a build that was made
    with this configuration in place**, so the currently installed app cannot
    receive them — it was compiled before any of this existed.
 
@@ -416,10 +431,14 @@ you find out by looking at it.
 
 ### The loop, afterwards
 
-Commit the change, then Actions -> **OTA update** -> Run workflow, with a
-message saying what it changes. It typechecks, lints and tests before
-publishing, since an update goes onto a phone with nothing in between to catch
-it. Then relaunch the app twice.
+Commit the change, then Actions -> **Pipeline** -> Run workflow, with `operation: ota`,
+`ota_branch: production` and a message saying what it changes. Check and fresh
+App Store screenshots must pass before publishing. Then relaunch the app twice.
+
+`npm run ota-update -- "Describe the fix"` and `tools/ota-update.sh` dispatch this
+same gated workflow using GitHub CLI; they no longer publish from the local
+machine. Commit and push first. The script's optional second argument is the EAS
+branch and the third is the Git branch or tag to validate.
 
 To check beforehand whether a change can go out this way at all:
 
@@ -429,7 +448,7 @@ npm run runtime-version
 
 Same hash before and after the change means it is JavaScript as far as the
 native build is concerned, and an update carries it. A different hash means it
-is not, and it needs `ios-testflight.yml`.
+is not, and it needs the pipeline’s TestFlight job.
 
 ### What decides that, and why it cannot be got wrong
 
@@ -443,11 +462,11 @@ fingerprint matches its own.**
 So publishing a native change is not dangerous, only useless: the update is
 built, stored, and never offered to anything. The failure mode is a fix that
 does not arrive, not a binary running JavaScript it cannot support. Both
-workflows print the fingerprint into their run summary, so comparing them is
+publishing paths print the fingerprint into their run summary, so comparing them is
 how you tell which of those happened.
 
 `fingerprint.config.js` excludes exactly one thing from that hash, and it is
-not a matter of taste: `ios-testflight.yml` stamps `ios.buildNumber` into
+not a matter of taste: the pipeline’s TestFlight job stamps `ios.buildNumber` into
 `app.json` before prebuild, so with version strings included the fingerprint
 compiled into the binary would be one no checkout of this repository could
 reproduce, and every update afterwards would silently miss it. Version strings
@@ -456,7 +475,7 @@ be: the two mistakes are not symmetric, and the file says so at more length.
 
 ### Development builds
 
-Actions -> iOS TestFlight -> Run workflow -> `configuration: Debug`. Same
+Actions -> Pipeline -> Run workflow -> `operation: testflight`, `configuration: Debug`. Same
 signing, same upload, same TestFlight; the difference is that the dev client's
 launcher is compiled in, and that a Debug build carries no embedded JavaScript
 bundle, so the launcher is what you get on opening it. From there you can load

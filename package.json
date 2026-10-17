@@ -6,7 +6,7 @@
   "scripts": {
     "postinstall": "patch-package --error-on-fail",
     "prebuild": "expo prebuild --platform ios --clean",
-    "ota-update": "npx eas-cli update --branch production",
+    "ota-update": "bash tools/ota-update.sh",
     "runtime-version": "expo-updates runtimeversion:resolve --platform ios",
     "start": "ELECTRON_DISABLE_SANDBOX=1 expo start --dev-client",
     "tunnel": "ELECTRON_DISABLE_SANDBOX=1 expo start --dev-client --tunnel",
@@ -59,7 +59,8 @@
     "jest": "^30.4.2",
     "patch-package": "^8.0.1",
     "ts-jest": "^29.4.12",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "yaml": "2.9.0"
   },
   "jest": {
     "preset": "ts-jest",

@@ -14,7 +14,7 @@
  *
  * So there is one exclusion here, and it is not a preference.
  *
- * `ios-testflight.yml` stamps `ios.buildNumber` into app.json before prebuild,
+ * The pipeline’s TestFlight job stamps `ios.buildNumber` into app.json before prebuild,
  * because CFBundleVersion has to rise on every upload. That number is different
  * on every release and exists only inside the CI job, so with versions in the
  * hash the fingerprint compiled into the binary is one no checkout of this

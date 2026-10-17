@@ -265,21 +265,29 @@ Where the numbers come from, if a frame has to be argued about:
 ## Keeping them current
 
 The frames are photographs of the app, so they go stale when the app moves.
-`.github/workflows/screenshots.yml` is what notices:
+Stage 2 of [Pipeline](../.github/workflows/pipeline.yml) runs after Check on every
+push to `main`, pull request and manual run. It captures all scenes in every
+language, composes both sizes, validates that no capture or frame is missing,
+and uploads `app-store-screenshots` with its source commit SHA.
 
-- **A push that changes the view** — `src/components/`, `src/i18n/strings/`,
-  `src/constants.ts` or the pipeline itself — regenerates the frames on Linux,
-  attaches them to the run as an artifact, and fails if they differ from what is
-  committed. That is a prompt to look at them, not a verdict: browsers do not
-  rasterise identically across machines.
-- **A manual run with `commit: true`** regenerates them and pushes the result.
-  That is how the listing is actually updated, once somebody has looked.
+Both TestFlight and OTA publishing depend on this stage succeeding for the same
+commit. The gate checks fresh captures and output validity; it does not compare
+PNG bytes against committed frames, since rasterisation and animation timing can
+vary. The satellite card's animation is paused and scrubbed to the start before
+capture to keep its map and timeline consistent between languages.
 
-Both cover every language the app speaks, so a change to an Italian string is
-caught by the same run that catches a change to an English one.
+To update the committed listing, choose **Pipeline → Run workflow →
+operation: screenshots**, or run:
 
-Committing six 2 MB PNGs on every interface tweak would bloat the history, which
-is why the automatic half stops at telling you.
+```bash
+gh workflow run pipeline.yml --ref main -f operation=screenshots
+```
+
+This first runs Check and screenshot generation, then commits the validated
+artifact to that branch. It never publishes a TestFlight build or an OTA update.
+If the branch moved during generation, the push is rejected; rerun against the
+new head. Automatic validations upload artifacts without adding PNG commits on
+every interface tweak.
 
 The staging in `capture.mjs` presses the app's own controls, found by the
 accessibility labels the app publishes — the same surface

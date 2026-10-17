@@ -236,7 +236,9 @@ async function handlesFor(locale) {
     filter: `[aria-label="${strings.filter.open}"]`,
     showAll: strings.filter.showAll,
     passes: `[aria-label="${strings.scene.passes.open}"]`,
-    card: `[aria-label="${strings.card.details}"]`
+    card: `[aria-label="${strings.card.details}"]`,
+    mapPause: strings.card.map.pause,
+    mapTimeline: strings.card.map.timeline
   };
 }
 
@@ -270,6 +272,10 @@ async function stage(page, scene, handles) {
       await row.waitFor({ timeout: 30000 });
       await row.click();
       await page.locator(handles.card).waitFor({ timeout: 30000 });
+      // Freeze the real transport, then show the start of the same forecast
+      // in every language. A running map can never settle into a still frame.
+      await page.getByRole("button", { name: handles.mapPause, exact: true }).click();
+      await page.getByRole("slider", { name: handles.mapTimeline, exact: true }).fill("0");
       return;
     }
 
