@@ -32,7 +32,7 @@ both:
 Neither is a resize of the other. The phone screen is laid into both at its own
 1090 pixels and only the space around it changes, so no capture is ever
 resampled. A third size — 1242 × 2688, which those slots also accept — is one
-line in `SIZES`. iPad support is enabled; an App Store submission also needs screenshots captured at a supported iPad size.
+line in `SIZES`. Stare targets iPhone only (`ios.supportsTablet: false` in `app.json`), so the listing uses iPhone screenshots.
 
 **The words inside the phone are the app's own.** The filter's categories, the
 count in the header, the card's five labels, the letters on the compass and the
