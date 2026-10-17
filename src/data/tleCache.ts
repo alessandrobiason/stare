@@ -3,6 +3,7 @@ import {
   TLE_RETRY_INTERVAL_MS,
   TLE_USABLE_INTERVAL_MS
 } from "../constants";
+import { resetTleDownloadStatus } from "./tleDownloadStatus";
 import { Tle } from "../types";
 import { parseCatalogInSlices } from "./tleCatalog";
 import {
@@ -21,6 +22,7 @@ export type CachedCatalog = {
   downloadedAtMs: number;
   /** When a download was last attempted, successfully or not. */
   attemptedAtMs: number;
+  retryAtMs?: number;
   /** The URL it came from. */
   url: string;
   /** Size of the raw catalog text as stored, in bytes. */
@@ -63,6 +65,7 @@ export async function readCache(): Promise<CachedCatalog | null> {
     tles,
     downloadedAtMs: stored.downloadedAtMs,
     attemptedAtMs: stored.attemptedAtMs,
+    retryAtMs: stored.retryAtMs,
     url: stored.url,
     sizeBytes: stored.catalog.length
   };
@@ -121,7 +124,10 @@ export function isUsable(cache: CachedCatalog, url: string, nowMs: number): bool
  */
 export function mayRetry(cache: CachedCatalog, nowMs: number): boolean {
   const sinceAttempt = nowMs - cache.attemptedAtMs;
-  return sinceAttempt < 0 || sinceAttempt >= TLE_RETRY_INTERVAL_MS;
+  if (sinceAttempt < 0) return true;
+  const retryAt = cache.retryAtMs;
+  return typeof retryAt === "number" && Number.isFinite(retryAt)
+    ? nowMs >= retryAt : sinceAttempt >= TLE_RETRY_INTERVAL_MS;
 }
 
 /** Records a fresh download at both levels and returns the parsed catalog. */
@@ -161,12 +167,13 @@ export const BUNDLED_CATALOG_URL = "bundled";
  * nothing to hang it on, so a view that keeps asking for fresh elements would
  * ask CelesTrak every time it did.
  */
-export function holdBundledCatalog(tles: Tle[], downloadedAtMs: number, nowMs: number): void {
+export function holdBundledCatalog(tles: Tle[], downloadedAtMs: number, nowMs: number, retryAtMs?: number): void {
   memory = {
     tles,
     downloadedAtMs,
     attemptedAtMs: nowMs,
     url: BUNDLED_CATALOG_URL,
+    retryAtMs,
     sizeBytes: 0
   };
 }
@@ -182,13 +189,14 @@ export function isStale(downloadedAtMs: number, nowMs: number): boolean {
 }
 
 /** Notes a failed attempt, so the retry interval starts running. */
-export function recordFailedAttempt(nowMs: number): void {
-  if (memory) memory = { ...memory, attemptedAtMs: nowMs };
-  touchStoredAttempt(nowMs);
+export function recordFailedAttempt(nowMs: number, retryAtMs = nowMs + TLE_RETRY_INTERVAL_MS): void {
+  if (memory) memory = { ...memory, attemptedAtMs: nowMs, retryAtMs };
+  touchStoredAttempt(nowMs, retryAtMs);
 }
 
 /** Test seam, and the way to force the next call to re-download. */
 export function clearTleCache(): void {
+  resetTleDownloadStatus();
   memory = null;
   clearStoredCatalog();
 }

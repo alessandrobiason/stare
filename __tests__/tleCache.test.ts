@@ -1,10 +1,12 @@
 import {
   TLE_CONNECT_TIMEOUT_MS,
+  TLE_DOWNLOAD_TIMEOUT_MS,
   TLE_REFRESH_INTERVAL_MS,
   TLE_RETRY_INTERVAL_MS,
   TLE_USABLE_INTERVAL_MS
 } from "../src/constants";
 import { forgetBundledCatalogForTesting } from "../src/data/bundledCatalog";
+import { tleDownloadStatus } from "../src/data/tleDownloadStatus";
 import { SAMPLE_TLE } from "../src/data/sampleTle";
 import {
   clearTleCache,
@@ -430,4 +432,72 @@ test("a half-written cache entry is ignored", async () => {
   const fetchMock = respondWith(body);
   await expect(loadActiveCatalog()).resolves.toMatchObject({ source: "network" });
   expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+
+test("accepts the observed 17-second CelesTrak response instead of timing out at 15 seconds", async () => {
+  jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+  try {
+    jest.spyOn(globalThis, "fetch").mockImplementation(() => new Promise((resolve) => {
+      setTimeout(() => resolve(new Response(body)), 18_000);
+    }));
+    const result = loadActiveCatalog();
+    await jest.advanceTimersByTimeAsync(18_000);
+    await expect(result).resolves.toMatchObject({ source: "network" });
+    expect(tleDownloadStatus().phase).toBe("ready");
+  } finally { jest.useRealTimers(); }
+});
+
+test("a stalled response body releases refresh and reports a timeout", async () => {
+  jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+  try {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const response = new Response(body);
+    jest.spyOn(response, "text").mockReturnValue(new Promise(() => undefined));
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(response);
+    const result = loadActiveCatalog();
+    await jest.advanceTimersByTimeAsync(TLE_DOWNLOAD_TIMEOUT_MS);
+    await expect(result).resolves.toMatchObject({ source: "bundled" });
+    expect(tleDownloadStatus().issue?.kind).toBe("timeout");
+    respondWith(body);
+    await expect(loadActiveCatalog({ force: true })).resolves.toMatchObject({ source: "network" });
+    expect(tleDownloadStatus().issue).toBeNull();
+  } finally { jest.useRealTimers(); }
+});
+
+test("server refusals and Retry-After block even forced requests until the deadline", async () => {
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  respondWith(body);
+  await loadActiveCatalog();
+  const now = 1_000_000 + TLE_USABLE_INTERVAL_MS * 2;
+  jest.spyOn(Date, "now").mockReturnValue(now);
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  const request = jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response("", {
+    status: 429, headers: { "Retry-After": "10800" }
+  }));
+  request.mockClear();
+  await loadActiveCatalog();
+  expect(tleDownloadStatus()).toMatchObject({ issue: { kind: "http", status: 429 }, retryAtMs: now + 10_800_000 });
+  expect(JSON.parse(device.store.read()!).retryAtMs).toBe(now + 10_800_000);
+  jest.spyOn(Date, "now").mockReturnValue(now + TLE_RETRY_INTERVAL_MS + 1);
+  await loadActiveCatalog({ force: true });
+  await refreshStaleCatalog();
+  expect(request).toHaveBeenCalledTimes(1);
+});
+
+
+test("a retry cooldown still chooses a newer bundled catalogue after an app update", async () => {
+  respondWith(body);
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  await loadActiveCatalog();
+  const now = 1_000_000 + TLE_USABLE_INTERVAL_MS * 3;
+  jest.spyOn(Date, "now").mockReturnValue(now);
+  const request = jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  await loadActiveCatalog();
+  request.mockClear();
+  mockBundled = { downloadedAtMs: now - 3_600_000, catalog: bundledBody };
+  forgetBundledCatalogForTesting();
+  await expect(loadActiveCatalog()).resolves.toMatchObject({ source: "bundled", downloadedAtMs: now - 3_600_000 });
+  expect(request).not.toHaveBeenCalled();
 });

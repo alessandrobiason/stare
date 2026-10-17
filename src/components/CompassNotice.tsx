@@ -69,7 +69,7 @@ function noticeFor({ accuracy, declinationKnown, skyFixStanding }: Props): Notic
   // seconds before the first heading, not a verdict.
   const notices = strings().compassNotice;
   if (accuracy !== undefined && accuracy <= COMPASS_ACCURACY.warnAtOrBelow) {
-    return notices.calibrate;
+    return accuracy === 2 ? notices.limited : notices.calibrate;
   }
   if (!declinationKnown) return notices.magnetic;
   return null;

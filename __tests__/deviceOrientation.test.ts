@@ -215,6 +215,16 @@ describe("the platform's compass", () => {
     expect(readings.at(-1)).toMatchObject({ declination: 4, compassAccuracy: 0 });
   });
 
+  test("invalid compass values cannot poison the bearing or masquerade as calibrated", async () => {
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 4);
+    field(northward);
+    report({ trueHeading: Number.NaN, magHeading: 90, accuracy: Number.NaN });
+    emit(levelMeasurement);
+    expect(readings.at(-1)).toMatchObject({ declination: 4, compassAccuracy: 0 });
+    expect(Number.isFinite(readings.at(-1)!.northOffset)).toBe(true);
+  });
+
   test("the attitude does not wait on it", async () => {
     // A watch that never registers — a device that refused the fix — must not
     // hold up the view: this resolving at all is the assertion.

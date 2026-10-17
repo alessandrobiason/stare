@@ -345,7 +345,7 @@ describe("and says it in the space it is given", () => {
     expect(width(t.calibrate.title, 12)).toBeLessThan(COLUMN);
     expect(width(t.magnetic.title, 12)).toBeLessThan(COLUMN);
     // The sentence under it wraps rather than being cut off.
-    for (const notice of [t.calibrate, t.magnetic]) {
+    for (const notice of [t.calibrate, t.limited, t.magnetic]) {
       expect(width(notice.detail, 11)).toBeLessThan(4 * COLUMN);
     }
   });

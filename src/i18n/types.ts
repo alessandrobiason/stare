@@ -415,6 +415,7 @@ export type Strings = {
   compass: readonly [string, string, string, string, string, string, string, string];
   compassNotice: {
     calibrate: Notice;
+    limited: Notice;
     magnetic: Notice;
   };
   /**
@@ -423,6 +424,9 @@ export type Strings = {
    * catalogue it shipped with. See `CatalogNotice`.
    */
   catalogNotice: {
+    downloading: string;
+    retryAfter: string;
+    errors: Record<"timeout" | "network" | "http" | "invalid", string>;
     /** `{age}` in the detail is one of the two below. */
     stale: Notice;
     /** The age, when it is a single day. */

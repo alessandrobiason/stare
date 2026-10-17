@@ -85,7 +85,7 @@ export async function readMagneticDeclinationDeg(): Promise<number | null> {
     const heading = await within(Location.getHeadingAsync(), HEADING_TIMEOUT_MS);
     if (!heading) return null;
     // iOS reports a negative true heading when it has no declination to apply.
-    if (heading.trueHeading < 0 || heading.magHeading < 0) return null;
+    if (!Number.isFinite(heading.trueHeading) || !Number.isFinite(heading.magHeading) || heading.trueHeading < 0 || heading.magHeading < 0) return null;
     return wrapDegrees180(heading.trueHeading - heading.magHeading);
   } catch {
     return null;
@@ -151,8 +151,9 @@ export async function subscribeToCompass(
       // iOS reports a negative true heading when it has no declination to
       // apply, exactly as in the one-shot read above.
       declinationDeg:
-        trueHeading < 0 || magHeading < 0 ? null : wrapDegrees180(trueHeading - magHeading),
-      accuracy
+        !Number.isFinite(trueHeading) || !Number.isFinite(magHeading) || trueHeading < 0 || magHeading < 0
+          ? null : wrapDegrees180(trueHeading - magHeading),
+      accuracy: Number.isInteger(accuracy) && accuracy >= 0 && accuracy <= 3 ? accuracy : 0
     });
   });
   return () => subscription.remove();

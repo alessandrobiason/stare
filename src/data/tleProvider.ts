@@ -1,4 +1,5 @@
-import { TLE_CONNECT_TIMEOUT_MS } from "../constants";
+import { TLE_CONNECT_TIMEOUT_MS, TLE_DOWNLOAD_TIMEOUT_MS, TLE_REFRESH_INTERVAL_MS, TLE_RETRY_INTERVAL_MS } from "../constants";
+import { setTleDownloadStatus, TleDownloadIssue } from "./tleDownloadStatus";
 import { Tle } from "../types";
 import { readBundledCatalog } from "./bundledCatalog";
 import {
@@ -25,26 +26,60 @@ const ACTIVE_TLE_URL = process.env.EXPO_PUBLIC_TLE_URL ?? DEFAULT_TLE_URL;
  */
 let inFlight: Promise<ActiveCatalog> | null = null;
 
-/**
- * Downloads and stores the catalogue.
- *
- * The timeout is on the *answer*, not on the download: it is cleared as soon as
- * the headers are in, so a slow connection pulling two and a half megabytes is
- * left to finish. What it cuts short is a server that never answers at all,
- * which the platform would otherwise wait out for a minute or more — with
- * boot's screen up, and a catalogue on hand to open on instead.
- */
-async function fetchActiveCatalog(url: string, nowMs: number): Promise<Tle[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TLE_CONNECT_TIMEOUT_MS);
-  let response: Response;
-  try {
-    response = await fetch(url, { headers: { Accept: "text/plain" }, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
+class CatalogDownloadError extends Error {
+  constructor(readonly issue: TleDownloadIssue, readonly retryAtMs?: number) {
+    super(issue.message);
   }
-  if (!response.ok) throw new Error(`TLE download failed (${response.status})`);
-  return await storeCatalog(url, await response.text(), nowMs);
+}
+
+/** A deadline independent of fetch's abort behavior, including response body reads on iOS. */
+async function bounded<T>(work: Promise<T>, controller: AbortController, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([work, new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(new CatalogDownloadError({ kind: "timeout", message: `CelesTrak timed out after ${ms / 1000}s` }));
+        controller.abort();
+      }, ms);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
+function retryDeadline(response: Response, nowMs: number): number | undefined {
+  const header = response.headers.get("Retry-After");
+  const requested = header === null ? 0 : /^\d+$/.test(header.trim())
+    ? nowMs + Number(header) * 1000 : Date.parse(header);
+  const minimum = response.status === 403 || response.status === 429
+    ? nowMs + TLE_REFRESH_INTERVAL_MS : nowMs + TLE_RETRY_INTERVAL_MS;
+  return Number.isFinite(requested) && requested > minimum ? requested : minimum;
+}
+
+async function fetchActiveCatalog(url: string, nowMs: number): Promise<Tle[]> {
+  setTleDownloadStatus({ phase: "loading", url, attemptedAtMs: nowMs, retryAtMs: null, issue: null });
+  const controller = new AbortController();
+  const response = await bounded(
+    fetch(url, { headers: { Accept: "text/plain" }, signal: controller.signal }),
+    controller, TLE_CONNECT_TIMEOUT_MS
+  );
+  if (!response.ok) throw new CatalogDownloadError({
+    kind: "http", status: response.status, message: `CelesTrak returned HTTP ${response.status}`
+  }, retryDeadline(response, nowMs));
+  const text = await bounded(response.text(), controller, TLE_DOWNLOAD_TIMEOUT_MS);
+  let tles: Tle[];
+  try { tles = await storeCatalog(url, text, nowMs); }
+  catch { throw new CatalogDownloadError({ kind: "invalid", message: "CelesTrak returned no valid satellite elements" }); }
+  setTleDownloadStatus({ phase: "ready", url, attemptedAtMs: nowMs, retryAtMs: null, issue: null });
+  return tles;
+}
+
+function rememberFailure(error: unknown, url: string, nowMs: number): void {
+  const retryAtMs = error instanceof CatalogDownloadError && error.retryAtMs !== undefined
+    ? error.retryAtMs : nowMs + TLE_RETRY_INTERVAL_MS;
+  const issue: TleDownloadIssue = error instanceof CatalogDownloadError ? error.issue : {
+    kind: "network", message: error instanceof Error ? error.message : "Network request failed"
+  };
+  recordFailedAttempt(nowMs, retryAtMs);
+  setTleDownloadStatus({ phase: "failed", url, attemptedAtMs: nowMs, retryAtMs, issue });
 }
 
 /**
@@ -88,7 +123,7 @@ async function fallBack(cache: CachedCatalog | null, nowMs: number): Promise<Act
     return fromCache(cache);
   }
   if (bundled) {
-    holdBundledCatalog(bundled.tles, bundled.downloadedAtMs, nowMs);
+    holdBundledCatalog(bundled.tles, bundled.downloadedAtMs, cache?.attemptedAtMs ?? nowMs, cache?.retryAtMs);
     return { tles: bundled.tles, source: "bundled", downloadedAtMs: bundled.downloadedAtMs };
   }
   return { tles: [], source: "none", downloadedAtMs: 0 };
@@ -114,6 +149,9 @@ function shouldDownload(
 ): boolean {
   if (!cache) return true;
   if (isFresh(cache, url, nowMs)) return false;
+  // A deliberate retry may bypass a network failure's short throttle, but
+  // must respect a longer server refusal or Retry-After deadline.
+  if (cache.retryAtMs !== undefined && cache.retryAtMs > cache.attemptedAtMs + TLE_RETRY_INTERVAL_MS && !mayRetry(cache, nowMs)) return false;
   return force || mayRetry(cache, nowMs);
 }
 
@@ -146,7 +184,7 @@ function refreshInBackground(url: string, nowMs: number): void {
   refreshing = true;
   void fetchActiveCatalog(url, nowMs)
     .catch((error: unknown) => {
-      recordFailedAttempt(nowMs);
+      rememberFailure(error, url, nowMs);
       console.warn("Background TLE refresh failed; the cached catalogue stands", error);
     })
     .finally(() => {
@@ -164,7 +202,9 @@ async function resolveActiveCatalog(
   // A cache still inside the refresh window is the answer. Not a fallback, not
   // a head start on a download — the request is simply not made.
   if (cache && !shouldDownload(cache, url, nowMs, force)) {
-    return fromCache(cache);
+    // A cooldown must not select an obsolete device cache over newer elements
+    // included in an app update, or pretend another request was attempted.
+    return isFresh(cache, url, nowMs) ? fromCache(cache) : fallBack(cache, nowMs);
   }
 
   // Past the refresh window and still well inside the accuracy one: open on
@@ -186,8 +226,8 @@ async function resolveActiveCatalog(
   try {
     return { tles: await fetchActiveCatalog(url, nowMs), source: "network", downloadedAtMs: nowMs };
   } catch (error) {
-    recordFailedAttempt(nowMs);
     const fallback = await fallBack(cache, nowMs);
+    rememberFailure(error, url, nowMs);
     console.warn(`TLE download failed; serving the ${fallback.source} catalog`, error);
     return fallback;
   }
@@ -255,7 +295,7 @@ export async function refreshStaleCatalog(): Promise<ActiveCatalog | null> {
   try {
     return { tles: await fetchActiveCatalog(url, nowMs), source: "network", downloadedAtMs: nowMs };
   } catch (error) {
-    recordFailedAttempt(nowMs);
+    rememberFailure(error, url, nowMs);
     console.warn("TLE refresh failed; the stale catalogue stands", error);
     return null;
   } finally {

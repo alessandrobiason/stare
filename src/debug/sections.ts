@@ -14,6 +14,7 @@ import { localeReport } from "../i18n/locale";
 import { CelestialAlignmentStats } from "../hooks/useCelestialAlignment";
 import { sunAltitudeDeg } from "../coordinates/sunAltitude";
 import { BUNDLED_CATALOG_URL, CachedCatalog } from "../data/tleCache";
+import { tleDownloadStatus } from "../data/tleDownloadStatus";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
 import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
@@ -495,8 +496,12 @@ export function catalogSection({ cache, nowMs }: CatalogDebugInput): DebugSectio
   const age = nowMs - cache.downloadedAtMs;
   const sinceAttempt = nowMs - cache.attemptedAtMs;
 
+  const download = tleDownloadStatus();
+  const retryAtMs = cache.retryAtMs;
   let nextRefresh: string;
-  if (age < TLE_REFRESH_INTERVAL_MS) {
+  if (retryAtMs !== undefined && retryAtMs > nowMs) {
+    nextRefresh = `retry in ${duration(retryAtMs - nowMs)}`;
+  } else if (age < TLE_REFRESH_INTERVAL_MS) {
     nextRefresh = `in ${duration(TLE_REFRESH_INTERVAL_MS - age)}`;
   } else if (sinceAttempt < TLE_RETRY_INTERVAL_MS) {
     nextRefresh = `retry in ${duration(TLE_RETRY_INTERVAL_MS - sinceAttempt)}`;
@@ -511,9 +516,12 @@ export function catalogSection({ cache, nowMs }: CatalogDebugInput): DebugSectio
       { label: "Satellites", value: cache.tles.length.toLocaleString() },
       // The shipped catalogue is held in memory without its text.
       ...(cache.url === BUNDLED_CATALOG_URL ? [] : [{ label: "Size", value: bytes(cache.sizeBytes) }]),
-      { label: "Downloaded", value: `${duration(age)} ago` },
+      { label: cache.url === BUNDLED_CATALOG_URL ? "Bundled catalogue dated" : "Downloaded", value: `${duration(age)} ago` },
       { label: "Last attempt", value: `${duration(sinceAttempt)} ago` },
       { label: "Next refresh", value: nextRefresh },
+      { label: "Download state", value: download.phase },
+      ...(download.issue ? [{ label: "Last error", value: download.issue.message, wrap: true }] : []),
+      ...(download.url ? [{ label: "Request", value: download.url, wrap: true }] : []),
       {
         label: "Source",
         value: cache.url === BUNDLED_CATALOG_URL ? "Bundled with the app" : cache.url,

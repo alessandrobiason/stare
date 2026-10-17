@@ -36,6 +36,7 @@ import {
   allSubcategories,
   SatelliteCategory
 } from "../src/satellite/categories";
+import { resetTleDownloadStatus, setTleDownloadStatus } from "../src/data/tleDownloadStatus";
 import { SatelliteDetail, Tle } from "../src/types";
 
 /** A phone with nothing to inset, for the pieces that read the safe area. */
@@ -603,15 +604,16 @@ describe("the compass notice", () => {
     // A magnetometer captured by a magnet reports a field like any other and
     // the sky is simply drawn somewhere else — so the notice has to name the
     // action, not the fault.
-    expect(at(0)).toContain("figure eight");
-    expect(at(0)).toContain("Compass needs calibrating");
+    expect(at(0)).toContain("all three axes");
+    expect(at(0)).toContain(strings().compassNotice.calibrate.title);
   });
 
   test("warns at medium too, since 35° is most of the frame", () => {
     // The platform's own band for level 2 is wider than half the camera's field
     // of view: a satellite drawn under it can be off the picture entirely,
     // which is a wrong view rather than a degraded one.
-    expect(at(2)).toContain("Compass needs calibrating");
+    expect(at(2)).toContain(strings().compassNotice.limited.title);
+    expect(at(2)).not.toContain(strings().compassNotice.calibrate.title);
   });
 
   test("a missing declination is said instead, and only when nothing worse is", () => {
@@ -625,7 +627,7 @@ describe("the compass notice", () => {
     const uncalibrated = textOf(
       <CompassNotice accuracy={0} declinationKnown={false} skyFixStanding={false} />
     );
-    expect(uncalibrated).toContain("Compass needs calibrating");
+    expect(uncalibrated).toContain(strings().compassNotice.calibrate.title);
     expect(uncalibrated).not.toContain("magnetic north");
   });
 
@@ -648,6 +650,19 @@ describe("the out-of-date orbits notice", () => {
 
   test("says nothing while the orbits are current", () => {
     expect(textOf(<CatalogNotice staleDays={null} />)).toBe("");
+  });
+
+  test.each(["en", "it"] as const)("%s explains a failed download and its retry time", (locale) => {
+    setLocaleForTesting(locale);
+    try {
+      setTleDownloadStatus({
+        phase: "failed", url: "https://celestrak.org", attemptedAtMs: 1_000_000,
+        retryAtMs: 2_000_000, issue: { kind: "http", status: 429, message: "HTTP 429" }
+      });
+      const text = textOf(<CatalogNotice staleDays={22} />);
+      expect(text).toContain("HTTP 429");
+      expect(text).toContain(strings().catalogNotice.retryAfter.split("{time}")[0]);
+    } finally { resetTleDownloadStatus(); }
   });
 
   test("says how old the orbits are, and that CelesTrak is being tried", () => {

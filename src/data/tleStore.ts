@@ -19,6 +19,8 @@ export type StoredCatalog = {
   downloadedAtMs: number;
   /** `Date.now()` of the last attempt, successful or not. Throttles retries. */
   attemptedAtMs: number;
+  /** Server-requested or ordinary retry deadline; absent in older caches. */
+  retryAtMs?: number;
   /** The URL it came from, so changing the source invalidates the cache. */
   url: string;
   /** The raw TLE text, exactly as served. */
@@ -84,10 +86,10 @@ export function writeStoredCatalog(stored: StoredCatalog): void {
  * Records that a download was attempted, leaving the catalog itself alone.
  * Keeps a failing or rate-limited CelesTrak from being retried on every launch.
  */
-export function touchStoredAttempt(attemptedAtMs: number): void {
+export function touchStoredAttempt(attemptedAtMs: number, retryAtMs?: number): void {
   const stored = readStoredCatalog();
   if (!stored) return;
-  writeStoredCatalog({ ...stored, attemptedAtMs });
+  writeStoredCatalog({ ...stored, attemptedAtMs, retryAtMs });
 }
 
 /** Test seam, and the way to force a refresh. */

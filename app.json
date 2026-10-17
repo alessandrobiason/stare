@@ -20,7 +20,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.alessandrobiason.stare",
-      "supportsTablet": false,
+      "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIRequiredDeviceCapabilities": [
@@ -38,7 +38,8 @@
         "NSPrivacyTrackingDomains": [],
         "NSPrivacyCollectedDataTypes": [],
         "NSPrivacyAccessedAPITypes": []
-      }
+      },
+      "requireFullScreen": true
     },
     "plugins": [
       "expo-asset",

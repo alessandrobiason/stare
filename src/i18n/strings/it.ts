@@ -210,25 +210,36 @@ export const it: Strings = {
   compass: ["N", "NE", "E", "SE", "S", "SO", "O", "NO"],
   compassNotice: {
     calibrate: {
-      title: "La bussola va calibrata",
+      title: "La bussola è poco precisa",
       detail:
-        "Muovi il telefono a forma di otto, lontano da calamite, metallo e altri " +
-        "telefoni."
+        "Allontana cover, tastiere magnetiche e metallo. Ruota lentamente il dispositivo " +
+        "sui tre assi e prova all’aperto. Le direzioni possono essere imprecise."
+    },
+    limited: {
+      title: "Precisione della bussola ridotta",
+      detail: "Il sensore segnala precisione media: le posizioni possono essere spostate. " +
+        "Allontana cover e tastiere magnetiche."
     },
     magnetic: {
       title: "Le direzioni indicano il nord magnetico",
       detail:
-        "Questo telefono non indica lo scostamento dal nord geografico, quindi tutto " +
+        "Questo dispositivo non indica lo scostamento dal nord geografico, quindi tutto " +
         "è disegnato spostato della declinazione locale — pochi gradi quasi ovunque."
     }
   },
   catalogNotice: {
+    downloading: "Scaricamento del catalogo aggiornato in corso.",
+    retryAfter: "Nuovo tentativo dopo le {time}.",
+    errors: {
+      timeout: "CelesTrak non ha risposto in tempo o il download si è interrotto.",
+      network: "Connessione a CelesTrak non riuscita: controlla la rete o eventuali VPN e filtri.",
+      http: "Il server ha rifiutato il download o non è disponibile (HTTP {status}).",
+      invalid: "La risposta del server non conteneva orbite valide."
+    },
     stale: {
       title: "Orbite dei satelliti non aggiornate",
       detail:
-        "Stare non riesce a contattare CelesTrak, quindi usa orbite di {age} fa e i " +
-        "satelliti possono non essere dove sono disegnati. Continua a provare a " +
-        "contattare il server e le aggiornerà da sola."
+        "Le orbite di CelesTrak risalgono a {age} fa; le posizioni possono essere imprecise."
     },
     oneDay: "un giorno",
     days: "{days} giorni"

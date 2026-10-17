@@ -1753,14 +1753,16 @@ export const TLE_USABLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * How long a catalogue download may wait for CelesTrak to *answer* before it is
- * given up on — the headers, not the whole body, which on a slow connection
- * takes as long as it takes.
+ * given up on. The response body has a separate, longer deadline below.
  *
  * Without it an unreachable server is waited out for as long as the platform
  * cares to, which on a phone is a minute or more of boot screen in front of a
  * cached or bundled catalogue the app could have opened on.
  */
-export const TLE_CONNECT_TIMEOUT_MS = 15 * 1000;
+// CelesTrak has been observed taking over 17 seconds just to return headers.
+export const TLE_CONNECT_TIMEOUT_MS = 45 * 1000;
+/** Bound body reads too: a half-delivered catalogue must not stop all future refreshes. */
+export const TLE_DOWNLOAD_TIMEOUT_MS = 90 * 1000;
 
 /**
  * How often a running view checks whether the elements it is drawing have gone

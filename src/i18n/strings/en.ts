@@ -217,24 +217,36 @@ export const en: Strings = {
   compass: ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
   compassNotice: {
     calibrate: {
-      title: "Compass needs calibrating",
+      title: "Compass accuracy is low",
       detail:
-        "Move the phone in a figure eight, away from magnets, metal and other phones."
+        "Move away from magnetic cases, keyboards and metal. Slowly rotate the device " +
+        "around all three axes and try outdoors. Directions may be inaccurate."
+    },
+    limited: {
+      title: "Reduced compass accuracy",
+      detail: "The sensor reports medium accuracy, so positions may be offset. " +
+        "Move away from magnetic cases and keyboards."
     },
     magnetic: {
       title: "Headings point to magnetic north",
       detail:
-        "This phone has not reported a true-north offset, so everything is shown shifted " +
+        "This device has not reported a true-north offset, so everything is shown shifted " +
         "by the local declination — a few degrees in most places."
     }
   },
   catalogNotice: {
+    downloading: "Downloading an updated catalogue.",
+    retryAfter: "Next attempt after {time}.",
+    errors: {
+      timeout: "CelesTrak did not respond in time or the download stalled.",
+      network: "Could not connect to CelesTrak. Check your network, VPN or filters.",
+      http: "The server refused the download or is unavailable (HTTP {status}).",
+      invalid: "The server response did not contain valid satellite elements."
+    },
     stale: {
       title: "Satellite orbits are out of date",
       detail:
-        "Stare could not reach CelesTrak, so it is drawing orbits from {age} ago and " +
-        "satellites may be off from where they are shown. It keeps trying the server " +
-        "and will update them by itself."
+        "CelesTrak orbits are from {age} ago; positions may be inaccurate."
     },
     oneDay: "a day",
     days: "{days} days"
