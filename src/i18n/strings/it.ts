@@ -178,6 +178,9 @@ export const it: Strings = {
     },
     sighting: "Visibile a occhio nudo alle {time}",
     map: {
+      play: "Riprendi il movimento",
+      pause: "Metti in pausa il movimento",
+      timeline: "Posizione nelle 24 ore",
       label: "Traccia a terra di {name}",
       title: "TRACCIA A TERRA",
       window: "PROSSIME 24 ORE",

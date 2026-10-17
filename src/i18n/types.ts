@@ -330,6 +330,10 @@ export type Strings = {
      * counting. See `src/components/GroundTrackMap.tsx`.
      */
     map: {
+      /** Playback controls for the map's 24-hour timeline. */
+      play: string;
+      pause: string;
+      timeline: string;
       /** The explicitly named 24-hour forecast and its local date/time bounds. */
       window: string;
       range: string;

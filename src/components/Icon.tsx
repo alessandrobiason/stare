@@ -29,6 +29,8 @@ export type IconName =
   | "layers"
   /** Freezing the view: the sign every screen already uses for "hold this". */
   | "pause"
+  /** Resume the map forecast from its selected time. */
+  | "play"
   /** Onwards into a card, and — turned — the thing that opens a panel. */
   | "chevron"
   /** The way out of a sheet. */
@@ -221,6 +223,18 @@ export const Icon: React.FC<Props> = ({
               }}
             />
           ))}
+        </View>
+      );
+
+    case "play":
+      return (
+        <View style={[box, styles.centre]}>
+          <View style={{
+            width: 0, height: 0, marginLeft: size * 0.12,
+            borderTopWidth: size * 0.31, borderBottomWidth: size * 0.31,
+            borderLeftWidth: size * 0.48, borderTopColor: "transparent",
+            borderBottomColor: "transparent", borderLeftColor: color
+          }} />
         </View>
       );
 

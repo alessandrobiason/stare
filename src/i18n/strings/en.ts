@@ -185,6 +185,9 @@ export const en: Strings = {
     },
     sighting: "Visible to the eye at {time}",
     map: {
+      play: "Play satellite motion",
+      pause: "Pause satellite motion",
+      timeline: "Position in the 24-hour forecast",
       label: "Ground track of {name}",
       title: "GROUND TRACK",
       window: "NEXT 24 HOURS",

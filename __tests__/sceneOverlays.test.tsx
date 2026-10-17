@@ -1075,6 +1075,23 @@ describe("the tapped satellite's card", () => {
       expect(markup).toContain(fill(strings().card.map.label, { name: "STARLINK-1234" }));
     });
 
+    test.each(["en", "it"] as const)("%s exposes playback and a full-day scrubber", (locale) => {
+      setLocaleForTesting(locale);
+      try {
+        const markup = renderToStaticMarkup(
+          card({ "STARLINK-1234": detail() }, undefined, undefined, null, plan())
+        );
+        expect(markup).toContain(`aria-label="${strings().card.map.pause}"`);
+        expect(markup).toContain(`aria-label="${strings().card.map.timeline}"`);
+        expect(markup).toMatch(/type="range"[^>]*min="0"[^>]*max="1440"/);
+        expect(markup).toContain("+12h");
+        expect(markup).toContain("+24h");
+        expect(markup).toContain('aria-valuetext="');
+      } finally {
+        setLocaleForTesting(undefined);
+      }
+    });
+
     test("is absent until the orbit has been worked out", () => {
       // The plan lands a moment after the tap, and an object whose elements
       // will not make an orbit never gets one at all. Either way the card is

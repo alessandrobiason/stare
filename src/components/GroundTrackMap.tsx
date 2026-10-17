@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { GROUND_TRACK } from "../constants";
 import { GroundTrackPlan } from "../hooks/useGroundTrack";
 import { useOrbitPhase } from "../hooks/useOrbitPhase";
 import { fill, strings } from "../i18n";
+import type { GroundTrack } from "../satellite/groundTrack";
 import { calendarTime } from "../i18n/format";
+import { Icon } from "./Icon";
+import { OrbitScrubber } from "./OrbitScrubber";
 import { GroundTrackCanvas } from "./GroundTrackCanvas";
 import { groundTrackBackdrop, groundTrackMoment, MAP_INK, mapBoxFor } from "./groundTrackScene";
 import { theme } from "./theme";
@@ -45,7 +48,8 @@ type Props = {
  *
  * The next 24 hours are flown in 40 seconds, at the same compression for
  * every satellite. Dates and local times identify the window and the animated
- * moment, including crossings of midnight.
+ * moment, including crossings of midnight. A quiet transport below the map
+ * pauses on a manually selected moment and resumes the loop from there.
  *
  * The width is measured rather than assumed: this sits in a card whose width is
  * the phone's, and the map's height follows from it at the projection's aspect.
@@ -54,7 +58,10 @@ type Props = {
 export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
   const t = strings();
   const [width, setWidth] = useState(0);
-  const { track } = plan;
+  // Once someone takes control, keep that forecast window fixed. Background
+  // replanning must not move a paused satellite or the time they selected.
+  const [inspectionTrack, setInspectionTrack] = useState<GroundTrack | null>(null);
+  const track = inspectionTrack ?? plan.track;
 
   const box = useMemo(() => mapBoxFor(width), [width]);
   // The world and the whole orbit, which only change when the card is opened
@@ -65,7 +72,9 @@ export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
   );
 
   // The same time compression for every object over the full forecast window.
-  const phase = useOrbitPhase(track && backdrop ? GROUND_TRACK.loopSeconds : null);
+  const { phase, playing, seek, toggle } = useOrbitPhase(
+    track && backdrop ? GROUND_TRACK.loopSeconds : null
+  );
   const moment = track && backdrop ? groundTrackMoment(track, phase, box) : null;
 
   const onLayout = ({ nativeEvent }: LayoutChangeEvent) => {
@@ -98,6 +107,39 @@ export const GroundTrackMap: React.FC<Props> = ({ plan, name, color }) => {
           <GroundTrackCanvas backdrop={backdrop} moment={moment} color={color} />
         )}
       </View>
+
+      {track && (
+        <View style={styles.transport}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={playing ? t.card.map.pause : t.card.map.play}
+            hitSlop={6}
+            onPress={() => {
+              setInspectionTrack(track);
+              toggle();
+            }}
+            style={({ pressed }) => [styles.playback, pressed && styles.pressed]}
+          >
+            <Icon name={playing ? "pause" : "play"} size={12} color={theme.color.textDim} />
+          </Pressable>
+          <View style={styles.timeline}>
+            <OrbitScrubber
+              value={phase}
+              label={t.card.map.timeline}
+              valueText={atLabel(track.fromMs + phase * track.spanMs)}
+              onChange={(value) => {
+                setInspectionTrack(track);
+                seek(value);
+              }}
+            />
+            <View pointerEvents="none" style={styles.scale}>
+              <Text style={styles.tick}>0h</Text>
+              <Text style={styles.tick}>+12h</Text>
+              <Text style={styles.tick}>+24h</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Memoised, so the row of writing is not reconciled sixty times a second
           for a clock that changes a few times a second. */}
@@ -160,6 +202,38 @@ const styles = StyleSheet.create({
     // What is behind the map for the one frame before the width is measured.
     // The sea's own colour, so the box does not flash a different dark.
     backgroundColor: MAP_INK.sea.color
+  },
+  transport: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingTop: 4
+  },
+  playback: {
+    width: 32,
+    height: 32,
+    marginTop: 2,
+    borderRadius: theme.radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.color.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.color.divider
+  },
+  pressed: { opacity: 0.6 },
+  timeline: { flex: 1, height: 44, minWidth: 0 },
+  scale: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  tick: {
+    color: theme.color.textFaint,
+    fontSize: 9,
+    fontVariant: ["tabular-nums"]
   },
   caption: {
     flexDirection: "row",

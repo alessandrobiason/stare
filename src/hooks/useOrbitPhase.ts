@@ -1,42 +1,41 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { clamp } from "../math/angles";
 
-/**
- * How far round its orbit the animated satellite is, in `[0, 1)`.
- *
- * A wall clock rather than a frame counter: the phase is read off elapsed time
- * on each animation frame, so a loop takes `loopSeconds` on a phone dropping
- * frames exactly as it does on one that is not, and a stall shows as the dot
- * jumping rather than as the orbit quietly taking longer than the card says
- * it does.
- *
- * `null` stops it, for a card with no orbit to draw.
- *
- * Keyed on the loop's length alone, which is deliberate: the track underneath
- * is replanned from time to time (`useGroundTrack`) and restarting the
- * animation at every replan would put a stutter into a loop that is otherwise
- * continuous. The length only changes when the card is opened on a different
- * object, which is the one moment the phase *should* go back to the start.
- */
-export function useOrbitPhase(loopSeconds: number | null): number {
+/** A looping forecast clock. Seeking pauses it; play resumes at that position. */
+export function useOrbitPhase(loopSeconds: number | null) {
   const [phase, setPhase] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const phaseRef = useRef(0);
+  const playingRef = useRef(true);
 
   useEffect(() => {
-    if (loopSeconds === null || !(loopSeconds > 0)) return;
-    // Server-rendered in the test suite, where there are no frames to ask for.
+    if (!playing || loopSeconds === null || !(loopSeconds > 0)) return;
     if (typeof requestAnimationFrame !== "function") return;
 
-    setPhase(0);
-    const startedAt = performance.now();
-    let frame = requestAnimationFrame(function tick() {
-      const elapsed = (performance.now() - startedAt) / 1000;
-      // `%` on a float that only grows: the modulo is what makes it a loop, and
-      // the elapsed time is small enough for the whole life of an open card
-      // that it cannot lose precision.
-      setPhase((elapsed / loopSeconds) % 1);
+    let previous = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      if (!playingRef.current) return;
+      const elapsed = Math.max(0, now - previous);
+      previous = now;
+      phaseRef.current = (phaseRef.current + elapsed / (loopSeconds * 1000)) % 1;
+      setPhase(phaseRef.current);
       frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
-  }, [loopSeconds]);
+  }, [loopSeconds, playing]);
 
-  return loopSeconds === null ? 0 : phase;
+  const seek = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return;
+    playingRef.current = false;
+    phaseRef.current = clamp(value, 0, 1);
+    setPlaying(false);
+    setPhase(phaseRef.current);
+  }, []);
+
+  const toggle = useCallback(() => {
+    playingRef.current = !playingRef.current;
+    setPlaying(playingRef.current);
+  }, []);
+
+  return { phase, playing, seek, toggle };
 }
