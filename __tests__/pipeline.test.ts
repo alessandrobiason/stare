@@ -14,8 +14,8 @@ function requested(job: Job, event: string, operation: string): boolean {
   return new Function("event", "operation", `return (${expression});`)(event, operation);
 }
 
-test("there is one workflow and Stage 2 always follows Check", () => {
-  expect(readdirSync(".github/workflows").filter((file) => /\.ya?ml$/.test(file))).toEqual(["pipeline.yml"]);
+test("the app pipeline retains both gates and Pages has its own workflow", () => {
+  expect(readdirSync(".github/workflows").filter((file) => /\.ya?ml$/.test(file)).sort()).toEqual(["pages.yml", "pipeline.yml"]);
   expect(workflow.on.push.branches).toEqual(["main"]);
   expect(workflow.on).toHaveProperty("pull_request");
   expect(workflow.on.push).not.toHaveProperty("paths");
@@ -23,6 +23,30 @@ test("there is one workflow and Stage 2 always follows Check", () => {
   expect(needs(jobs.screenshots)).toEqual(["check"]);
   expect(jobs.check.if).toBeUndefined();
   expect(jobs.screenshots.if).toBeUndefined();
+  expect(jobs).not.toHaveProperty("pages");
+  expect(workflow.on.workflow_dispatch.inputs.operation.options).not.toContain("pages");
+});
+
+test("Pages deploys independently on site changes or a manual request, with its own link check", () => {
+  const pages = parse(readFileSync(".github/workflows/pages.yml", "utf8"));
+  expect(pages.on.push.branches).toEqual(["main"]);
+  expect(pages.on.push.paths).toEqual(["site/**", ".github/workflows/pages.yml"]);
+  expect(pages.on).toHaveProperty("workflow_dispatch");
+  expect(pages.on).not.toHaveProperty("workflow_run");
+  expect(Object.keys(pages.jobs)).toEqual(["deploy"]);
+  const deploy = pages.jobs.deploy;
+  expect(needs(deploy)).toEqual([]);
+  expect(deploy.if).toBeUndefined();
+  expect(deploy.permissions).toMatchObject({ pages: "write", "id-token": "write" });
+  expect(deploy.environment.name).toBe("github-pages");
+  expect(deploy.steps.find((step: Step) => step.uses?.startsWith("actions/checkout@"))?.with?.ref).toBe("${{ github.sha }}");
+  const upload = deploy.steps.findIndex((step: Step) => step.uses?.startsWith("actions/upload-pages-artifact@"));
+  const linkCheck = deploy.steps.findIndex((step: Step) => step.run?.includes("is missing"));
+  expect(linkCheck).toBeGreaterThan(-1);
+  expect(linkCheck).toBeLessThan(upload);
+  expect(deploy.steps[upload].with.path).toBe("site");
+  expect(deploy.steps.some((step: Step) => step.uses?.startsWith("actions/deploy-pages@"))).toBe(true);
+  expect(pages.concurrency).toEqual({ group: "pages", "cancel-in-progress": false });
 });
 
 test.each(["testflight", "ota"])("%s requires both successful gates in its own run", (publisher) => {

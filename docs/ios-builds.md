@@ -25,8 +25,8 @@ the privacy manifest.
 
 ## One pipeline, with release gates
 
-[`.github/workflows/pipeline.yml`](../.github/workflows/pipeline.yml) is the only
-Actions workflow. Every push to `main`, pull request, and manual run starts with:
+[`.github/workflows/pipeline.yml`](../.github/workflows/pipeline.yml) handles the
+app. Every push to `main`, pull request, and manual run starts with:
 
 1. **Check** — typecheck, lint and the Jest suites.
 2. **App Store screenshots** — capture the actual app in every language, compose
@@ -61,9 +61,18 @@ Other operations in the same workflow preserve the maintenance tasks:
 - `screenshots`: commit the generated screenshot artifact back to the selected
   branch. A concurrent branch update makes the push fail rather than attaching
   images to code they were not captured from.
-- `pages`: deploy `site/` to GitHub Pages. Site changes on `main` also deploy
-  automatically after the two gates. Pages setup remains Settings → Pages →
-  Build and deployment → Source: **GitHub Actions**.
+
+The support and privacy site has its own [Pages workflow](../.github/workflows/pages.yml),
+independent of the app's Check and screenshot stages. It checks local page links
+before deploying `site/`, automatically when `site/**` or the Pages workflow
+changes on `main`, or manually with:
+
+```bash
+gh workflow run pages.yml --ref main
+```
+
+Pages setup remains Settings → Pages → Build and deployment → Source:
+**GitHub Actions**.
 
 Screenshot success means that this run captured and rendered the complete listing,
 not byte equality with committed PNGs. Browser rendering and animated content can

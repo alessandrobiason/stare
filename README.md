@@ -170,9 +170,10 @@ stream — video, clock, GPS, ARKit pose, IMU — instead of a live camera.
 | `npm run start` | Metro for a dev-client build on a phone | A dev-client build, and a phone that can reach this machine |
 | TestFlight | The real thing, on a real sky | A GitHub Actions run — [docs/ios-builds.md](docs/ios-builds.md) |
 
-GitHub Actions uses one [Pipeline](.github/workflows/pipeline.yml): Check → App Store
+The app uses one [Pipeline](.github/workflows/pipeline.yml): Check → App Store
 screenshots → manually requested TestFlight or OTA publishing. Both validation
 stages must pass for the exact commit before either publisher can run.
+The support and privacy site deploys independently through [Pages](.github/workflows/pages.yml).
 
 **Expo Go cannot run this app.** Its binary carries none of the native modules
 the view is built on — camera, location, motion, ONNX Runtime.

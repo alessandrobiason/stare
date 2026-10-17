@@ -24,7 +24,6 @@ run-name: ${{ inputs.operation || 'validate' }} · ${{ github.ref_name }}
         - ota
         - screenshots
         - ios-build
-        - pages
         default: validate
       configuration:
         description: Xcode configuration for TestFlight or simulator builds
@@ -57,24 +56,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         ref: ${{ github.sha }}
-        persist-credentials: true
-    - name: Find site changes
-      id: changes
-      if: github.event_name == 'push'
-      env:
-        BEFORE: ${{ github.event.before }}
-      run: |
-        set -euo pipefail
-        if [[ "$BEFORE" =~ ^0+$ ]]; then
-          echo "site_changed=true" >> "$GITHUB_OUTPUT"
-        else
-          git fetch --no-tags --depth=1 origin "$BEFORE"
-          if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- site .github/workflows/pipeline.yml; then
-            echo "site_changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "site_changed=true" >> "$GITHUB_OUTPUT"
-          fi
-        fi
+        persist-credentials: false
     - name: Validate the requested operation
       env:
         OPERATION: ${{ inputs.operation }}
@@ -96,8 +78,6 @@ jobs:
       run: npm ci --legacy-peer-deps --no-audit --no-fund
     - name: Check
       run: npm run check
-    outputs:
-      site_changed: ${{ steps.changes.outputs.site_changed }}
   screenshots:
     name: Stage 2 · App Store screenshots
     runs-on: ubuntu-latest
@@ -699,42 +679,3 @@ jobs:
         git push origin "HEAD:refs/heads/$TARGET_BRANCH"
       env:
         TARGET_BRANCH: ${{ github.ref_name }}
-  pages:
-    name: Deploy support and privacy pages
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-    - uses: actions/checkout@v5
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-    - name: Check the pages link to each other
-      run: |
-        cd site
-        status=0
-        for page in *.html; do
-          while read -r target; do
-            [ -f "$target" ] || { echo "$page -> $target is missing"; status=1; }
-          done < <(grep -o 'href="[^"#:]*\.\(html\|css\)"' "$page" | sed 's/href="//;s/"$//')
-        done
-        exit $status
-    - uses: actions/configure-pages@v5
-    - uses: actions/upload-pages-artifact@v3
-      with:
-        path: site
-    - id: deployment
-      uses: actions/deploy-pages@v4
-    needs:
-    - check
-    - screenshots
-    if: (github.event_name == 'push' && needs.check.outputs.site_changed == 'true') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'pages')
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
