@@ -15,6 +15,9 @@ import { CelestialAlignmentStats } from "../hooks/useCelestialAlignment";
 import { sunAltitudeDeg } from "../coordinates/sunAltitude";
 import { BUNDLED_CATALOG_URL, CachedCatalog } from "../data/tleCache";
 import { tleDownloadStatus } from "../data/tleDownloadStatus";
+import { retryActiveCatalog } from "../data/tleProvider";
+import { fill, strings } from "../i18n";
+import { clockTime as localizedClockTime } from "../i18n/format";
 import { DeviceCapabilities } from "../device/capabilities";
 import { DeviceOrientation } from "../device/deviceOrientation";
 import { northOffsetNoiseDeg } from "../fusion/orientationFilter";
@@ -59,6 +62,7 @@ export type DebugRow = { label: string; value: string; wrap?: boolean };
  * what it was last told to do.
  */
 export type DebugSwitch = { label: string; on: boolean; onToggle: () => void };
+export type DebugAction = { label: string; disabled?: boolean; onPress: () => void };
 
 /**
  * One page of the debug overlay: a tab and what it shows. Sections are what the
@@ -72,6 +76,7 @@ export type DebugSection = {
   title: string;
   rows: DebugRow[];
   switches?: DebugSwitch[];
+  actions?: DebugAction[];
 };
 
 /**
@@ -489,14 +494,23 @@ export type CatalogDebugInput = {
  * behind them, which is the thing that gets a client blocked if it is wrong.
  */
 export function catalogSection({ cache, nowMs }: CatalogDebugInput): DebugSection {
+  const download = tleDownloadStatus();
+  const words = strings().tleSettings;
+  const actions: DebugAction[] = [{
+    label: download.phase === "loading" ? words.downloading : words.retry,
+    disabled: download.phase === "loading",
+    onPress: () => { void retryActiveCatalog(); }
+  }];
+  const feedback: DebugRow[] = download.phase === "waiting" && download.retryAtMs !== null
+    ? [{ label: words.status, value: fill(words.waiting, { time: localizedClockTime(new Date(download.retryAtMs)) }), wrap: true }]
+    : download.phase === "ready" ? [{ label: words.status, value: words.updated }] : [];
   if (!cache) {
-    return { id: "tle", title: "TLE", rows: [{ label: "State", value: "No cached catalog" }] };
+    return { id: "tle", title: "TLE", actions, rows: [...feedback, { label: "State", value: "No cached catalog" }] };
   }
 
   const age = nowMs - cache.downloadedAtMs;
   const sinceAttempt = nowMs - cache.attemptedAtMs;
 
-  const download = tleDownloadStatus();
   const retryAtMs = cache.retryAtMs;
   let nextRefresh: string;
   if (retryAtMs !== undefined && retryAtMs > nowMs) {
@@ -512,7 +526,9 @@ export function catalogSection({ cache, nowMs }: CatalogDebugInput): DebugSectio
   return {
     id: "tle",
     title: "TLE",
+    actions,
     rows: [
+      ...feedback,
       { label: "Satellites", value: cache.tles.length.toLocaleString() },
       // The shipped catalogue is held in memory without its text.
       ...(cache.url === BUNDLED_CATALOG_URL ? [] : [{ label: "Size", value: bytes(cache.sizeBytes) }]),

@@ -301,6 +301,13 @@ export const en: Strings = {
   language: {
     title: "Language"
   },
+  tleSettings: {
+    retry: "Retry TLE download",
+    downloading: "Downloading…",
+    status: "Status",
+    updated: "TLE updated",
+    waiting: "Next download available at {time}."
+  },
   console: {
     detail: "Technical readings."
   },

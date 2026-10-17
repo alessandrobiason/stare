@@ -1760,9 +1760,9 @@ export const TLE_USABLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
  * cached or bundled catalogue the app could have opened on.
  */
 // CelesTrak has been observed taking over 17 seconds just to return headers.
-export const TLE_CONNECT_TIMEOUT_MS = 45 * 1000;
+export const TLE_CONNECT_TIMEOUT_MS = 2 * 60 * 1000;
 /** Bound body reads too: a half-delivered catalogue must not stop all future refreshes. */
-export const TLE_DOWNLOAD_TIMEOUT_MS = 90 * 1000;
+export const TLE_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
  * How often a running view checks whether the elements it is drawing have gone

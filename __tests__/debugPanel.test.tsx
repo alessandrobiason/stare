@@ -1,7 +1,9 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DebugPanel } from "../src/components/DebugPanel";
-import { DebugSection } from "../src/debug/sections";
+import { catalogSection, DebugSection } from "../src/debug/sections";
+import { resetTleDownloadStatus, setTleDownloadStatus } from "../src/data/tleDownloadStatus";
+import { setLocaleForTesting, strings } from "../src/i18n";
 
 /** The rendered panel as plain text, the way someone reads it. */
 function textOf(element: React.ReactElement): string {
@@ -41,6 +43,26 @@ test("one page is shown at a time, starting with the scene's own", () => {
 
 test("a scene with nothing to report still renders rather than throwing", () => {
   expect(textOf(panel(() => []))).toBe("✕");
+});
+
+describe("TLE download action", () => {
+  afterEach(() => { resetTleDownloadStatus(); setLocaleForTesting("en"); });
+
+  test.each(["en", "it"] as const)("is an accessible retry button even without a cached catalogue (%s)", (locale) => {
+    setLocaleForTesting(locale);
+    const markup = renderToStaticMarkup(panel(() => [catalogSection({ cache: null, nowMs: Date.now() })]));
+    expect(markup).toContain(`aria-label="${strings().tleSettings.retry}"`);
+    expect(markup).toContain('role="button"');
+    expect(markup).not.toContain('aria-disabled="true"');
+  });
+
+  test("shows a disabled busy button while downloading", () => {
+    setTleDownloadStatus({ phase: "loading", attemptedAtMs: Date.now(), retryAtMs: null, issue: null, url: null });
+    const markup = renderToStaticMarkup(panel(() => [catalogSection({ cache: null, nowMs: Date.now() })]));
+    expect(markup).toContain(`aria-label="${strings().tleSettings.downloading}"`);
+    expect(markup).toContain('aria-disabled="true"');
+    expect(markup).toContain('aria-busy="true"');
+  });
 });
 
 describe("a page's switches", () => {

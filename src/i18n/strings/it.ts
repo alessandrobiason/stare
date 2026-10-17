@@ -294,6 +294,13 @@ export const it: Strings = {
   language: {
     title: "Lingua"
   },
+  tleSettings: {
+    retry: "Riprova a scaricare i TLE",
+    downloading: "Scaricamento…",
+    status: "Stato",
+    updated: "TLE aggiornati",
+    waiting: "Prossimo download disponibile dalle {time}."
+  },
   console: {
     detail: "Dati tecnici."
   },

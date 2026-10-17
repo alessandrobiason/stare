@@ -11,9 +11,12 @@ import { SAMPLE_TLE } from "../src/data/sampleTle";
 import {
   clearTleCache,
   loadActiveCatalog,
+  retryActiveCatalog,
   refreshStaleCatalog
 } from "../src/data/tleProvider";
 import { PersistentStore, setPersistentStoreForTesting } from "../src/data/tleStore";
+import { cachedCatalog } from "../src/data/tleCache";
+import { catalogSection } from "../src/debug/sections";
 
 /**
  * What the app ships with, in place of the real two-and-a-half megabytes.
@@ -400,6 +403,7 @@ test("a rejected download does not overwrite a good cache", async () => {
   jest.spyOn(Date, "now").mockReturnValue(1_000_000 + TLE_REFRESH_INTERVAL_MS + 1);
   await loadActiveCatalog();
 
+  await flush();
   const stored = JSON.parse(device.store.read() ?? "{}");
   expect(stored.catalog).toContain("SAT ONE");
   expect(stored.downloadedAtMs).toBe(1_000_000);
@@ -482,7 +486,69 @@ test("server refusals and Retry-After block even forced requests until the deadl
   jest.spyOn(Date, "now").mockReturnValue(now + TLE_RETRY_INTERVAL_MS + 1);
   await loadActiveCatalog({ force: true });
   await refreshStaleCatalog();
+  await retryActiveCatalog();
   expect(request).toHaveBeenCalledTimes(1);
+});
+
+test("settings retry bypasses a failed connection's backoff and replaces the bundled fallback", async () => {
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  await loadActiveCatalog();
+  const request = respondWith(otherBody);
+  request.mockClear();
+  const action = catalogSection({ cache: cachedCatalog(), nowMs: Date.now() }).actions?.[0];
+  expect(action?.disabled).toBe(false);
+  action!.onPress();
+  await flush();
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(cachedCatalog()?.tles[0].name).toBe("SAT TWO");
+  expect(tleDownloadStatus()).toMatchObject({ phase: "ready", issue: null });
+});
+
+test("settings retry explains when a recent download can be refreshed", async () => {
+  jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+  const request = respondWith(body);
+  await loadActiveCatalog();
+  await expect(retryActiveCatalog()).resolves.toBeNull();
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(tleDownloadStatus()).toMatchObject({ phase: "waiting", retryAtMs: 1_000_000 + TLE_REFRESH_INTERVAL_MS });
+});
+
+test("repeated settings taps and boot share a single active network download", async () => {
+  let finish!: (response: Response) => void;
+  const request = jest.spyOn(globalThis, "fetch").mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  const opened = loadActiveCatalog();
+  const first = retryActiveCatalog();
+  const second = retryActiveCatalog();
+  expect(first).toBe(second);
+  await flush();
+  expect(request).toHaveBeenCalledTimes(1);
+  finish(new Response(body));
+  await expect(first).resolves.toMatchObject({ source: "network" });
+  await opened;
+});
+
+test("settings retry failure keeps existing elements and reports the error", async () => {
+  jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  await expect(retryActiveCatalog()).resolves.toBeNull();
+  expect(tleDownloadStatus()).toMatchObject({ phase: "failed", issue: { kind: "network" } });
+  respondWith(body);
+  await expect(retryActiveCatalog()).resolves.toMatchObject({ source: "network" });
+});
+
+test("accepts slow headers and a four-minute body transfer on a poor connection", async () => {
+  jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+  try {
+    const response = new Response(body);
+    jest.spyOn(response, "text").mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(body), 240_000)));
+    jest.spyOn(globalThis, "fetch").mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(response), 90_000)));
+    const result = retryActiveCatalog();
+    await jest.advanceTimersByTimeAsync(330_000);
+    await expect(result).resolves.toMatchObject({ source: "network" });
+    expect(tleDownloadStatus().phase).toBe("ready");
+  } finally { jest.useRealTimers(); }
 });
 
 

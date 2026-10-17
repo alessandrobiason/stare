@@ -1,5 +1,5 @@
 import { TLE_CONNECT_TIMEOUT_MS, TLE_DOWNLOAD_TIMEOUT_MS, TLE_REFRESH_INTERVAL_MS, TLE_RETRY_INTERVAL_MS } from "../constants";
-import { setTleDownloadStatus, TleDownloadIssue } from "./tleDownloadStatus";
+import { setTleDownloadStatus, tleDownloadStatus, TleDownloadIssue } from "./tleDownloadStatus";
 import { Tle } from "../types";
 import { readBundledCatalog } from "./bundledCatalog";
 import {
@@ -25,6 +25,8 @@ const ACTIVE_TLE_URL = process.env.EXPO_PUBLIC_TLE_URL ?? DEFAULT_TLE_URL;
  * the refresh interval is that the server sees one download per window.
  */
 let inFlight: Promise<ActiveCatalog> | null = null;
+let networkInFlight: Promise<Tle[]> | null = null;
+let retryInFlight: Promise<ActiveCatalog | null> | null = null;
 
 class CatalogDownloadError extends Error {
   constructor(readonly issue: TleDownloadIssue, readonly retryAtMs?: number) {
@@ -54,7 +56,14 @@ function retryDeadline(response: Response, nowMs: number): number | undefined {
   return Number.isFinite(requested) && requested > minimum ? requested : minimum;
 }
 
-async function fetchActiveCatalog(url: string, nowMs: number): Promise<Tle[]> {
+function fetchActiveCatalog(url: string, nowMs: number): Promise<Tle[]> {
+  // Boot, timer refreshes and explicit retries share the same network request.
+  if (networkInFlight) return networkInFlight;
+  networkInFlight = downloadActiveCatalog(url, nowMs).finally(() => { networkInFlight = null; });
+  return networkInFlight;
+}
+
+async function downloadActiveCatalog(url: string, nowMs: number): Promise<Tle[]> {
   setTleDownloadStatus({ phase: "loading", url, attemptedAtMs: nowMs, retryAtMs: null, issue: null });
   const controller = new AbortController();
   const response = await bounded(
@@ -166,15 +175,9 @@ function shouldDownload(
 let refreshing = false;
 
 /**
- * Fetches a newer catalogue for the *next* launch, without anybody waiting on
- * it.
- *
- * Nothing here reaches the screen. The app is already running on the elements
- * this was started beside, and swapping a sixteen-thousand-entry catalogue out
- * from under a view that is drawing it would cost a rebuild of every SGP4
- * record for a correction of a fraction of a pixel. What it buys is the next
- * launch: the elements land on disk, and the one after this opens on a fresh
- * cache without a request.
+ * Fetches a newer catalogue without blocking boot on a still-usable cache.
+ * The result is persisted for future launches and the ready notification lets
+ * useLiveCatalog adopt it in the running scene too.
  *
  * Failures are noted and swallowed. A refresh nobody asked for must not become
  * an unhandled rejection, and the app it is running behind is working.
@@ -265,6 +268,34 @@ export function loadActiveCatalog(options: LoadCatalogOptions = {}): Promise<Act
   return inFlight;
 }
 
+/** Explicit settings retry: skip network-error backoff, but honor server limits and fresh downloads. */
+export function retryActiveCatalog(): Promise<ActiveCatalog | null> {
+  if (retryInFlight) return retryInFlight;
+  retryInFlight = retryDownload().finally(() => { retryInFlight = null; });
+  return retryInFlight;
+}
+
+async function retryDownload(): Promise<ActiveCatalog | null> {
+  const url = ACTIVE_TLE_URL;
+  const nowMs = Date.now();
+  const cache = await readCache();
+  if (!networkInFlight && cache && !shouldDownload(cache, url, nowMs, true)) {
+    const retryAtMs = Math.max(
+      isFresh(cache, url, nowMs) ? cache.downloadedAtMs + TLE_REFRESH_INTERVAL_MS : 0,
+      cache.retryAtMs ?? 0
+    );
+    setTleDownloadStatus({ ...tleDownloadStatus(), phase: "waiting", retryAtMs });
+    return null;
+  }
+  try {
+    return { tles: await fetchActiveCatalog(url, nowMs), source: "network", downloadedAtMs: nowMs };
+  } catch (error) {
+    await fallBack(cache, nowMs);
+    rememberFailure(error, url, nowMs);
+    return null;
+  }
+}
+
 /**
  * A newer catalogue for a view that is drawing a stale one, or `null` when
  * there is none to be had yet.
@@ -272,9 +303,8 @@ export function loadActiveCatalog(options: LoadCatalogOptions = {}): Promise<Act
  * For the running app, which unlike boot has something on screen and no reason
  * to wait: called on a timer while the elements in use are past
  * `TLE_USABLE_INTERVAL_MS`, and the answer — when there is one — replaces them
- * in place. That is the other side of `refreshInBackground`, which does not
- * swap: a correction of a fraction of a pixel is not worth rebuilding sixteen
- * thousand records under a view that is drawing them, a correction of days is.
+ * in place. Successful background and settings downloads also notify the view
+ * directly, without waiting for this stale-catalogue timer.
  *
  * Throttled exactly as a launch is. A failed attempt starts
  * `TLE_RETRY_INTERVAL_MS`, and until it has run out this answers `null` without

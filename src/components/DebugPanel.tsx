@@ -9,7 +9,7 @@ import {
   View,
   ViewStyle
 } from "react-native";
-import { DebugSection, DebugSource, DebugSwitch } from "../debug/sections";
+import { DebugAction, DebugSection, DebugSource, DebugSwitch } from "../debug/sections";
 import { theme } from "./theme";
 import { Toggle } from "./Toggle";
 
@@ -90,6 +90,11 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose, sty
     },
     [settle]
   );
+  const run = (action: DebugAction) => {
+    if (action.disabled) return;
+    action.onPress();
+    settle();
+  };
 
   // Falling back to the first section rather than remembering an index keeps a
   // scene that adds or drops a page from landing on an empty one.
@@ -137,6 +142,20 @@ export const DebugPanel: React.FC<Props> = React.memo(({ sourceRef, onClose, sty
       </View>
 
       <ScrollView style={styles.rows} contentContainerStyle={styles.rowsContent}>
+        {active?.actions?.map((action) => (
+          <Pressable
+            key={action.label}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            accessibilityState={{ disabled: !!action.disabled, busy: !!action.disabled }}
+            aria-busy={!!action.disabled}
+            disabled={action.disabled}
+            style={[styles.action, action.disabled && styles.actionDisabled]}
+            onPress={() => run(action)}
+          >
+            <Text style={styles.actionLabel}>{action.label}</Text>
+          </Pressable>
+        ))}
         {active?.switches?.map((control) => (
           <Pressable
             key={control.label}
@@ -229,6 +248,20 @@ const styles = StyleSheet.create({
   rowsContent: {
     paddingVertical: 4
   },
+  action: {
+    minHeight: 44,
+    marginHorizontal: 10,
+    marginVertical: 6,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.color.divider,
+    backgroundColor: theme.color.controlActive
+  },
+  actionDisabled: { opacity: 0.55 },
+  actionLabel: { color: theme.color.textBright, fontSize: 12, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",

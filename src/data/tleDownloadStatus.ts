@@ -4,7 +4,7 @@ export type TleDownloadIssue = {
   status?: number;
 };
 export type TleDownloadStatus = {
-  phase: "idle" | "loading" | "ready" | "failed";
+  phase: "idle" | "loading" | "ready" | "failed" | "waiting";
   url: string | null;
   attemptedAtMs: number | null;
   retryAtMs: number | null;

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { TLE_STALE_CHECK_INTERVAL_MS } from "../constants";
 import { isStale, refreshStaleCatalog } from "../data/tleProvider";
+import { readCache } from "../data/tleCache";
+import { subscribeTleDownloadStatus, tleDownloadStatus } from "../data/tleDownloadStatus";
 import { SatelliteCatalog } from "../satellite/catalog";
 import { watchForeground } from "./watchForeground";
 
@@ -35,7 +37,9 @@ type Held = { catalog: SatelliteCatalog; downloadedAtMs: number; staleDays: numb
  * swaps them in — the markers, the passes and the directory all key on the
  * catalogue, so they follow.
  *
- * A catalogue that goes stale while the view is open counts too: a session left
+ * Successful downloads (including an explicit settings retry) are adopted at
+ * once, even while the current elements are still usable. A catalogue that
+ * goes stale while the view is open counts too: a session left
  * running overnight crosses the line on the timer, says so, and asks.
  *
  * State, not a ref, for the same reason as `useCompassAccuracy`: something is
@@ -54,12 +58,12 @@ export function useLiveCatalog(initial: SatelliteCatalog, downloadedAtMs: number
     let cancelled = false;
     let checking = false;
 
-    const check = async () => {
+    const check = async (downloadReady = false) => {
       if (checking) return;
       checking = true;
       try {
-        if (staleDaysOf(current.downloadedAtMs, Date.now()) !== null) {
-          const fresher = await refreshStaleCatalog();
+        if (downloadReady || staleDaysOf(current.downloadedAtMs, Date.now()) !== null) {
+          const fresher = downloadReady ? await readCache() : await refreshStaleCatalog();
           if (!cancelled && fresher && fresher.downloadedAtMs > current.downloadedAtMs) {
             const catalog = await SatelliteCatalog.build(fresher.tles);
             // An answer that holds nothing is not a sky to replace one with.
@@ -86,12 +90,16 @@ export function useLiveCatalog(initial: SatelliteCatalog, downloadedAtMs: number
     // Coming back to the app is when a person is most likely to have moved
     // from no signal into some.
     const stopWatching = watchForeground(() => void check());
-    void check();
+    const stopDownloads = subscribeTleDownloadStatus(() => {
+      if (tleDownloadStatus().phase === "ready") void check(true);
+    });
+    void check(tleDownloadStatus().phase === "ready");
 
     return () => {
       cancelled = true;
       clearInterval(timer);
       stopWatching();
+      stopDownloads();
     };
   }, [initial, downloadedAtMs]);
 

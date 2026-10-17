@@ -547,6 +547,13 @@ export type Strings = {
   console: {
     detail: string;
   };
+  tleSettings: {
+    retry: string;
+    downloading: string;
+    status: string;
+    updated: string;
+    waiting: string;
+  };
   /**
    * The alerts row in settings, and the words a notification carries.
    *
