@@ -1,8 +1,9 @@
 import { DeviceMotion, DeviceMotionMeasurement, Magnetometer } from "expo-sensors";
+import { Platform } from "react-native";
 import { attitudeFromAxes } from "../camera/attitude";
 import { DeviceCapabilities } from "./capabilities";
 import { subscribeToCompass } from "./location";
-import { toDegrees, wrapDegrees180 } from "../math/angles";
+import { toDegrees, toRadians, wrapDegrees180 } from "../math/angles";
 import { Quaternion, rotateVector, Vector3 } from "../math/quaternion";
 import { EnuPosition } from "../types";
 
@@ -41,6 +42,16 @@ export type DeviceOrientation = {
 const LEVEL: DeviceOrientation = { yaw: 0, pitch: 0, roll: 0 };
 
 const UPDATE_INTERVAL_MS = 50;
+
+/** Added by patches/expo-sensors: the field and attitude share a CMDeviceMotion. */
+type MotionReading = DeviceMotionMeasurement & {
+  magneticField?: Vector3 & { accuracy: number };
+};
+
+function usableField(field: Vector3 | undefined): field is Vector3 {
+  return field !== undefined && [field.x, field.y, field.z].every(Number.isFinite) &&
+    Math.hypot(field.x, field.y, field.z) > 0;
+}
 
 /** The rear camera looks along the device's -z; +x is the right of the frame. */
 const LENS_AXIS: Vector3 = { x: 0, y: 0, z: -1 };
@@ -120,9 +131,9 @@ export async function readDeviceCapabilities(): Promise<DeviceCapabilities> {
  * handled here is a browser refusing the reading — the one platform where a
  * permission stands between this and the sensor (`readingsNeedPermission`).
  *
- * The magnetometer is taken separately, since losing it still leaves a usable
- * pitch and roll — only the bearing to north goes, which `northOffset` already
- * reports as absent.
+ * iOS supplies attitude and calibrated field from one CMDeviceMotion sample.
+ * Elsewhere the field is read separately. Losing it still leaves usable pitch
+ * and roll; only the bearing to north is absent.
  *
  * `declinationDeg` is boot's reading, or `null` where it had none by the time
  * the view opened. Either way it is only a starting point: the compass watch
@@ -146,6 +157,9 @@ export async function subscribeToDeviceOrientation(
   const useMagnetometer =
     capabilities.magnetometer &&
     (!gated || (await Magnetometer.requestPermissionsAsync()).status === "granted");
+  // Native iOS supplies both in one event. A separate CMMotionManager can
+  // deliver the field from before a turn alongside the attitude after it.
+  const pairedMotion = Platform.OS === "ios";
 
   let rotation: Quaternion | null = null;
   let field: Vector3 | null = null;
@@ -154,7 +168,7 @@ export async function subscribeToDeviceOrientation(
   let compassAccuracy: number | undefined;
 
   DeviceMotion.setUpdateInterval(UPDATE_INTERVAL_MS);
-  if (useMagnetometer) Magnetometer.setUpdateInterval(UPDATE_INTERVAL_MS);
+  if (useMagnetometer && !pairedMotion) Magnetometer.setUpdateInterval(UPDATE_INTERVAL_MS);
 
   const publish = () => {
     if (!rotation) return;
@@ -179,26 +193,33 @@ export async function subscribeToDeviceOrientation(
   };
 
   const motionSubscription = DeviceMotion.addListener(
-    ({ rotation: euler, rotationRate }: DeviceMotionMeasurement) => {
-      if (!euler) return;
+    ({ rotation: euler, rotationRate, magneticField }: MotionReading) => {
+      if (!euler || ![euler.alpha, euler.beta, euler.gamma].every(Number.isFinite)) return;
       rotation = fromDeviceOrientationAngles(euler.alpha, euler.beta, euler.gamma);
+      if (pairedMotion) {
+        field = useMagnetometer && usableField(magneticField) && magneticField.accuracy >= 0
+          ? magneticField : null;
+      }
       orientation = {
         ...orientation,
-        gyro: rotationRate
-          ? { x: rotationRate.alpha, y: rotationRate.beta, z: rotationRate.gamma }
+        // Expo's rotationRate is degrees/s; fusion and mask motion gating use radians/s.
+        gyro: rotationRate && [rotationRate.alpha, rotationRate.beta, rotationRate.gamma].every(Number.isFinite)
+          ? { x: toRadians(rotationRate.alpha), y: toRadians(rotationRate.beta), z: toRadians(rotationRate.gamma) }
           : undefined
       };
       publish();
     }
   );
 
-  const magnetometerSubscription = useMagnetometer
+  const magnetometerSubscription = useMagnetometer && !pairedMotion
     ? Magnetometer.addListener(({ x, y, z }) => {
         // A dead sensor reports exactly zero on every axis, which has no bearing
         // in it at all.
-        if (x === 0 && y === 0 && z === 0) return;
-        field = { x, y, z };
-        publish();
+        const next = { x, y, z };
+        if (!usableField(next)) return;
+        field = next;
+        // Publish on motion only, without feeding the filter the same pose
+        // twice at an artificial interval when this callback arrives late.
       })
     : null;
 

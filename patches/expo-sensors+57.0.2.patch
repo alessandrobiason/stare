@@ -1,0 +1,28 @@
+diff --git a/node_modules/expo-sensors/ios/DeviceMotionModule.swift b/node_modules/expo-sensors/ios/DeviceMotionModule.swift
+index ed6f05f..ca437c3 100644
+--- a/node_modules/expo-sensors/ios/DeviceMotionModule.swift
++++ b/node_modules/expo-sensors/ios/DeviceMotionModule.swift
+@@ -84,6 +84,9 @@ public final class DeviceMotionModule: Module {
+       let userAcceleration = data.userAcceleration
+       let attitude = data.attitude
+       let rotationRate = data.rotationRate
++      // Stare needs the calibrated field and attitude at the same instant.
++      // Separate managers can deliver different sides of a turn to JavaScript.
++      let magneticField = data.magneticField
+ 
+       self.sendEvent(EVENT_DEVICE_MOTION_DID_UPDATE, [
+         "acceleration": [
+@@ -110,6 +113,13 @@ public final class DeviceMotionModule: Module {
+           "gamma": radiansToDegrees(rotationRate.x),
+           "timestamp": data.timestamp
+         ],
++        "magneticField": [
++          "x": magneticField.field.x,
++          "y": magneticField.field.y,
++          "z": magneticField.field.z,
++          "accuracy": magneticField.accuracy.rawValue,
++          "timestamp": data.timestamp
++        ],
+         "orientation": getDeviceOrientationRotation(),
+         "interval": Double(self.motionManager.deviceMotionUpdateInterval)
+       ])

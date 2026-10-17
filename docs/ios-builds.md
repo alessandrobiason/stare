@@ -203,8 +203,16 @@ to be pasted, is in
 `postinstall` script, on every install — locally and in every workflow, all of
 which run a plain `npm ci` with dev dependencies.
 
-There is currently one, and it is worth knowing why it exists rather than only
-that it does.
+The camera and motion patches below require a new native build. Release and
+simulator jobs run `tools/ci/verify-native-patches.sh` before compiling.
+
+`patches/expo-sensors+57.0.2.patch` includes the calibrated magnetic field in
+each iOS `DeviceMotion` event. Attitude and field come from the same
+`CMDeviceMotion`, with the same timestamp. Stare previously combined two
+independent managers' latest readings, so a turn between their callbacks could
+look like a change in north. iOS now uses only the paired event. JavaScript also
+converts Expo's rotation rate from degrees/s to the radians/s required by fusion
+and mask motion gating, and publishes once per motion sample.
 
 `patches/expo-camera+57.0.4.patch` disables automatic deferred photo delivery
 on the camera's photo output. On hardware that supports deferred delivery — an

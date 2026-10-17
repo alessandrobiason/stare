@@ -22,8 +22,8 @@ export type DeviceOrientationFeed = {
  * on a phone; a recorded stream overrides it when one is replaying.
  *
  * Published to listeners rather than as React state. `DeviceMotion` and the
- * magnetometer are both read at 20 Hz and each publishes, so a reading arrives
- * roughly every 25 ms; as state that was up to 40 renders a second of the whole
+ * magnetometer are read at 20 Hz, with one publish per motion sample (paired
+ * natively on iOS); as state that was repeated renders of the whole
  * scene — every marker, the camera view, the panels — for a number only the
  * attitude filter and a debug page ever look at. Nothing on screen is drawn
  * from a raw reading: the markers are drawn from the *filtered* attitude, which

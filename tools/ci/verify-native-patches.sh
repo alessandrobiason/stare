@@ -15,8 +15,10 @@ require node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift lastInterr
 require node_modules/expo-camera/ios/Current/CameraSessionManager.swift startRunningPersistently
 require node_modules/expo-camera/ios/Current/CameraView.swift readinessObservation
 require node_modules/expo-camera/ios/Common/CameraExceptions.swift CameraImageCaptureDetailedException
+require node_modules/expo-sensors/ios/DeviceMotionModule.swift '"magneticField":'
+require node_modules/expo-sensors/ios/DeviceMotionModule.swift 'magneticField.accuracy.rawValue'
 if [ "$missing" -ne 0 ]; then
-  echo "::error::Refusing to build, the camera fix is not in the sources CocoaPods compiles"
+  echo "::error::Refusing to build, required native patches are missing from the sources CocoaPods compiles"
   exit 1
 fi
 echo "Native patches present in node_modules."

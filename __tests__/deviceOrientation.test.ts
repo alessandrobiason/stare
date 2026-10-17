@@ -14,6 +14,7 @@
  */
 
 import { DeviceCapabilities } from "../src/device/capabilities";
+import { Platform } from "react-native";
 import {
   DeviceOrientation,
   subscribeToDeviceOrientation
@@ -64,6 +65,7 @@ type Emit = (measurement: unknown) => void;
 let emit: Emit;
 
 beforeEach(() => {
+  (Platform as { OS: string }).OS = "web";
   jest.clearAllMocks();
   emit = () => undefined;
   deviceMotion.addListener.mockImplementation((listener: Emit) => {
@@ -86,6 +88,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  (Platform as { OS: string }).OS = "web";
   delete (globalThis as { DeviceMotionEvent?: unknown }).DeviceMotionEvent;
 });
 
@@ -173,6 +176,76 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
  * and nothing else — which is what these tests are reading.
  */
 const northward = { x: 0, y: 20, z: -40 };
+
+test("Expo's degrees per second are converted to the radians per second expected by fusion", async () => {
+  const readings: DeviceOrientation[] = [];
+  await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 0);
+  emit({ ...levelMeasurement, rotationRate: { alpha: 180, beta: 90, gamma: -45 } });
+  expect(readings.at(-1)?.gyro).toEqual({ x: Math.PI, y: Math.PI / 2, z: -Math.PI / 4 });
+});
+
+describe("synchronized Core Motion readings on iOS", () => {
+  beforeEach(() => { (Platform as { OS: string }).OS = "ios"; });
+
+  test("uses one manager's paired field and pose throughout a quarter turn", async () => {
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 7);
+    expect(magnetometer.addListener).not.toHaveBeenCalled();
+    expect(magnetometer.setUpdateInterval).not.toHaveBeenCalled();
+
+    // Upright, rear camera aimed north. Magnetic inclination is held fixed.
+    emit({
+      rotation: { alpha: 0, beta: Math.PI / 2, gamma: 0 }, rotationRate: null,
+      magneticField: { x: 0, y: -40, z: -20, accuracy: 2 }
+    });
+    expect(readings.at(-1)?.yaw).toBeCloseTo(0);
+    expect(readings.at(-1)?.pitch).toBeCloseTo(0);
+    expect(readings.at(-1)?.northOffset).toBeCloseTo(7);
+
+    // Same field, now aimed east. Mixing the previous field with this pose
+    // would invent a 90-degree change in the north reference.
+    emit({
+      rotation: { alpha: -Math.PI / 2, beta: Math.PI / 2, gamma: 0 }, rotationRate: null,
+      magneticField: { x: -20, y: -40, z: 0, accuracy: 2 }
+    });
+    expect(readings).toHaveLength(2);
+    expect(readings.at(-1)?.yaw).toBeCloseTo(90);
+    expect(readings.at(-1)?.northOffset).toBeCloseTo(7);
+  });
+
+  test.each([
+    undefined,
+    { ...northward, accuracy: -1 },
+    { x: 0, y: 0, z: 0, accuracy: 2 },
+    { ...northward, x: Number.NaN, accuracy: 2 }
+  ])("does not reuse an old field when the next sample is unavailable or invalid: %p", async (magneticField) => {
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 0);
+    emit({ ...levelMeasurement, magneticField: { ...northward, accuracy: 2 } });
+    expect(readings.at(-1)?.northOffset).toBeDefined();
+    emit({ ...levelMeasurement, magneticField });
+    expect(readings.at(-1)?.northOffset).toBeUndefined();
+    expect(Number.isFinite(readings.at(-1)?.yaw)).toBe(true);
+  });
+
+  test("missing magnetometer capability does not use a paired magnetic field", async () => {
+    const readings: DeviceOrientation[] = [];
+    await subscribeToDeviceOrientation((next) => readings.push(next), { motion: true, magnetometer: false }, 0);
+    emit({ ...levelMeasurement, magneticField: { ...northward, accuracy: 2 } });
+    expect(readings.at(-1)?.northOffset).toBeUndefined();
+  });
+});
+
+test("a separate field update waits for the next motion sample instead of publishing the same pose twice", async () => {
+  const readings: DeviceOrientation[] = [];
+  await subscribeToDeviceOrientation((next) => readings.push(next), bothSensors, 0);
+  emit(levelMeasurement);
+  field(northward);
+  expect(readings).toHaveLength(1);
+  emit(levelMeasurement);
+  expect(readings).toHaveLength(2);
+  expect(readings.at(-1)?.northOffset).toBe(0);
+});
 
 describe("the platform's compass", () => {
   test("fills in a declination boot never got, rather than leaving the session on magnetic north", async () => {
