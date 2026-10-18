@@ -54,10 +54,8 @@ export type Ink = {
 };
 
 /**
- * The app's own light: white. What the boot screen and the logo draw their
- * satellites in, and the ring round a tapped mark — the sky's marks are
- * coloured by purpose instead (`CATEGORY_COLORS`), and neither the icon nor
- * the ring is any one purpose.
+ * The selection ring's white light. Sky markers are coloured by purpose
+ * (`CATEGORY_COLORS`); the S orbitale brand colours live in `bootSky.ts`.
  */
 export const MARK_COLOR = "#ffffff";
 

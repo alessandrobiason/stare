@@ -42,8 +42,8 @@ import { Ink, MARK_COLOR, MarkerPalette } from "./palette";
  * marking. So the solid part is now a point about half of that, in a glow that
  * fades to nothing; and the tail is the same taper, faded from the point to its
  * tip. What a satellite looks like in the sky is a point of light moving, and
- * that is what is drawn — and the logo (`assets/icon.svg`) and the boot screen
- * (`bootSky`) are now drawn in this light, rather than the other way round.
+ * that is what is drawn. The S orbitale logo and boot screen use their own
+ * crisp brand geometry (`bootSky`).
  *
  * **At night a mark is drawn the way a star photographs.** Three layers of the
  * same light, none of them with an edge: a pale centre that is solid only in
@@ -738,7 +738,7 @@ function tailFor(
  * pattern travels with the head, so it is still while the object moves; only
  * the far end changes, as the trail lengthens and shortens.
  *
- * Exported for the boot screen and the logo, whose one light trails the same
+ * Shared by the renderers, whose lights trail the same
  * line along its arc; `scale` is pixels per design pixel of `TAIL_DASH`.
  */
 export function dashedRuns(points: number[], length: number, scale: number): number[][] {

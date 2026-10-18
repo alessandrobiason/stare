@@ -61,9 +61,9 @@ type Props = {
  * The screen the app opens on, and the one it comes back to when something
  * fatal happens.
  *
- * While it is loading it is the sky, the app's name and one short bar — a
- * satellite crossing the night above the word, and under it how far start-up
- * has got (see `bootSky` and `BootProgressBar`). It used to carry a tagline and
+ * While it is loading it is the sky, the app's name and one short bar — the
+ * S orbitale mark with a gently pulsing blue point above the word, and under
+ * it how far start-up has got (see `bootSky` and `BootProgressBar`). It used to carry a tagline and
  * the list of start-up steps as they settled as well, which was a lot of screen
  * spent telling someone that a catalogue they have never heard of is being
  * downloaded; none of that was actionable. The bar is, in the one way that
@@ -72,9 +72,8 @@ type Props = {
  * screen can do.
  *
  * A failure is that reason, and is the only other thing this screen ever
- * writes. The name gives way to it, and the light stops where it is
- * underneath, because its moving is what was saying that something is still
- * happening.
+ * writes. The name and mark give way to the reason, and the sky stops
+ * twinkling so a failed boot cannot look as though it is still working.
  */
 export const BootScreen: React.FC<Props> = ({
   failed,
@@ -112,7 +111,7 @@ export const BootScreen: React.FC<Props> = ({
 
   return (
     <View style={styles.root} onLayout={measure}>
-      <BootSky frame={frame} turning={!failed} />
+      <BootSky frame={frame} turning={!failed} showLogo={!failed} />
 
       {!failed && (
         <>
@@ -203,12 +202,12 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   /**
-   * The name, in the middle of the night the satellite crosses.
+   * The name, centred below the S orbitale mark.
    *
    * Set small, light and wide, the way a name is set on something made with
-   * care rather than on a sign: the light above it is the thing to look at, and
-   * the word only has to say whose sky it is. Every pass in `BOOT_PASSES` peaks
-   * well above the middle of the screen, so the two never meet.
+   * care rather than on a sign: the symbol above it is the thing to look at, and
+   * the word only has to say whose sky it is. `bootLogo` places the whole
+   * symbol above the middle of the screen, so the two never meet.
    *
    * `letterSpacing` is applied after the last letter as well as between them, so
    * the box is a space wider than the word in it and the letters sit half a

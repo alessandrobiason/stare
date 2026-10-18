@@ -1,62 +1,28 @@
-import { clamp } from "../math/angles";
-import { FrameSize } from "./markerGeometry";
-import { dashedRuns } from "./markerScene";
+import type { FrameSize } from "./markerGeometry";
 
 /**
- * The sky the app opens on: one satellite crossing the night above the app's
- * name, and nothing else.
- *
- * point of light on a wide arc over a horizon, trailing a line that breaks
- * point of light on a wide arc over a horizon, trailing a tail that fades to
- * off into dashes; this is that pass, moving. And the light is the overlay's
- * own — a landmark's champagne point in a bloom of its own hue, trailing the
- * same solid-then-dashed line along its path, faded by the same stops
- * (`TAIL_FADE`, `GLOW_FADE`, `BLOOM_FADE`, `CORE_FADE`) and broken by the same
- * pattern (`dashedRuns`) — so what a person is about to read against the real
- * sky is already in front of them while it loads. Champagne because the one
- * light on this screen stands for the kind of object worth going outside for.
- *
- * It used to be five solid satellites turning on five orbits around the name.
- * That was the logo as it was then — a disc with a separate solid trail — and
- * when the marks became light it was the one place left drawing them as
- * paint. Five of anything also made a diagram of it. One light is a sky.
- *
- * The motion is what says that something is still happening, and it says it
- * with the thing the app is for: something crossing your sky. There is no
- * spinner and no step list — naming each step told nobody anything they could
- * act on, and the app either opens or comes back with a reason.
- *
- * What motion cannot say is *how much longer*, and on the first launch of an
- * install that is a 95 MB download and minutes of it. So there is one short
- * bar under the name (`BootProgressBar`), and the light and the bar divide the
- * work between them: the light says the app is alive, the bar says how far it
- * has got. Neither is a step list, and neither names anything.
- *
- * Nothing here knows about Skia, about a browser canvas or about React — the
- * same split as `markerScene`, and for the same reason. A pass is built once
- * and then only *turned*: its light keeps its shape as it goes along the arc, so
- * what changes per displayed frame is one angle and one alpha rather than the
- * geometry. `BootSky.tsx` draws it on the phone, `BootSky.web.tsx` in the replay
- * harness, and `tools/make-logo.mjs` holds its first frame still.
+ * The S orbitale identity, shared by both boot renderers and the asset generator.
+ * Coordinates use one square view box, so the icon and the floating boot mark
+ * have precisely the same silhouette. No platform or runtime imports here:
+ * tools/make-logo.mjs reads this module through loadFromSource.
  */
+export const ORBITAL_LOGO = {
+  size: 256,
+  background: "#050b16",
+  color: "#eef4fb",
+  accent: "#4da6ff",
+  paths: [
+    "M 161 62 C 91 67 36 94 57 125 C 69 143 101 152 134 156 C 89 139 65 124 78 107 C 93 88 128 74 162 68 Z",
+    "M 107 116 C 171 141 200 192 43 197 C 115 215 192 199 192 165 C 192 145 158 127 107 116 Z"
+  ],
+  dot: { x: 184, y: 64, radius: 14 },
+  pulse: { periodSeconds: 3.2, depth: 0.08 }
+} as const;
 
-/**
- * The space the composition is drawn in, in points: a phone's own frame,
- * mapped onto whatever the device's actually is by covering it. Portrait
- * because the app is portrait-only, and the light sizes below are quoted in it
- * so that they are the size on a phone that they read as here.
- */
+/** The indicator shares the blue satellite's colour, rather than a category. */
+export const BOOT_LIGHT_COLORS = { color: ORBITAL_LOGO.accent, bloom: ORBITAL_LOGO.accent } as const;
 export const BOOT_SKY_DESIGN: FrameSize = { width: 390, height: 844 };
 
-/**
- * The night behind everything: darkest overhead, lifting towards the horizon
- * the phone is held above.
- *
- * Deliberately not a flat colour and not a glow round the middle — the old sky
- * had one, and it made the screen a spotlit stage. A sky is lighter near the
- * horizon than at the zenith, and a person holding a phone upright is looking
- * at the part of it just above the horizon.
- */
 const SKY = {
   /** Top to bottom of the design frame. */
   stops: [
@@ -79,94 +45,6 @@ const SKY = {
  */
 export const BOOT_SKY_BACKGROUND = SKY.stops[1].color;
 
-/**
- * One pass, in design points: an arc of a circle whose centre is below the
- * screen, so what shows is a shallow curve over the name — near enough the
- * path a satellite takes across the sky from horizon to horizon.
- */
-export type BootPass = {
-  /** How far from the top of the frame the arc peaks. */
-  apex: number;
-  radius: number;
-  /** How far right of the middle the arc's centre, and so its peak, sits. */
-  lean: number;
-  /** 1 left to right, -1 right to left. */
-  direction: 1 | -1;
-};
-
-/**
- * The passes, in the order they are flown, and then round again.
- *
- * Composed rather than random, so none of them can come out ugly: each peaks
- * well above the name, which sits at 422, and a few points' lean either way
- * keeps them from being the same arc four times. Alternate directions, because
- * real passes do not all go one way, and a run of them that did would read as a
- * progress bar.
- */
-export const BOOT_PASSES: readonly BootPass[] = [
-  { apex: 253, radius: 608, lean: 20, direction: 1 },
-  { apex: 304, radius: 675, lean: -40, direction: -1 },
-  { apex: 228, radius: 557, lean: -15, direction: 1 },
-  { apex: 279, radius: 641, lean: 45, direction: -1 }
-];
-
-/** How a pass is flown. */
-export const PASS_TIMING = {
-  /** Seconds from one edge of the frame to the other. */
-  periodSeconds: 8,
-  /**
-   * How far into the first pass the clock starts.
-   *
-   * A pass starts off the edge of the frame, and a boot can be over in two and
-   * a half seconds (`MIN_BOOT_SCREEN_MS`). Starting at the edge would spend the
-   * first second of that on an empty sky; starting part-way across, the light
-   * is there on the first frame.
-   */
-  startProgress: 0.3,
-  /** The share of a pass at each end over which its light fades in and out. */
-  fadeShare: 0.12,
-  /** How far past the frame's edge, in design points, a pass starts and ends. */
-  marginPx: 40
-} as const;
-
-/**
- * The light, in design points.
- *
- * The overlay's own mark at the size a satellite would be drawn nearest, and a
- * little over — the boot screen has one light, not seventy, and can afford to
- * let it be seen. The alphas are the overlay's at full strength (`GLOW_ALPHA`,
- * `BLOOM_ALPHA` in `markerScene`). The tail is a fine line along the arc, as
- * long as a fast pass's on the sky; `dashScale` is design pixels of `TAIL_DASH`
- * per point, a little over the overlay's own on a phone, as the light is.
- */
-const LIGHT = {
-  coreRadius: 2.6,
-  glow: { radius: 14, alpha: 0.8 },
-  bloom: { radius: 40, alpha: 0.35 },
-  tail: { width: 1.7, length: 170, alpha: 0.85, dashScale: 0.75 }
-} as const;
-
-/**
- * The colours the light is drawn in: its fill and the bloom it sits in.
- *
- * A landmark's champagne, as the landmarks were coloured when the logo was
- * drawn — held here rather than read from `CATEGORY_COLORS`, because the light
- * is also the app's icon (`assets/icon.svg`, `tools/make-logo.mjs`). The marks'
- * palette is tuned against a sky full of Starlinks and changes when that tuning
- * does; an icon on somebody's home screen is the app's name, and does not
- * change colour with it.
- */
-export const BOOT_LIGHT_COLORS = { color: "#fbe6af", bloom: "#e6c77c" } as const;
-
-/**
- * The star field, as the parameters that generate it.
- *
- * Generated rather than listed, and from a fixed seed, so the same sky comes
- * out of every run — the still frame in `assets/logo-extended.svg` is the same
- * picture as the first frame on the phone, rather than a similar one. Pinpricks
- * rather than dots: the stars are what the light is seen *against*, and the old
- * field's larger ones competed with the satellites.
- */
 const STARS = {
   seed: 7,
   count: 64,
@@ -205,55 +83,6 @@ export type SkyNight = {
   horizon: { x: number; y: number; radius: number; color: string; alpha: number };
 };
 
-/** Light fading out from a centre to `radius`, at `alpha` at the centre. */
-export type SkyGlow = { radius: number; alpha: number };
-
-/**
- * The satellite, at rest at the top of its arc. Layout pixels.
- *
- * Drawn the way a mark is: the bloom, the glow, the tail, and the point over
- * them, each faded by the overlay's stop for it.
- */
-export type SkyLight = {
-  x: number;
-  y: number;
-  color: string;
-  bloomColor: string;
-  coreRadius: number;
-  glow: SkyGlow;
-  bloom: SkyGlow;
-  tail: {
-    /**
-     * What to stroke, as runs of flat `x, y` pairs along the arc: the solid
-     * stretch from under the light, then the dashes (`dashedRuns`).
-     */
-    runs: number[][];
-    /** Where the arc behind the light ends, which is where `TAIL_FADE` reaches nothing. */
-    tipX: number;
-    tipY: number;
-    width: number;
-    alpha: number;
-  };
-};
-
-/** One pass across a frame. */
-export type SkyPass = {
-  index: number;
-  /** The centre of its arc, in layout pixels. */
-  cx: number;
-  cy: number;
-  radius: number;
-  direction: 1 | -1;
-  /**
-   * The light's angle about the centre where the pass begins and ends, in
-   * degrees — zero to the right, increasing downwards as the frame's own
-   * coordinates do, so the top of the arc is -90. Both are off the frame.
-   */
-  fromDeg: number;
-  toDeg: number;
-  light: SkyLight;
-};
-
 export type BootSkyScene = {
   frame: FrameSize;
   /** Layout pixels per design point, and where the design frame's corner lands. */
@@ -263,12 +92,6 @@ export type BootSkyScene = {
   night: SkyNight;
   stars: SkyStar[];
 };
-
-/** Where a pass is, in its own terms. */
-export type SkyMoment = { index: number; progress: number };
-
-/** Where the light has got to: turned from rest about its arc's centre, and faded. */
-export type SkyPose = { angleDeg: number; alpha: number };
 
 /**
  * The night and the stars for a frame.
@@ -307,59 +130,24 @@ export function bootSkyScene(frame: FrameSize): BootSkyScene {
   };
 }
 
-/** Which pass is being flown after `elapsedSeconds`, and how far through it. */
-export function skyMoment(elapsedSeconds: number): SkyMoment {
-  const along = Math.max(0, elapsedSeconds) / PASS_TIMING.periodSeconds + PASS_TIMING.startProgress;
-  const index = Math.floor(along);
-  return { index, progress: along - index };
-}
+export type BootLogo = { x: number; y: number; size: number; scale: number };
 
-/**
- * The `index`th pass across the scene's frame, at rest.
- *
- * Built once per pass and then posed (`passPose`). Where it starts and ends is
- * worked out from the frame rather than the design frame: the covering scale
- * crops the sides of a wide screen's composition and not a narrow one's, and a
- * pass that started at the design frame's edge would spend a second of it
- * invisible on the one and appear out of nowhere on the other.
- */
-export function skyPass(scene: BootSkyScene, index: number): SkyPass {
-  const { scale, offsetX, offsetY, frame } = scene;
-  const pass = BOOT_PASSES[((index % BOOT_PASSES.length) + BOOT_PASSES.length) % BOOT_PASSES.length];
-  const radius = pass.radius * scale;
-  const cx = offsetX + (BOOT_SKY_DESIGN.width / 2 + pass.lean) * scale;
-  const cy = offsetY + (pass.apex + pass.radius) * scale;
-  const margin = PASS_TIMING.marginPx * scale;
-
-  const left = crossingDeg(cx, radius, -margin);
-  const right = crossingDeg(cx, radius, frame.width + margin);
-
+/** Fit above the centred wordmark, including on the smallest supported phone. */
+export function bootLogo(frame: FrameSize): BootLogo {
+  const size = Math.min(frame.width * 0.4, frame.height * 0.2);
   return {
-    index,
-    cx,
-    cy,
-    radius,
-    direction: pass.direction,
-    fromDeg: pass.direction === 1 ? left : right,
-    toDeg: pass.direction === 1 ? right : left,
-    light: lightAtRest(cx, cy, radius, pass.direction, scale)
+    x: (frame.width - size) / 2,
+    y: frame.height / 2 - 32 - size,
+    size,
+    scale: size / ORBITAL_LOGO.size
   };
 }
 
-/**
- * Where the light is `progress` of the way through its pass.
- *
- * At a constant rate, as a satellite moves, and faded in and out over the ends
- * — smoothstepped, so it arrives and leaves rather than switching on.
- */
-export function passPose(pass: SkyPass, progress: number): SkyPose {
-  const along = clamp(progress, 0, 1);
-  const headDeg = pass.fromDeg + (pass.toDeg - pass.fromDeg) * along;
-  const edge = clamp(Math.min(along, 1 - along) / PASS_TIMING.fadeShare, 0, 1);
-  return {
-    angleDeg: headDeg - REST_DEG,
-    alpha: edge * edge * (3 - 2 * edge)
-  };
+/** A quiet, seamless breath; holding elapsed time also holds a failed boot. */
+export function logoDotRadius(elapsedSeconds: number): number {
+  const { periodSeconds, depth } = ORBITAL_LOGO.pulse;
+  return ORBITAL_LOGO.dot.radius *
+    (1 + depth * Math.sin(Math.max(0, elapsedSeconds) * Math.PI * 2 / periodSeconds));
 }
 
 /** How bright a star is after `elapsedSeconds`: slowly, and never far from its best. */
@@ -369,74 +157,6 @@ export function starAlpha(star: SkyStar, elapsedSeconds: number): number {
   return star.alpha * (1 - depth + depth * wave);
 }
 
-/** The top of every arc, where a pass's light is built before it is turned. */
-const REST_DEG = -90;
-
-/**
- * The angle on the upper half of a circle at which it crosses a vertical line.
- *
- * Clamped, so a line the circle does not reach gives the nearest side rather
- * than nothing — which is only possible on a frame far wider than any phone.
- */
-function crossingDeg(cx: number, radius: number, x: number): number {
-  return -Math.acos(clamp((x - cx) / radius, -1, 1)) * (180 / Math.PI);
-}
-
-/** Points on a circle, with the frame's y axis pointing down. */
-function pointAt(cx: number, cy: number, radius: number, degrees: number): [number, number] {
-  const radians = degrees * (Math.PI / 180);
-  return [cx + radius * Math.cos(radians), cy + radius * Math.sin(radians)];
-}
-
-/**
- * The light at the top of its arc, its tail laid back along the arc behind it.
- *
- * "Behind" is against the way the pass is flown, so a right-to-left pass's tail
- * lies at *increasing* angles from the head rather than decreasing ones. The
- * tail starts under the point, so what shows is the line coming out of it.
- */
-function lightAtRest(
-  cx: number,
-  cy: number,
-  radius: number,
-  direction: 1 | -1,
-  scale: number
-): SkyLight {
-  const [x, y] = pointAt(cx, cy, radius, REST_DEG);
-  const length = LIGHT.tail.length * scale;
-  const sweepDeg = (length / radius) * (180 / Math.PI);
-  // About a degree and a half a segment: an arc this shallow is straight to
-  // well inside a pixel over that.
-  const steps = Math.max(16, Math.round(sweepDeg / 1.5));
-  const arc: number[] = [];
-  for (let step = 0; step <= steps; step += 1) {
-    arc.push(...pointAt(cx, cy, radius, REST_DEG - direction * sweepDeg * (step / steps)));
-  }
-
-  return {
-    x,
-    y,
-    color: BOOT_LIGHT_COLORS.color,
-    bloomColor: BOOT_LIGHT_COLORS.bloom,
-    coreRadius: LIGHT.coreRadius * scale,
-    glow: { radius: LIGHT.glow.radius * scale, alpha: LIGHT.glow.alpha },
-    bloom: { radius: LIGHT.bloom.radius * scale, alpha: LIGHT.bloom.alpha },
-    tail: {
-      runs: dashedRuns(arc, length, LIGHT.tail.dashScale * scale),
-      tipX: arc[arc.length - 2],
-      tipY: arc[arc.length - 1],
-      width: LIGHT.tail.width * scale,
-      alpha: LIGHT.tail.alpha
-    }
-  };
-}
-
-/**
- * The star field for a frame.
- *
- * A linear congruential generator rather than `Math.random`, because the field
- * has to come out the same every time: see `STARS`.
- */
 function starsFor(scale: number, offsetX: number, offsetY: number): SkyStar[] {
   let state: number = STARS.seed;
   const random = () => (state = (state * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;

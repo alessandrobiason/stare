@@ -2,77 +2,56 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { useElapsedSeconds } from "../hooks/useElapsedSeconds";
 import {
   BootSkyScene,
+  bootLogo,
   bootSkyScene,
-  passPose,
-  SkyPass,
-  SkyPose,
-  skyMoment,
-  skyPass,
+  logoDotRadius,
+  ORBITAL_LOGO,
   STAR_COLOR,
   starAlpha
 } from "./bootSky";
-import { FrameSize } from "./markerGeometry";
-import { BLOOM_FADE, CORE_FADE, FadeStop, GLOW_FADE, TAIL_FADE } from "./markerScene";
+import type { FrameSize } from "./markerGeometry";
 import { cssColor } from "./palette";
 
 type Props = {
-  /** The box the sky fills. Geometry is pixels, not percent. */
   frame: FrameSize | null;
-  /** Whether the satellite is moving. Stopped, it says start-up has. */
   turning: boolean;
+  /** Clear the mark behind a failure card so it cannot compete with the reason. */
+  showLogo?: boolean;
 };
 
-/**
- * The boot screen's sky in the replay harness: the same scene, on a 2D canvas.
- *
- * The phone draws it with Skia (`BootSky.tsx`) because that is the only
- * single-node canvas React Native has; a browser already has one. What both
- * draw is decided in `bootSky`, and neither knows anything about the
- * composition beyond how to fade a circle and a polygon.
- */
-export const BootSky: React.FC<Props> = ({ frame, turning }) => {
+/** The same paths and placement as iPhone, rendered on a browser canvas. */
+export const BootSky: React.FC<Props> = ({ frame, turning, showLogo = true }) => {
   const elapsed = useElapsedSeconds(turning);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scene = useMemo(() => (frame ? bootSkyScene(frame) : null), [frame]);
-  const moment = skyMoment(elapsed);
-  const pass = useMemo(
-    () => (scene ? skyPass(scene, moment.index) : null),
-    [scene, moment.index]
-  );
+  const paths = useMemo(() => typeof Path2D === "undefined" ? [] :
+    ORBITAL_LOGO.paths.map((svg) => new Path2D(svg)), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !scene || !pass || !frame) return;
-    // Backing pixels rather than layout pixels, or the sky is drawn soft on
-    // every display the harness is actually looked at on.
+    if (!canvas || !scene || !frame) return;
     const density = window.devicePixelRatio || 1;
     const width = Math.round(frame.width * density);
     const height = Math.round(frame.height * density);
     if (canvas.width !== width) canvas.width = width;
     if (canvas.height !== height) canvas.height = height;
-
     const context = canvas.getContext("2d");
     if (!context) return;
     context.setTransform(density, 0, 0, density, 0, 0);
-    draw(context, scene, pass, passPose(pass, moment.progress), elapsed);
+    draw(context, scene, paths, elapsed, showLogo);
   });
 
   if (!frame) return null;
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{ position: "absolute", left: 0, top: 0, width: frame.width, height: frame.height }}
-    />
-  );
+  return <canvas ref={canvasRef} aria-hidden="true"
+    style={{ position: "absolute", left: 0, top: 0, width: frame.width, height: frame.height }} />;
 };
 
 function draw(
   context: CanvasRenderingContext2D,
   scene: BootSkyScene,
-  pass: SkyPass,
-  pose: SkyPose,
-  elapsed: number
+  paths: readonly Path2D[],
+  elapsed: number,
+  showLogo: boolean
 ): void {
   const { frame, night } = scene;
   const grade = context.createLinearGradient(0, night.fromY, 0, night.toY);
@@ -96,59 +75,19 @@ function draw(
     context.fill();
   }
 
-  if (!(pose.alpha > 0)) return;
-  const { light } = pass;
-  // The light keeps its shape along the arc, so it is the canvas that turns
-  // rather than the geometry that is rebuilt.
+  if (!showLogo) return;
+  const logo = bootLogo(frame);
   context.save();
-  context.translate(pass.cx, pass.cy);
-  context.rotate(pose.angleDeg * (Math.PI / 180));
-  context.translate(-pass.cx, -pass.cy);
-
-  glow(context, light.x, light.y, light.bloom.radius, BLOOM_FADE, light.bloomColor, light.bloom.alpha * pose.alpha);
-  glow(context, light.x, light.y, light.glow.radius, GLOW_FADE, light.color, light.glow.alpha * pose.alpha);
-
-  const { tail } = light;
-  const fade = context.createLinearGradient(light.x, light.y, tail.tipX, tail.tipY);
-  for (const stop of TAIL_FADE) {
-    fade.addColorStop(stop.at, cssColor({ color: light.color, alpha: stop.strength }));
-  }
-  context.globalAlpha = tail.alpha * pose.alpha;
-  context.strokeStyle = fade;
-  context.lineWidth = tail.width;
-  context.lineCap = "round";
-  context.lineJoin = "round";
+  context.translate(logo.x, logo.y);
+  context.scale(logo.scale, logo.scale);
+  context.globalAlpha = 1;
+  context.fillStyle = ORBITAL_LOGO.color;
+  for (const path of paths) context.fill(path);
+  context.fillStyle = ORBITAL_LOGO.accent;
   context.beginPath();
-  for (const run of tail.runs) {
-    context.moveTo(run[0], run[1]);
-    for (let index = 2; index < run.length; index += 2) {
-      context.lineTo(run[index], run[index + 1]);
-    }
-  }
-  context.stroke();
-
-  glow(context, light.x, light.y, light.coreRadius, CORE_FADE, light.color, pose.alpha);
-  context.restore();
-}
-
-/** Light fading out from a centre, at the rate `fade` gives. */
-function glow(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-  fade: readonly FadeStop[],
-  color: string,
-  alpha: number
-): void {
-  if (!(radius > 0) || !(alpha > 0)) return;
-  const light = context.createRadialGradient(x, y, 0, x, y, radius);
-  for (const stop of fade) light.addColorStop(stop.at, cssColor({ color, alpha: stop.strength }));
-  context.globalAlpha = alpha;
-  context.fillStyle = light;
-  context.beginPath();
-  context.arc(x, y, radius, 0, TWO_PI);
+  context.arc(ORBITAL_LOGO.dot.x, ORBITAL_LOGO.dot.y, logoDotRadius(elapsed), 0, TWO_PI);
   context.fill();
+  context.restore();
 }
 
 const TWO_PI = Math.PI * 2;

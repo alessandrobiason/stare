@@ -163,8 +163,8 @@ const styles = StyleSheet.create({
   /**
    * Hung off the middle of the screen rather than stacked under the name.
    *
-   * The name is centred against the sky the light crosses, and every pass in
-   * `BOOT_PASSES` is composed around that; a sibling in the flow would have
+   * The name is centred against the sky, and the S orbitale mark
+   * is composed above it; a sibling in the flow would have
    * pushed it up by half of whatever this is tall, and moved the one fixed
    * point of the composition to make room for a line two pixels high.
    */
@@ -191,22 +191,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "rgba(255, 255, 255, 0.11)"
   },
-  /**
-   * The champagne of the light crossing above it (`BOOT_LIGHT_COLORS`), not the
-   * app's accent blue.
-   *
-   * Two reasons, and the second is the real one. The blue belongs to controls
-   * that do something when pressed (`theme.color.accent`) and nothing on this
-   * screen does. And the only other thing lit on a black sky here is that
-   * satellite: sharing its colour makes the bar part of the same picture rather
-   * than a piece of interface laid over it.
-   */
+  /** The same electric blue as the satellite in the S orbitale mark. */
   fill: {
     height: "100%",
     borderRadius: 1,
     backgroundColor: BOOT_LIGHT_COLORS.color,
-    // The same bloom the light has, at a fraction of it: enough that the bar
-    // sits in the night rather than on it.
     shadowColor: BOOT_LIGHT_COLORS.bloom,
     shadowOpacity: 0.55,
     shadowRadius: 6,

@@ -3,566 +3,146 @@ import { Buffer } from "node:buffer";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { loadFromSource } from "./screenshots/tsModule.mjs";
 
 /**
- * Draws the app's logo, in the two shapes it is kept in:
- *
- * - `assets/icon.svg`, the mark on its own — one satellite as a point of light
- *   on a wide arc over a horizon, trailing a line along the arc that breaks
- *   into dashes and fades to nothing — and
- *   `assets/icon.png`, the same picture rasterised: the app icon proper,
- *   because `app.json` can only point iOS at a PNG.
- * - `assets/logo-extended.svg`, the boot screen held still — the night, the
- *   stars and the first pass, at the moment the phone first draws it, at three
- *   times the design frame's points, which is a current iPhone's pixels.
- *
- *     node tools/make-logo.mjs
- *
- * Both are drawn in the overlay's own light: a landmark's champagne point, a
- * tight glow of the same colour and a wide bloom of its deeper hue, trailing
- * the overlay's solid-then-dashed line, faded by the stops and broken by the
- * pattern `src/components/markerScene.ts` draws every mark with. A logo in
- * another light, or with a different tail, is a picture of a different app.
- *
- * The numbers below are `src/components/bootSky.ts`'s and `markerScene.ts`'s,
- * restated: a build tool cannot import TypeScript, and the alternative is a
- * second copy of the geometry that silently rots. `__tests__/bootSky.test.ts`
- * fails if the two disagree, so a change to the composition is a change to
- * both, and this file is what makes the second one a one-line command.
- *
- * No third-party imports on purpose, in keeping with the other generators here.
+ * Generate the opaque App Store icon, its SVG master, the boot sky still and
+ * the README thumbnail from the app's actual geometry. Run after changing
+ * src/components/bootSky.ts: node tools/make-logo.mjs
+ * No geometry or animation constants are duplicated in this generator.
  */
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const { ORBITAL_LOGO: logo, BOOT_SKY_DESIGN, bootSkyScene, bootLogo, starAlpha, STAR_COLOR } =
+  await loadFromSource(join(root, "src/components/bootSky.ts"));
+const round = (value) => Number(value.toFixed(4));
 
-/** Must match TAIL_FADE, GLOW_FADE, BLOOM_FADE and CORE_FADE in src/components/markerScene.ts. */
-const FADES = {
-  tail: [
-    { at: 0, strength: 1 },
-    { at: 0.12, strength: 0.8 },
-    { at: 0.45, strength: 0.32 },
-    { at: 1, strength: 0 }
-  ],
-  glow: [
-    { at: 0, strength: 1 },
-    { at: 0.12, strength: 0.7 },
-    { at: 0.35, strength: 0.22 },
-    { at: 1, strength: 0 }
-  ],
-  bloom: [
-    { at: 0, strength: 1 },
-    { at: 0.2, strength: 0.45 },
-    { at: 0.5, strength: 0.12 },
-    { at: 1, strength: 0 }
-  ],
-  core: [
-    { at: 0, strength: 1 },
-    { at: 0.5, strength: 1 },
-    { at: 1, strength: 0 }
-  ]
-};
-/** Must match TAIL_DASH in src/components/markerScene.ts. */
-const TAIL_DASH = {
-  solidShare: 0.3,
-  solidPx: 64,
-  dashPx: 11,
-  gapPx: 4,
-  dashGrowth: 0.82,
-  gapGrowth: 1.34,
-  maxDashes: 32
-};
-/** Must match BOOT_LIGHT_COLORS in src/components/bootSky.ts. */
-const LIGHT_COLOR = "#fbe6af";
-const LIGHT_BLOOM = "#e6c77c";
-
-/**
- * Must match BOOT_SKY_DESIGN, SKY, BOOT_PASSES[0], PASS_TIMING, LIGHT, STARS and
- * STAR_COLOR in src/components/bootSky.ts.
- */
-const DESIGN = { width: 390, height: 844 };
-const SKY = {
-  stops: [
-    { offset: 0, color: "#03060d" },
-    { offset: 0.55, color: "#07101f" },
-    { offset: 1, color: "#0d1c33" }
-  ],
-  horizon: { x: 0.5, y: 1.12, radius: 0.75, color: "#406eaa", alpha: 0.2 }
-};
-const FIRST_PASS = { apex: 253, radius: 608, lean: 20, direction: 1 };
-const PASS_TIMING = { startProgress: 0.3, fadeShare: 0.12, marginPx: 40 };
-const LIGHT = {
-  coreRadius: 2.6,
-  glow: { radius: 14, alpha: 0.8 },
-  bloom: { radius: 40, alpha: 0.35 },
-  tail: { width: 1.7, length: 170, alpha: 0.85, dashScale: 0.75 }
-};
-const STARS = {
-  seed: 7,
-  count: 64,
-  clearRadius: 80,
-  radius: { minimum: 0.35, maximum: 1.15 },
-  alpha: { minimum: 0.12, maximum: 0.54 },
-  twinkle: { depth: 0.22, rate: { minimum: 0.5, maximum: 1.5 } }
-};
-const STAR_COLOR = "#dbe6f2";
-
-/** The still is the design frame at this many pixels a point. */
-const EXTENDED_SCALE = 3;
-
-/**
- * The mark on its own: one satellite, on its own arc, filling a square.
- *
- * Its own numbers rather than a crop of the boot screen, because at the size
- * of a home screen a light a few points across in a phone-sized sky is a speck.
- * What it shares with the boot screen is everything else: the same night going
- * lighter towards the horizon, the same kind of arc with its centre below the
- * square, the same light made of the same fades.
- *
- * The one fade it does not share is the tail's. The overlay's spends most of a
- * tail's strength in its first half, which at sixty points across is a stub;
- * the icon's holds on further along so the arc still reads as an arc there.
- * The dashes are the overlay's pattern at `dashScale` pixels to its one.
- */
-const ICON = {
-  size: 1024,
-  night: [
-    { offset: 0, color: "#040811" },
-    { offset: 1, color: "#12284a" }
-  ],
-  horizon: { x: 0.5, y: 1.25, radius: 0.95, color: "#3f78c8", alpha: 0.26 },
-  /** The arc's centre as fractions of the square, and its radius in pixels. */
-  arc: { cx: 0.43, cy: 0.97, radius: 600 },
-  /** Past the top of the arc and heading down it, clockwise: tail behind, rising from the left. */
-  headDeg: -66,
-  sweepDeg: 58,
-  direction: 1,
-  coreRadius: 39,
-  glow: { radius: 172, alpha: 0.8 },
-  bloom: { radius: 368, alpha: 0.45 },
-  tail: { width: 15, alpha: 0.95, dashScale: 4.4 },
-  tailFade: [
-    { at: 0, strength: 1 },
-    { at: 0.35, strength: 0.7 },
-    { at: 0.75, strength: 0.25 },
-    { at: 1, strength: 0 }
-  ]
-};
-
-const round = (value) => Number(value.toFixed(2));
-const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
-
-function pointAt(cx, cy, radius, degrees) {
-  const radians = degrees * (Math.PI / 180);
-  return [cx + radius * Math.cos(radians), cy + radius * Math.sin(radians)];
+function markSvg() {
+  return logo.paths.map((path) => `    <path d="${path}" fill="${logo.color}"/>`).join("\n") +
+    `\n    <circle cx="${logo.dot.x}" cy="${logo.dot.y}" r="${logo.dot.radius}" fill="${logo.accent}"/>`;
 }
 
-/** `stretchOf`: the part of a polyline between two distances along it. */
-function stretchOf(points, from, to) {
-  const run = [];
-  let walked = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    const [x0, y0] = points[index - 1];
-    const [x1, y1] = points[index];
-    const step = Math.hypot(x1 - x0, y1 - y0);
-    const next = walked + step;
-    if (next >= from && step > 0) {
-      if (run.length === 0) {
-        const share = (from - walked) / step;
-        run.push([x0 + (x1 - x0) * share, y0 + (y1 - y0) * share]);
-      }
-      if (next >= to) {
-        const share = (to - walked) / step;
-        run.push([x0 + (x1 - x0) * share, y0 + (y1 - y0) * share]);
-        return run;
-      }
-      run.push([x1, y1]);
-    }
-    walked = next;
-  }
-  return run;
+function iconSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 ${logo.size} ${logo.size}">
+  <rect width="${logo.size}" height="${logo.size}" fill="${logo.background}"/>
+${markSvg()}
+</svg>
+`;
 }
 
-/** `dashedRuns`: the solid stretch from the head, then the dashes. */
-function dashedRuns(points, length, scale) {
-  const { solidShare, solidPx, dashPx, gapPx, dashGrowth, gapGrowth, maxDashes } = TAIL_DASH;
-  const spans = [[0, Math.min(length * solidShare, solidPx * scale)]];
-  let dash = dashPx * scale;
-  let gap = gapPx * scale;
-  let at = spans[0][1] + gap;
-  while (at < length && spans.length <= maxDashes) {
-    spans.push([at, Math.min(length, at + dash)]);
-    at += dash;
-    dash *= dashGrowth;
-    gap *= gapGrowth;
-    at += gap;
-  }
-  return spans.map(([from, to]) => stretchOf(points, from, to));
-}
-
-/**
- * A tail laid back along an arc from a head at `headDeg`, `length` long: the
- * arc as points, then broken into the runs that are stroked.
- */
-function tailOnArc(cx, cy, radius, headDeg, length, direction, dashScale) {
-  const sweepDeg = (length / radius) * (180 / Math.PI);
-  const steps = Math.max(16, Math.round(sweepDeg / 1.5));
-  const arc = [];
-  for (let step = 0; step <= steps; step += 1) {
-    arc.push(pointAt(cx, cy, radius, headDeg - direction * sweepDeg * (step / steps)));
-  }
-  return { runs: dashedRuns(arc, length, dashScale), tip: arc[arc.length - 1] };
-}
-
-function crossingDeg(cx, radius, x) {
-  return -Math.acos(clamp((x - cx) / radius, -1, 1)) * (180 / Math.PI);
-}
-
-/* ---- The boot screen, held still. ---------------------------------------- */
-
-/** `bootSkyScene`, `skyPass(scene, 0)` and `passPose` at `skyMoment(0)`, for the still's frame. */
-function bootStill() {
-  const scale = EXTENDED_SCALE;
-  const width = DESIGN.width * scale;
-  const height = DESIGN.height * scale;
-  const pass = FIRST_PASS;
-  const radius = pass.radius * scale;
-  const cx = (DESIGN.width / 2 + pass.lean) * scale;
-  const cy = (pass.apex + pass.radius) * scale;
-  const margin = PASS_TIMING.marginPx * scale;
-  const left = crossingDeg(cx, radius, -margin);
-  const right = crossingDeg(cx, radius, width + margin);
-  const [fromDeg, toDeg] = pass.direction === 1 ? [left, right] : [right, left];
-
-  const progress = PASS_TIMING.startProgress;
-  const edge = clamp(Math.min(progress, 1 - progress) / PASS_TIMING.fadeShare, 0, 1);
-  const pose = {
-    angleDeg: fromDeg + (toDeg - fromDeg) * progress + 90,
-    alpha: edge * edge * (3 - 2 * edge)
-  };
-
-  const [x, y] = pointAt(cx, cy, radius, -90);
-  const tail = tailOnArc(
-    cx,
-    cy,
-    radius,
-    -90,
-    LIGHT.tail.length * scale,
-    pass.direction,
-    LIGHT.tail.dashScale * scale
-  );
-
-  return {
-    width,
-    height,
-    scale,
-    pass: { cx, cy },
-    pose,
-    light: {
-      x,
-      y,
-      coreRadius: LIGHT.coreRadius * scale,
-      glow: { radius: LIGHT.glow.radius * scale, alpha: LIGHT.glow.alpha },
-      bloom: { radius: LIGHT.bloom.radius * scale, alpha: LIGHT.bloom.alpha },
-      tail: { ...tail, width: LIGHT.tail.width * scale, alpha: LIGHT.tail.alpha },
-      tailFade: FADES.tail
-    }
-  };
-}
-
-/** `starsFor`, with each star at the brightness `starAlpha` gives it on the first frame. */
-function stars(scale) {
-  let state = STARS.seed;
-  const random = () => (state = (state * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  const between = (range) => range.minimum + random() * (range.maximum - range.minimum);
-
-  const centreX = DESIGN.width / 2;
-  const centreY = DESIGN.height / 2;
-  const drawn = [];
-  for (let attempt = 0; attempt < STARS.count * 60 && drawn.length < STARS.count; attempt += 1) {
-    const x = random() * DESIGN.width;
-    const y = random() * DESIGN.height;
-    const radius = between(STARS.radius);
-    const alpha = between(STARS.alpha);
-    between(STARS.twinkle.rate);
-    const phase = random() * Math.PI * 2;
-    if (Math.hypot(x - centreX, y - centreY) < STARS.clearRadius) continue;
-    const { depth } = STARS.twinkle;
-    const shown = alpha * (1 - depth + depth * Math.sin(phase));
-    drawn.push(
-      `    <circle cx="${round(x * scale)}" cy="${round(y * scale)}" ` +
-        `r="${round(radius * scale)}" opacity="${round(shown)}"/>`
-    );
-  }
-  return drawn;
-}
-
-/* ---- SVG. ---------------------------------------------------------------- */
-
-function stopsSvg(fade, color) {
-  return fade
-    .map((stop) => `      <stop offset="${round(stop.at * 100)}%" stop-color="${color}" stop-opacity="${stop.strength}"/>`)
-    .join("\n");
-}
-
-/**
- * One light, as the four shapes every backend draws it with: bloom, glow, tail
- * and point, each filled or stroked with its fade. Gradients in user space, so
- * a light inside a turned group turns with its gradients.
- */
-function lightSvg(id, light, alpha, transform = "") {
-  const { x, y, tail } = light;
-  const path = tail.runs
-    .map((run) => `M ${run.map(([px, py]) => `${round(px)} ${round(py)}`).join(" L ")}`)
-    .join(" ");
-  const radial = (name, radius, fade, color) => `    <radialGradient id="${id}-${name}" gradientUnits="userSpaceOnUse" cx="${round(x)}" cy="${round(
-    y
-  )}" r="${round(radius)}">
-${stopsSvg(fade, color)}
-    </radialGradient>`;
-
-  const defs = `  <defs>
-${radial("bloom", light.bloom.radius, FADES.bloom, LIGHT_BLOOM)}
-${radial("glow", light.glow.radius, FADES.glow, LIGHT_COLOR)}
-${radial("core", light.coreRadius, FADES.core, LIGHT_COLOR)}
-    <linearGradient id="${id}-tail" gradientUnits="userSpaceOnUse" x1="${round(x)}" y1="${round(y)}" x2="${round(
-      tail.tip[0]
-    )}" y2="${round(tail.tip[1])}">
-${stopsSvg(light.tailFade, LIGHT_COLOR)}
-    </linearGradient>
-  </defs>`;
-
-  const shapes = `  <g${transform ? ` transform="${transform}"` : ""}>
-    <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.bloom.radius)}" fill="url(#${id}-bloom)" opacity="${round(
-      light.bloom.alpha * alpha
-    )}"/>
-    <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.glow.radius)}" fill="url(#${id}-glow)" opacity="${round(
-      light.glow.alpha * alpha
-    )}"/>
-    <path d="${path}" fill="none" stroke="url(#${id}-tail)" stroke-width="${round(tail.width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${round(tail.alpha * alpha)}"/>
-    <circle cx="${round(x)}" cy="${round(y)}" r="${round(light.coreRadius)}" fill="url(#${id}-core)" opacity="${round(alpha)}"/>
-  </g>`;
-
-  return `${defs}\n${shapes}`;
-}
-
-/** The composition: the boot screen's first frame, as `BootSky` draws it. */
+/** The drawn background and mark; BootScreen supplies the live word and bar. */
 function extendedSvg() {
-  const still = bootStill();
-  const { width, height, scale } = still;
-  const horizon = SKY.horizon;
-  const transform = `rotate(${round(still.pose.angleDeg)} ${round(still.pass.cx)} ${round(still.pass.cy)})`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  const frame = { width: BOOT_SKY_DESIGN.width * 3, height: BOOT_SKY_DESIGN.height * 3 };
+  const { night, stars } = bootSkyScene(frame);
+  const placement = bootLogo(frame);
+  const { horizon } = night;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${frame.width}" height="${frame.height}" viewBox="0 0 ${frame.width} ${frame.height}">
   <defs>
-    <linearGradient id="night" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${height}">
-${SKY.stops.map((stop) => `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}"/>`).join("\n")}
+    <linearGradient id="night" gradientUnits="userSpaceOnUse" x1="0" y1="${night.fromY}" x2="0" y2="${night.toY}">
+${night.stops.map((stop) => `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}"/>`).join("\n")}
     </linearGradient>
-    <radialGradient id="horizon" gradientUnits="userSpaceOnUse" cx="${round(horizon.x * width)}" cy="${round(
-      horizon.y * height
-    )}" r="${round(horizon.radius * height)}">
+    <radialGradient id="horizon" gradientUnits="userSpaceOnUse" cx="${horizon.x}" cy="${horizon.y}" r="${horizon.radius}">
       <stop offset="0%" stop-color="${horizon.color}" stop-opacity="${horizon.alpha}"/>
       <stop offset="100%" stop-color="${horizon.color}" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="${width}" height="${height}" fill="url(#night)"/>
-  <rect width="${width}" height="${height}" fill="url(#horizon)"/>
+  <rect width="${frame.width}" height="${frame.height}" fill="url(#night)"/>
+  <rect width="${frame.width}" height="${frame.height}" fill="url(#horizon)"/>
   <g id="stars" fill="${STAR_COLOR}">
-${stars(scale).join("\n")}
+${stars.map((star) => `    <circle cx="${round(star.x)}" cy="${round(star.y)}" r="${round(star.radius)}" opacity="${round(starAlpha(star, 0))}"/>`).join("\n")}
   </g>
-${lightSvg("pass", still.light, still.pose.alpha, transform)}
+  <g id="orbital-logo" transform="translate(${round(placement.x)} ${round(placement.y)}) scale(${round(placement.scale)})">
+${markSvg()}
+  </g>
 </svg>
 `;
 }
 
-/** The icon's light, placed in the square. */
-function iconLight() {
-  const S = ICON.size;
-  const cx = ICON.arc.cx * S;
-  const cy = ICON.arc.cy * S;
-  const [x, y] = pointAt(cx, cy, ICON.arc.radius, ICON.headDeg);
-  const length = ICON.arc.radius * ICON.sweepDeg * (Math.PI / 180);
-  const tail = tailOnArc(cx, cy, ICON.arc.radius, ICON.headDeg, length, ICON.direction, ICON.tail.dashScale);
-  return {
-    x,
-    y,
-    coreRadius: ICON.coreRadius,
-    glow: ICON.glow,
-    bloom: ICON.bloom,
-    tail: { ...tail, width: ICON.tail.width, alpha: ICON.tail.alpha },
-    tailFade: ICON.tailFade
-  };
+/** Flatten the master's M/C/Z paths for the small, dependency-free rasteriser. */
+function polygonFor(path) {
+  const tokens = path.match(/[A-Za-z]|-?\d+(?:\.\d+)?/g);
+  const points = [];
+  let current;
+  let at = 0;
+  const point = () => [Number(tokens[at++]), Number(tokens[at++])];
+  while (at < tokens.length) {
+    const command = tokens[at++];
+    if (command === "M") {
+      current = point();
+      points.push(current);
+    } else if (command === "C") {
+      const from = current;
+      const first = point();
+      const second = point();
+      const to = point();
+      for (let step = 1; step <= 128; step++) {
+        const t = step / 128;
+        const u = 1 - t;
+        points.push([0, 1].map((axis) =>
+          u ** 3 * from[axis] + 3 * u ** 2 * t * first[axis] +
+          3 * u * t ** 2 * second[axis] + t ** 3 * to[axis]));
+      }
+      current = to;
+    } else if (command !== "Z") {
+      throw new Error(`Unsupported logo path command: ${command}`);
+    }
+  }
+  return points;
 }
-
-function iconSvg(light) {
-  const S = ICON.size;
-  const { horizon } = ICON;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">
-  <defs>
-    <linearGradient id="night" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${S}">
-${ICON.night.map((stop) => `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}"/>`).join("\n")}
-    </linearGradient>
-    <radialGradient id="horizon" gradientUnits="userSpaceOnUse" cx="${round(horizon.x * S)}" cy="${round(
-      horizon.y * S
-    )}" r="${round(horizon.radius * S)}">
-      <stop offset="0%" stop-color="${horizon.color}" stop-opacity="${horizon.alpha}"/>
-      <stop offset="100%" stop-color="${horizon.color}" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="${S}" height="${S}" fill="url(#night)"/>
-  <rect width="${S}" height="${S}" fill="url(#horizon)"/>
-${lightSvg("light", light, 1)}
-</svg>
-`;
-}
-
-/* ---- PNG. ---------------------------------------------------------------- */
-
-/**
- * The icon again, as pixels. `app.json` names a PNG because that is all an iOS
- * asset catalogue takes, and an SVG nothing on the build machine can rasterise
- * is how `assets/icon.png` came to be a different picture from `assets/icon.svg`
- * for a while — the App Store showed the older one, and a new build did not
- * change that. Drawing both here is what keeps them one picture.
- *
- * The SVG is two gradient-filled rectangles and a light, and every one of those
- * is a formula per pixel, so a compositor that evaluates each layer's gradient
- * the way SVG defines it and lays it over the last is the whole renderer — the
- * one edge that needs antialiasing, the tail's, gets a coverage map from each
- * pixel's distance to the stroked runs.
- * Cheaper than a dependency, and it keeps the file's no-imports rule.
- */
 
 function rgb(hex) {
   const value = Number.parseInt(hex.slice(1), 16);
-  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
-/** A fade's strength `t` of the way along it, interpolated between its stops as SVG does. */
-function fadeAt(fade, t) {
-  if (t <= fade[0].at) return fade[0].strength;
-  for (let index = 1; index < fade.length; index += 1) {
-    const stop = fade[index];
-    if (t <= stop.at) {
-      const previous = fade[index - 1];
-      const share = (t - previous.at) / (stop.at - previous.at);
-      return previous.strength + (stop.strength - previous.strength) * share;
-    }
+/** Four-by-four subpixels keep both the 1024 master and README thumbnail crisp. */
+function iconPng(size) {
+  const samples = 4;
+  const highSize = size * samples;
+  const scale = highSize / logo.size;
+  const coverage = new Uint8Array(size * size);
+  const polygons = logo.paths.map(polygonFor);
+  const dot = Array.from({ length: 512 }, (_, index) => {
+    const angle = index / 512 * Math.PI * 2;
+    return [logo.dot.x + Math.cos(angle) * logo.dot.radius,
+      logo.dot.y + Math.sin(angle) * logo.dot.radius];
+  });
+  const pixels = Buffer.alloc(size * size * 3);
+  const background = rgb(logo.background);
+  for (let index = 0; index < pixels.length; index += 3) {
+    for (let channel = 0; channel < 3; channel++) pixels[index + channel] = background[channel];
   }
-  return fade[fade.length - 1].strength;
-}
-
-/**
- * Coverage of round-capped strokes of `width` along `runs`, in [0, 1] per pixel:
- * how far inside the stroke each pixel's centre is, a pixel's width of ramp at
- * the edge. Only the box around each segment is visited.
- */
-function strokeCoverage(size, runs, width) {
-  const coverage = new Float64Array(size * size);
-  const half = width / 2;
-  for (const run of runs) {
-    const segments = run.length > 1 ? run.length - 1 : 1;
-    for (let index = 0; index < segments; index += 1) {
-      const [x0, y0] = run[index];
-      const [x1, y1] = run[Math.min(index + 1, run.length - 1)];
-      const dx = x1 - x0;
-      const dy = y1 - y0;
-      const lengthSquared = dx * dx + dy * dy;
-      const fromX = Math.max(0, Math.floor(Math.min(x0, x1) - half - 1));
-      const toX = Math.min(size - 1, Math.ceil(Math.max(x0, x1) + half + 1));
-      const fromY = Math.max(0, Math.floor(Math.min(y0, y1) - half - 1));
-      const toY = Math.min(size - 1, Math.ceil(Math.max(y0, y1) + half + 1));
-      for (let y = fromY; y <= toY; y += 1) {
-        for (let x = fromX; x <= toX; x += 1) {
-          const px = x + 0.5 - x0;
-          const py = y + 0.5 - y0;
-          const t = lengthSquared > 0 ? clamp((px * dx + py * dy) / lengthSquared, 0, 1) : 0;
-          const distance = Math.hypot(px - t * dx, py - t * dy);
-          const covered = clamp(half - distance + 0.5, 0, 1);
-          const at = y * size + x;
-          if (covered > coverage[at]) coverage[at] = covered;
+  for (const [shapes, color] of [[polygons, logo.color], [[dot], logo.accent]]) {
+    coverage.fill(0);
+    for (const polygon of shapes) {
+      for (let y = 0; y < highSize; y++) {
+        const across = (y + 0.5) / scale;
+        const intersections = [];
+        for (let at = 0; at < polygon.length; at++) {
+          const a = polygon[at];
+          const b = polygon[(at + 1) % polygon.length];
+          if ((a[1] > across) !== (b[1] > across)) {
+            intersections.push((a[0] + (across - a[1]) * (b[0] - a[0]) / (b[1] - a[1])) * scale);
+          }
+        }
+        intersections.sort((a, b) => a - b);
+        for (let at = 0; at < intersections.length; at += 2) {
+          const from = Math.max(0, Math.ceil(intersections[at] - 0.5));
+          const to = Math.min(highSize, Math.ceil(intersections[at + 1] - 0.5));
+          for (let x = from; x < to; x++) coverage[Math.floor(y / samples) * size + Math.floor(x / samples)]++;
         }
       }
     }
-  }
-  return coverage;
-}
-
-/**
- * A little noise per pixel, the same on every run.
- *
- * Added before each channel is rounded to eight bits. A night that goes from
- * near-black to deep blue across a thousand pixels has fewer than fifty steps of
- * blue to spend on it, and without this they are bands a person can count.
- */
-function dither(x, y) {
-  let hash = Math.imul(x, 374761393) + Math.imul(y, 668265263);
-  hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
-  hash ^= hash >>> 16;
-  return (hash >>> 0) / 4294967296 - 0.5;
-}
-
-function iconPng(light) {
-  const S = ICON.size;
-  const colour = new Float64Array(S * S * 3);
-  const over = (index, [red, green, blue], alpha) => {
-    if (!(alpha > 0)) return;
-    colour[index] += (red - colour[index]) * alpha;
-    colour[index + 1] += (green - colour[index + 1]) * alpha;
-    colour[index + 2] += (blue - colour[index + 2]) * alpha;
-  };
-
-  const top = rgb(ICON.night[0].color);
-  const bottom = rgb(ICON.night[1].color);
-  const horizon = { ...ICON.horizon, x: ICON.horizon.x * S, y: ICON.horizon.y * S, radius: ICON.horizon.radius * S };
-  const tail = strokeCoverage(S, light.tail.runs, light.tail.width);
-  const [tipX, tipY] = light.tail.tip;
-  const alongX = tipX - light.x;
-  const alongY = tipY - light.y;
-  const alongSquared = alongX * alongX + alongY * alongY;
-  const radial = (index, px, py, radius, fade, color, alpha) => {
-    const distance = Math.hypot(px - light.x, py - light.y);
-    if (distance < radius) over(index, color, alpha * fadeAt(fade, distance / radius));
-  };
-  const white = rgb(LIGHT_COLOR);
-  const bloom = rgb(LIGHT_BLOOM);
-  const breath = rgb(horizon.color);
-
-  for (let y = 0; y < S; y += 1) {
-    const py = y + 0.5;
-    const t = py / S;
-    const night = top.map((channel, index) => channel + (bottom[index] - channel) * t);
-    for (let x = 0; x < S; x += 1) {
-      const px = x + 0.5;
-      const index = (y * S + x) * 3;
-      colour[index] = night[0];
-      colour[index + 1] = night[1];
-      colour[index + 2] = night[2];
-
-      const fromHorizon = Math.hypot(px - horizon.x, py - horizon.y) / horizon.radius;
-      if (fromHorizon < 1) over(index, breath, horizon.alpha * (1 - fromHorizon));
-
-      radial(index, px, py, light.bloom.radius, FADES.bloom, bloom, light.bloom.alpha);
-      radial(index, px, py, light.glow.radius, FADES.glow, white, light.glow.alpha);
-
-      const covered = tail[y * S + x];
-      if (covered > 0) {
-        const along = clamp(((px - light.x) * alongX + (py - light.y) * alongY) / alongSquared, 0, 1);
-        over(index, white, Math.min(1, covered) * light.tail.alpha * fadeAt(light.tailFade, along));
-      }
-
-      radial(index, px, py, light.coreRadius, FADES.core, white, 1);
-    }
-  }
-
-  const pixels = Buffer.alloc(S * S * 3);
-  for (let y = 0; y < S; y += 1) {
-    for (let x = 0; x < S; x += 1) {
-      const index = (y * S + x) * 3;
-      const noise = dither(x, y);
-      for (let channel = 0; channel < 3; channel += 1) {
-        pixels[index + channel] = clamp(Math.round(colour[index + channel] + noise), 0, 255);
+    const ink = rgb(color);
+    for (let index = 0; index < coverage.length; index++) {
+      const alpha = Math.min(1, coverage[index] / (samples * samples));
+      if (alpha === 0) continue;
+      for (let channel = 0; channel < 3; channel++) {
+        const offset = index * 3 + channel;
+        pixels[offset] = Math.round(pixels[offset] + (ink[channel] - pixels[offset]) * alpha);
       }
     }
   }
-  return encodePng(S, pixels);
+  return encodePng(size, pixels);
 }
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
@@ -618,14 +198,12 @@ function encodePng(size, pixels) {
   ]);
 }
 
-const light = iconLight();
-const assets = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
-for (const [name, contents] of [
-  ["icon.svg", iconSvg(light)],
-  ["icon.png", iconPng(light)],
-  ["logo-extended.svg", extendedSvg()]
+for (const [file, contents] of [
+  ["assets/icon.svg", iconSvg()],
+  ["assets/icon.png", iconPng(1024)],
+  ["assets/logo-extended.svg", extendedSvg()],
+  ["docs/readme/icon.png", iconPng(192)]
 ]) {
-  const out = join(assets, name);
-  writeFileSync(out, contents);
-  console.log(`wrote ${out}`);
+  writeFileSync(join(root, file), contents);
+  console.log(`wrote ${file}`);
 }
