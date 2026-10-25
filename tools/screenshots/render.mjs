@@ -4,17 +4,17 @@
  *     node tools/screenshots/render.mjs              # every language
  *     node tools/screenshots/render.mjs --locale it  # just that one
  *
- * One set per storefront language, and all of them by default. English writes
- * `docs/app-store/`, every other locale writes `docs/app-store/<locale>/`, and
- * the list is the one the app itself speaks.
+ * One set per storefront language and size, and all of them by default.
+ * `docs/app-store/<size>/<locale>/` holds each set, and the list of locales is
+ * the one the app itself speaks.
  *
  * Two passes, and the split is the point. The phone screen is rendered on its
  * own at the device scale factor a 6.9-inch iPhone actually has, so every panel
  * is rasterised at the size the phone rasterises it — text included — rather
  * than being drawn small and scaled up. The store frame is then composed around
  * that image at full resolution: caption, background, and the screen laid into
- * it. Output is 1290 x 2796, which is the size App Store Connect takes for the
- * 6.7 and 6.9-inch classes and downscales for everything below them.
+ * it. Output covers the 6.1 and 6.3-inch slots at 1179 x 2556 and
+ * 1206 x 2622.
  *
  * The camera picture behind the markers is drawn rather than photographed —
  * see `page/sky.js`. Put a real capture at
@@ -102,8 +102,8 @@ let t = null;
 /** Where `capture.mjs` left its photographs of the running app for it. */
 let captures = null;
 /**
- * English keeps the directory it has always had, so the six paths the listing
- * already points at do not move; every other language gets one beside it.
+ * Each size has a directory named for its pixels; locale directories sit
+ * inside it when needed.
  */
 let outDir = null;
 /** The eight points of the compass, in that language. */
@@ -112,6 +112,13 @@ let COMPASS_POINTS = null;
 /** Switches the frame being drawn to one of `SIZES`. */
 function selectSize(size) {
   FRAME = size;
+  SCREEN_IN_FRAME_PX = Math.round(1090 * FRAME.height / 2796);
+  DEVICE_SCALE = SCREEN_IN_FRAME_PX / SCREEN.width;
+  RAIL_PX = pt(2.6);
+  BEZEL_PX = pt(4.2);
+  RADIUS = { screen: pt(55), bezel: pt(59.2), rail: pt(61.8) };
+  DEVICE_WIDTH = SCREEN_IN_FRAME_PX + 2 * (RAIL_PX + BEZEL_PX);
+  DEVICE_HEIGHT = Math.round(SCREEN.height * DEVICE_SCALE) + 2 * (RAIL_PX + BEZEL_PX);
   DEVICE_TOP = FRAME.height - DEVICE_HEIGHT - DEVICE_BOTTOM_GAP;
 }
 
@@ -126,16 +133,11 @@ async function selectLocale(next) {
 /**
  * Where this language's frames at this size go.
  *
- * English at the default size keeps the six paths the listing has always
- * pointed at; every other language is a directory beside them, and every other
- * size is a directory named for its pixels with the same shape inside it.
+ * Every size is stored in a directory named for its pixels.
  */
 function setOutDir() {
-  const base =
-    FRAME.id === DEFAULT_SIZE
-      ? join(root, "docs", "app-store")
-      : join(root, "docs", "app-store", FRAME.id);
-  outDir = locale === FALLBACK_LOCALE ? base : join(base, locale);
+  const base = join(root, "docs", "app-store", FRAME.id);
+  outDir = join(base, locale);
 }
 
 /**
@@ -201,23 +203,18 @@ function figureRows(figures) {
 /*
  * The store's frame, and the phone inside it.
  *
- * App Store Connect does not take one size for every slot: the 6.9-inch class
- * wants 1290 x 2796, and the 6.5 and 6.7-inch classes reject it and want
- * 1284 x 2778 (or 1242 x 2688). A set uploaded into the wrong slot comes back
+ * The currently targeted 6.1 and 6.3-inch slots accept 1206 x 2622 and
+ * 1179 x 2556. A set uploaded into the wrong slot comes back
  * as "the dimensions of one or more screenshots are not correct" and nothing
  * more specific than that.
  *
- * Both are drawn from the same captures, and neither resamples the phone
- * screen: it is laid in at its own 1090 pixels either way, and only the space
- * around it changes. Adding 1242 x 2688 is a line here.
+ * All sizes are drawn from the same captures. The complete phone scales with
+ * the frame height to preserve room for the caption above it.
  */
 const SIZES = [
-  { id: "1290x2796", width: 1290, height: 2796, slot: "6.9-inch" },
-  { id: "1284x2778", width: 1284, height: 2778, slot: "6.5 and 6.7-inch" }
+  { id: "1206x2622", width: 1206, height: 2622, slot: "6.3-inch" },
+  { id: "1179x2556", width: 1179, height: 2556, slot: "6.1-inch" }
 ];
-/** The one that keeps the paths the listing already points at. */
-const DEFAULT_SIZE = SIZES[0].id;
-
 let FRAME = SIZES[0];
 /** What the headline starts at, before the fitting below brings it down. */
 const TITLE_SIZE_PX = 78;
@@ -251,9 +248,14 @@ const VIEWPORT = {
   top: 50 - Math.min(1, SCREEN.height / PICTURE.height) * 50,
   bottom: 50 + Math.min(1, SCREEN.height / PICTURE.height) * 50
 };
-/** How wide the phone sits in the frame, and the scale that follows from it. */
-const SCREEN_IN_FRAME_PX = 1090;
-const DEVICE_SCALE = SCREEN_IN_FRAME_PX / SCREEN.width;
+/**
+ * Scale the phone with the frame height. The old 1090px width left too little
+ * room above the handset at these shorter screenshot sizes, so its top edge
+ * covered the caption. Keeping the 6.9-inch composition's proportions gives
+ * the title and description their original clear space.
+ */
+let SCREEN_IN_FRAME_PX = 0;
+let DEVICE_SCALE = 0;
 
 /** Screen points to frame pixels, which is how every part of the phone is sized. */
 const pt = (points) => Math.round(points * DEVICE_SCALE);
@@ -265,18 +267,17 @@ const pt = (points) => Math.round(points * DEVICE_SCALE);
  * the eye reads as "a phone" is the corner radius and the island, and a fat
  * bezel at this scale reads as a case.
  */
-const RAIL_PX = pt(2.6);
-const BEZEL_PX = pt(4.2);
-const RADIUS = { screen: pt(55), bezel: pt(59.2), rail: pt(61.8) };
-
-const DEVICE_WIDTH = SCREEN_IN_FRAME_PX + 2 * (RAIL_PX + BEZEL_PX);
-const DEVICE_HEIGHT = Math.round(SCREEN.height * DEVICE_SCALE) + 2 * (RAIL_PX + BEZEL_PX);
+let RAIL_PX = 0;
+let BEZEL_PX = 0;
+let RADIUS = null;
+let DEVICE_WIDTH = 0;
+let DEVICE_HEIGHT = 0;
 /**
  * How much frame is left under the phone. The caption takes what is left above,
  * so a shorter frame moves the phone up rather than cropping it.
  */
 const DEVICE_BOTTOM_GAP = 13;
-let DEVICE_TOP = FRAME.height - DEVICE_HEIGHT - DEVICE_BOTTOM_GAP;
+let DEVICE_TOP = 0;
 
 /*
  * The headless shell first, and it matters which.
@@ -864,24 +865,20 @@ const clockFor = (scene) =>
 /**
  * Fails if a captured screen is not exactly the size the frame lays it in.
  *
- * The whole pipeline is built so the phone screen is rasterised once, at the
- * size it is shown, and never resampled: the browser captures at a device scale
- * factor of 1090/430 rather than the phone's 3, and the frame then draws that
- * image at its own pixel size. A capture of any other size still *works* — the
- * browser will scale it and the text goes soft — so nothing would fail, and the
- * listing would quietly get blurrier. Hence this.
+ * The app capture is rasterised once at its native frame size. The finished
+ * phone is then scaled uniformly with the store frame to preserve the caption
+ * area while keeping the handset fully visible.
  */
 function assertNativeSize(file) {
   const png = readFileSync(file);
   // IHDR is the first chunk: width and height as big-endian 32-bit, at byte 16.
   const width = png.readUInt32BE(16);
   const height = png.readUInt32BE(20);
-  const wanted = { width: SCREEN_IN_FRAME_PX, height: Math.round(SCREEN.height * DEVICE_SCALE) };
+  const wanted = { width: 1090, height: Math.round(SCREEN.height * 1090 / SCREEN.width) };
   if (width !== wanted.width || height !== wanted.height) {
     throw new Error(
-      `${relative(root, file)} is ${width}x${height}, and the frame lays it in at ` +
-        `${wanted.width}x${wanted.height}. Scaling it would soften the panels; ` +
-        "recapture instead (the device scale factor in capture.mjs has to match DEVICE_SCALE here)."
+      `${relative(root, file)} is ${width}x${height}; expected the native app capture ` +
+        `${wanted.width}x${wanted.height}.`
     );
   }
 }

@@ -1,7 +1,7 @@
 # App Store screenshots
 
-Six frames for the iPhone listing, one set per storefront language, and the
-pipeline that makes them: `docs/app-store/`, from `tools/screenshots/`.
+Six frames for the iPhone listing, one set per storefront language and screen
+size, and the pipeline that makes them: `docs/app-store/`, from `tools/screenshots/`.
 
     npm run screenshots                            # every language
     npm run screenshots -- --locale it             # just that one
@@ -11,27 +11,27 @@ That is two steps, and they can be run apart:
     node tools/screenshots/capture.mjs   # photograph the running app
     node tools/screenshots/render.mjs    # lay the captions around it
 
-**Every language in one run.** English writes `docs/app-store/`, each other
-language a directory beside it. One invocation covers them all because the
+**Every language in one run.** Each size has a directory named for its pixels;
+inside it, English writes `en/` and each other language gets its own directory.
+One invocation covers them all because the
 expensive parts — Metro's first bundle, the segmentation model, the browser —
 are paid once however many sets come out, and because running the tool once per
 language is how the sets drifted apart before: only English had been captured
 from the app, and Italian was still the old hand-drawn mirror, with its own copy
 of the marker colours.
 
-**Two sizes, because App Store Connect will not take one.** The 6.9-inch slot
-wants **1290 × 2796** and the 6.5 and 6.7-inch slots reject it and want
-**1284 × 2778**; uploading the wrong one is answered with "the dimensions of one
+**Two sizes, for the 6.1 and 6.3-inch slots.** The 6.3-inch slot accepts
+**1206 × 2622** and the 6.1-inch slot accepts **1179 × 2556**; uploading the wrong one is answered with "the dimensions of one
 or more screenshots are not correct" and nothing more specific. So a run draws
 both:
 
-    docs/app-store/              1290 × 2796, English
-    docs/app-store/it/           1290 × 2796, Italian
-    docs/app-store/1284x2778/    and the same again, one size down
+    docs/app-store/1206x2622/en/ 1206 × 2622, English
+    docs/app-store/1206x2622/it/ 1206 × 2622, Italian
+    docs/app-store/1179x2556/en/ and the same again, one size down
 
-Neither is a resize of the other. The phone screen is laid into both at its own
-1090 pixels and only the space around it changes, so no capture is ever
-resampled. A third size — 1242 × 2688, which those slots also accept — is one
+Neither is a resize of the other. The same native app capture is used in both;
+the phone is scaled uniformly with the frame height to keep the caption clear
+and the complete handset visible. A third size — 1242 × 2688, which those slots also accept — is one
 line in `SIZES`. Stare targets iPhone only (`ios.supportsTablet: false` in `app.json`), so the listing uses iPhone screenshots.
 
 **The words inside the phone are the app's own.** The filter's categories, the

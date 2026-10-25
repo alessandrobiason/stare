@@ -26,9 +26,8 @@ beforeEach(() => {
   for (const locale of ["en", "it"]) {
     put(`src/i18n/strings/${locale}.ts`, "");
     put(`tools/screenshots/.capture/${locale}/02-tap.png`, png(1090, Math.round(932 * 1090 / 430)));
-    for (const [width, height] of [[1290, 2796], [1284, 2778]]) {
-      const size = width === 1290 ? "" : `${width}x${height}/`;
-      put(`docs/app-store/${size}${locale === "en" ? "" : "it/"}02-tap.png`, png(width, height));
+    for (const [width, height] of [[1206, 2622], [1179, 2556]]) {
+      put(`docs/app-store/${width}x${height}/${locale}/02-tap.png`, png(width, height));
     }
   }
 });
@@ -46,11 +45,11 @@ test("blocks a renderer fallback when an app capture is missing", () => {
 });
 
 test("blocks the wrong App Store dimensions and incomplete language sets", () => {
-  put("docs/app-store/1284x2778/it/02-tap.png", png(1290, 2796));
+  put("docs/app-store/1179x2556/it/02-tap.png", png(1206, 2622));
   const result = check();
   expect(result.status).not.toBe(0);
-  expect(result.stderr).toContain("1284 × 2778");
-  rmSync(join(directory, "docs/app-store/1284x2778/it/02-tap.png"));
+  expect(result.stderr).toContain("1179 × 2556");
+  rmSync(join(directory, "docs/app-store/1179x2556/it/02-tap.png"));
   expect(check().status).not.toBe(0);
 });
 
